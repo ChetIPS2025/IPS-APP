@@ -54,6 +54,16 @@ _EQUIPMENT_MISSING_MSG = (
     "Equipment lines cannot be saved yet — run sql/090_create_estimate_equipment.sql "
     "(or sql/067_estimate_costing.sql) in Supabase, then refresh the app."
 )
+_OTHER_COSTS_TABLE = "estimate_other_costs"
+_OTHER_COSTS_MISSING_MSG = (
+    "Other costs cannot be saved yet — run sql/115_create_estimate_other_costs.sql in Supabase, "
+    "then refresh the app."
+)
+_SUBCONTRACTORS_TABLE = "estimate_subcontractors"
+_SUBCONTRACTORS_MISSING_MSG = (
+    "Subcontractor lines cannot be saved yet — run sql/067_estimate_costing.sql in Supabase, "
+    "then refresh the app."
+)
 _equipment_uses_line_items: bool | None = None
 
 
@@ -816,9 +826,18 @@ def delete_estimate_labor(line_id: str, *, estimate_id: str = "") -> ServiceResu
     return result
 
 
-def _add_line(table: str, estimate_id: str, payload: dict[str, Any], *, recalc: bool = True) -> ServiceResult:
+def _add_line(
+    table: str,
+    estimate_id: str,
+    payload: dict[str, Any],
+    *,
+    recalc: bool = True,
+    missing_table_msg: str | None = None,
+) -> ServiceResult:
     payload = {**payload, "estimate_id": _str(estimate_id)}
     result = insert_row(table, payload)
+    if not result.ok and missing_table_msg and result.error and _is_missing_table_message(result.error):
+        return ServiceResult(ok=False, error=missing_table_msg)
     if result.ok and recalc:
         recalculate_and_save_estimate_totals(_str(estimate_id))
     return result
@@ -1020,7 +1039,12 @@ def add_estimate_subcontractor(estimate_id: str, data: dict[str, Any]) -> Servic
         "notes": _str(data.get("notes")),
         "sort_order": _next_sort_order(existing),
     }
-    return _add_line("estimate_subcontractors", estimate_id, payload)
+    return _add_line(
+        _SUBCONTRACTORS_TABLE,
+        estimate_id,
+        payload,
+        missing_table_msg=_SUBCONTRACTORS_MISSING_MSG,
+    )
 
 
 def update_estimate_subcontractor(line_id: str, data: dict[str, Any]) -> ServiceResult:
@@ -1056,7 +1080,12 @@ def add_estimate_other_cost(estimate_id: str, data: dict[str, Any]) -> ServiceRe
         "notes": _str(data.get("notes")),
         "sort_order": _next_sort_order(existing),
     }
-    return _add_line("estimate_other_costs", estimate_id, payload)
+    return _add_line(
+        _OTHER_COSTS_TABLE,
+        estimate_id,
+        payload,
+        missing_table_msg=_OTHER_COSTS_MISSING_MSG,
+    )
 
 
 def update_estimate_other_cost(line_id: str, data: dict[str, Any]) -> ServiceResult:
