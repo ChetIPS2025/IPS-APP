@@ -10,6 +10,7 @@ from app.services.repository import (
     ServiceResult,
     clear_all_data_caches,
     delete_row,
+    fetch_by_id,
     fetch_rows,
     insert_row,
     update_row,
@@ -1351,14 +1352,14 @@ def resolve_category_markup_defaults(estimate: dict[str, Any]) -> dict[str, floa
 
 def _markup_defaults_for_estimate_id(estimate_id: str) -> dict[str, float]:
     eid = _str(estimate_id)
-    rows, _ = fetch_rows("estimates", match={"id": eid}, limit=1, use_admin=True)
-    if not rows:
+    row = fetch_by_id("estimates", eid)
+    if not row:
         return {cat: 0.0 for cat in _MARKUP_CATEGORIES}
     try:
         from app.services.phase2_modules_service import normalize_estimate
     except ImportError:
         from services.phase2_modules_service import normalize_estimate  # type: ignore
-    est = normalize_estimate(rows[0])
+    est = normalize_estimate(row)
     return resolve_category_markup_defaults(est)
 
 
@@ -1504,8 +1505,7 @@ def save_category_markup_settings(
         from services.phase2_modules_service import _estimate_json_category_markups_patch  # type: ignore
 
     cols = table_column_names("estimates")
-    existing_rows, _ = fetch_rows("estimates", match={"id": eid}, limit=1, use_admin=True)
-    existing = existing_rows[0] if existing_rows else {}
+    existing = fetch_by_id("estimates", eid) or {}
 
     normalized: dict[str, float] = {}
     for cat in _MARKUP_CATEGORIES:
@@ -1548,8 +1548,7 @@ def save_global_markup_settings(
         from services.phase2_modules_service import _estimate_json_markup_patch  # type: ignore
 
     cols = table_column_names("estimates")
-    existing_rows, _ = fetch_rows("estimates", match={"id": eid}, limit=1, use_admin=True)
-    existing = existing_rows[0] if existing_rows else {}
+    existing = fetch_by_id("estimates", eid) or {}
 
     payload: dict[str, Any] = {}
     for key in _MARKUP_DEFAULT_FIELDS:

@@ -1332,10 +1332,10 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
     existing: dict[str, Any] = {}
     if row_id:
         try:
-            rows = fetch_rows("estimates", match={"id": row_id}, limit=1, use_admin=True)
-            existing = rows[0] if rows else {}
-        except Exception:
-            existing = {}
+            from app.services.repository import fetch_by_id
+        except ImportError:
+            from services.repository import fetch_by_id  # type: ignore
+        existing = fetch_by_id("estimates", row_id) or {}
 
     if "scope_of_work" in ui:
         scope_text = str(ui.get("scope_of_work") or "").strip()
