@@ -5,6 +5,8 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
+from app.services.repository import ServiceResult
+from app.services.estimate_job_workflow_service import award_job_and_sync_estimate
 from app.services.job_from_estimate import (
     _estimate_pending_job_is_orphan,
     _job_has_stale_estimate_link,
@@ -43,6 +45,37 @@ class TestEstimateLinkedJobs(unittest.TestCase):
         self.assertFalse(
             _job_has_stale_estimate_link({"id": "job-a", "estimate_id": "est-old"})
         )
+
+    @patch("app.services.estimate_job_workflow_service.sync_estimate_job_links_and_financials")
+    @patch("app.services.estimate_job_workflow_service._fetch_job_row")
+    def test_award_job_and_sync_estimate(
+        self,
+        fetch_job_mock,
+        sync_mock,
+    ) -> None:
+        fetch_job_mock.return_value = {
+            "id": "job-1",
+            "job_number": "J26070",
+            "status": "Estimate Pending",
+        }
+        sync_mock.return_value = ServiceResult(
+            ok=True,
+            data={
+                "estimate_id": "est-1",
+                "job_patch": {"awarded_amount": 10330.0, "estimate_id": "est-1"},
+                "customer_price": 10330.0,
+            },
+        )
+
+        result = award_job_and_sync_estimate("job-1", new_status="Awarded")
+
+        self.assertTrue(result.ok)
+        sync_mock.assert_called_once()
+        call_kwargs = sync_mock.call_args.kwargs
+        self.assertEqual(call_kwargs.get("job_id"), "job-1")
+        self.assertFalse(call_kwargs.get("persist_job"))
+        self.assertTrue(call_kwargs.get("skip_if_no_estimate"))
+
 
 if __name__ == "__main__":
     unittest.main()

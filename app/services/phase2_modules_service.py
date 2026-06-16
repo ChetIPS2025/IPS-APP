@@ -1317,7 +1317,40 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
             payload["location"] = str(ui.get("location") or "").strip()
 
     if row_id:
-        return update_row("jobs", payload, {"id": row_id})
+        try:
+            from app.db import fetch_one
+        except ImportError:
+            from db import fetch_one  # type: ignore
+        try:
+            from app.services.estimate_job_workflow_service import award_job_and_sync_estimate
+            from app.services.jobs_service import normalize_job_status
+        except ImportError:
+            from services.estimate_job_workflow_service import award_job_and_sync_estimate  # type: ignore
+            from services.jobs_service import normalize_job_status  # type: ignore
+
+        prior = fetch_one("jobs", {"id": row_id}) or {}
+        new_status = normalize_job_status(ui.get("status") or prior.get("status"))
+        old_status = normalize_job_status(prior.get("status"))
+        awarded_missing = _money_field(prior, "awarded_amount") <= 0
+        if new_status in {"Awarded", "Active"} and (old_status != new_status or awarded_missing):
+            sync = award_job_and_sync_estimate(
+                row_id,
+                new_status=new_status,
+                job_row={**prior, **payload},
+            )
+            if not sync.ok:
+                return sync
+            sync_data = sync.data if isinstance(sync.data, dict) else {}
+            if sync_data.get("skipped"):
+                pass
+            else:
+                job_patch = sync_data.get("job_patch") or {}
+                if isinstance(job_patch, dict):
+                    payload.update(job_patch)
+        result = update_row("jobs", payload, {"id": row_id})
+        if result.ok:
+            clear_all_data_caches()
+        return result
     return insert_row("jobs", payload)
 
 

@@ -219,7 +219,7 @@ def update_job_status(
     old_status = normalize_job_status(current_row.get("status"))
     if old_status in {"Deleted", "Archived"}:
         return ServiceResult(ok=False, error="Archived jobs cannot be updated.")
-    if old_status == status:
+    if old_status == status and status not in {"Awarded", "Active"}:
         return ServiceResult(ok=True, data={"status": status})
 
     actor = str(changed_by or _current_user_id() or "").strip() or None
@@ -239,6 +239,25 @@ def update_job_status(
         reason_text = str(reason or "").strip()
         if reason_text:
             payload["cancellation_reason"] = reason_text
+
+    if status in {"Awarded", "Active"}:
+        try:
+            from app.services.estimate_job_workflow_service import award_job_and_sync_estimate
+        except ImportError:
+            from services.estimate_job_workflow_service import award_job_and_sync_estimate  # type: ignore
+
+        sync = award_job_and_sync_estimate(
+            jid,
+            new_status=status,
+            approved_by=actor,
+            job_row=current_row,
+        )
+        if not sync.ok:
+            return sync
+        sync_data = sync.data if isinstance(sync.data, dict) else {}
+        job_patch = sync_data.get("job_patch") or {}
+        if isinstance(job_patch, dict):
+            payload.update(job_patch)
 
     result = update_row("jobs", payload, {"id": jid})
     if not result.ok:

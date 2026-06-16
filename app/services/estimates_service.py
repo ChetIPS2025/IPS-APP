@@ -67,6 +67,8 @@ from app.services.phase2_modules_service import (
 )
 from app.services.estimate_job_workflow_service import (
     approve_estimate_and_job,
+    approve_estimate_and_sync_job,
+    award_job_and_sync_estimate,
     can_approve_estimates,
     can_revise_approved_estimates,
     estimate_status_approvable,
@@ -76,6 +78,8 @@ from app.services.estimate_job_workflow_service import (
     estimate_visible_in_draft_view,
     estimate_visible_in_rejected_view,
     estimate_visible_in_sent_view,
+    sync_estimate_job_links_and_financials,
+    sync_linked_estimate_on_job_award,
 )
 from app.services.estimate_revision_service import (
     begin_approved_estimate_revision,
@@ -115,6 +119,9 @@ __all__ = [
     "add_estimate_travel",
     "add_estimate_travel_batch",
     "approve_estimate_and_job",
+    "approve_estimate_and_sync_job",
+    "sync_estimate_job_links_and_financials",
+    "sync_linked_estimate_on_job_award",
     "calculate_estimate_totals",
     "can_approve_estimates",
     "can_revise_approved_estimates",

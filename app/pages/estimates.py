@@ -69,7 +69,7 @@ try:
     from app.pages._core._crud import is_demo_id
     from app.pages._core._session import select_key
     from app.services.estimates_service import (
-        approve_estimate_and_job,
+        approve_estimate_and_sync_job,
         begin_approved_estimate_revision,
         cancel_approved_estimate_revision,
         complete_approved_estimate_revision,
@@ -160,7 +160,7 @@ except ImportError:
     from pages._core._crud import is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
     from services.estimates_service import (  # type: ignore
-        approve_estimate_and_job,
+        approve_estimate_and_sync_job,
         begin_approved_estimate_revision,
         cancel_approved_estimate_revision,
         complete_approved_estimate_revision,
@@ -951,7 +951,7 @@ def _render_approve_confirmation_panel(rows_by_id: dict[str, dict]) -> None:
     b1, b2, _ = st.columns([1, 1, 3], gap="small")
     with b1:
         if st.button("Approve Job", key=f"est_confirm_approve_{eid}", type="primary", use_container_width=True):
-            res = approve_estimate_and_job(eid)
+            res = approve_estimate_and_sync_job(eid)
             if res.ok:
                 try:
                     from app.services.phase2_modules_service import clear_all_data_caches

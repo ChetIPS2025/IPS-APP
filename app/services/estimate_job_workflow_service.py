@@ -75,6 +75,7 @@ _LOG = logging.getLogger(__name__)
 
 JOB_STATUS_ESTIMATE_PENDING = "Estimate Pending"
 JOB_STATUS_AFTER_ESTIMATE_APPROVAL = "Active"
+JOB_AWARD_SYNC_STATUSES: FrozenSet[str] = frozenset({"Awarded", "Active"})
 
 ESTIMATE_STATUSES_APPROVABLE: FrozenSet[str] = frozenset({"draft", "pending", "sent"})
 ESTIMATE_STATUSES_ALREADY_APPROVED: FrozenSet[str] = frozenset(
@@ -215,6 +216,44 @@ def _fetch_job_row(job_id: str) -> dict[str, Any] | None:
         limit=1,
     )
     return rows[0] if rows else None
+
+
+def _linked_estimate_row_for_job(job: dict[str, Any]) -> dict[str, Any] | None:
+    """Resolve an existing estimate linked by ``jobs.estimate_id`` or ``estimates.job_id``."""
+    jid = str(job.get("id") or "").strip()
+    eid = str(job.get("estimate_id") or "").strip()
+    if eid:
+        row = _fetch_estimate_row_for_create(eid)
+        if row:
+            return row
+    if jid:
+        rows = fetch_by_match_admin("estimates", {"job_id": jid}, limit=5)
+        if rows:
+            return rows[0]
+    return None
+
+
+def _estimate_financial_totals(row: dict[str, Any]) -> tuple[float, float]:
+    """Return (customer_price, internal_cost) for a linked estimate row."""
+    try:
+        from app.services.estimate_revision_service import _estimate_customer_price
+    except ImportError:
+        from services.estimate_revision_service import _estimate_customer_price  # type: ignore
+
+    customer_price = float(_estimate_customer_price(row) or 0)
+    internal_cost = 0.0
+    eid = str(row.get("id") or "").strip()
+    if eid:
+        try:
+            from app.services.estimate_costing_service import calculate_estimate_totals
+        except ImportError:
+            from services.estimate_costing_service import calculate_estimate_totals  # type: ignore
+        try:
+            totals = calculate_estimate_totals(eid)
+            internal_cost = float(totals.get("total_cost") or 0)
+        except Exception:
+            pass
+    return customer_price, internal_cost
 
 
 def _sync_linked_job_row(
@@ -522,12 +561,12 @@ def auto_create_linked_job_after_estimate_insert(
     return ensure_linked_pending_job_for_estimate(estimate_id, estimate_row=estimate_row)
 
 
-def approve_estimate_and_job(
+def approve_estimate_and_sync_job(
     estimate_id: str,
     *,
     approved_by: str | None = None,
 ) -> ApproveEstimateResult:
-    """Approve estimate and activate its linked job (create job first if missing)."""
+    """Approve estimate and sync its linked job (create job first if missing)."""
     eid = str(estimate_id or "").strip()
     if not eid:
         return ApproveEstimateResult(ok=False, message="Invalid estimate id.", error_code="invalid_id")
@@ -562,7 +601,6 @@ def approve_estimate_and_job(
         )
 
     actor = str(approved_by or current_user_profile_id() or "").strip() or None
-    now = _utc_now_iso()
 
     job = _existing_job_for_estimate(eid, row)
     if not job:
@@ -580,68 +618,227 @@ def approve_estimate_and_job(
     if not jid:
         return ApproveEstimateResult(ok=False, message="Linked job is missing an id.", error_code="no_job")
 
-    try:
-        from app.services.estimate_revision_service import _estimate_customer_price
-    except ImportError:
-        from services.estimate_revision_service import _estimate_customer_price  # type: ignore
-    approved_price = _estimate_customer_price(row)
-    job_fields: dict[str, Any] = {
-        "status": JOB_STATUS_AFTER_ESTIMATE_APPROVAL,
-        "estimate_id": eid,
-        "approved_at": now,
-        "approved_by": actor,
-        "updated_at": now,
-    }
-    if approved_price > 0:
-        job_fields["awarded_amount"] = round(approved_price, 2)
-
-    job_update = filter_payload_to_table("jobs", job_fields)
-    try:
-        update_rows_admin("jobs", job_update, {"id": jid})
-    except Exception as exc:
-        return ApproveEstimateResult(
-            ok=False,
-            message=f"Could not update linked job: {exc}",
-            error_code="job_update_failed",
-            job=job,
-        )
-
-    est_update = filter_payload_to_table(
-        "estimates",
-        {
-            "status": "Approved",
-            "job_id": jid,
-            "approved_at": now,
-            "approved_by": actor,
-            "converted_to_job_at": now,
-            "archived_from_estimates": True,
-            "updated_at": now,
-        },
+    sync = sync_estimate_job_links_and_financials(
+        estimate_id=eid,
+        job_id=jid,
+        estimate_row=row,
+        job_row=job,
+        approved_by=actor,
+        job_status=JOB_STATUS_AFTER_ESTIMATE_APPROVAL,
+        persist_job=True,
+        estimate_activity=("Estimate approved", f"Job {job_number_display(job.get('job_number'))}"),
+        job_activity=("Job approved from estimate", str(row.get("quote_number") or "")),
     )
-    try:
-        update_rows_admin("estimates", est_update, {"id": eid})
-    except Exception as exc:
+    if not sync.ok:
         return ApproveEstimateResult(
             ok=False,
-            message=f"Job updated but estimate approval failed: {exc}",
-            error_code="estimate_update_failed",
+            message=sync.error or "Could not sync estimate and job.",
+            error_code="sync_failed",
             job=job,
         )
 
-    updated_est = _fetch_estimate_row_for_create(eid)
-    updated_job = fetch_by_match_admin("jobs", {"id": jid}, limit=1)
-    job_row = updated_job[0] if updated_job else job
-
-    _log_estimate_activity(eid, "Estimate approved", details=f"Job {job_number_display(job_row.get('job_number'))}", actor_id=actor)
-    _log_job_activity(jid, "Job approved from estimate", details=str(row.get("quote_number") or ""), actor_id=actor)
-
-    jn = job_number_display(job_row.get("job_number"))
+    data = sync.data if isinstance(sync.data, dict) else {}
+    updated_est = data.get("estimate") or _fetch_estimate_row_for_create(eid)
+    updated_job = data.get("job") or job
+    jn = job_number_display(updated_job.get("job_number") if isinstance(updated_job, dict) else None)
     return ApproveEstimateResult(
         ok=True,
         message=f"Estimate approved and linked job {jn or jid} activated.",
         estimate=updated_est,
-        job=job_row,
+        job=updated_job,
     )
+
+
+def sync_estimate_job_links_and_financials(
+    *,
+    estimate_id: str = "",
+    job_id: str = "",
+    estimate_row: dict[str, Any] | None = None,
+    job_row: dict[str, Any] | None = None,
+    approved_by: str | None = None,
+    job_status: str | None = None,
+    persist_job: bool = False,
+    skip_if_no_estimate: bool = False,
+    skip_if_no_job: bool = False,
+    estimate_activity: tuple[str, str] | None = None,
+    job_activity: tuple[str, str] | None = None,
+) -> ServiceResult:
+    """
+    Shared sync: approve linked estimate (when eligible), ensure bidirectional links,
+    and align job financial fields with estimate totals.
+
+    Returns ``job_patch`` in ``data`` for callers that merge job updates (Jobs page award flow).
+    When ``persist_job`` is True, writes the job patch immediately (Estimates page approve flow).
+    """
+    eid = str(estimate_id or "").strip()
+    jid = str(job_id or "").strip()
+    est = estimate_row
+    job = job_row
+
+    if est is None and eid:
+        est = _fetch_estimate_row_for_create(eid)
+    if job is None and jid:
+        job = _fetch_job_row(jid)
+    if est is None and job:
+        est = _linked_estimate_row_for_job(job)
+        if est and not eid:
+            eid = str(est.get("id") or "").strip()
+    if job is None and est and eid:
+        job = _existing_job_for_estimate(eid, est)
+        if job and not jid:
+            jid = str(job.get("id") or "").strip()
+
+    if skip_if_no_estimate and not est:
+        return ServiceResult(ok=True, data={"skipped": True, "reason": "no_linked_estimate"})
+    if skip_if_no_job and not job:
+        return ServiceResult(ok=True, data={"skipped": True, "reason": "no_linked_job"})
+
+    if not est:
+        return ServiceResult(ok=False, error="Estimate not found.")
+    if not job:
+        return ServiceResult(ok=False, error="Linked job not found.")
+
+    if not eid:
+        eid = str(est.get("id") or "").strip()
+    if not jid:
+        jid = str(job.get("id") or "").strip()
+    if not eid or not jid:
+        return ServiceResult(ok=False, error="Estimate and job must both have ids.")
+
+    if _norm_status(est.get("status")) in ESTIMATE_STATUSES_TERMINAL_NEGATIVE:
+        return ServiceResult(
+            ok=False,
+            error=f"Linked estimate cannot be approved (status {est.get('status')!r}).",
+        )
+
+    actor = str(approved_by or current_user_profile_id() or "").strip() or None
+    now = _utc_now_iso()
+    customer_price, internal_cost = _estimate_financial_totals(est)
+
+    already_approved = (
+        estimate_status_already_approved(est.get("status"))
+        or est.get("archived_from_estimates") is True
+    )
+
+    if not already_approved:
+        if not estimate_status_approvable(est.get("status")):
+            return ServiceResult(
+                ok=False,
+                error=f"Linked estimate status {est.get('status')!r} is not eligible for approval.",
+            )
+        est_update = filter_payload_to_table(
+            "estimates",
+            {
+                "status": "Approved",
+                "job_id": jid,
+                "approved_at": now,
+                "approved_by": actor,
+                "converted_to_job_at": now,
+                "archived_from_estimates": True,
+                "updated_at": now,
+            },
+        )
+        try:
+            update_rows_admin("estimates", est_update, {"id": eid})
+        except Exception as exc:
+            return ServiceResult(ok=False, error=f"Could not approve linked estimate: {exc}")
+        if estimate_activity:
+            _log_estimate_activity(eid, estimate_activity[0], details=estimate_activity[1], actor_id=actor)
+        est = _fetch_estimate_row_for_create(eid) or est
+
+    if str(est.get("job_id") or "").strip() != jid:
+        _link_estimate_to_job(eid, job, est)
+
+    job_patch: dict[str, Any] = {
+        "estimate_id": eid,
+        "updated_at": now,
+    }
+    if job_status:
+        job_patch["status"] = job_status
+    if customer_price > 0:
+        job_patch["awarded_amount"] = round(customer_price, 2)
+    if internal_cost > 0:
+        job_patch["estimated_cost"] = round(internal_cost, 2)
+    if actor:
+        job_patch.setdefault("approved_by", actor)
+    job_patch.setdefault("approved_at", now)
+
+    filtered_patch = filter_payload_to_table("jobs", job_patch)
+    if persist_job and filtered_patch:
+        try:
+            update_rows_admin("jobs", filtered_patch, {"id": jid})
+        except Exception as exc:
+            return ServiceResult(ok=False, error=f"Could not update linked job: {exc}")
+
+    quote = str(est.get("quote_number") or est.get("estimate_number") or "").strip()
+    if job_activity:
+        action, details = job_activity[0], (job_activity[1] if len(job_activity) > 1 else "") or quote
+        _log_job_activity(jid, action, details=details, actor_id=actor)
+    elif quote:
+        _log_job_activity(jid, "Job synced with linked estimate", details=quote, actor_id=actor)
+
+    updated_est = _fetch_estimate_row_for_create(eid) or est
+    updated_job_rows = fetch_by_match_admin("jobs", {"id": jid}, limit=1)
+    updated_job = updated_job_rows[0] if updated_job_rows else {**job, **filtered_patch}
+
+    return ServiceResult(
+        ok=True,
+        data={
+            "estimate_id": eid,
+            "job_id": jid,
+            "estimate": updated_est,
+            "job": updated_job,
+            "job_patch": filtered_patch,
+            "customer_price": customer_price,
+            "internal_cost": internal_cost,
+            "estimate_approved": not already_approved,
+            "quote_number": quote,
+        },
+    )
+
+
+def award_job_and_sync_estimate(
+    job_id: str,
+    *,
+    new_status: str,
+    approved_by: str | None = None,
+    job_row: dict[str, Any] | None = None,
+) -> ServiceResult:
+    """
+    When a job is set to Awarded/Active, approve its linked estimate (if any) and return
+    job column updates for the caller to merge. Preserves Awarded vs Active from the Jobs UI.
+    """
+    try:
+        from app.services.jobs_service import normalize_job_status
+    except ImportError:
+        from services.jobs_service import normalize_job_status  # type: ignore
+
+    status = normalize_job_status(new_status)
+    if status not in JOB_AWARD_SYNC_STATUSES:
+        return ServiceResult(ok=True, data={"skipped": True, "reason": "status_not_awarded"})
+
+    jid = str(job_id or "").strip()
+    job = job_row or _fetch_job_row(jid)
+    if not job:
+        return ServiceResult(ok=False, error="Job not found.")
+    if not jid:
+        jid = str(job.get("id") or "").strip()
+
+    jn = job_number_display(job.get("job_number"))
+    return sync_estimate_job_links_and_financials(
+        job_id=jid,
+        job_row=job,
+        approved_by=approved_by,
+        persist_job=False,
+        skip_if_no_estimate=True,
+        estimate_activity=("Estimate approved from job", f"Job {jn or jid} set to {status}"),
+        job_activity=("Job synced with linked estimate", ""),
+    )
+
+
+# Backward-compatible aliases
+approve_estimate_and_job = approve_estimate_and_sync_job
+sync_linked_estimate_on_job_award = award_job_and_sync_estimate
 
 
 def rollback_estimate_if_job_link_failed(estimate_id: str) -> None:

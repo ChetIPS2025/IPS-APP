@@ -14,7 +14,7 @@ try:
     from app.components.modal_delete import can_admin_mutate
     from app.pages._core._crud import is_demo_id
     from app.services.estimate_job_workflow_service import (
-        approve_estimate_and_job,
+        approve_estimate_and_sync_job,
         can_approve_estimates,
         estimate_status_approvable,
         estimate_visible_in_approved_view,
@@ -26,7 +26,7 @@ except ImportError:
     from components.modal_delete import can_admin_mutate  # type: ignore
     from pages._core._crud import is_demo_id  # type: ignore
     from services.estimate_job_workflow_service import (  # type: ignore
-        approve_estimate_and_job,
+        approve_estimate_and_sync_job,
         can_approve_estimates,
         estimate_status_approvable,
         estimate_visible_in_approved_view,
@@ -151,7 +151,7 @@ def render_estimate_action_buttons(
 
 
 def _handle_approve(estimate_id: str, on_approve: Callable[[], None] | None) -> bool:
-    res = approve_estimate_and_job(estimate_id)
+    res = approve_estimate_and_sync_job(estimate_id)
     if res.ok:
         clear_all_data_caches()
         st.success(res.message or "Estimate approved and linked job activated.")
