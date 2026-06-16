@@ -34,6 +34,10 @@ try:
         delete_estimate_travel,
         get_estimate_bundle,
         recalculate_and_save_estimate_totals,
+        resolve_global_markup_pct,
+        resolve_category_markup_defaults,
+        save_category_markup_settings,
+        save_global_markup_settings,
         update_estimate_labor,
     )
     from app.services.labor_rates_service import save_default_rates_from_lines
@@ -77,6 +81,10 @@ except ImportError:
         delete_estimate_travel,
         get_estimate_bundle,
         recalculate_and_save_estimate_totals,
+        resolve_global_markup_pct,
+        resolve_category_markup_defaults,
+        save_category_markup_settings,
+        save_global_markup_settings,
         update_estimate_labor,
     )
     from services.labor_rates_service import save_default_rates_from_lines  # type: ignore
@@ -2187,44 +2195,126 @@ def render_scope_of_work_tab(
             st.error(msg or "Could not save scope of work.")
 
 
-def render_markups_tab(est: dict[str, Any], *, persist_fn: Callable[[dict[str, Any], str], tuple[bool, str]]) -> None:
+def render_markups_tab(est: dict[str, Any]) -> None:
     eid = str(est.get("id") or "")
-    st.markdown("##### Default markups for new lines")
-    c1, c2 = st.columns(2)
-    with c1:
-        mat_mk = st.number_input("Material markup %", value=float(est.get("default_material_markup_pct") or 0), key=f"mk_mat_{eid}")
-        lab_mk = st.number_input("Labor markup %", value=float(est.get("default_labor_markup_pct") or 0), key=f"mk_lab_{eid}")
-        eq_mk = st.number_input("Equipment markup %", value=float(est.get("default_equipment_markup_pct") or 0), key=f"mk_eq_{eid}")
-        trv_mk = st.number_input("Travel markup %", value=float(est.get("default_travel_markup_pct") or 0), key=f"mk_trv_{eid}")
-    with c2:
-        sub_mk = st.number_input("Subcontractor markup %", value=float(est.get("default_subcontractor_markup_pct") or 0), key=f"mk_sub_{eid}")
-        oth_mk = st.number_input("Other markup %", value=float(est.get("default_other_markup_pct") or 0), key=f"mk_oth_{eid}")
-        tax_rate = st.number_input("Tax rate %", value=float(est.get("tax_rate") or 0), key=f"mk_tax_{eid}")
-    global_mk = st.number_input("Global markup %", value=float(est.get("global_markup_pct") or 0), key=f"mk_global_{eid}")
-    overhead = st.number_input("Overhead %", value=float(est.get("overhead_pct") or 0), key=f"mk_oh_{eid}")
-    profit = st.number_input("Profit %", value=float(est.get("profit_pct") or 0), key=f"mk_profit_{eid}")
+    current_mk = resolve_global_markup_pct(est)
+    category_defaults = resolve_category_markup_defaults(est)
 
-    if st.button("Save markup settings", key=f"mk_save_{eid}", type="primary"):
-        ok, msg = persist_fn(
-            {
-                "default_material_markup_pct": mat_mk,
-                "default_labor_markup_pct": lab_mk,
-                "default_equipment_markup_pct": eq_mk,
-                "default_travel_markup_pct": trv_mk,
-                "default_subcontractor_markup_pct": sub_mk,
-                "default_other_markup_pct": oth_mk,
-                "global_markup_pct": global_mk,
-                "overhead_pct": overhead,
-                "profit_pct": profit,
-                "tax_rate": tax_rate,
-            },
-            eid,
-        )
-        if ok:
-            recalculate_and_save_estimate_totals(eid)
-            st.success(msg or "Markup settings saved.")
+    st.markdown("##### Default Markup Settings")
+    st.caption("Price = Cost × (1 + Markup %). Example: 15% markup on $100 cost → $115 price.")
+    global_mk = st.number_input(
+        "Global markup %",
+        min_value=0.0,
+        value=float(current_mk),
+        step=0.01,
+        format="%.2f",
+        key=f"mk_global_{eid}",
+    )
+
+    if st.button("Save Default Markup", key=f"mk_save_default_{eid}"):
+        result = save_global_markup_settings(eid, global_mk, apply_to_existing_lines=False, recalculate=False)
+        if result.ok:
+            st.success("Default markup saved. New Cost Builder lines will use this markup.")
             st.rerun()
-        st.error(msg or "Could not save markup settings.")
+        else:
+            st.error(str(result.error or "Could not save default markup."))
+
+    apply_existing = st.checkbox(
+        "Apply to existing estimate lines",
+        key=f"mk_apply_existing_{eid}",
+        help="Update labor, equipment, travel, subcontractor, material, and other lines using saved markup defaults.",
+    )
+
+    if st.button("Save & Recalculate Estimate", key=f"mk_save_recalc_{eid}", type="primary"):
+        result = save_global_markup_settings(
+            eid,
+            global_mk,
+            apply_to_existing_lines=apply_existing,
+            recalculate=True,
+        )
+        if result.ok:
+            if apply_existing:
+                st.success("Markup applied to all lines and estimate totals recalculated.")
+            else:
+                st.success("Default markup saved and estimate totals recalculated.")
+            st.rerun()
+        else:
+            st.error(str(result.error or "Could not save markup settings."))
+
+    with st.expander("Advanced", expanded=False):
+        st.caption(
+            "Optional per-category defaults for new lines only. "
+            "When set, each category uses its own markup instead of the global default."
+        )
+        c1, c2 = st.columns(2)
+        with c1:
+            mat_mk = st.number_input(
+                "Material markup %",
+                min_value=0.0,
+                value=float(category_defaults["material"]),
+                step=0.01,
+                format="%.2f",
+                key=f"mk_adv_mat_{eid}",
+            )
+            lab_mk = st.number_input(
+                "Labor markup %",
+                min_value=0.0,
+                value=float(category_defaults["labor"]),
+                step=0.01,
+                format="%.2f",
+                key=f"mk_adv_lab_{eid}",
+            )
+            eq_mk = st.number_input(
+                "Equipment markup %",
+                min_value=0.0,
+                value=float(category_defaults["equipment"]),
+                step=0.01,
+                format="%.2f",
+                key=f"mk_adv_eq_{eid}",
+            )
+        with c2:
+            trv_mk = st.number_input(
+                "Travel markup %",
+                min_value=0.0,
+                value=float(category_defaults["travel"]),
+                step=0.01,
+                format="%.2f",
+                key=f"mk_adv_trv_{eid}",
+            )
+            sub_mk = st.number_input(
+                "Subcontractor markup %",
+                min_value=0.0,
+                value=float(category_defaults["subcontractor"]),
+                step=0.01,
+                format="%.2f",
+                key=f"mk_adv_sub_{eid}",
+            )
+            oth_mk = st.number_input(
+                "Other markup %",
+                min_value=0.0,
+                value=float(category_defaults["other"]),
+                step=0.01,
+                format="%.2f",
+                key=f"mk_adv_oth_{eid}",
+            )
+
+        if st.button("Save category markups", key=f"mk_save_advanced_{eid}"):
+            result = save_category_markup_settings(
+                eid,
+                {
+                    "material": mat_mk,
+                    "labor": lab_mk,
+                    "equipment": eq_mk,
+                    "travel": trv_mk,
+                    "subcontractor": sub_mk,
+                    "other": oth_mk,
+                },
+            )
+            if result.ok:
+                st.success("Category markup defaults saved.")
+                st.rerun()
+            else:
+                st.error(str(result.error or "Could not save category markups."))
 
 
 def render_summary_tab(est: dict[str, Any]) -> None:

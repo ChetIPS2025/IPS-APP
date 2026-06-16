@@ -37,8 +37,12 @@ def calc_markup(cost: Any, markup_percent: Any) -> Decimal:
 
 
 def calc_line_price(cost: Any, markup_percent: Any) -> Decimal:
+    """Customer price: Cost × (1 + Markup % / 100)."""
     cost_d = _q2(cost)
-    return _q2(cost_d + calc_markup(cost_d, markup_percent))
+    pct = _dec(markup_percent)
+    if pct <= _D0:
+        return cost_d
+    return _q2(cost_d * (Decimal("1") + pct / Decimal("100")))
 
 
 def calc_material_line(

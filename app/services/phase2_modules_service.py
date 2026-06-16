@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import date, datetime, timezone
 from typing import Any
@@ -54,11 +55,140 @@ def _money_field(row: dict[str, Any], primary: str, *fallbacks: str) -> float:
     return 0.0
 
 
+def _parse_estimate_json(raw: Any) -> dict[str, Any]:
+    if isinstance(raw, dict):
+        return dict(raw)
+    if isinstance(raw, str) and raw.strip():
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                return parsed
+        except Exception:
+            pass
+    return {}
+
+
 def _estimate_json_get(row: dict[str, Any], key: str) -> str:
-    ej = row.get("estimate_json")
-    if isinstance(ej, dict):
+    ej = _parse_estimate_json(row.get("estimate_json"))
+    if ej:
         return str(ej.get(key) or "").strip()
     return ""
+
+
+_MARKUP_DEFAULT_KEYS = (
+    "global_markup_pct",
+    "default_material_markup_pct",
+    "default_labor_markup_pct",
+    "default_equipment_markup_pct",
+    "default_travel_markup_pct",
+    "default_subcontractor_markup_pct",
+    "default_other_markup_pct",
+)
+
+
+def _load_estimate_json_for_patch(*, row_id: str | None, existing_row: dict[str, Any] | None = None) -> dict[str, Any]:
+    if existing_row is not None:
+        return _parse_estimate_json(existing_row.get("estimate_json"))
+    rid = str(row_id or "").strip()
+    if not rid:
+        return {}
+    try:
+        from app.services.repository import fetch_by_id
+    except ImportError:
+        from services.repository import fetch_by_id  # type: ignore
+    row = fetch_by_id("estimates", rid) or {}
+    return _parse_estimate_json(row.get("estimate_json"))
+
+
+def _global_markup_from_row(row: dict[str, Any]) -> float:
+    try:
+        g = float(row.get("global_markup_pct") or 0)
+    except (TypeError, ValueError):
+        g = 0.0
+    if g > 0:
+        return g
+    ej = _parse_estimate_json(row.get("estimate_json"))
+    if ej:
+        try:
+            g = float(ej.get("global_markup_pct") or 0)
+        except (TypeError, ValueError):
+            g = 0.0
+        if g > 0:
+            return g
+    for key in _MARKUP_DEFAULT_KEYS[1:]:
+        try:
+            v = float(row.get(key) or 0)
+        except (TypeError, ValueError):
+            v = 0.0
+        if v > 0:
+            return v
+        if ej:
+            try:
+                v = float(ej.get(key) or 0)
+            except (TypeError, ValueError):
+                v = 0.0
+            if v > 0:
+                return v
+    return 0.0
+
+
+def _category_default_markup(row: dict[str, Any], category: str, *, global_mk: float) -> float:
+    key = f"default_{category}_markup_pct"
+    ej = _parse_estimate_json(row.get("estimate_json"))
+    try:
+        v = float(row.get(key) or 0)
+    except (TypeError, ValueError):
+        v = 0.0
+    if v > 0:
+        return v
+    if ej:
+        try:
+            v = float(ej.get(key) or 0)
+        except (TypeError, ValueError):
+            v = 0.0
+        if v > 0:
+            return v
+    return global_mk if global_mk > 0 else 0.0
+
+
+def _estimate_json_category_markups_patch(
+    category_markups: dict[str, float],
+    cols: frozenset[str],
+    *,
+    row_id: str | None,
+    existing_row: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Persist per-category markup defaults in estimate_json without changing global."""
+    if cols and "estimate_json" not in cols:
+        return {}
+    ej = _load_estimate_json_for_patch(row_id=row_id, existing_row=existing_row)
+    for cat, val in category_markups.items():
+        try:
+            ej[f"default_{cat}_markup_pct"] = float(val or 0)
+        except (TypeError, ValueError):
+            ej[f"default_{cat}_markup_pct"] = 0.0
+    return {"estimate_json": ej}
+
+
+def _estimate_json_markup_patch(
+    markup_pct: float,
+    cols: frozenset[str],
+    *,
+    row_id: str | None,
+    existing_row: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Persist global markup defaults in estimate_json when DB columns are missing."""
+    if cols and "estimate_json" not in cols:
+        return {}
+    try:
+        mk = float(markup_pct or 0)
+    except (TypeError, ValueError):
+        mk = 0.0
+    ej = _load_estimate_json_for_patch(row_id=row_id, existing_row=existing_row)
+    ej["global_markup_pct"] = mk
+    for cat in ("material", "labor", "equipment", "travel", "subcontractor", "other"):
+        ej[f"default_{cat}_markup_pct"] = mk
+    return {"estimate_json": ej}
 
 
 def _estimate_row_title(row: dict[str, Any], *keys: str) -> str:
@@ -418,6 +548,7 @@ def normalize_estimate(
     if not customer:
         customer = "—"
     display_project = estimate_project_title(row)
+    global_mk = _global_markup_from_row(row)
     return {
         "id": eid or num,
         "estimate_number": num,
@@ -453,13 +584,13 @@ def normalize_estimate(
         "other_cost": float(row.get("other_cost") or 0),
         "gross_profit": float(row.get("gross_profit") or 0),
         "gross_margin_percent": float(row.get("gross_margin_percent") or 0),
-        "default_material_markup_pct": float(row.get("default_material_markup_pct") or 0),
-        "default_labor_markup_pct": float(row.get("default_labor_markup_pct") or 0),
-        "default_equipment_markup_pct": float(row.get("default_equipment_markup_pct") or 0),
-        "default_travel_markup_pct": float(row.get("default_travel_markup_pct") or 0),
-        "default_subcontractor_markup_pct": float(row.get("default_subcontractor_markup_pct") or 0),
-        "default_other_markup_pct": float(row.get("default_other_markup_pct") or 0),
-        "global_markup_pct": float(row.get("global_markup_pct") or 0),
+        "default_material_markup_pct": _category_default_markup(row, "material", global_mk=global_mk),
+        "default_labor_markup_pct": _category_default_markup(row, "labor", global_mk=global_mk),
+        "default_equipment_markup_pct": _category_default_markup(row, "equipment", global_mk=global_mk),
+        "default_travel_markup_pct": _category_default_markup(row, "travel", global_mk=global_mk),
+        "default_subcontractor_markup_pct": _category_default_markup(row, "subcontractor", global_mk=global_mk),
+        "default_other_markup_pct": _category_default_markup(row, "other", global_mk=global_mk),
+        "global_markup_pct": global_mk,
         "overhead_pct": float(row.get("overhead_pct") or 0),
         "profit_pct": float(row.get("profit_pct") or 0),
         "proposal_show_line_items": bool(row.get("proposal_show_line_items")),
@@ -1284,6 +1415,15 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
     project_fields = _estimate_project_payload(project_name, cols)
     payload.update(project_fields)
     payload.update(_estimate_json_project_patch(project_name, cols, row_id=row_id))
+    if ui.get("global_markup_pct") is not None:
+        payload.update(
+            _estimate_json_markup_patch(
+                ui.get("global_markup_pct"),
+                cols,
+                row_id=row_id,
+                existing_row=existing or None,
+            )
+        )
     payload = {k: v for k, v in payload.items() if v is not None}
     if cols and "customer_name" not in cols:
         payload.pop("customer_name", None)

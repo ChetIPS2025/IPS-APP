@@ -1192,3 +1192,289 @@ def get_default_terms() -> str:
     defaults = [r for r in rows if r.get("is_default")]
     row = defaults[0] if defaults else rows[0]
     return _str(row.get("terms_text"))
+
+
+_MARKUP_DEFAULT_FIELDS = (
+    "global_markup_pct",
+    "default_material_markup_pct",
+    "default_labor_markup_pct",
+    "default_equipment_markup_pct",
+    "default_travel_markup_pct",
+    "default_subcontractor_markup_pct",
+    "default_other_markup_pct",
+)
+
+
+def resolve_global_markup_pct(estimate: dict[str, Any]) -> float:
+    """Return the estimate's global markup % from columns or estimate_json."""
+    try:
+        g = _num(estimate.get("global_markup_pct"))
+    except Exception:
+        g = 0.0
+    if g > 0:
+        return g
+    ej = estimate.get("estimate_json")
+    if isinstance(ej, str) and ej.strip():
+        try:
+            ej = json.loads(ej)
+        except Exception:
+            ej = {}
+    if isinstance(ej, dict):
+        g = _num(ej.get("global_markup_pct"))
+        if g > 0:
+            return g
+        for key in _MARKUP_DEFAULT_FIELDS[1:]:
+            v = _num(ej.get(key))
+            if v > 0:
+                return v
+    for key in _MARKUP_DEFAULT_FIELDS[1:]:
+        v = _num(estimate.get(key))
+        if v > 0:
+            return v
+    return 0.0
+
+
+_MARKUP_CATEGORIES = (
+    "material",
+    "labor",
+    "equipment",
+    "travel",
+    "subcontractor",
+    "other",
+)
+
+
+def resolve_category_markup_defaults(estimate: dict[str, Any]) -> dict[str, float]:
+    """Per-category default markup % for new lines (falls back to global)."""
+    global_mk = resolve_global_markup_pct(estimate)
+    out: dict[str, float] = {}
+    for cat in _MARKUP_CATEGORIES:
+        key = f"default_{cat}_markup_pct"
+        val = _num(estimate.get(key))
+        out[cat] = val if val > 0 else global_mk
+    return out
+
+
+def _markup_defaults_for_estimate_id(estimate_id: str) -> dict[str, float]:
+    eid = _str(estimate_id)
+    rows, _ = fetch_rows("estimates", match={"id": eid}, limit=1, use_admin=True)
+    if not rows:
+        return {cat: 0.0 for cat in _MARKUP_CATEGORIES}
+    try:
+        from app.services.phase2_modules_service import normalize_estimate
+    except ImportError:
+        from services.phase2_modules_service import normalize_estimate  # type: ignore
+    est = normalize_estimate(rows[0])
+    return resolve_category_markup_defaults(est)
+
+
+def apply_estimate_markup_defaults_to_lines(estimate_id: str) -> ServiceResult:
+    """Reprice all costing lines using each category's default markup %."""
+    eid = _str(estimate_id)
+    if not eid:
+        return ServiceResult(ok=False, error="Estimate id is required.")
+    defaults = _markup_defaults_for_estimate_id(eid)
+    errors: list[str] = []
+
+    materials, _ = get_estimate_materials(eid)
+    mat_mk = defaults["material"]
+    for row in materials:
+        line = normalize_material_line(row, eid)
+        calc = calc_material_line(line["quantity"], line["unit_cost"], mat_mk)
+        result = update_row(
+            "estimate_line_items",
+            {
+                "markup_percent": mat_mk,
+                "markup_amount": calc["markup_amount"],
+                "price_total": calc["price_total"],
+            },
+            {"id": line["id"]},
+        )
+        if not result.ok:
+            errors.append(str(result.error or "Could not update material line."))
+
+    labor, _ = get_estimate_labor(eid)
+    lab_mk = defaults["labor"]
+    for row in labor:
+        line = normalize_labor_line(row, eid)
+        calc = calc_labor_line(
+            line["st_hours"],
+            line["ot_hours"],
+            0,
+            line["st_rate"],
+            line["ot_rate"],
+            0,
+            lab_mk,
+        )
+        result = update_row(
+            _LABOR_LINES_TABLE,
+            {
+                "markup_percent": lab_mk,
+                "markup_amount": calc["markup_amount"],
+                "price_total": calc["price_total"],
+            },
+            {"id": line["id"]},
+        )
+        if not result.ok and not (result.error and _is_missing_table_error(Exception(result.error))):
+            errors.append(str(result.error or "Could not update labor line."))
+
+    equipment, _ = get_estimate_equipment(eid)
+    eq_mk = defaults["equipment"]
+    for row in equipment:
+        line = normalize_equipment_line(row, eid)
+        calc = calc_equipment_line(line["quantity"], line["duration"], line["cost_rate"], eq_mk)
+        if _equipment_storage_is_line_items():
+            payload = _equipment_line_item_payload(
+                eid,
+                {**line, "markup_percent": eq_mk},
+                calc=calc,
+                sort_order=int(line.get("sort_order") or 0),
+            )
+            result = update_row("estimate_line_items", payload, {"id": line["id"]})
+        else:
+            result = update_row(
+                _EQUIPMENT_TABLE,
+                {
+                    "markup_percent": eq_mk,
+                    "markup_amount": calc["markup_amount"],
+                    "price_total": calc["price_total"],
+                },
+                {"id": line["id"]},
+            )
+        if not result.ok:
+            errors.append(str(result.error or "Could not update equipment line."))
+
+    travel, _ = get_estimate_travel(eid)
+    trv_mk = defaults["travel"]
+    for row in travel:
+        line = normalize_travel_line(row, eid)
+        data = {**line, "markup_percent": trv_mk}
+        payload = _travel_payload(data)
+        result = update_row("estimate_travel", payload, {"id": line["id"]})
+        if not result.ok:
+            errors.append(str(result.error or "Could not update travel line."))
+
+    subcontractors, _ = get_estimate_subcontractors(eid)
+    sub_mk = defaults["subcontractor"]
+    for row in subcontractors:
+        line = normalize_subcontractor_line(row, eid)
+        calc = calc_simple_line(line["cost_total"], sub_mk)
+        result = update_row(
+            "estimate_subcontractors",
+            {
+                "markup_percent": sub_mk,
+                "markup_amount": calc["markup_amount"],
+                "price_total": calc["price_total"],
+            },
+            {"id": line["id"]},
+        )
+        if not result.ok:
+            errors.append(str(result.error or "Could not update subcontractor line."))
+
+    other_costs, _ = get_estimate_other_costs(eid)
+    oth_mk = defaults["other"]
+    for row in other_costs:
+        line = normalize_other_cost_line(row, eid)
+        calc = calc_simple_line(line["cost_total"], oth_mk)
+        result = update_row(
+            _OTHER_COSTS_TABLE,
+            {
+                "markup_percent": oth_mk,
+                "markup_amount": calc["markup_amount"],
+                "price_total": calc["price_total"],
+            },
+            {"id": line["id"]},
+        )
+        if not result.ok and not (result.error and _is_missing_table_message(result.error)):
+            errors.append(str(result.error or "Could not update other cost line."))
+
+    if errors:
+        return ServiceResult(ok=False, error=errors[0])
+    return ServiceResult(ok=True, data={"defaults": defaults})
+
+
+def save_category_markup_settings(
+    estimate_id: str,
+    category_markups: dict[str, float],
+) -> ServiceResult:
+    """Persist optional per-category default markups (Advanced settings)."""
+    eid = _str(estimate_id)
+    if not eid:
+        return ServiceResult(ok=False, error="Estimate id is required.")
+
+    try:
+        from app.services.repository import table_column_names
+        from app.services.phase2_modules_service import _estimate_json_category_markups_patch
+    except ImportError:
+        from services.repository import table_column_names  # type: ignore
+        from services.phase2_modules_service import _estimate_json_category_markups_patch  # type: ignore
+
+    cols = table_column_names("estimates")
+    existing_rows, _ = fetch_rows("estimates", match={"id": eid}, limit=1, use_admin=True)
+    existing = existing_rows[0] if existing_rows else {}
+
+    normalized: dict[str, float] = {}
+    for cat in _MARKUP_CATEGORIES:
+        if cat in category_markups:
+            normalized[cat] = max(_num(category_markups[cat]), 0.0)
+
+    payload: dict[str, Any] = {}
+    for cat, val in normalized.items():
+        key = f"default_{cat}_markup_pct"
+        if not cols or key in cols:
+            payload[key] = val
+    payload.update(
+        _estimate_json_category_markups_patch(normalized, cols, row_id=eid, existing_row=existing)
+    )
+
+    result = update_row("estimates", payload, {"id": eid})
+    if result.ok:
+        clear_all_data_caches()
+    return result
+
+
+def save_global_markup_settings(
+    estimate_id: str,
+    markup_pct: float,
+    *,
+    apply_to_existing_lines: bool = False,
+    recalculate: bool = False,
+) -> ServiceResult:
+    """Persist global markup defaults and optionally reprice existing lines."""
+    eid = _str(estimate_id)
+    if not eid:
+        return ServiceResult(ok=False, error="Estimate id is required.")
+    mk = max(_num(markup_pct), 0.0)
+
+    try:
+        from app.services.repository import table_column_names
+        from app.services.phase2_modules_service import _estimate_json_markup_patch
+    except ImportError:
+        from services.repository import table_column_names  # type: ignore
+        from services.phase2_modules_service import _estimate_json_markup_patch  # type: ignore
+
+    cols = table_column_names("estimates")
+    existing_rows, _ = fetch_rows("estimates", match={"id": eid}, limit=1, use_admin=True)
+    existing = existing_rows[0] if existing_rows else {}
+
+    payload: dict[str, Any] = {}
+    for key in _MARKUP_DEFAULT_FIELDS:
+        if not cols or key in cols:
+            payload[key] = mk
+    payload.update(_estimate_json_markup_patch(mk, cols, row_id=eid, existing_row=existing))
+
+    result = update_row("estimates", payload, {"id": eid})
+    if not result.ok:
+        return result
+
+    clear_all_data_caches()
+
+    if apply_to_existing_lines:
+        apply_result = apply_estimate_markup_defaults_to_lines(eid)
+        if not apply_result.ok:
+            return apply_result
+
+    if recalculate or apply_to_existing_lines:
+        return recalculate_and_save_estimate_totals(eid)
+
+    return ServiceResult(ok=True, data={"global_markup_pct": mk})

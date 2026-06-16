@@ -450,9 +450,6 @@ def _persist_estimate_partial(data: dict, row_id: str) -> tuple[bool, str]:
     return ok, msg
 
 
-def _persist_markup_settings(data: dict, row_id: str) -> tuple[bool, str]:
-    return _persist_estimate_partial(data, row_id)
-
 
 def _persist_scope_of_work(data: dict, row_id: str) -> tuple[bool, str]:
     return _persist_estimate_partial(data, row_id)
@@ -1083,7 +1080,7 @@ def _render_estimate_detail_tabs(est: dict) -> None:
         )
 
     with tab_markups:
-        render_markups_tab(est, persist_fn=_persist_markup_settings)
+        render_markups_tab(est)
 
     with tab_summary:
         render_summary_tab(est)
