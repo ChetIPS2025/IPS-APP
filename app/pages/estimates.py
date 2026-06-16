@@ -299,6 +299,28 @@ def _estimate_stored_customer_price(row: dict) -> float:
     return 0.0
 
 
+def _estimate_live_customer_price_amount(row: dict) -> float:
+    eid = str(row.get("id") or "").strip()
+    if not eid or is_demo_id(eid):
+        return 0.0
+    try:
+        from app.services.estimate_costing_service import calculate_estimate_totals
+    except ImportError:
+        from services.estimate_costing_service import calculate_estimate_totals  # type: ignore
+    try:
+        return float(calculate_estimate_totals(eid).get("customer_price") or 0)
+    except Exception:
+        return 0.0
+
+
+def _estimate_rollups_are_stale(row: dict) -> bool:
+    live = _estimate_live_customer_price_amount(row)
+    if live <= 0:
+        return False
+    stored = _estimate_stored_customer_price(row)
+    return stored <= 0 or abs(stored - live) > 0.01
+
+
 def _estimate_customer_price_from_builder(row: dict, *, field: str = "customer_price") -> str:
     """Use live Cost Builder totals when the estimate row rollup is still zero."""
     eid = str(row.get("id") or "").strip()
@@ -320,9 +342,12 @@ def _estimate_customer_price_from_builder(row: dict, *, field: str = "customer_p
 
 def _estimate_customer_price(row: dict) -> str:
     stored = _estimate_stored_customer_price(row)
+    live = _estimate_live_customer_price_amount(row)
+    if live > 0 and (stored <= 0 or abs(stored - live) > 0.01):
+        return fmt_currency(live)
     if stored > 0:
         return fmt_currency(stored)
-    return _estimate_customer_price_from_builder(row)
+    return fmt_currency(live) if live > 0 else fmt_currency(0)
 
 
 def _sync_estimate_rollups_if_stale(estimate_id: str) -> None:
@@ -330,30 +355,25 @@ def _sync_estimate_rollups_if_stale(estimate_id: str) -> None:
     eid = str(estimate_id or "").strip()
     if not eid or is_demo_id(eid):
         return
+    est_row = get_estimate(eid) or {}
+    if not _estimate_rollups_are_stale(est_row):
+        return
+    live = _estimate_live_customer_price_amount(est_row)
     sync_key = f"_est_rollups_synced_{eid}"
-    if st.session_state.get(sync_key):
+    if st.session_state.get(sync_key) == live:
         return
     try:
-        from app.services.estimate_costing_service import (
-            calculate_estimate_totals,
-            recalculate_and_save_estimate_totals,
-        )
+        from app.services.estimate_costing_service import recalculate_and_save_estimate_totals
     except ImportError:
-        from services.estimate_costing_service import (  # type: ignore
-            calculate_estimate_totals,
-            recalculate_and_save_estimate_totals,
-        )
+        from services.estimate_costing_service import recalculate_and_save_estimate_totals  # type: ignore
     try:
-        stored = _estimate_stored_customer_price(get_estimate(eid) or {})
-        calc = float(calculate_estimate_totals(eid).get("customer_price") or 0)
-        if calc > 0 and abs(stored - calc) > 0.01:
-            if recalculate_and_save_estimate_totals(eid).ok:
-                st.session_state[sync_key] = True
-                try:
-                    from app.services.phase2_modules_service import clear_all_data_caches
-                except ImportError:
-                    from services.phase2_modules_service import clear_all_data_caches  # type: ignore
-                clear_all_data_caches()
+        if recalculate_and_save_estimate_totals(eid).ok:
+            st.session_state[sync_key] = live
+            try:
+                from app.services.phase2_modules_service import clear_all_data_caches
+            except ImportError:
+                from services.phase2_modules_service import clear_all_data_caches  # type: ignore
+            clear_all_data_caches()
     except Exception:
         pass
 
@@ -558,7 +578,7 @@ def _render_custom_estimates_table(
             status = _normalize_estimate_status(est.get("status"))
             est_date = fmt_date(est.get("estimate_date"))
             job_no = _estimate_job(est)
-            if _estimate_stored_customer_price(est) <= 0:
+            if _estimate_rollups_are_stale(est):
                 _sync_estimate_rollups_if_stale(eid)
                 fresh_row = get_estimate(eid)
                 if fresh_row:
@@ -1121,6 +1141,8 @@ def _render_estimate_actions_panel(est: dict) -> None:
 def render_estimate_detail_dialog(est: dict) -> None:
     rk = record_session_key(est, "id", "estimate_number")
     eid = str(est.get("id") or "")
+    if eid and not is_demo_id(eid) and _estimate_rollups_are_stale(est):
+        _sync_estimate_rollups_if_stale(eid)
     fresh = get_estimate(eid) if eid else None
     if fresh:
         est = fresh
@@ -1128,7 +1150,7 @@ def render_estimate_detail_dialog(est: dict) -> None:
     project = _estimate_project(est)
     status = safe_value(est.get("status"))
     customer = safe_value(est.get("customer"))
-    total = fmt_currency(est.get("total"))
+    total = _estimate_customer_price(est)
     linked_job = str(est.get("job_id") or est.get("job_number") or "").strip()
 
     render_modal_shell()
