@@ -88,16 +88,30 @@ def allocation_day_block_class(state: str) -> str:
     return ""
 
 
-def allocation_day_approval_class(day_status: str) -> str:
+def allocation_day_approval_class(day_status: str, *, alloc_state: str = "") -> str:
     """CSS hook for day-level approval state on allocation cards."""
+    try:
+        from app.services.timekeeping_day_ui import (
+            day_fully_approved_and_allocated,
+            normalize_timecard_status,
+        )
+    except ImportError:
+        from services.timekeeping_day_ui import (  # type: ignore
+            day_fully_approved_and_allocated,
+            normalize_timecard_status,
+        )
+
     mapping = {
         "Draft": "timekeeping-alloc-approval-draft",
         "Pending": "timekeeping-alloc-approval-pending",
         "Approved": "timekeeping-alloc-approval-approved",
         "Rejected": "timekeeping-alloc-approval-rejected",
     }
-    key = str(day_status or "Draft").strip()
-    return mapping.get(key, "timekeeping-alloc-approval-draft")
+    key = normalize_timecard_status(day_status)
+    base = mapping.get(key, "timekeeping-alloc-approval-draft")
+    if day_fully_approved_and_allocated(alloc_state, key):
+        return f"{base} timekeeping-alloc-approval-approved-complete"
+    return base
 
 
 def allocation_card_state_class(state: str) -> str:
@@ -263,8 +277,15 @@ def _render_day_actions_bar(
 
     status_col, actions_col = st.columns([1.35, 4.65], gap="medium", vertical_alignment="center")
     with status_col:
+        status_wrap_cls = ""
+        try:
+            from app.services.timekeeping_day_ui import day_fully_approved_and_allocated
+        except ImportError:
+            from services.timekeeping_day_ui import day_fully_approved_and_allocated  # type: ignore
+        if day_fully_approved_and_allocated(str(ctx.alloc_state or ""), day_status):
+            status_wrap_cls = " timekeeping-alloc-day-actions-status-approved-complete"
         st.markdown(
-            f'<div class="timekeeping-alloc-day-actions-status">'
+            f'<div class="timekeeping-alloc-day-actions-status{status_wrap_cls}">'
             f'<span class="timekeeping-alloc-day-actions-status-label">Status:</span> '
             f"{deps.timecard_status_pill_html(day_status)}</div>",
             unsafe_allow_html=True,
@@ -536,7 +557,7 @@ def render_day_allocation_card(
     card_cls = allocation_card_state_class(state)
 
     day_status_norm = normalize_timecard_status(ctx.day_status)
-    approval_cls = allocation_day_approval_class(day_status_norm)
+    approval_cls = allocation_day_approval_class(day_status_norm, alloc_state=state)
     scope = allocation_panel_scope_key(ctx.panel_scope)
     with st.container(key=f"tk_alloc_day_{scope}_{ctx.iso}", border=True):
         unbalanced_cls = (

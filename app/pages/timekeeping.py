@@ -1876,7 +1876,9 @@ def _render_list_day_hour_stepper(
     up_key = f"{widget_key}_up"
     spin_key = f"tk_list_hour_spin_{widget_key}"
     norm = _normalize_timecard_status(day_status)
-    if norm == "Draft":
+    if _day_fully_approved_and_allocated(alloc_state, day_status):
+        spin_marker_cls = " timekeeping-list-hour-spin-approved-complete"
+    elif norm == "Draft":
         spin_marker_cls = _top_row_hour_spin_marker_class(alloc_state) + _day_approval_spin_marker_class(day_status)
     else:
         spin_marker_cls = _day_approval_spin_marker_class(day_status)
@@ -1964,7 +1966,7 @@ def _render_list_row_day_cell(
         has_hours=has_hours,
     )
     grid_marker = " timesheet-list-days-marker" if day_ix == 0 else ""
-    status_badge = _timecard_status_display(day_status).upper()
+    status_badge = _list_day_status_badge_html(day_status, alloc_state)
     day_title = f'{day_d.strftime("%a").upper()} {day_d.strftime("%m/%d")}'
 
     with st.container(key=f"tk_list_day_{emp_id}_{week_sig}_{day_ix}"):
@@ -1976,7 +1978,7 @@ def _render_list_row_day_cell(
         st.markdown(
             f'<div class="timekeeping-day-cell">'
             f'<div class="timekeeping-day-date-label">{html.escape(day_title)}</div>'
-            f'<div class="timekeeping-day-status-badge">{html.escape(status_badge)}</div>'
+            f'<div class="timekeeping-day-status-badge">{status_badge}</div>'
             f"</div>",
             unsafe_allow_html=True,
         )
@@ -1992,6 +1994,8 @@ def _render_list_row_day_cell(
             return hrs
         ro_cls = "timekeeping-hour-input timekeeping-hour-input-ro"
         ro_cls += _day_approval_ro_hour_class(day_status)
+        if _day_fully_approved_and_allocated(alloc_state, day_status):
+            ro_cls += " timekeeping-list-hour-ro-approved-complete"
         norm = _normalize_timecard_status(day_status)
         if norm == "Draft":
             if alloc_state == "complete":
@@ -2366,17 +2370,20 @@ def _timecard_status_pill_html(status: str, *, compact: bool = False) -> str:
     )
 
 
-def _day_approval_marker_class(day_status: str, *, has_hours: bool) -> str:
-    norm = _normalize_timecard_status(day_status)
-    if norm == "Approved":
-        return " ips-tk-day-approved"
-    if norm == "Rejected":
-        return " ips-tk-day-rejected"
-    if norm == "Pending":
-        return " ips-tk-day-pending"
-    if has_hours:
-        return " ips-tk-day-draft"
-    return " ips-tk-day-draft-empty"
+def _day_fully_approved_and_allocated(alloc_state: str, day_status: str) -> bool:
+    try:
+        from app.services.timekeeping_day_ui import day_fully_approved_and_allocated
+    except ImportError:
+        from services.timekeeping_day_ui import day_fully_approved_and_allocated  # type: ignore
+    return day_fully_approved_and_allocated(alloc_state, day_status)
+
+
+def _day_approval_marker_class(day_status: str, *, has_hours: bool, alloc_state: str = "") -> str:
+    try:
+        from app.services.timekeeping_day_ui import day_approval_marker_class
+    except ImportError:
+        from services.timekeeping_day_ui import day_approval_marker_class  # type: ignore
+    return day_approval_marker_class(day_status, has_hours=has_hours, alloc_state=alloc_state)
 
 
 def _list_day_box_marker_classes(
@@ -2385,12 +2392,23 @@ def _list_day_box_marker_classes(
     alloc_state: str,
     has_hours: bool,
 ) -> str:
-    """Approval status drives day-box color; allocation hints apply only on Draft days."""
-    approval_cls = _day_approval_marker_class(day_status, has_hours=has_hours)
-    norm = _normalize_timecard_status(day_status)
-    if norm in ("Approved", "Rejected", "Pending"):
-        return approval_cls
-    return approval_cls + _top_row_day_marker_classes(alloc_state)
+    try:
+        from app.services.timekeeping_day_ui import list_day_box_marker_classes
+    except ImportError:
+        from services.timekeeping_day_ui import list_day_box_marker_classes  # type: ignore
+    return list_day_box_marker_classes(
+        day_status=day_status,
+        alloc_state=alloc_state,
+        has_hours=has_hours,
+    )
+
+
+def _list_day_status_badge_html(day_status: str, alloc_state: str) -> str:
+    try:
+        from app.services.timekeeping_day_ui import list_day_status_badge_html
+    except ImportError:
+        from services.timekeeping_day_ui import list_day_status_badge_html  # type: ignore
+    return list_day_status_badge_html(day_status, alloc_state)
 
 
 def _day_approval_spin_marker_class(day_status: str) -> str:

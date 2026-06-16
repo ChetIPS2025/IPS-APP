@@ -4955,6 +4955,23 @@ def inject_timekeeping_module_css() -> None:
   background: #dcfce7;
   color: #166534;
 }}
+.ips-timekeeping-status-pill-day-box {{
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  height: 16px;
+  padding: 0 6px;
+  margin: 2px auto 0;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  white-space: nowrap;
+  background: #22c55e !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 1px #16a34a;
+}}
 .ips-timekeeping-status-rejected {{
   background: #fee2e2;
   color: #991b1b;
@@ -8193,6 +8210,24 @@ def inject_timekeeping_module_css() -> None:
   overflow: visible !important;
   box-shadow: none !important;
 }}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"]:has(.timekeeping-list-hour-spin-approved-complete)
+  [data-testid="stHorizontalBlock"]:has(.timekeeping-spinner-buttons-marker) {{
+  background: #f0fdf4 !important;
+  border: 2px solid #22c55e !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"]:has(.timekeeping-list-hour-spin-approved-complete)
+  [data-testid="stNumberInput"] input {{
+  background: #f0fdf4 !important;
+  color: #166534 !important;
+  font-weight: 700 !important;
+}}
+.timekeeping-list-hour-ro-approved-complete {{
+  background: #f0fdf4 !important;
+  border: 2px solid #22c55e !important;
+  border-radius: 8px !important;
+  color: #166534 !important;
+  font-weight: 700 !important;
+}}
 .st-key-timekeeping_table_wrap [class*="st-key-tk_list_hour_spin_"]:has(.timekeeping-list-hour-spin-complete)
   [data-testid="stHorizontalBlock"]:has(.timekeeping-spinner-buttons-marker) {{
   background: #ffffff !important;
@@ -8272,25 +8307,44 @@ def inject_timekeeping_module_css() -> None:
   color: #475569;
 }}
 {tk_list_day_col}:has(.ips-tk-day-pending) {{
-  background: transparent !important;
+  background: #fffbeb !important;
+  border: 1px solid #f59e0b !important;
+  border-radius: 8px !important;
   box-shadow: none !important;
-  border-radius: 0 !important;
 }}
 {tk_list_day_col}:has(.ips-tk-day-pending) .timekeeping-day-status-badge {{
   color: #b45309;
 }}
-{tk_list_day_col}:has(.ips-tk-day-approved) {{
-  background: transparent !important;
+{tk_list_day_col}:has(.ips-tk-day-approved):not(:has(.ips-tk-day-approved-complete)) {{
+  background: #f8fafc !important;
+  border: 1px dashed #86efac !important;
+  border-radius: 8px !important;
   box-shadow: none !important;
-  border-radius: 0 !important;
 }}
-{tk_list_day_col}:has(.ips-tk-day-approved) .timekeeping-day-status-badge {{
+{tk_list_day_col}:has(.ips-tk-day-approved):not(:has(.ips-tk-day-approved-complete)) .timekeeping-day-status-badge {{
   color: #15803d;
 }}
+{tk_list_day_col}:has(.ips-tk-day-approved-complete) {{
+  background: #f0fdf4 !important;
+  border: 2px solid #22c55e !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 0 1px #bbf7d0 !important;
+  padding: 2px !important;
+  box-sizing: border-box !important;
+}}
+{tk_list_day_col}:has(.ips-tk-day-approved-complete) .timekeeping-day-date-label {{
+  color: #166534 !important;
+}}
+{tk_list_day_col}:has(.ips-tk-day-approved-complete) .timekeeping-day-status-badge {{
+  margin-top: 2px !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}}
 {tk_list_day_col}:has(.ips-tk-day-rejected) {{
-  background: transparent !important;
+  background: #fef2f2 !important;
+  border: 1px solid #ef4444 !important;
+  border-radius: 8px !important;
   box-shadow: none !important;
-  border-radius: 0 !important;
 }}
 {tk_list_day_col}:has(.ips-tk-day-rejected) .timekeeping-day-status-badge {{
   color: #b91c1c;
@@ -8339,8 +8393,13 @@ def inject_timekeeping_module_css() -> None:
   background: #fffbeb !important;
 }}
 [class*="st-key-tk_alloc_day_"]:has(.timekeeping-alloc-approval-approved) {{
-  border-color: #22c55e !important;
+  border-color: #86efac !important;
+  background: #f8fafc !important;
+}}
+[class*="st-key-tk_alloc_day_"]:has(.timekeeping-alloc-approval-approved-complete) {{
+  border: 2px solid #22c55e !important;
   background: #f0fdf4 !important;
+  box-shadow: 0 0 0 1px #bbf7d0 !important;
 }}
 [class*="st-key-tk_alloc_day_"]:has(.timekeeping-alloc-approval-rejected) {{
   border-color: #ef4444 !important;
@@ -8350,7 +8409,15 @@ def inject_timekeeping_module_css() -> None:
   box-shadow: 0 0 0 1px #f59e0b;
 }}
 .timekeeping-alloc-approval-approved .timekeeping-alloc-day-actions-status .ips-timekeeping-status-pill {{
-  box-shadow: 0 0 0 1px #22c55e;
+  box-shadow: 0 0 0 1px #86efac;
+}}
+.timekeeping-alloc-approval-approved-complete .timekeeping-alloc-day-actions-status .ips-timekeeping-status-pill,
+.timekeeping-alloc-day-actions-status-approved-complete .ips-timekeeping-status-pill {{
+  background: #22c55e !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 1px #16a34a !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
 }}
 .timekeeping-alloc-approval-rejected .timekeeping-alloc-day-actions-status .ips-timekeeping-status-pill {{
   box-shadow: 0 0 0 1px #ef4444;
@@ -8447,9 +8514,13 @@ def inject_timekeeping_module_css() -> None:
   background: #ffffff !important;
   border-radius: 0 0 7px 7px !important;
 }}
-{tk_alloc_day}:has(.timekeeping-alloc-day-state-complete) [data-testid="stVerticalBlockBorderWrapper"],
-{tk_alloc_day}:has(.timekeeping-alloc-day-state-complete) > [data-testid="stVerticalBlock"] {{
+{tk_alloc_day}:has(.timekeeping-alloc-day-state-complete):not(:has(.timekeeping-alloc-approval-approved-complete)) [data-testid="stVerticalBlockBorderWrapper"],
+{tk_alloc_day}:has(.timekeeping-alloc-day-state-complete):not(:has(.timekeeping-alloc-approval-approved-complete)) > [data-testid="stVerticalBlock"] {{
   border-color: #86efac !important;
+}}
+{tk_alloc_day}:has(.timekeeping-alloc-approval-approved-complete) [data-testid="stVerticalBlockBorderWrapper"],
+{tk_alloc_day}:has(.timekeeping-alloc-approval-approved-complete) > [data-testid="stVerticalBlock"] {{
+  border-color: #22c55e !important;
 }}
 {tk_alloc_day}:has(.timekeeping-alloc-day-state-incomplete) [data-testid="stVerticalBlockBorderWrapper"],
 {tk_alloc_day}:has(.timekeeping-alloc-day-state-needs_assignment) [data-testid="stVerticalBlockBorderWrapper"],
@@ -8485,10 +8556,21 @@ def inject_timekeeping_module_css() -> None:
   min-width: 0 !important;
   max-width: none !important;
 }}
-{tk_alloc_day}:has(.timekeeping-alloc-day-state-complete) .timekeeping-day-summary-inline {{
+{tk_alloc_day}:has(.timekeeping-alloc-day-state-complete):not(:has(.timekeeping-alloc-approval-approved-complete)) .timekeeping-day-summary-inline {{
   background: #fffbeb !important;
   border: none !important;
   border-bottom: 1px solid #fde68a !important;
+}}
+{tk_alloc_day}:has(.timekeeping-alloc-approval-approved-complete) .timekeeping-day-summary-inline {{
+  background: #dcfce7 !important;
+  border: none !important;
+  border-bottom: 1px solid #22c55e !important;
+}}
+{tk_alloc_day}:has(.timekeeping-alloc-approval-approved-complete) .timekeeping-allocation-status-text,
+{tk_alloc_day}:has(.timekeeping-alloc-approval-approved-complete) .timekeeping-alloc-day-split,
+{tk_alloc_day}:has(.timekeeping-alloc-approval-approved-complete) .timekeeping-alloc-remaining-text {{
+  color: #166534 !important;
+  font-weight: 700 !important;
 }}
 {tk_alloc_day}:has(.timekeeping-alloc-day-state-incomplete) .timekeeping-day-summary-inline,
 {tk_alloc_day}:has(.timekeeping-alloc-day-state-needs_assignment) .timekeeping-day-summary-inline {{
@@ -13294,11 +13376,27 @@ section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="st
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(n+4):nth-child(-n+10):has(.ips-tk-day-draft),
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(n+4):nth-child(-n+10):has(.ips-tk-day-draft-empty),
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(n+4):nth-child(-n+10):has(.ips-tk-day-pending),
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(n+4):nth-child(-n+10):has(.ips-tk-day-approved),
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(n+4):nth-child(-n+10):has(.ips-tk-day-approved):not(:has(.ips-tk-day-approved-complete)),
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(n+4):nth-child(-n+10):has(.ips-tk-day-rejected) {{
   background: transparent !important;
   box-shadow: none !important;
   border-radius: 0 !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(n+4):nth-child(-n+10):has(.ips-tk-day-approved-complete) {{
+  background: #f0fdf4 !important;
+  border: 2px solid #22c55e !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 0 1px #bbf7d0 !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(n+4):nth-child(-n+10):has(.ips-tk-day-pending) {{
+  background: #fffbeb !important;
+  border: 1px solid #f59e0b !important;
+  border-radius: 8px !important;
+}}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"]:has(.timesheet-list-row-marker) > [data-testid="column"]:nth-child(n+4):nth-child(-n+10):has(.ips-tk-day-rejected) {{
+  background: #fef2f2 !important;
+  border: 1px solid #ef4444 !important;
+  border-radius: 8px !important;
 }}
 </style>
 """,
