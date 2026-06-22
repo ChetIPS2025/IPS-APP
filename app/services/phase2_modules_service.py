@@ -496,6 +496,8 @@ def normalize_job(row: dict[str, Any]) -> dict[str, Any]:
         "completed_at": row.get("completed_at"),
         "cancelled_at": row.get("cancelled_at"),
         "deleted_at": row.get("deleted_at"),
+        "awarded_amount": _money_field(row, "awarded_amount", "contract_value"),
+        "estimated_cost": _money_field(row, "estimated_cost"),
     }
 
 
@@ -1316,6 +1318,13 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
         else:
             payload["location"] = str(ui.get("location") or "").strip()
 
+    contract_value = _job_save_money(ui.get("contract_value") if "contract_value" in ui else ui.get("awarded_amount"))
+    estimated_cost = _job_save_money(ui.get("estimated_cost"))
+    if contract_value is not None:
+        payload["awarded_amount"] = contract_value
+    if estimated_cost is not None:
+        payload["estimated_cost"] = estimated_cost
+
     if row_id:
         try:
             from app.db import fetch_one
@@ -1668,6 +1677,14 @@ def _job_save_text(value: Any, *, default: str = "") -> str:
 
 def _job_save_date(value: Any) -> str | None:
     return _asset_save_date(value)
+
+
+def _job_save_money(value: Any) -> float | None:
+    try:
+        from app.services.job_financial_ui import parse_money
+    except ImportError:
+        from services.job_financial_ui import parse_money  # type: ignore
+    return parse_money(value)
 
 
 def _asset_save_number(value: Any) -> float | None:

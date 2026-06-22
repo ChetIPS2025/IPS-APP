@@ -295,8 +295,8 @@ _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("CUSTOMER", "customer"),
     ("STATUS", "status"),
     ("CONTRACT VALUE", None),
-    ("ACTUAL COST", None),
-    ("PROFIT", None),
+    ("ESTIMATED COST", None),
+    ("GROSS PROFIT", None),
     ("MARGIN %", None),
     ("OPEN TASKS / SUBJOBS", None),
     ("ACTIONS", None),
@@ -452,15 +452,112 @@ def _job_open_subjobs_count(job: dict, *, subjob_counts: dict[str, int] | None =
         return 0
 
 
+def _projected_job_financials(contract_value: float, estimated_cost: float) -> tuple[float, float]:
+    try:
+        from app.services.job_financial_ui import projected_gross_profit, projected_margin_pct
+    except ImportError:
+        from services.job_financial_ui import projected_gross_profit, projected_margin_pct  # type: ignore
+    return projected_gross_profit(contract_value, estimated_cost), projected_margin_pct(
+        contract_value, estimated_cost
+    )
+
+
+def _job_financials_editable(job: dict) -> bool:
+    try:
+        from app.services.job_financial_ui import job_manual_financials_editable
+    except ImportError:
+        from services.job_financial_ui import job_manual_financials_editable  # type: ignore
+    return job_manual_financials_editable(job)
+
+
+def _job_financial_snapshot(job: dict) -> dict[str, float | bool]:
+    costs = _compute_job_list_cost_fields(job, sync_if_empty=False)
+    contract = float(costs.get("contract_value") or 0)
+    estimated = float(costs.get("estimated_cost") or 0)
+    profit, margin = _projected_job_financials(contract, estimated)
+    return {
+        "contract_value": contract,
+        "estimated_cost": estimated,
+        "gross_profit": profit,
+        "margin_pct": margin,
+        "has_contract": bool(costs.get("has_contract")),
+        "has_estimated": bool(costs.get("has_estimated")),
+    }
+
+
+def _render_projected_financial_caption(*, contract_value: float, estimated_cost: float) -> None:
+    profit, margin = _projected_job_financials(contract_value, estimated_cost)
+    st.caption(
+        f"Projected Gross Profit: {_money_cell(profit, available=contract_value > 0)} · "
+        f"Projected Margin: {_pct_cell(margin) if contract_value > 0 else '—'}"
+    )
+
+
+def _render_job_financial_inputs(
+    *,
+    key_prefix: str,
+    contract_key: str,
+    estimated_key: str,
+    initial_contract: float = 0.0,
+    initial_estimated: float = 0.0,
+    editable: bool = True,
+    estimate_note: str = "",
+) -> tuple[float, float]:
+    st.markdown("**Financial Information**")
+    if estimate_note:
+        st.caption(estimate_note)
+    fc1, fc2 = st.columns(2, gap="medium")
+    with fc1:
+        if editable:
+            if contract_key not in st.session_state:
+                st.session_state[contract_key] = float(initial_contract or 0)
+            contract = float(
+                st.number_input(
+                    "Contract Value ($)",
+                    min_value=0.0,
+                    step=100.0,
+                    format="%.2f",
+                    key=contract_key,
+                )
+            )
+        else:
+            st.markdown(
+                f"**Contract Value ($)**  \n{_money_cell(initial_contract, available=initial_contract > 0)}"
+            )
+            contract = float(initial_contract or 0)
+    with fc2:
+        if editable:
+            if estimated_key not in st.session_state:
+                st.session_state[estimated_key] = float(initial_estimated or 0)
+            estimated = float(
+                st.number_input(
+                    "Estimated Cost ($)",
+                    min_value=0.0,
+                    step=100.0,
+                    format="%.2f",
+                    key=estimated_key,
+                )
+            )
+        else:
+            st.markdown(
+                f"**Estimated Cost ($)**  \n{_money_cell(initial_estimated, available=initial_estimated > 0)}"
+            )
+            estimated = float(initial_estimated or 0)
+    _render_projected_financial_caption(contract_value=contract, estimated_cost=estimated)
+    return contract, estimated
+
+
 def _compute_job_list_cost_fields(job: dict, *, sync_if_empty: bool = False) -> dict[str, float | dict | bool]:
     """Costing snapshot for list/detail; ledger backfill only when ``sync_if_empty``."""
     defaults: dict[str, float | dict | bool] = {
         "contract_value": 0.0,
+        "estimated_cost": 0.0,
         "actual_cost": 0.0,
         "profit": 0.0,
         "margin_pct": 0.0,
         "raw_summary": {},
         "has_contract": False,
+        "has_estimated": False,
         "has_actual": False,
     }
     jid = str(job.get("id") or "").strip()
@@ -472,17 +569,37 @@ def _compute_job_list_cost_fields(job: dict, *, sync_if_empty: bool = False) -> 
             summary = build_job_cost_summary(job)
         summary = _enrich_job_cost_summary(job, summary)
         defaults["contract_value"] = float(summary.get("contract_value") or 0)
+        defaults["estimated_cost"] = float(summary.get("estimated_cost") or 0)
         defaults["actual_cost"] = float(summary.get("actual_cost") or 0)
-        defaults["profit"] = float(summary.get("profit") or 0)
-        defaults["margin_pct"] = float(summary.get("margin_pct") or 0)
+        profit, margin = _projected_job_financials(
+            float(defaults["contract_value"]),
+            float(defaults["estimated_cost"]),
+        )
+        defaults["profit"] = profit
+        defaults["margin_pct"] = margin
         defaults["raw_summary"] = summary
     except Exception:
         try:
             defaults["contract_value"] = float(job.get("awarded_amount") or job.get("contract_value") or 0)
         except (TypeError, ValueError):
             defaults["contract_value"] = 0.0
+        try:
+            defaults["estimated_cost"] = float(job.get("estimated_cost") or 0)
+        except (TypeError, ValueError):
+            defaults["estimated_cost"] = 0.0
+        profit, margin = _projected_job_financials(
+            float(defaults["contract_value"]),
+            float(defaults["estimated_cost"]),
+        )
+        defaults["profit"] = profit
+        defaults["margin_pct"] = margin
     txn_count = int(summary.get("transaction_count") or 0) if isinstance(summary, dict) else 0
-    defaults["has_contract"] = bool(summary.get("has_contract_value")) if isinstance(summary, dict) else False
+    defaults["has_contract"] = bool(summary.get("has_contract_value")) if isinstance(summary, dict) else (
+        float(defaults["contract_value"]) > 0
+    )
+    defaults["has_estimated"] = bool(summary.get("has_estimated_cost")) if isinstance(summary, dict) else (
+        float(defaults["estimated_cost"]) > 0
+    )
     defaults["has_actual"] = txn_count > 0 or float(defaults["actual_cost"]) > 0
     return defaults
 
@@ -713,7 +830,7 @@ def _render_custom_jobs_table(
             status = _normalize_job_status(job.get("status"))
             costs = _job_list_cost_fields(job, cost_cache=cost_cache)
             contract_val = float(costs["contract_value"])
-            actual_val = float(costs["actual_cost"])
+            estimated_val = float(costs["estimated_cost"])
             profit_val = float(costs["profit"])
             margin_val = float(costs["margin_pct"])
             open_subjobs = _job_open_subjobs_count(job, subjob_counts=subjob_counts)
@@ -789,7 +906,7 @@ def _render_custom_jobs_table(
 
             profit_cls = ""
             has_contract = bool(costs.get("has_contract"))
-            has_actual = bool(costs.get("has_actual"))
+            has_estimated = bool(costs.get("has_estimated"))
             has_profit_data = has_contract
             if has_profit_data:
                 if profit_val > 0:
@@ -803,9 +920,9 @@ def _render_custom_jobs_table(
                     unsafe_allow_html=True,
                 )
             with cols[6]:
-                actual_cls = _money_cell_class(actual_val, available=has_actual)
+                estimated_cls = _money_cell_class(estimated_val, available=has_estimated)
                 st.markdown(
-                    f'<div class="ips-jobs-money ips-jobs-cell{actual_cls}">{html.escape(_money_cell(actual_val, available=has_actual))}</div>',
+                    f'<div class="ips-jobs-money ips-jobs-cell{estimated_cls}">{html.escape(_money_cell(estimated_val, available=has_estimated))}</div>',
                     unsafe_allow_html=True,
                 )
             with cols[7]:
@@ -999,6 +1116,9 @@ def _seed_job_edit_form(job: dict) -> None:
     st.session_state[f"job_edit_prog_{job_key}"] = int(job.get("progress") or 0)
     st.session_state[f"job_edit_scope_{job_key}"] = str(job.get("scope") or job.get("description") or "")
     st.session_state[f"job_edit_notes_{job_key}"] = str(job.get("notes") or "")
+    fin = _job_financial_snapshot(job)
+    st.session_state[f"job_edit_contract_{job_key}"] = float(fin.get("contract_value") or 0)
+    st.session_state[f"job_edit_estimated_{job_key}"] = float(fin.get("estimated_cost") or 0)
 
 
 def _open_jobs_detail_modal(job_id: str, _job: dict | None = None) -> None:
@@ -1949,6 +2069,30 @@ def _render_job_detail_tabs(job: dict) -> None:
             f"</div>",
             unsafe_allow_html=True,
         )
+        fin = _job_financial_snapshot(job)
+        fin_left = (
+            f'<div class="ips-detail-grid">'
+            f"{_detail_field('Contract Value', _money_cell(float(fin['contract_value']), available=bool(fin['has_contract'])))}"
+            f"{_detail_field('Estimated Cost', _money_cell(float(fin['estimated_cost']), available=bool(fin['has_estimated'])))}"
+            f"</div>"
+        )
+        fin_right = (
+            f'<div class="ips-detail-grid">'
+            f"{_detail_field('Projected Gross Profit', _money_cell(float(fin['gross_profit']), available=bool(fin['has_contract'])))}"
+            f"{_detail_field('Projected Margin %', _pct_cell(float(fin['margin_pct'])) if fin['has_contract'] else '—')}"
+            f"</div>"
+        )
+        fin_note = ""
+        if not _job_financials_editable(job):
+            fin_note = (
+                '<p style="margin:0.35rem 0 0;font-size:0.8125rem;color:#64748b;">'
+                "Contract and estimated cost are synced from the linked approved estimate."
+                "</p>"
+            )
+        st.markdown(
+            f'{_dialog_card("Financial Information", fin_left + fin_right + fin_note)}',
+            unsafe_allow_html=True,
+        )
         if st.button(
             "Edit Overview",
             key=f"jobs_overview_edit_{_job_session_key(job)}",
@@ -2134,6 +2278,22 @@ def _render_job_edit_form(job: dict) -> None:
     st.text_area("Scope of work", key=f"job_edit_scope_{job_key}", height=120)
     st.text_area("Notes", key=f"job_edit_notes_{job_key}", height=100)
 
+    fin = _job_financial_snapshot(job)
+    fin_editable = _job_financials_editable(job)
+    _render_job_financial_inputs(
+        key_prefix=job_key,
+        contract_key=f"job_edit_contract_{job_key}",
+        estimated_key=f"job_edit_estimated_{job_key}",
+        initial_contract=float(fin["contract_value"] or 0),
+        initial_estimated=float(fin["estimated_cost"] or 0),
+        editable=fin_editable,
+        estimate_note=(
+            "Values are managed by the linked approved estimate and cannot be edited here."
+            if not fin_editable
+            else ""
+        ),
+    )
+
     btn_cancel, btn_spacer, btn_save = st.columns([1, 4, 1], gap="small")
     with btn_cancel:
         if st.button("Cancel", key=f"{pk}_cancel"):
@@ -2157,6 +2317,9 @@ def _render_job_edit_form(job: dict) -> None:
                 "description": scope_text,
                 "notes": notes_text or scope_text,
             }
+            if fin_editable:
+                ui["contract_value"] = st.session_state.get(f"job_edit_contract_{job_key}")
+                ui["estimated_cost"] = st.session_state.get(f"job_edit_estimated_{job_key}")
             ok, msg = persist_job(ui, row_id=jid or None)
             if ok:
                 st.session_state[edit_mode_key] = False
@@ -2391,6 +2554,14 @@ def render() -> None:
                     from services.jobs_service import MANUAL_JOB_STATUSES  # type: ignore
                 st.selectbox("Status", list(MANUAL_JOB_STATUSES), key="job_new_status")
             st.text_area("Description", key="job_new_desc")
+            _render_job_financial_inputs(
+                key_prefix="job_new",
+                contract_key="job_new_contract",
+                estimated_key="job_new_estimated",
+                initial_contract=float(st.session_state.get("job_new_contract") or 0),
+                initial_estimated=float(st.session_state.get("job_new_estimated") or 0),
+                editable=True,
+            )
             sb1, sb2 = st.columns(2)
             with sb1:
                 if st.button("Save job", key="job_save_new", type="primary"):
@@ -2407,6 +2578,8 @@ def render() -> None:
                             "start_date": st.session_state.get("job_new_start"),
                             "end_date": st.session_state.get("job_new_end"),
                             "description": st.session_state.get("job_new_desc"),
+                            "contract_value": st.session_state.get("job_new_contract"),
+                            "estimated_cost": st.session_state.get("job_new_estimated"),
                         }
                     )
                     if apply_persist_feedback(ok, msg, clear_keys=("ips_job_form",)):
