@@ -1276,13 +1276,13 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
         return ServiceResult(ok=False, error="Job number is required.")
 
     payload: dict[str, Any] = {
-        "job_name": ui.get("job_name"),
-        "status": ui.get("status"),
-        "supervisor": ui.get("supervisor"),
-        "project_manager": ui.get("project_manager"),
-        "start_date": ui.get("start_date") or None,
-        "target_completion_date": ui.get("end_date") or None,
-        "notes": ui.get("description") or ui.get("notes") or "",
+        "job_name": _job_save_text(ui.get("job_name")),
+        "status": _job_save_text(ui.get("status"), default="Draft"),
+        "supervisor": _job_save_text(ui.get("supervisor")),
+        "project_manager": _job_save_text(ui.get("project_manager")),
+        "start_date": _job_save_date(ui.get("start_date")),
+        "target_completion_date": _job_save_date(ui.get("end_date")),
+        "notes": _job_save_text(ui.get("description") or ui.get("notes")),
     }
     if not row_id:
         payload["job_number"] = job_number
@@ -1657,6 +1657,17 @@ def _asset_save_date(value: Any) -> str | None:
         return str(value.isoformat())[:10]
     s = str(value).strip()
     return s[:10] if s else None
+
+
+def _job_save_text(value: Any, *, default: str = "") -> str:
+    """Coerce optional job text fields — Postgres NOT NULL text columns reject explicit null."""
+    if value is None:
+        return default
+    return str(value)
+
+
+def _job_save_date(value: Any) -> str | None:
+    return _asset_save_date(value)
 
 
 def _asset_save_number(value: Any) -> float | None:

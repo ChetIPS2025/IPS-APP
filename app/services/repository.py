@@ -154,9 +154,18 @@ def filter_payload_to_table(table: str, payload: dict[str, Any]) -> dict[str, An
 
 def _friendly_repo_error(exc: Exception, *, table: str, action: str) -> str:
     try:
-        from app.auth import friendly_auth_error_message
+        from app.auth import friendly_auth_error_message, is_jwt_expired_error
     except ImportError:
-        from auth import friendly_auth_error_message  # type: ignore
+        from auth import friendly_auth_error_message, is_jwt_expired_error  # type: ignore
+    if is_jwt_expired_error(exc):
+        return friendly_auth_error_message(exc, operation=f"{action} {table}")
+    low = str(exc or "").casefold()
+    if "23505" in low or "duplicate key" in low or "unique constraint" in low:
+        if table == "jobs":
+            return "A job with this job number already exists. Choose a different number."
+        return "That record already exists. Please refresh and try again."
+    if "23502" in low or "not-null constraint" in low:
+        return f"Missing required information for {table.replace('_', ' ')}. Check required fields and try again."
     return friendly_auth_error_message(exc, operation=f"{action} {table}")
 
 
