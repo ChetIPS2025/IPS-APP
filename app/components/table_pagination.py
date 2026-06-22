@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-DEFAULT_CATALOG_PAGE_SIZE = 75
+DEFAULT_CATALOG_PAGE_SIZE = 50
 _PAGE_SIZE_OPTIONS = (50, 75, 100, 150)
 _PAGINATION_CSS_KEY = "_ips_table_pagination_css"
 

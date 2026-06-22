@@ -42,7 +42,8 @@ class AllocationRenderDeps:
     handle_day_submit_for_date: Callable[[dict, date, str], bool]
     handle_day_approve_for_date: Callable[[dict, date, str], bool]
     handle_day_reject_for_date: Callable[[dict, date, str], bool]
-    auto_save_allocation_day: Callable[[str], None]
+    mark_allocation_dirty: Callable[[str], None]
+    save_allocation_day: Callable[[str], None]
     alloc_autosave_status_html: Callable[[str], str]
 
 
@@ -242,7 +243,7 @@ def _append_assignment_line(
     )
     by_date[iso] = day_lines
     st.session_state[deps.alloc_state_key(eid)] = by_date
-    deps.auto_save_allocation_day(iso)
+    deps.mark_allocation_dirty(iso)
     st.rerun()
 
 
@@ -264,6 +265,8 @@ def _render_day_actions_bar(
     action_slots: list[str] = []
     if hours_editable:
         action_slots.append("add")
+        if ctx.daily_total > 0:
+            action_slots.append("save")
     if (
         hours_editable
         and ctx.can_submit
@@ -315,6 +318,14 @@ def _render_day_actions_bar(
                         help="Add another assignment row for this day",
                     ):
                         _append_assignment_line(deps=deps, ctx=ctx)
+                elif slot == "save":
+                    if st.button(
+                        "Save day",
+                        key=f"tk_save_day_{ctx.eid}_{ctx.week_sig}_{ctx.iso}",
+                        type="primary",
+                    ):
+                        deps.save_allocation_day(ctx.iso)
+                        st.rerun()
                 elif slot == "submit":
                     if st.button(
                         "Submit day",
@@ -379,7 +390,7 @@ def _render_allocation_row_secondary_actions(
         ):
             ctx.by_date[ctx.iso] = [ln for j, ln in enumerate(lines) if j != lix]
             st.session_state[deps.alloc_state_key(ctx.eid)] = ctx.by_date
-            deps.auto_save_allocation_day(ctx.iso)
+            deps.mark_allocation_dirty(ctx.iso)
             action_taken = True
     if action_taken:
         st.rerun()
@@ -420,7 +431,7 @@ def render_allocation_control_row(
         hour_type = deps.normalize_alloc_hour_type(st.session_state[type_key])
     is_primary_row = lix == 0
     line_scope = allocation_panel_scope_key(f"{ctx.panel_scope}_{iso}_{lix}")
-    autosave_cb = deps.auto_save_allocation_day if row_editable else None
+    autosave_cb = deps.mark_allocation_dirty if row_editable else None
     autosave_args = (iso,)
     with st.container(key=f"tk_alloc_line_{line_scope}"):
         row_cols = st.columns(ALLOC_LINE_COLS, gap="small")

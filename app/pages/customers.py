@@ -49,7 +49,7 @@ try:
     from app.components.status import status_pill_html
     from app.components.tables import render_data_table
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
-    from app.pages._core._data import estimates_for_customer, jobs_for_customer
+    from app.pages._core._data import estimates_for_customer, jobs_for_customer, load_estimates, load_jobs
     from app.pages._core._session import select_key
     from app.services.customers_service import (
         CONTACT_ROLE_TYPES,
@@ -109,7 +109,7 @@ except ImportError:
     from components.status import status_pill_html  # type: ignore
     from components.tables import render_data_table  # type: ignore
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
-    from pages._core._data import estimates_for_customer, jobs_for_customer  # type: ignore
+    from pages._core._data import estimates_for_customer, jobs_for_customer, load_estimates, load_jobs  # type: ignore
     from pages._core._session import select_key  # type: ignore
     from services.customers_service import (  # type: ignore
         CONTACT_ROLE_TYPES,
@@ -403,21 +403,46 @@ def _yes_dash(value: object) -> str:
     return "Yes" if bool(value) else "—"
 
 
+def _open_counts_by_customer_name(
+    jobs: list[dict],
+    estimates: list[dict],
+) -> tuple[dict[str, int], dict[str, int]]:
+    open_jobs: dict[str, int] = {}
+    open_ests: dict[str, int] = {}
+    for job in jobs:
+        name = str(job.get("customer") or "").strip().lower()
+        if not name:
+            continue
+        if str(job.get("status") or "").strip().lower() not in _CLOSED_JOB_STATUSES:
+            open_jobs[name] = open_jobs.get(name, 0) + 1
+    for est in estimates:
+        name = str(est.get("customer") or "").strip().lower()
+        if not name:
+            continue
+        if str(est.get("status") or "").strip().lower() not in _CLOSED_EST_STATUSES:
+            open_ests[name] = open_ests.get(name, 0) + 1
+    return open_jobs, open_ests
+
+
 def _enrich_list_rows(rows: list[dict]) -> list[dict]:
-    out: list[dict] = []
-    for row in rows:
-        cname = str(row.get("customer_name") or row.get("company_name") or "")
-        jobs = jobs_for_customer(cname)
-        ests = estimates_for_customer(cname)
-        enriched = dict(row)
-        enriched["open_jobs"] = sum(
-            1 for j in jobs if str(j.get("status") or "").strip().lower() not in _CLOSED_JOB_STATUSES
-        )
-        enriched["open_estimates"] = sum(
-            1 for e in ests if str(e.get("status") or "").strip().lower() not in _CLOSED_EST_STATUSES
-        )
-        out.append(enriched)
-    return out
+    try:
+        from app.perf_debug import perf_span
+    except ImportError:
+        from perf_debug import perf_span  # type: ignore
+
+    with perf_span("customers.enrich_list_rows"):
+        jobs = load_jobs()
+        estimates = load_estimates()
+        open_jobs_by_name, open_ests_by_name = _open_counts_by_customer_name(jobs, estimates)
+        out: list[dict] = []
+        for row in rows:
+            cname = str(row.get("customer_name") or row.get("company_name") or "")
+            key = cname.strip().lower()
+            enriched = dict(row)
+            enriched["open_jobs"] = open_jobs_by_name.get(key, 0)
+            enriched["open_estimates"] = open_ests_by_name.get(key, 0)
+            out.append(enriched)
+        return out
 
 
 def _apply_customers_search_filter(rows: list[dict], q: str) -> list[dict]:

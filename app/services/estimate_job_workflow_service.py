@@ -759,6 +759,13 @@ def sync_estimate_job_links_and_financials(
         job_patch["awarded_amount"] = round(customer_price, 2)
     if internal_cost > 0:
         job_patch["estimated_cost"] = round(internal_cost, 2)
+    try:
+        from app.services.job_financial_ui import apply_projected_financials_to_job_payload
+    except ImportError:
+        from services.job_financial_ui import apply_projected_financials_to_job_payload  # type: ignore
+    projected = apply_projected_financials_to_job_payload({**job, **job_patch})
+    job_patch["projected_gross_profit"] = projected["projected_gross_profit"]
+    job_patch["projected_margin_pct"] = projected["projected_margin_pct"]
     if actor:
         job_patch.setdefault("approved_by", actor)
     job_patch.setdefault("approved_at", now)

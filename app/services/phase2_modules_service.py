@@ -498,6 +498,8 @@ def normalize_job(row: dict[str, Any]) -> dict[str, Any]:
         "deleted_at": row.get("deleted_at"),
         "awarded_amount": _money_field(row, "awarded_amount", "contract_value"),
         "estimated_cost": _money_field(row, "estimated_cost"),
+        "projected_gross_profit": _money_field(row, "projected_gross_profit"),
+        "projected_margin_pct": _money_field(row, "projected_margin_pct"),
     }
 
 
@@ -1325,11 +1327,25 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
     if estimated_cost is not None:
         payload["estimated_cost"] = estimated_cost
 
+    prior: dict[str, Any] = {}
     if row_id:
         try:
             from app.db import fetch_one
         except ImportError:
             from db import fetch_one  # type: ignore
+        prior = fetch_one("jobs", {"id": row_id}) or {}
+
+    try:
+        from app.services.job_financial_ui import apply_projected_financials_to_job_payload
+    except ImportError:
+        from services.job_financial_ui import apply_projected_financials_to_job_payload  # type: ignore
+    projected = apply_projected_financials_to_job_payload({**prior, **payload})
+    if not cols or "projected_gross_profit" in cols:
+        payload["projected_gross_profit"] = projected["projected_gross_profit"]
+    if not cols or "projected_margin_pct" in cols:
+        payload["projected_margin_pct"] = projected["projected_margin_pct"]
+
+    if row_id:
         try:
             from app.services.estimate_job_workflow_service import award_job_and_sync_estimate
             from app.services.jobs_service import normalize_job_status
@@ -1337,7 +1353,6 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
             from services.estimate_job_workflow_service import award_job_and_sync_estimate  # type: ignore
             from services.jobs_service import normalize_job_status  # type: ignore
 
-        prior = fetch_one("jobs", {"id": row_id}) or {}
         new_status = normalize_job_status(ui.get("status") or prior.get("status"))
         old_status = normalize_job_status(prior.get("status"))
         awarded_missing = _money_field(prior, "awarded_amount") <= 0

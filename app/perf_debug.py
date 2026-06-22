@@ -29,12 +29,12 @@ def perf_span(name: str) -> Iterator[None]:
         yield
     finally:
         dt_ms = (time.perf_counter() - t0) * 1000.0
-        _log.warning("[perf] %s: %.1f ms", name, dt_ms)
+        _LOG.warning("[perf] %s: %.1f ms", name, dt_ms)
 
 
 def perf_log(name: str, dt_seconds: float) -> None:
     if perf_enabled():
-        _log.warning("[perf] %s: %.1f ms", name, dt_seconds * 1000.0)
+        _LOG.warning("[perf] %s: %.1f ms", name, dt_seconds * 1000.0)
 
 
 def perf_now() -> float:

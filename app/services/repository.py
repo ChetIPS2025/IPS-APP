@@ -51,6 +51,18 @@ def _clear_all_data_caches_impl() -> None:
             clear_session_table_cache()
         except Exception:
             pass
+    try:
+        from app.pages._core._data import clear_all_catalog_list_caches
+    except ImportError:
+        try:
+            from pages._core._data import clear_all_catalog_list_caches  # type: ignore
+        except ImportError:
+            clear_all_catalog_list_caches = None  # type: ignore
+    if clear_all_catalog_list_caches:
+        try:
+            clear_all_catalog_list_caches()
+        except Exception:
+            pass
 
 
 def _db():

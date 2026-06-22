@@ -83,6 +83,57 @@ def _primary_location(locations: list[dict[str, Any]]) -> dict[str, Any] | None:
     return primary or locations[0]
 
 
+def _bulk_locations_by_customer_id() -> dict[str, list[dict[str, Any]]]:
+    try:
+        from app.services.repository import fetch_rows
+    except ImportError:
+        from services.repository import fetch_rows  # type: ignore
+    rows, err = fetch_rows("customer_locations", limit=5000)
+    if err:
+        out: dict[str, list[dict[str, Any]]] = {}
+        for row in _demo_locations():
+            cid = str(row.get("customer_id") or "").strip()
+            if cid:
+                out.setdefault(cid, []).append(normalize_customer_location(row))
+        return out
+    out: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        cid = str(row.get("customer_id") or "").strip()
+        if not cid:
+            continue
+        out.setdefault(cid, []).append(normalize_customer_location(row))
+    for locs in out.values():
+        locs.sort(
+            key=lambda r: (
+                str(r.get("location_name") or r.get("site_name") or "").lower(),
+                str(r.get("id") or ""),
+            )
+        )
+    return out
+
+
+def _bulk_contacts_by_customer_id() -> dict[str, list[dict[str, Any]]]:
+    try:
+        from app.services.repository import fetch_rows
+    except ImportError:
+        from services.repository import fetch_rows  # type: ignore
+    rows, err = fetch_rows("customer_contacts", limit=5000, alt_tables=("contacts",))
+    if err:
+        out: dict[str, list[dict[str, Any]]] = {}
+        for row in _demo_contacts():
+            cid = str(row.get("customer_id") or "").strip()
+            if cid:
+                out.setdefault(cid, []).append(normalize_customer_contact(row))
+        return out
+    out: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        cid = str(row.get("customer_id") or "").strip()
+        if not cid:
+            continue
+        out.setdefault(cid, []).append(normalize_customer_contact(row))
+    return out
+
+
 def _enrich_customer(
     customer: dict[str, Any],
     *,
@@ -110,7 +161,16 @@ def get_customers(*, enrich: bool = True) -> list[dict[str, Any]]:
     rows, _ = list_customers(demo=_demo_customers())
     if not enrich:
         return rows
-    return [_enrich_customer(row) for row in rows]
+    locs_by_cid = _bulk_locations_by_customer_id()
+    cons_by_cid = _bulk_contacts_by_customer_id()
+    return [
+        _enrich_customer(
+            row,
+            locations=locs_by_cid.get(str(row.get("id") or "").strip(), []),
+            contacts=cons_by_cid.get(str(row.get("id") or "").strip(), []),
+        )
+        for row in rows
+    ]
 
 
 def get_customer(customer_id: str) -> dict[str, Any] | None:

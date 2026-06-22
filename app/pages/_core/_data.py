@@ -7,6 +7,22 @@ from typing import Any
 
 import streamlit as st
 
+CATALOG_CACHE_TTL = 300
+_CATALOG_SESSION_KEY = "_ips_catalog_datasets"
+
+
+def _catalog_session_get(name: str, loader):
+    """Mirror cached catalog rows in session for fast reuse within a user session."""
+    store = st.session_state.setdefault(_CATALOG_SESSION_KEY, {})
+    if name not in store:
+        store[name] = loader()
+    return store[name]
+
+
+def clear_catalog_session_datasets() -> None:
+    st.session_state.pop(_CATALOG_SESSION_KEY, None)
+
+
 try:
     from app.utils.dates import week_dates
 except ImportError:
@@ -134,12 +150,27 @@ def _mark_if_demo(used: bool) -> None:
 
 def load_jobs() -> list[dict[str, Any]]:
     try:
+        from app.perf_debug import perf_span
+    except ImportError:
+        from perf_debug import perf_span  # type: ignore
+
+    def _load() -> list[dict[str, Any]]:
+        rows, used = _cached_jobs_rows()
+        _mark_if_demo(used)
+        return list(rows)
+
+    with perf_span("data.load_jobs"):
+        return _catalog_session_get("jobs", _load)
+
+
+@st.cache_data(ttl=CATALOG_CACHE_TTL, show_spinner=False)
+def _cached_jobs_rows() -> tuple[tuple[dict[str, Any], ...], bool]:
+    try:
         from app.services.jobs_service import list_jobs
     except ImportError:
         from services.jobs_service import list_jobs  # type: ignore
     rows, used = list_jobs(demo=list(_DEMO_JOBS))
-    _mark_if_demo(used)
-    return rows
+    return tuple(rows), used
 
 
 def load_dashboard_kpis() -> dict[str, Any]:
@@ -561,12 +592,27 @@ _DEMO_ASSETS: list[dict[str, Any]] = [
 
 def load_estimates() -> list[dict[str, Any]]:
     try:
+        from app.perf_debug import perf_span
+    except ImportError:
+        from perf_debug import perf_span  # type: ignore
+
+    def _load() -> list[dict[str, Any]]:
+        rows, used = _cached_estimates_rows()
+        _mark_if_demo(used)
+        return list(rows)
+
+    with perf_span("data.load_estimates"):
+        return _catalog_session_get("estimates", _load)
+
+
+@st.cache_data(ttl=CATALOG_CACHE_TTL, show_spinner=False)
+def _cached_estimates_rows() -> tuple[tuple[dict[str, Any], ...], bool]:
+    try:
         from app.services.estimates_service import list_estimates
     except ImportError:
         from services.estimates_service import list_estimates  # type: ignore
     rows, used = list_estimates(demo=list(_DEMO_ESTIMATES))
-    _mark_if_demo(used)
-    return rows
+    return tuple(rows), used
 
 
 def get_estimate(estimate_id: str) -> dict[str, Any] | None:
@@ -613,7 +659,49 @@ def clear_assets_list_cache() -> None:
     _cached_assets_rows.clear()
 
 
-@st.cache_data(ttl=120, show_spinner=False)
+def clear_jobs_list_cache() -> None:
+    _cached_jobs_rows.clear()
+
+
+def clear_customers_list_cache() -> None:
+    _cached_customers_rows.clear()
+
+
+def clear_employees_list_cache() -> None:
+    _cached_employees_rows.clear()
+
+
+def clear_estimates_list_cache() -> None:
+    _cached_estimates_rows.clear()
+
+
+def clear_user_profiles_cache() -> None:
+    _cached_user_profiles.clear()
+
+
+def clear_labor_rates_cache() -> None:
+    _cached_labor_rates_rows.clear()
+
+
+def clear_all_catalog_list_caches() -> None:
+    """Invalidate Streamlit catalog caches after mutations."""
+    clear_catalog_session_datasets()
+    clear_inventory_list_cache()
+    clear_assets_list_cache()
+    clear_jobs_list_cache()
+    clear_customers_list_cache()
+    clear_employees_list_cache()
+    clear_estimates_list_cache()
+    clear_user_profiles_cache()
+    clear_labor_rates_cache()
+    try:
+        from app.services.pricing_guide_service import clear_pricing_guide_cache
+    except ImportError:
+        from services.pricing_guide_service import clear_pricing_guide_cache  # type: ignore
+    clear_pricing_guide_cache()
+
+
+@st.cache_data(ttl=CATALOG_CACHE_TTL, show_spinner=False)
 def _cached_inventory_rows() -> tuple[tuple[dict[str, Any], ...], bool]:
     try:
         from app.services.inventory_service import list_inventory
@@ -623,7 +711,7 @@ def _cached_inventory_rows() -> tuple[tuple[dict[str, Any], ...], bool]:
     return tuple(rows), used
 
 
-@st.cache_data(ttl=120, show_spinner=False)
+@st.cache_data(ttl=CATALOG_CACHE_TTL, show_spinner=False)
 def _cached_assets_rows() -> tuple[tuple[dict[str, Any], ...], bool]:
     try:
         from app.services.assets_service import list_assets
@@ -754,12 +842,27 @@ _DEMO_EVENTS: list[dict[str, Any]] = [
 
 def load_employees() -> list[dict[str, Any]]:
     try:
+        from app.perf_debug import perf_span
+    except ImportError:
+        from perf_debug import perf_span  # type: ignore
+
+    def _load() -> list[dict[str, Any]]:
+        rows, used = _cached_employees_rows()
+        _mark_if_demo(used)
+        return list(rows)
+
+    with perf_span("data.load_employees"):
+        return _catalog_session_get("employees", _load)
+
+
+@st.cache_data(ttl=CATALOG_CACHE_TTL, show_spinner=False)
+def _cached_employees_rows() -> tuple[tuple[dict[str, Any], ...], bool]:
+    try:
         from app.services.employees_service import list_employees
     except ImportError:
         from services.employees_service import list_employees  # type: ignore
     rows, used = list_employees(demo=list(_DEMO_EMPLOYEES))
-    _mark_if_demo(used)
-    return rows
+    return tuple(rows), used
 
 
 def is_workforce_employee(emp: dict[str, Any]) -> bool:
@@ -1774,12 +1877,71 @@ _DEMO_CUSTOMER_CONTACTS: list[dict[str, Any]] = [
 
 def load_customers() -> list[dict[str, Any]]:
     try:
+        from app.perf_debug import perf_span
+    except ImportError:
+        from perf_debug import perf_span  # type: ignore
+
+    def _load() -> list[dict[str, Any]]:
+        rows, used = _cached_customers_rows()
+        _mark_if_demo(used)
+        return list(rows)
+
+    with perf_span("data.load_customers"):
+        return _catalog_session_get("customers", _load)
+
+
+@st.cache_data(ttl=CATALOG_CACHE_TTL, show_spinner=False)
+def _cached_customers_rows() -> tuple[tuple[dict[str, Any], ...], bool]:
+    try:
         from app.services.customers_service import list_customers
     except ImportError:
         from services.customers_service import list_customers  # type: ignore
     rows, used = list_customers(demo=list(_DEMO_CUSTOMERS))
-    _mark_if_demo(used)
-    return rows
+    return tuple(rows), used
+
+
+def load_user_profiles(*, limit: int = 200) -> list[dict[str, Any]]:
+    try:
+        from app.perf_debug import perf_span
+    except ImportError:
+        from perf_debug import perf_span  # type: ignore
+
+    def _load() -> list[dict[str, Any]]:
+        return list(_cached_user_profiles(limit))
+
+    with perf_span("data.load_user_profiles"):
+        return _catalog_session_get(f"users_{limit}", _load)
+
+
+@st.cache_data(ttl=CATALOG_CACHE_TTL, show_spinner=False)
+def _cached_user_profiles(limit: int) -> tuple[dict[str, Any], ...]:
+    try:
+        from app.services.users_service import list_profiles
+    except ImportError:
+        from services.users_service import list_profiles  # type: ignore
+    return tuple(list_profiles(limit=limit))
+
+
+def load_labor_rates(*, active_only: bool = False) -> list[dict[str, Any]]:
+    try:
+        from app.perf_debug import perf_span
+    except ImportError:
+        from perf_debug import perf_span  # type: ignore
+
+    def _load() -> list[dict[str, Any]]:
+        return list(_cached_labor_rates_rows(active_only))
+
+    with perf_span("data.load_labor_rates"):
+        return _catalog_session_get(f"labor_rates_{active_only}", _load)
+
+
+@st.cache_data(ttl=CATALOG_CACHE_TTL, show_spinner=False)
+def _cached_labor_rates_rows(active_only: bool) -> tuple[dict[str, Any], ...]:
+    try:
+        from app.services.labor_rates_service import list_labor_rates
+    except ImportError:
+        from services.labor_rates_service import list_labor_rates  # type: ignore
+    return tuple(list_labor_rates(active_only=active_only))
 
 
 def get_customer(customer_id: str) -> dict[str, Any] | None:

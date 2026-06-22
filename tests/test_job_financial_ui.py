@@ -6,6 +6,8 @@ import unittest
 from unittest.mock import patch
 
 from app.services.job_financial_ui import (
+    apply_projected_financials_to_job_payload,
+    job_list_financials_from_row,
     job_manual_financials_editable,
     projected_gross_profit,
     projected_margin_pct,
@@ -33,6 +35,26 @@ class TestJobFinancialUi(unittest.TestCase):
                 {"id": "j1", "estimate_id": "e1", "status": "Active", "awarded_amount": 1000}
             )
         )
+
+    def test_apply_projected_financials_to_payload(self) -> None:
+        payload = apply_projected_financials_to_job_payload(
+            {"awarded_amount": 10000, "estimated_cost": 7000}
+        )
+        self.assertEqual(payload["projected_gross_profit"], 3000)
+        self.assertEqual(payload["projected_margin_pct"], 30.0)
+
+    def test_job_list_financials_from_row(self) -> None:
+        fin = job_list_financials_from_row(
+            {
+                "awarded_amount": 5000,
+                "estimated_cost": 4000,
+                "projected_gross_profit": 1000,
+                "projected_margin_pct": 20.0,
+            }
+        )
+        self.assertEqual(fin["contract_value"], 5000)
+        self.assertEqual(fin["profit"], 1000)
+        self.assertEqual(fin["margin_pct"], 20.0)
 
 
 if __name__ == "__main__":

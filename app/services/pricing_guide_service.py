@@ -394,7 +394,7 @@ def fetch_pricing_guide_rows(
     return out
 
 
-@st.cache_data(ttl=120, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def cached_pricing_guide_rows(*, include_inactive: bool = True) -> list[dict[str, Any]]:
     return fetch_pricing_guide_rows(include_inactive=include_inactive)
 

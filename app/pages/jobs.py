@@ -471,15 +471,14 @@ def _job_financials_editable(job: dict) -> bool:
 
 
 def _job_financial_snapshot(job: dict) -> dict[str, float | bool]:
-    costs = _compute_job_list_cost_fields(job, sync_if_empty=False)
+    costs = _job_list_financials_from_row(job)
     contract = float(costs.get("contract_value") or 0)
     estimated = float(costs.get("estimated_cost") or 0)
-    profit, margin = _projected_job_financials(contract, estimated)
     return {
         "contract_value": contract,
         "estimated_cost": estimated,
-        "gross_profit": profit,
-        "margin_pct": margin,
+        "gross_profit": float(costs.get("profit") or 0),
+        "margin_pct": float(costs.get("margin_pct") or 0),
         "has_contract": bool(costs.get("has_contract")),
         "has_estimated": bool(costs.get("has_estimated")),
     }
@@ -547,6 +546,26 @@ def _render_job_financial_inputs(
     return contract, estimated
 
 
+def _job_list_financials_from_row(job: dict) -> dict[str, float | dict | bool]:
+    """List/table financials from stored job columns (no ledger queries)."""
+    try:
+        from app.services.job_financial_ui import job_list_financials_from_row
+    except ImportError:
+        from services.job_financial_ui import job_list_financials_from_row  # type: ignore
+    fin = job_list_financials_from_row(job)
+    return {
+        "contract_value": float(fin["contract_value"]),
+        "estimated_cost": float(fin["estimated_cost"]),
+        "actual_cost": float(fin["actual_cost"]),
+        "profit": float(fin["profit"]),
+        "margin_pct": float(fin["margin_pct"]),
+        "raw_summary": {},
+        "has_contract": bool(fin["has_contract"]),
+        "has_estimated": bool(fin["has_estimated"]),
+        "has_actual": bool(fin["has_actual"]),
+    }
+
+
 def _compute_job_list_cost_fields(job: dict, *, sync_if_empty: bool = False) -> dict[str, float | dict | bool]:
     """Costing snapshot for list/detail; ledger backfill only when ``sync_if_empty``."""
     defaults: dict[str, float | dict | bool] = {
@@ -610,7 +629,7 @@ def _build_jobs_list_cost_cache(jobs: list[dict]) -> dict[str, dict[str, float |
         jid = str(job.get("id") or "").strip()
         if not jid or jid in cache:
             continue
-        cache[jid] = _compute_job_list_cost_fields(job, sync_if_empty=False)
+        cache[jid] = _job_list_financials_from_row(job)
     return cache
 
 
@@ -622,12 +641,11 @@ def _job_list_cost_fields(
     jid = str(job.get("id") or "").strip()
     if cost_cache is not None and jid and jid in cost_cache:
         return cost_cache[jid]
-    return _compute_job_list_cost_fields(job, sync_if_empty=False)
+    return _job_list_financials_from_row(job)
 
 
 def _jobs_summary_counts(
     rows: list[dict],
-    cost_cache: dict[str, dict[str, float | dict | bool]],
     subjob_counts: dict[str, int],
 ) -> dict[str, float | int]:
     counts: dict[str, float | int] = {
@@ -654,9 +672,7 @@ def _jobs_summary_counts(
             counts["draft"] += 1
         jid = str(job.get("id") or "").strip()
         counts["open_subjobs"] += _job_open_subjobs_count(job, subjob_counts=subjob_counts)
-        costs = cost_cache.get(jid) if jid else None
-        if not isinstance(costs, dict):
-            continue
+        costs = _job_list_financials_from_row(job)
         counts["total_contract"] = float(counts["total_contract"]) + float(costs["contract_value"])
         counts["total_actual"] = float(counts["total_actual"]) + float(costs["actual_cost"])
         if costs.get("has_contract"):
@@ -2248,85 +2264,90 @@ def _render_job_edit_form(job: dict) -> None:
         status_opts = [cur_status, *status_opts]
     sup_opts = _supervisor_options(job)
 
-    ec1, ec2 = st.columns(2, gap="medium")
-    with ec1:
-        st.text_input("Job number", key=f"job_edit_num_{job_key}")
-        st.text_input("Job name / project description", key=f"job_edit_name_{job_key}")
-        st.selectbox("Customer", cust_opts, key=f"job_edit_cust_{job_key}")
-        cust_name = str(st.session_state.get(f"job_edit_cust_{job_key}") or job.get("customer") or "")
-        location_id = _customer_location_select(
-            customer_name=cust_name,
-            session_key=f"job_edit_location_{job_key}",
-            prev_customer_key=f"job_edit_cust_prev_{job_key}",
-            initial_location_id=_job_customer_location_id(job),
-        )
-        contact_id = _customer_contact_select(
-            customer_name=cust_name,
-            location_id=location_id,
-            session_key=f"job_edit_contact_{job_key}",
-            prev_customer_key=f"job_edit_cust_prev_{job_key}",
-            prev_location_key=f"job_edit_loc_prev_{job_key}",
-            initial_contact_id=str(job.get("customer_contact_id") or ""),
-        )
-        st.selectbox("Status", status_opts, key=f"job_edit_status_{job_key}")
-        st.selectbox("Supervisor", sup_opts, key=f"job_edit_sup_{job_key}")
-    with ec2:
-        st.date_input("Start date", key=f"job_edit_start_{job_key}")
-        st.date_input("End date", key=f"job_edit_end_{job_key}")
-        st.slider("Progress %", 0, 100, key=f"job_edit_prog_{job_key}")
-
-    st.text_area("Scope of work", key=f"job_edit_scope_{job_key}", height=120)
-    st.text_area("Notes", key=f"job_edit_notes_{job_key}", height=100)
-
-    fin = _job_financial_snapshot(job)
-    fin_editable = _job_financials_editable(job)
-    _render_job_financial_inputs(
-        key_prefix=job_key,
-        contract_key=f"job_edit_contract_{job_key}",
-        estimated_key=f"job_edit_estimated_{job_key}",
-        initial_contract=float(fin["contract_value"] or 0),
-        initial_estimated=float(fin["estimated_cost"] or 0),
-        editable=fin_editable,
-        estimate_note=(
-            "Values are managed by the linked approved estimate and cannot be edited here."
-            if not fin_editable
-            else ""
-        ),
+    st.selectbox("Customer", cust_opts, key=f"job_edit_cust_{job_key}")
+    cust_name = str(st.session_state.get(f"job_edit_cust_{job_key}") or job.get("customer") or "")
+    location_id = _customer_location_select(
+        customer_name=cust_name,
+        session_key=f"job_edit_location_{job_key}",
+        prev_customer_key=f"job_edit_cust_prev_{job_key}",
+        initial_location_id=_job_customer_location_id(job),
+    )
+    contact_id = _customer_contact_select(
+        customer_name=cust_name,
+        location_id=location_id,
+        session_key=f"job_edit_contact_{job_key}",
+        prev_customer_key=f"job_edit_cust_prev_{job_key}",
+        prev_location_key=f"job_edit_loc_prev_{job_key}",
+        initial_contact_id=str(job.get("customer_contact_id") or ""),
     )
 
-    btn_cancel, btn_spacer, btn_save = st.columns([1, 4, 1], gap="small")
-    with btn_cancel:
-        if st.button("Cancel", key=f"{pk}_cancel"):
-            _set_job_view_mode(job)
+    with st.form(f"job_edit_form_{job_key}", clear_on_submit=False):
+        ec1, ec2 = st.columns(2, gap="medium")
+        with ec1:
+            st.text_input("Job number", key=f"job_edit_num_{job_key}")
+            st.text_input("Job name / project description", key=f"job_edit_name_{job_key}")
+            st.selectbox("Status", status_opts, key=f"job_edit_status_{job_key}")
+            st.selectbox("Supervisor", sup_opts, key=f"job_edit_sup_{job_key}")
+        with ec2:
+            st.date_input("Start date", key=f"job_edit_start_{job_key}")
+            st.date_input("End date", key=f"job_edit_end_{job_key}")
+            st.slider("Progress %", 0, 100, key=f"job_edit_prog_{job_key}")
+
+        st.text_area("Scope of work", key=f"job_edit_scope_{job_key}", height=120)
+        st.text_area("Notes", key=f"job_edit_notes_{job_key}", height=100)
+
+        fin = _job_financial_snapshot(job)
+        fin_editable = _job_financials_editable(job)
+        _render_job_financial_inputs(
+            key_prefix=job_key,
+            contract_key=f"job_edit_contract_{job_key}",
+            estimated_key=f"job_edit_estimated_{job_key}",
+            initial_contract=float(fin["contract_value"] or 0),
+            initial_estimated=float(fin["estimated_cost"] or 0),
+            editable=fin_editable,
+            estimate_note=(
+                "Values are managed by the linked approved estimate and cannot be edited here."
+                if not fin_editable
+                else ""
+            ),
+        )
+
+        btn_cancel, btn_spacer, btn_save = st.columns([1, 4, 1], gap="small")
+        with btn_cancel:
+            cancelled = st.form_submit_button("Cancel")
+        with btn_save:
+            submitted = st.form_submit_button("Save Changes", type="primary")
+
+    if cancelled:
+        _set_job_view_mode(job)
+        st.rerun()
+    if submitted:
+        scope_text = str(st.session_state.get(f"job_edit_scope_{job_key}") or "").strip()
+        notes_text = str(st.session_state.get(f"job_edit_notes_{job_key}") or "").strip()
+        ui = {
+            "job_number": st.session_state.get(f"job_edit_num_{job_key}"),
+            "job_name": st.session_state.get(f"job_edit_name_{job_key}"),
+            "customer": st.session_state.get(f"job_edit_cust_{job_key}"),
+            "customer_location_id": location_id or None,
+            "customer_contact_id": contact_id or None,
+            "status": st.session_state.get(f"job_edit_status_{job_key}"),
+            "supervisor": st.session_state.get(f"job_edit_sup_{job_key}"),
+            "start_date": st.session_state.get(f"job_edit_start_{job_key}"),
+            "end_date": st.session_state.get(f"job_edit_end_{job_key}"),
+            "progress": st.session_state.get(f"job_edit_prog_{job_key}"),
+            "description": scope_text,
+            "notes": notes_text or scope_text,
+        }
+        if fin_editable:
+            ui["contract_value"] = st.session_state.get(f"job_edit_contract_{job_key}")
+            ui["estimated_cost"] = st.session_state.get(f"job_edit_estimated_{job_key}")
+        ok, msg = persist_job(ui, row_id=jid or None)
+        if ok:
+            st.session_state[edit_mode_key] = False
+            st.success(msg or "Job saved.")
             st.rerun()
-    with btn_save:
-        if st.button("Save Changes", key=f"{pk}_save", type="primary"):
-            scope_text = str(st.session_state.get(f"job_edit_scope_{job_key}") or "").strip()
-            notes_text = str(st.session_state.get(f"job_edit_notes_{job_key}") or "").strip()
-            ui = {
-                "job_number": st.session_state.get(f"job_edit_num_{job_key}"),
-                "job_name": st.session_state.get(f"job_edit_name_{job_key}"),
-                "customer": st.session_state.get(f"job_edit_cust_{job_key}"),
-                "customer_location_id": location_id or None,
-                "customer_contact_id": contact_id or None,
-                "status": st.session_state.get(f"job_edit_status_{job_key}"),
-                "supervisor": st.session_state.get(f"job_edit_sup_{job_key}"),
-                "start_date": st.session_state.get(f"job_edit_start_{job_key}"),
-                "end_date": st.session_state.get(f"job_edit_end_{job_key}"),
-                "progress": st.session_state.get(f"job_edit_prog_{job_key}"),
-                "description": scope_text,
-                "notes": notes_text or scope_text,
-            }
-            if fin_editable:
-                ui["contract_value"] = st.session_state.get(f"job_edit_contract_{job_key}")
-                ui["estimated_cost"] = st.session_state.get(f"job_edit_estimated_{job_key}")
-            ok, msg = persist_job(ui, row_id=jid or None)
-            if ok:
-                st.session_state[edit_mode_key] = False
-                st.success(msg or "Job saved.")
-                st.rerun()
-            else:
-                st.error(msg or "Could not save job.")
+        else:
+            st.error(msg or "Could not save job.")
 
 
 def _render_job_actions_panel(job: dict) -> None:
@@ -2481,10 +2502,17 @@ def _show_jobs_detail_modal() -> None:
 def render() -> None:
     try:
         from app.pages._core._access import begin_module
+        from app.perf_debug import perf_span
     except ImportError:
         from pages._core._access import begin_module  # type: ignore
+        from perf_debug import perf_span  # type: ignore
     if not begin_module("jobs"):
         return
+    with perf_span("page.jobs.render"):
+        _render_jobs_page()
+
+
+def _render_jobs_page() -> None:
     st.markdown(
         '<span class="ips-jobs-page ips-page-shell-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
@@ -2521,75 +2549,76 @@ def render() -> None:
 
     if st.session_state.get("ips_job_form"):
         with st.expander("New Job", expanded=True):
-            nc1, nc2 = st.columns(2)
-            with nc2:
-                st.text_input("Supervisor", key="job_new_sup")
-                st.date_input("Start date", key="job_new_start", value=date.today())
-                st.date_input("End date", key="job_new_end", value=None)
-            with nc1:
-                sync_new_job_number()
-                st.text_input(
-                    "Job number",
-                    key="job_new_num",
-                    on_change=_job_new_num_edited,
-                )
-                st.text_input("Job name", key="job_new_name")
-                st.selectbox("Customer", customer_filter_options(), key="job_new_cust")
-                new_cust = str(st.session_state.get("job_new_cust") or "")
-                new_location_id = _customer_location_select(
-                    customer_name=new_cust,
-                    session_key="job_new_location",
-                    prev_customer_key="job_new_cust_prev",
-                )
-                new_contact_id = _customer_contact_select(
-                    customer_name=new_cust,
-                    location_id=new_location_id,
-                    session_key="job_new_contact",
-                    prev_customer_key="job_new_cust_prev",
-                    prev_location_key="job_new_loc_prev",
-                )
-                try:
-                    from app.services.jobs_service import MANUAL_JOB_STATUSES
-                except ImportError:
-                    from services.jobs_service import MANUAL_JOB_STATUSES  # type: ignore
-                st.selectbox("Status", list(MANUAL_JOB_STATUSES), key="job_new_status")
-            st.text_area("Description", key="job_new_desc")
-            _render_job_financial_inputs(
-                key_prefix="job_new",
-                contract_key="job_new_contract",
-                estimated_key="job_new_estimated",
-                initial_contract=float(st.session_state.get("job_new_contract") or 0),
-                initial_estimated=float(st.session_state.get("job_new_estimated") or 0),
-                editable=True,
+            st.selectbox("Customer", customer_filter_options(), key="job_new_cust")
+            new_cust = str(st.session_state.get("job_new_cust") or "")
+            new_location_id = _customer_location_select(
+                customer_name=new_cust,
+                session_key="job_new_location",
+                prev_customer_key="job_new_cust_prev",
             )
-            sb1, sb2 = st.columns(2)
-            with sb1:
-                if st.button("Save job", key="job_save_new", type="primary"):
-                    ok, msg = persist_job(
-                        {
-                            "job_number": str(st.session_state.get("job_new_num") or "").strip(),
-                            "job_name": st.session_state.get("job_new_name"),
-                            "customer": st.session_state.get("job_new_cust"),
-                            "customer_id": customer_id_for_name(new_cust) or None,
-                            "customer_location_id": new_location_id or None,
-                            "customer_contact_id": new_contact_id or None,
-                            "status": st.session_state.get("job_new_status"),
-                            "supervisor": st.session_state.get("job_new_sup"),
-                            "start_date": st.session_state.get("job_new_start"),
-                            "end_date": st.session_state.get("job_new_end"),
-                            "description": st.session_state.get("job_new_desc"),
-                            "contract_value": st.session_state.get("job_new_contract"),
-                            "estimated_cost": st.session_state.get("job_new_estimated"),
-                        }
-                    )
-                    if apply_persist_feedback(ok, msg, clear_keys=("ips_job_form",)):
-                        clear_new_job_number_state()
-                        st.rerun()
-            with sb2:
-                if st.button("Cancel", key="job_cancel_new"):
-                    st.session_state.pop("ips_job_form", None)
+            new_contact_id = _customer_contact_select(
+                customer_name=new_cust,
+                location_id=new_location_id,
+                session_key="job_new_contact",
+                prev_customer_key="job_new_cust_prev",
+                prev_location_key="job_new_loc_prev",
+            )
+            with st.form("job_new_form", clear_on_submit=False):
+                nc1, nc2 = st.columns(2)
+                with nc2:
+                    st.text_input("Supervisor", key="job_new_sup")
+                    st.date_input("Start date", key="job_new_start", value=date.today())
+                    st.date_input("End date", key="job_new_end", value=None)
+                with nc1:
+                    sync_new_job_number()
+                    st.text_input("Job number", key="job_new_num")
+                    st.text_input("Job name", key="job_new_name")
+                    try:
+                        from app.services.jobs_service import MANUAL_JOB_STATUSES
+                    except ImportError:
+                        from services.jobs_service import MANUAL_JOB_STATUSES  # type: ignore
+                    st.selectbox("Status", list(MANUAL_JOB_STATUSES), key="job_new_status")
+                st.text_area("Description", key="job_new_desc")
+                _render_job_financial_inputs(
+                    key_prefix="job_new",
+                    contract_key="job_new_contract",
+                    estimated_key="job_new_estimated",
+                    initial_contract=float(st.session_state.get("job_new_contract") or 0),
+                    initial_estimated=float(st.session_state.get("job_new_estimated") or 0),
+                    editable=True,
+                )
+                save_col, cancel_col = st.columns(2)
+                with save_col:
+                    submitted = st.form_submit_button("Save job", type="primary")
+                with cancel_col:
+                    cancelled = st.form_submit_button("Cancel")
+            if cancelled:
+                st.session_state.pop("ips_job_form", None)
+                clear_new_job_number_state()
+                st.rerun()
+            if submitted:
+                ok, msg = persist_job(
+                    {
+                        "job_number": str(st.session_state.get("job_new_num") or "").strip(),
+                        "job_name": st.session_state.get("job_new_name"),
+                        "customer": st.session_state.get("job_new_cust"),
+                        "customer_id": customer_id_for_name(new_cust) or None,
+                        "customer_location_id": new_location_id or None,
+                        "customer_contact_id": new_contact_id or None,
+                        "status": st.session_state.get("job_new_status"),
+                        "supervisor": st.session_state.get("job_new_sup"),
+                        "start_date": st.session_state.get("job_new_start"),
+                        "end_date": st.session_state.get("job_new_end"),
+                        "description": st.session_state.get("job_new_desc"),
+                        "contract_value": st.session_state.get("job_new_contract"),
+                        "estimated_cost": st.session_state.get("job_new_estimated"),
+                    }
+                )
+                if apply_persist_feedback(ok, msg, clear_keys=("ips_job_form",)):
                     clear_new_job_number_state()
                     st.rerun()
+                else:
+                    st.error(msg or "Could not save job.")
 
     def _filters() -> None:
         c1, c2, c3 = st.columns([3.2, 2.2, 0.6])
@@ -2620,19 +2649,18 @@ def render() -> None:
                 clear_field_expanded(FIELD_EXPANDED_JOB_KEY)
                 st.rerun()
 
-    render_jobs_filter_bar_shell()
-    layout_filter_bar(_filters)
-    close_jobs_filter_bar_shell()
-
+    subjob_counts = _load_open_subjob_counts()
     filtered = _filter_jobs(
         all_jobs,
         q=str(st.session_state.get("jobs_search") or "").strip(),
         view=str(st.session_state.get("jobs_view") or _JOBS_DEFAULT_VIEW),
     )
 
-    subjob_counts = _load_open_subjob_counts()
-    cost_cache = _build_jobs_list_cost_cache(filtered)
-    summary = _jobs_summary_counts(filtered, cost_cache, subjob_counts)
+    render_jobs_filter_bar_shell()
+    layout_filter_bar(_filters)
+    close_jobs_filter_bar_shell()
+
+    summary = _jobs_summary_counts(filtered, subjob_counts)
     render_jobs_summary_cards(
         total=int(summary["total"]),
         active=int(summary["active"]),
@@ -2664,7 +2692,7 @@ def render() -> None:
     _render_custom_jobs_table(
         page_rows,
         filter_options=filter_options,
-        cost_cache=cost_cache,
+        cost_cache=None,
         subjob_counts=subjob_counts,
     )
     render_jobs_pagination_footer(len(filtered), _TABLE_KEY, item_label="job")

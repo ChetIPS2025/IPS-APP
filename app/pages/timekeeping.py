@@ -1304,7 +1304,15 @@ def _alloc_autosave_status_html(eid: str, iso: str) -> str:
     return ""
 
 
-def _auto_save_allocation_day(emp: dict, week_start_d: date, iso: str) -> None:
+def _mark_allocation_dirty(emp: dict, week_start_d: date, iso: str) -> None:
+    eid = str(emp.get("id") or emp.get("employee_id") or "")
+    wd = str(iso or "")[:10]
+    if not eid or not wd:
+        return
+    _set_alloc_autosave_status(eid, wd, "unsaved")
+
+
+def _save_allocation_day(emp: dict, week_start_d: date, iso: str) -> None:
     eid = str(emp.get("id") or emp.get("employee_id") or "")
     wd = str(iso or "")[:10]
     if not eid or not wd:
@@ -2966,12 +2974,13 @@ def _render_list_allocation_detail(
         handle_day_submit_for_date=_handle_day_submit_for_date,
         handle_day_approve_for_date=_handle_day_approve_for_date,
         handle_day_reject_for_date=_handle_day_reject_for_date,
-        auto_save_allocation_day=lambda iso: _auto_save_allocation_day(emp, week_start_d, iso),
+        mark_allocation_dirty=lambda iso: _mark_allocation_dirty(emp, week_start_d, iso),
+        save_allocation_day=lambda iso: _save_allocation_day(emp, week_start_d, iso),
         alloc_autosave_status_html=lambda iso: _alloc_autosave_status_html(eid, iso),
     )
 
     if admin_edit and week_status == "Approved":
-        st.warning("Administrator edit mode — you can change approved hours. Changes save automatically.")
+        st.warning("Administrator edit mode — save each day with **Save day** after editing hours.")
     elif week_locked:
         st.info("This week is approved and locked.")
 
