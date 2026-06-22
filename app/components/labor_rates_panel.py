@@ -13,6 +13,7 @@ try:
         open_destructive_confirmation,
         render_destructive_confirmation,
     )
+    from app.pages._core._data import load_labor_rates
     from app.db import delete_rows_admin, fetch_one, fetch_table, update_rows_admin
     from app.ips_crud_list_styles import (
         IPS_CRUD_LIST_PAGE_GAP,
@@ -38,6 +39,7 @@ except ImportError:
         open_destructive_confirmation,
         render_destructive_confirmation,
     )
+    from pages._core._data import load_labor_rates  # type: ignore
     from db import delete_rows_admin, fetch_one, fetch_table, update_rows_admin  # type: ignore
     from ips_crud_list_styles import (  # type: ignore
         IPS_CRUD_LIST_PAGE_GAP,
@@ -395,7 +397,7 @@ def render_labor_rates_panel(*, key_prefix: str = "labor", show_header: bool = T
         _clear_panel(prefix)
 
     mode = st.session_state.get(mode_key)
-    rows = fetch_table("labor_rates", limit=5000, order_by="classification")
+    rows = load_labor_rates()
     df = pd.DataFrame(rows)
 
     del_prefix = _delete_prefix(prefix)

@@ -47,11 +47,26 @@ _CLOSED_SUBJOB_STATUSES = frozenset(
 def get_tasks() -> list[dict[str, Any]]:
     """Load tasks for the Tasks page (demo fallback included)."""
     try:
-        from app.pages._core._data import _DEMO_TASKS
+        from app.pages._core._data import load_tasks
     except ImportError:
-        from pages._core._data import _DEMO_TASKS  # type: ignore
-    rows, _ = list_tasks(demo=list(_DEMO_TASKS))
-    return rows
+        from pages._core._data import load_tasks  # type: ignore
+    return load_tasks()
+
+
+def _tasks_by_job_index() -> dict[str, list[dict[str, Any]]]:
+    import streamlit as st
+
+    key = "_ips_tasks_by_job_index"
+    cached = st.session_state.get(key)
+    if isinstance(cached, dict):
+        return cached
+    idx: dict[str, list[dict[str, Any]]] = {}
+    for task in get_tasks():
+        jid = _resolve_task_job_id(task)
+        if jid:
+            idx.setdefault(jid, []).append(task)
+    st.session_state[key] = idx
+    return idx
 
 
 def _resolve_task_job_id(task: dict[str, Any]) -> str | None:
@@ -92,13 +107,10 @@ def get_tasks_by_job(job_id: str, *, include_closed: bool = False) -> list[dict[
     jid = str(job_id or "").strip()
     if not jid:
         return []
-    out: list[dict[str, Any]] = []
-    for task in get_tasks():
-        if _resolve_task_job_id(task) != jid:
-            continue
-        if include_closed or normalize_task_status(task.get("status")) == "Open":
-            out.append(task)
-    return out
+    tasks = list(_tasks_by_job_index().get(jid, []))
+    if include_closed:
+        return tasks
+    return [t for t in tasks if normalize_task_status(t.get("status")) == "Open"]
 
 
 def count_open_subjobs_by_job_id() -> dict[str, int]:
@@ -116,6 +128,9 @@ def count_open_subjobs_by_job_id() -> dict[str, int]:
 
 def clear_tasks_cache() -> None:
     """Invalidate cached task reads after inline edits."""
+    import streamlit as st
+
+    st.session_state.pop("_ips_tasks_by_job_index", None)
     clear_all_data_caches()
 
 

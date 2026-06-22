@@ -158,7 +158,11 @@ def _enrich_customer(
 
 
 def get_customers(*, enrich: bool = True) -> list[dict[str, Any]]:
-    rows, _ = list_customers(demo=_demo_customers())
+    try:
+        from app.pages._core._data import load_customers
+    except ImportError:
+        from pages._core._data import load_customers  # type: ignore
+    rows = load_customers()
     if not enrich:
         return rows
     locs_by_cid = _bulk_locations_by_customer_id()

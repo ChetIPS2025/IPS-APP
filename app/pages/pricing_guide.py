@@ -21,6 +21,12 @@ try:
         clear_table_filters,
         render_table_header_cell,
     )
+    from app.components.table_pagination import (
+        paginate_rows,
+        render_table_pagination_footer,
+        render_table_pagination_header,
+        reset_table_page,
+    )
     from app.components.record_modal import (
         build_modal_cache,
         clear_edit_modes,
@@ -97,6 +103,12 @@ except ImportError:
         build_filter_options,
         clear_table_filters,
         render_table_header_cell,
+    )
+    from components.table_pagination import (  # type: ignore
+        paginate_rows,
+        render_table_pagination_footer,
+        render_table_pagination_header,
+        reset_table_page,
     )
     from components.record_modal import (  # type: ignore
         build_modal_cache,
@@ -1115,6 +1127,7 @@ def render() -> None:
                     extra_keys=["pg_search"],
                 )
                 _clear_pg_selection(st.session_state.get(_ALL_PG_IDS_KEY))
+                reset_table_page(_TABLE_KEY)
                 st.rerun()
 
     layout_filter_bar(_filters)
@@ -1124,10 +1137,11 @@ def render() -> None:
         q=str(st.session_state.get("pg_search") or "").strip(),
     )
 
-    st.caption(f"{len(filtered):,} item(s)")
-
     build_modal_cache(filtered, cache_key=_CACHE_KEY)
-    _render_custom_pricing_guide_table(filtered, filter_options=filter_options)
+    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="item")
+    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
+    _render_custom_pricing_guide_table(page_rows, filter_options=filter_options)
+    render_table_pagination_footer(len(filtered), _TABLE_KEY)
 
     selected_id = st.session_state.get(SELECTED_PG_KEY)
     if selected_id and st.session_state.get(SHOW_PG_MODAL_KEY):

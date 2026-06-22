@@ -66,6 +66,12 @@ try:
         clear_table_filters,
         render_table_header_cell,
     )
+    from app.components.table_pagination import (
+        paginate_rows,
+        render_table_pagination_footer,
+        render_table_pagination_header,
+        reset_table_page,
+    )
     from app.pages._core._crud import is_demo_id
     from app.pages._core._session import select_key
     from app.services.estimates_service import (
@@ -156,6 +162,12 @@ except ImportError:
         build_filter_options,
         clear_table_filters,
         render_table_header_cell,
+    )
+    from components.table_pagination import (  # type: ignore
+        paginate_rows,
+        render_table_pagination_footer,
+        render_table_pagination_header,
+        reset_table_page,
     )
     from pages._core._crud import is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
@@ -427,12 +439,41 @@ def _sync_estimate_rollups_if_stale(estimate_id: str) -> None:
         if recalculate_and_save_estimate_totals(eid).ok:
             st.session_state[sync_key] = live
             try:
-                from app.services.phase2_modules_service import clear_all_data_caches
+                from app.pages._core._data import clear_estimates_list_cache, clear_catalog_session_datasets
             except ImportError:
-                from services.phase2_modules_service import clear_all_data_caches  # type: ignore
-            clear_all_data_caches()
+                from pages._core._data import clear_estimates_list_cache, clear_catalog_session_datasets  # type: ignore
+            clear_estimates_list_cache()
+            clear_catalog_session_datasets()
     except Exception:
         pass
+
+
+def _sync_stale_estimate_rollups(rows: list[dict], *, max_sync: int = 5) -> dict[str, dict]:
+    """Refresh at most ``max_sync`` stale estimate totals per page load (not per table row)."""
+    refreshed: dict[str, dict] = {}
+    synced = 0
+    for est in rows:
+        if synced >= max_sync:
+            break
+        eid = str(est.get("id") or "").strip()
+        if not eid or not _estimate_rollups_are_stale(est):
+            continue
+        _sync_estimate_rollups_if_stale(eid)
+        fresh_row = get_estimate(eid)
+        if fresh_row:
+            refreshed[eid] = fresh_row
+        synced += 1
+    return refreshed
+
+
+def _apply_estimate_row_refreshes(rows: list[dict], refreshed: dict[str, dict]) -> list[dict]:
+    if not refreshed:
+        return rows
+    out: list[dict] = []
+    for row in rows:
+        eid = str(row.get("id") or "").strip()
+        out.append(refreshed[eid] if eid and eid in refreshed else row)
+    return out
 
 
 def _on_estimate_cost_builder_saved(estimate_id: str) -> None:
@@ -690,11 +731,6 @@ def _render_custom_estimates_table(
             status = _normalize_estimate_status(est.get("status"))
             est_date = fmt_date(est.get("estimate_date"))
             job_no = _estimate_job(est)
-            if _estimate_rollups_are_stale(est):
-                _sync_estimate_rollups_if_stale(eid)
-                fresh_row = get_estimate(eid)
-                if fresh_row:
-                    est = fresh_row
             total = _estimate_customer_price(est)
 
             cols = st.columns(_ESTIMATE_COLS, gap="small", vertical_alignment="center")
@@ -1776,6 +1812,7 @@ def render() -> None:
                     extra_keys=["estimates_search", "estimates_view"],
                 )
                 st.session_state["estimates_view"] = _ESTIMATES_DEFAULT_VIEW
+                reset_table_page(_TABLE_KEY)
                 _clear_estimate_selection(st.session_state.get(_ALL_ESTIMATE_IDS_KEY))
                 st.rerun()
 
@@ -1814,7 +1851,12 @@ def render() -> None:
         )
 
     build_modal_cache(filtered, cache_key=_ESTIMATES_CACHE_KEY)
-    _render_custom_estimates_table(filtered, filter_options=filter_options)
+    refreshed = _sync_stale_estimate_rollups(filtered, max_sync=5)
+    filtered = _apply_estimate_row_refreshes(filtered, refreshed)
+    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="estimate")
+    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
+    _render_custom_estimates_table(page_rows, filter_options=filter_options)
+    render_table_pagination_footer(len(filtered), _TABLE_KEY)
 
     selected_estimate_id = st.session_state.get(SELECTED_ESTIMATE_KEY)
     if selected_estimate_id and st.session_state.get(SHOW_ESTIMATE_MODAL_KEY):

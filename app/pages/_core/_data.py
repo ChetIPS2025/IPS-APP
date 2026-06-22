@@ -179,7 +179,7 @@ def load_dashboard_kpis() -> dict[str, Any]:
     except ImportError:
         from services.job_service import dashboard_job_metrics  # type: ignore
 
-    estimates = _fetch_table("estimates", limit=200)
+    estimates = load_estimates()
     jobs = load_jobs()
     if estimates or jobs:
         open_est = sum(1 for e in estimates if str(e.get("status", "")).lower() in {"draft", "sent", "pending"})
@@ -679,6 +679,10 @@ def clear_user_profiles_cache() -> None:
     _cached_user_profiles.clear()
 
 
+def clear_tasks_list_cache() -> None:
+    _cached_tasks_rows.clear()
+
+
 def clear_labor_rates_cache() -> None:
     _cached_labor_rates_rows.clear()
 
@@ -694,6 +698,7 @@ def clear_all_catalog_list_caches() -> None:
     clear_estimates_list_cache()
     clear_user_profiles_cache()
     clear_labor_rates_cache()
+    clear_tasks_list_cache()
     try:
         from app.services.pricing_guide_service import clear_pricing_guide_cache
     except ImportError:
@@ -727,16 +732,28 @@ def load_inventory() -> list[dict[str, Any]]:
     except ImportError:
         from perf_debug import perf_span  # type: ignore
 
-    with perf_span("data.load_inventory"):
+    def _load() -> list[dict[str, Any]]:
         rows, used = _cached_inventory_rows()
-    _mark_if_demo(used)
-    return list(rows)
+        _mark_if_demo(used)
+        return list(rows)
+
+    with perf_span("data.load_inventory"):
+        return _catalog_session_get("inventory", _load)
 
 
 def load_assets() -> list[dict[str, Any]]:
-    rows, used = _cached_assets_rows()
-    _mark_if_demo(used)
-    return list(rows)
+    try:
+        from app.perf_debug import perf_span
+    except ImportError:
+        from perf_debug import perf_span  # type: ignore
+
+    def _load() -> list[dict[str, Any]]:
+        rows, used = _cached_assets_rows()
+        _mark_if_demo(used)
+        return list(rows)
+
+    with perf_span("data.load_assets"):
+        return _catalog_session_get("assets", _load)
 
 
 ACTIVE_EMPLOYEE_KEY = "ips_active_employee_id"
@@ -1004,12 +1021,27 @@ def job_options_for_timekeeping() -> list[str]:
 
 def load_tasks() -> list[dict[str, Any]]:
     try:
-        from app.services.tasks_service import list_tasks
+        from app.perf_debug import perf_span
     except ImportError:
-        from services.tasks_service import list_tasks  # type: ignore
+        from perf_debug import perf_span  # type: ignore
+
+    def _load() -> list[dict[str, Any]]:
+        rows, used = _cached_tasks_rows()
+        _mark_if_demo(used)
+        return list(rows)
+
+    with perf_span("data.load_tasks"):
+        return _catalog_session_get("tasks", _load)
+
+
+@st.cache_data(ttl=CATALOG_CACHE_TTL, show_spinner=False)
+def _cached_tasks_rows() -> tuple[tuple[dict[str, Any], ...], bool]:
+    try:
+        from app.services.phase2_modules_service import list_tasks
+    except ImportError:
+        from services.phase2_modules_service import list_tasks  # type: ignore
     rows, used = list_tasks(demo=list(_DEMO_TASKS))
-    _mark_if_demo(used)
-    return rows
+    return tuple(rows), used
 
 
 def get_task(task_id: str) -> dict[str, Any] | None:

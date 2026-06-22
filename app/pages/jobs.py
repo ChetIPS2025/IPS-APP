@@ -39,6 +39,7 @@ try:
     )
     from app.services.job_cost_transaction_service import (
         build_job_cost_summary,
+        cached_job_cost_summary,
         sync_all_sources_for_job,
     )
     from app.components.weekly_timesheet_builder import render_weekly_timesheet_builder
@@ -109,6 +110,7 @@ except ImportError:
     from components.job_cost_summary_cards import render_job_cost_summary_cards  # type: ignore
     from services.job_cost_transaction_service import (  # type: ignore
         build_job_cost_summary,
+        cached_job_cost_summary,
         sync_all_sources_for_job,
     )
     from components.job_row_actions_ui import render_job_row_actions  # type: ignore
@@ -2190,7 +2192,12 @@ def _render_job_detail_tabs(job: dict) -> None:
         _render_job_equipment_tab(job)
 
     with tab_costing:
-        render_job_costing_tab(job, key_prefix=f"job_cost_{str(job.get('id') or '')}")
+        cached_summary = st.session_state.get(f"_job_cost_summary_{str(job.get('id') or '').strip()}")
+        render_job_costing_tab(
+            job,
+            key_prefix=f"job_cost_{str(job.get('id') or '')}",
+            cost_summary=cached_summary if isinstance(cached_summary, dict) else None,
+        )
 
     with tab_schedule:
         sched_html = (
@@ -2430,8 +2437,8 @@ def render_job_detail_dialog(job: dict) -> None:
     cost_summary: dict = {}
     detail_stats: dict = {}
     if jid and not edit_mode:
-        sync_all_sources_for_job(jid)
-        cost_summary = _enrich_job_cost_summary(job, build_job_cost_summary(job))
+        cost_summary = _enrich_job_cost_summary(job, cached_job_cost_summary(job))
+        st.session_state[f"_job_cost_summary_{jid}"] = cost_summary
         detail_stats = gather_job_detail_stats(job, cost_summary)
         render_job_cost_summary_cards(cost_summary, compact=True)
         render_job_detail_health_section(job, cost_summary, detail_stats)

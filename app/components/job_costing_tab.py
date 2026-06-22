@@ -31,11 +31,12 @@ try:
         COST_SUBCONTRACT,
         SOURCE_MANUAL_ADJUSTMENT,
         build_job_cost_summary,
+        cached_job_cost_summary,
         can_manage_manual_cost_adjustments,
         create_manual_cost_adjustment,
         delete_manual_cost_adjustment,
         fetch_job_cost_transactions,
-        sync_all_sources_for_job,
+        invalidate_job_cost_session,
         transaction_display_source,
         transaction_employee_name,
         update_manual_cost_adjustment,
@@ -50,11 +51,12 @@ except ImportError:
         COST_SUBCONTRACT,
         SOURCE_MANUAL_ADJUSTMENT,
         build_job_cost_summary,
+        cached_job_cost_summary,
         can_manage_manual_cost_adjustments,
         create_manual_cost_adjustment,
         delete_manual_cost_adjustment,
         fetch_job_cost_transactions,
-        sync_all_sources_for_job,
+        invalidate_job_cost_session,
         transaction_display_source,
         transaction_employee_name,
         update_manual_cost_adjustment,
@@ -166,6 +168,7 @@ def _render_manual_adjustment_form(job: dict[str, Any], *, key_prefix: str) -> N
                     created_by=_current_user_id(),
                 )
                 if ok:
+                    invalidate_job_cost_session(jid)
                     st.success("Manual adjustment saved.")
                     st.rerun()
                 else:
@@ -248,19 +251,26 @@ def _render_manual_adjustment_editor(
                         },
                     )
                     if ok:
+                        invalidate_job_cost_session(str(t.get("job_id") or ""))
                         st.success("Adjustment updated.")
                         st.rerun()
                     else:
                         st.error("Update failed.")
                 if delete:
                     if delete_manual_cost_adjustment(tid):
+                        invalidate_job_cost_session(str(t.get("job_id") or ""))
                         st.success("Adjustment deleted.")
                         st.rerun()
                     else:
                         st.error("Delete failed.")
 
 
-def render_job_costing_tab(job: dict[str, Any], *, key_prefix: str = "job_cost") -> None:
+def render_job_costing_tab(
+    job: dict[str, Any],
+    *,
+    key_prefix: str = "job_cost",
+    cost_summary: dict[str, Any] | None = None,
+) -> None:
     """Full Job Costing panel inside Job Details."""
     jid = str(job.get("id") or "").strip()
     if not jid:
@@ -272,8 +282,10 @@ def render_job_costing_tab(job: dict[str, Any], *, key_prefix: str = "job_cost")
         unsafe_allow_html=True,
     )
 
-    sync_all_sources_for_job(jid)
-    summary = build_job_cost_summary(job)
+    refresh = st.button("Refresh costs", key=f"{key_prefix}_refresh", type="secondary")
+    summary = cached_job_cost_summary(job, force_refresh=refresh)
+    if isinstance(cost_summary, dict) and cost_summary and not refresh:
+        summary = cost_summary
     render_job_cost_summary_cards(summary)
     st.divider()
     render_job_cost_detail_metrics(summary)

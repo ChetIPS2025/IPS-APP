@@ -401,17 +401,14 @@ def render_job_database_detail_view_page(
         try:
             from app.components.job_cost_summary_cards import render_job_cost_summary_cards
             from app.services.job_cost_transaction_service import (
-                build_job_cost_summary,
-                sync_all_sources_for_job,
+                cached_job_cost_summary,
             )
         except ImportError:
             from components.job_cost_summary_cards import render_job_cost_summary_cards  # type: ignore
             from services.job_cost_transaction_service import (  # type: ignore
-                build_job_cost_summary,
-                sync_all_sources_for_job,
+                cached_job_cost_summary,
             )
-        sync_all_sources_for_job(jid)
-        render_job_cost_summary_cards(build_job_cost_summary(job_row))
+        render_job_cost_summary_cards(cached_job_cost_summary(job_row))
         st.divider()
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Awarded", _money(awarded))

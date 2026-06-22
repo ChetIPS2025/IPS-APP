@@ -919,6 +919,63 @@ def delete_manual_cost_adjustment(txn_id: str) -> bool:
         return False
 
 
+_JOB_COST_SYNCED_KEY = "_ips_job_cost_synced_job_ids"
+
+
+def _job_cost_summary_cache_key(job_id: str) -> str:
+    return f"_job_cost_summary_{str(job_id or '').strip()}"
+
+
+def ensure_job_cost_sources_synced(job_id: str) -> None:
+    """Backfill ledger sources once per job per browser session (idempotent)."""
+    import streamlit as st
+
+    jid = str(job_id or "").strip()
+    if not jid:
+        return
+    synced = st.session_state.setdefault(_JOB_COST_SYNCED_KEY, set())
+    if not isinstance(synced, set):
+        synced = set(synced) if synced else set()
+        st.session_state[_JOB_COST_SYNCED_KEY] = synced
+    if jid in synced:
+        return
+    sync_all_sources_for_job(jid)
+    synced.add(jid)
+
+
+def invalidate_job_cost_session(job_id: str = "") -> None:
+    """Drop cached sync/summary after manual costing edits."""
+    import streamlit as st
+
+    jid = str(job_id or "").strip()
+    if jid:
+        synced = st.session_state.get(_JOB_COST_SYNCED_KEY)
+        if isinstance(synced, set):
+            synced.discard(jid)
+        st.session_state.pop(_job_cost_summary_cache_key(jid), None)
+        return
+    st.session_state.pop(_JOB_COST_SYNCED_KEY, None)
+
+
+def cached_job_cost_summary(job: dict[str, Any], *, force_refresh: bool = False) -> dict[str, Any]:
+    """Build or return session-cached cost summary; sync sources at most once per session."""
+    import streamlit as st
+
+    jid = str(job.get("id") or "").strip()
+    if not jid:
+        return build_job_cost_summary(job)
+    cache_key = _job_cost_summary_cache_key(jid)
+    if force_refresh:
+        invalidate_job_cost_session(jid)
+    cached = st.session_state.get(cache_key)
+    if isinstance(cached, dict) and cached and not force_refresh:
+        return cached
+    ensure_job_cost_sources_synced(jid)
+    summary = build_job_cost_summary(job)
+    st.session_state[cache_key] = summary
+    return summary
+
+
 def transaction_display_source(row: dict[str, Any]) -> str:
     st = str(row.get("source_type") or "").strip()
     mapping = {

@@ -17,6 +17,12 @@ try:
         clear_table_filters,
         render_table_header_cell,
     )
+    from app.components.table_pagination import (
+        paginate_rows,
+        render_table_pagination_footer,
+        render_table_pagination_header,
+        reset_table_page,
+    )
     from app.components.record_modal import (
         build_modal_cache,
         clear_record_modal,
@@ -94,6 +100,12 @@ except ImportError:
         build_filter_options,
         clear_table_filters,
         render_table_header_cell,
+    )
+    from components.table_pagination import (  # type: ignore
+        paginate_rows,
+        render_table_pagination_footer,
+        render_table_pagination_header,
+        reset_table_page,
     )
     from components.record_modal import (  # type: ignore
         build_modal_cache,
@@ -264,11 +276,11 @@ def _build_assignee_lookup() -> dict[str, str]:
         if eid and name:
             lookup[eid] = name
     try:
-        from app.services.users_service import list_profiles
+        from app.pages._core._data import load_user_profiles
     except ImportError:
-        from services.users_service import list_profiles  # type: ignore
+        from pages._core._data import load_user_profiles  # type: ignore
     try:
-        for profile in list_profiles():
+        for profile in load_user_profiles():
             pid = str(profile.get("id") or "").strip()
             name = str(profile.get("full_name") or profile.get("name") or "").strip()
             if pid and name:
@@ -1508,6 +1520,7 @@ def render() -> None:
                 _clear_task_selection(st.session_state.get(_ALL_TASK_IDS_KEY))
                 clear_field_expanded(FIELD_EXPANDED_TASK_KEY)
                 st.session_state[TASK_VIEW_KEY] = "Due Today" if is_field_context() else "Open Tasks"
+                reset_table_page(_TABLE_KEY)
                 st.rerun()
 
     layout_filter_bar(_filters)
@@ -1581,13 +1594,16 @@ def render() -> None:
     st.caption(_task_count_caption(len(filtered), view))
 
     build_modal_cache(filtered, cache_key=CACHE_KEY)
+    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="task")
+    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
     _render_custom_task_table(
-        filtered,
+        page_rows,
         filter_options=filter_options,
         assignee_lookup=assignee_lookup,
         jobs_by_id=jobs_by_id,
         job_options=job_options,
     )
+    render_table_pagination_footer(len(filtered), _TABLE_KEY)
 
     selected_task_id = st.session_state.get(SELECTED_TASK_KEY)
     if selected_task_id and st.session_state.get(SHOW_MODAL_KEY):
