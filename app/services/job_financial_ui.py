@@ -62,25 +62,48 @@ def job_list_financials_from_row(job: dict[str, Any]) -> dict[str, float | bool]
     }
 
 
-def job_manual_financials_editable(job: dict[str, Any]) -> bool:
-    """Manual jobs may edit contract/estimated cost; approved estimate-linked jobs may not."""
-    eid = str(job.get("estimate_id") or "").strip()
+def _fetch_estimate_for_financial_lock(estimate_id: str) -> dict[str, Any]:
+    eid = str(estimate_id or "").strip()
     if not eid:
-        return True
+        return {}
     try:
-        from app.services.job_cost_transaction_service import (
-            _approved_estimate_for_job,
-            _estimate_is_approved,
-        )
+        from app.pages._core._data import get_estimate
     except ImportError:
-        from services.job_cost_transaction_service import (  # type: ignore
-            _approved_estimate_for_job,
-            _estimate_is_approved,
-        )
+        from pages._core._data import get_estimate  # type: ignore
+    return get_estimate(eid) or {}
+
+
+def _job_matches_linked_estimate_quote(job: dict[str, Any], estimate: dict[str, Any]) -> bool:
     try:
-        est = _approved_estimate_for_job(job)
-        if est and _estimate_is_approved(est):
-            return False
-    except Exception:
+        from app.services.job_from_estimate import _job_matches_estimate_quote
+    except ImportError:
+        from services.job_from_estimate import _job_matches_estimate_quote  # type: ignore
+    quote = str(estimate.get("quote_number") or estimate.get("estimate_number") or "").strip()
+    return bool(quote) and _job_matches_estimate_quote(job, quote)
+
+
+def job_financials_locked_by_approved_estimate(job: dict[str, Any]) -> bool:
+    """
+    True only when this job is tied to an approved estimate through the estimate workflow
+    (``jobs.estimate_id`` + approved estimate with matching ``estimates.job_id`` or quote).
+    Manual jobs without that link remain editable even if another estimate references the job.
+    """
+    jid = str(job.get("id") or "").strip()
+    eid = str(job.get("estimate_id") or "").strip()
+    if not jid or not eid:
+        return False
+    try:
+        from app.services.job_cost_transaction_service import _estimate_is_approved
+    except ImportError:
+        from services.job_cost_transaction_service import _estimate_is_approved  # type: ignore
+    est = _fetch_estimate_for_financial_lock(eid)
+    if not est or not _estimate_is_approved(est):
+        return False
+    if str(est.get("job_id") or "").strip() == jid:
         return True
-    return True
+    return _job_matches_linked_estimate_quote(job, est)
+
+
+def job_manual_financials_editable(job: dict[str, Any]) -> bool:
+    """Manual jobs may edit contract/estimated cost; estimate-synced jobs may not."""
+    return not job_financials_locked_by_approved_estimate(job)

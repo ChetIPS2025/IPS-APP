@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from app.services.job_financial_ui import (
     apply_projected_financials_to_job_payload,
+    job_financials_locked_by_approved_estimate,
     job_list_financials_from_row,
     job_manual_financials_editable,
     projected_gross_profit,
@@ -22,19 +23,73 @@ class TestJobFinancialUi(unittest.TestCase):
     def test_manual_financials_editable_without_estimate(self) -> None:
         self.assertTrue(job_manual_financials_editable({"id": "j1"}))
 
+    def test_manual_financials_editable_with_draft_estimate_link(self) -> None:
+        with patch(
+            "app.services.job_financial_ui._fetch_estimate_for_financial_lock",
+            return_value={"id": "e1", "status": "Draft", "job_id": "j1"},
+        ):
+            self.assertTrue(
+                job_manual_financials_editable({"id": "j1", "estimate_id": "e1", "status": "Active"})
+            )
+
+    def test_manual_financials_editable_when_only_reverse_estimate_link(self) -> None:
+        """Approved estimate pointing at job without jobs.estimate_id stays manual/editable."""
+        self.assertTrue(job_manual_financials_editable({"id": "j1", "status": "Active", "awarded_amount": 5000}))
+
     @patch("app.services.job_cost_transaction_service._estimate_is_approved", return_value=True)
-    @patch("app.services.job_cost_transaction_service._approved_estimate_for_job")
-    def test_manual_financials_not_editable_with_approved_estimate(
+    @patch("app.services.job_financial_ui._fetch_estimate_for_financial_lock")
+    def test_manual_financials_not_editable_with_bidirectional_approved_link(
         self,
-        estimate_mock,
+        fetch_mock,
         _approved_mock,
     ) -> None:
-        estimate_mock.return_value = {"id": "e1", "status": "Approved"}
-        self.assertFalse(
-            job_manual_financials_editable(
-                {"id": "j1", "estimate_id": "e1", "status": "Active", "awarded_amount": 1000}
-            )
-        )
+        fetch_mock.return_value = {
+            "id": "e1",
+            "status": "Approved",
+            "job_id": "j1",
+            "quote_number": "Q26070",
+        }
+        job = {"id": "j1", "estimate_id": "e1", "status": "Active", "job_number": "J26070"}
+        self.assertFalse(job_manual_financials_editable(job))
+        self.assertTrue(job_financials_locked_by_approved_estimate(job))
+
+    @patch("app.services.job_cost_transaction_service._estimate_is_approved", return_value=True)
+    @patch("app.services.job_financial_ui._fetch_estimate_for_financial_lock")
+    def test_manual_financials_not_editable_with_matching_quote(
+        self,
+        fetch_mock,
+        _approved_mock,
+    ) -> None:
+        fetch_mock.return_value = {
+            "id": "e1",
+            "status": "Approved",
+            "job_id": "",
+            "quote_number": "Q26070",
+        }
+        job = {
+            "id": "j1",
+            "estimate_id": "e1",
+            "status": "Active",
+            "job_number": "J26070",
+            "source_estimate_number": "Q26070",
+        }
+        self.assertFalse(job_manual_financials_editable(job))
+
+    @patch("app.services.job_cost_transaction_service._estimate_is_approved", return_value=True)
+    @patch("app.services.job_financial_ui._fetch_estimate_for_financial_lock")
+    def test_manual_financials_editable_when_estimate_id_points_elsewhere(
+        self,
+        fetch_mock,
+        _approved_mock,
+    ) -> None:
+        fetch_mock.return_value = {
+            "id": "e1",
+            "status": "Approved",
+            "job_id": "other-job",
+            "quote_number": "Q99999",
+        }
+        job = {"id": "j1", "estimate_id": "e1", "status": "Active", "job_number": "J26070"}
+        self.assertTrue(job_manual_financials_editable(job))
 
     def test_apply_projected_financials_to_payload(self) -> None:
         payload = apply_projected_financials_to_job_payload(

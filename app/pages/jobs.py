@@ -2345,7 +2345,7 @@ def _render_job_edit_form(job: dict) -> None:
             "description": scope_text,
             "notes": notes_text or scope_text,
         }
-        if fin_editable:
+        if _job_financials_editable(job):
             ui["contract_value"] = st.session_state.get(f"job_edit_contract_{job_key}")
             ui["estimated_cost"] = st.session_state.get(f"job_edit_estimated_{job_key}")
         ok, msg = persist_job(ui, row_id=jid or None)
