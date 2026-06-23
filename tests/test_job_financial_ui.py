@@ -6,10 +6,14 @@ import unittest
 from unittest.mock import patch
 
 from app.services.job_financial_ui import (
+    BILLING_TYPE_TM,
     apply_projected_financials_to_job_payload,
+    billing_type_label,
     job_financials_locked_by_approved_estimate,
+    job_is_time_and_material,
     job_list_financials_from_row,
     job_manual_financials_editable,
+    normalize_billing_type,
     projected_gross_profit,
     projected_margin_pct,
 )
@@ -110,6 +114,27 @@ class TestJobFinancialUi(unittest.TestCase):
         self.assertEqual(fin["contract_value"], 5000)
         self.assertEqual(fin["profit"], 1000)
         self.assertEqual(fin["margin_pct"], 20.0)
+        self.assertEqual(fin["actual_cost"], 0.0)
+        self.assertFalse(fin["has_actual"])
+
+    def test_job_list_financials_uses_running_actual_cost(self) -> None:
+        fin = job_list_financials_from_row(
+            {
+                "awarded_amount": 10000,
+                "estimated_cost": 7000,
+                "actual_cost": 3200,
+            }
+        )
+        self.assertEqual(fin["actual_cost"], 3200)
+        self.assertTrue(fin["has_actual"])
+        self.assertEqual(fin["profit"], 6800)
+        self.assertEqual(fin["margin_pct"], 68.0)
+
+    def test_billing_type_normalization(self) -> None:
+        self.assertEqual(normalize_billing_type("Time & Materials"), BILLING_TYPE_TM)
+        self.assertEqual(normalize_billing_type("Fixed Price"), "fixed_price")
+        self.assertTrue(job_is_time_and_material({"billing_type": "time_and_material"}))
+        self.assertEqual(billing_type_label(BILLING_TYPE_TM), "Time & Materials")
 
 
 if __name__ == "__main__":

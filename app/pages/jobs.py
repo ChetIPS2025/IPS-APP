@@ -24,6 +24,7 @@ try:
     from app.components.job_ips_forms import render_job_ips_forms_tab
     from app.components.job_materials_ui import render_job_materials_tab
     from app.components.job_costing_tab import render_job_costing_tab
+    from app.components.job_expenses_section import render_job_expenses_section
     from app.components.job_cost_summary_cards import render_job_cost_summary_cards
     from app.components.job_detail_layout import (
         close_job_detail_footer_shell,
@@ -36,6 +37,12 @@ try:
         render_job_detail_health_section,
         render_job_detail_metadata_row,
         render_job_detail_quick_stats,
+    )
+    from app.services.job_financial_ui import (
+        BILLING_TYPE_OPTIONS,
+        billing_type_label,
+        job_is_time_and_material,
+        normalize_billing_type,
     )
     from app.services.job_cost_transaction_service import (
         build_job_cost_summary,
@@ -95,6 +102,7 @@ except ImportError:
     from components.job_ips_forms import render_job_ips_forms_tab  # type: ignore
     from components.job_materials_ui import render_job_materials_tab  # type: ignore
     from components.job_costing_tab import render_job_costing_tab  # type: ignore
+    from components.job_expenses_section import render_job_expenses_section  # type: ignore
     from components.job_detail_layout import (  # type: ignore
         close_job_detail_footer_shell,
         gather_job_detail_stats,
@@ -108,6 +116,12 @@ except ImportError:
         render_job_detail_quick_stats,
     )
     from components.job_cost_summary_cards import render_job_cost_summary_cards  # type: ignore
+    from services.job_financial_ui import (  # type: ignore
+        BILLING_TYPE_OPTIONS,
+        billing_type_label,
+        job_is_time_and_material,
+        normalize_billing_type,
+    )
     from services.job_cost_transaction_service import (  # type: ignore
         build_job_cost_summary,
         cached_job_cost_summary,
@@ -289,7 +303,7 @@ JOB_DOC_PENDING_DELETE_JOB_KEY = "job_detail_doc_pending_delete_job_id"
 JOB_DAILY_UPDATE_ADD_MODE_KEY = "job_detail_daily_update_add_job_id"
 _DAILY_UPDATE_STATUS_OPTS = ["Draft", "Open", "Submitted", "Closed"]
 _JOB_DOC_UPLOAD_TYPES = ["pdf", "doc", "docx", "xls", "xlsx", "csv", "png", "jpg", "jpeg"]
-_JOB_COLS = [0.32, 0.9, 2.05, 1.35, 1.05, 1.05, 1.05, 0.9, 0.8, 0.95, 1.05]
+_JOB_COLS = [0.3, 0.85, 1.85, 1.2, 0.95, 0.95, 0.95, 0.95, 0.85, 0.75, 0.85, 1.0]
 _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
     ("JOB #", None),
@@ -298,6 +312,7 @@ _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("STATUS", "status"),
     ("CONTRACT VALUE", None),
     ("ESTIMATED COST", None),
+    ("ACTUAL COST", None),
     ("GROSS PROFIT", None),
     ("MARGIN %", None),
     ("OPEN TASKS / SUBJOBS", None),
@@ -654,17 +669,49 @@ def _render_job_customer_po_overview(job: dict) -> None:
             st.error(str(result.get("error") or "Could not sync PO from estimate."))
 
 
-def _job_financial_snapshot(job: dict) -> dict[str, float | bool]:
+def _job_financial_snapshot(job: dict, *, cost_summary: dict | None = None) -> dict[str, float | bool]:
     costs = _job_list_financials_from_row(job)
+    if isinstance(cost_summary, dict) and cost_summary:
+        actual = float(cost_summary.get("actual_cost") or costs.get("actual_cost") or 0)
+        contract = float(cost_summary.get("contract_value") or costs.get("contract_value") or 0)
+        estimated = float(cost_summary.get("estimated_cost") or costs.get("estimated_cost") or 0)
+        has_actual = int(cost_summary.get("transaction_count") or 0) > 0 or actual > 0
+        if has_actual and contract > 0:
+            profit = round(contract - actual, 2)
+            margin = round((profit / contract) * 100.0, 1)
+        else:
+            profit = float(costs.get("profit") or 0)
+            margin = float(costs.get("margin_pct") or 0)
+        return {
+            "contract_value": contract,
+            "estimated_cost": estimated,
+            "actual_cost": actual,
+            "gross_profit": profit,
+            "margin_pct": margin,
+            "labor_cost": float(cost_summary.get("labor_cost") or 0),
+            "material_cost": float(cost_summary.get("material_cost") or 0),
+            "equipment_cost": float(cost_summary.get("equipment_cost") or 0),
+            "remaining_budget": cost_summary.get("remaining_budget"),
+            "has_contract": contract > 0,
+            "has_estimated": estimated > 0,
+            "has_actual": has_actual,
+        }
     contract = float(costs.get("contract_value") or 0)
     estimated = float(costs.get("estimated_cost") or 0)
+    actual = float(costs.get("actual_cost") or 0)
     return {
         "contract_value": contract,
         "estimated_cost": estimated,
+        "actual_cost": actual,
         "gross_profit": float(costs.get("profit") or 0),
         "margin_pct": float(costs.get("margin_pct") or 0),
+        "labor_cost": 0.0,
+        "material_cost": 0.0,
+        "equipment_cost": 0.0,
+        "remaining_budget": None,
         "has_contract": bool(costs.get("has_contract")),
         "has_estimated": bool(costs.get("has_estimated")),
+        "has_actual": bool(costs.get("has_actual")),
     }
 
 
@@ -737,13 +784,22 @@ def _job_list_financials_from_row(job: dict) -> dict[str, float | dict | bool]:
     except ImportError:
         from services.job_financial_ui import job_list_financials_from_row  # type: ignore
     fin = job_list_financials_from_row(job)
+    actual = float(fin["actual_cost"])
+    estimated = float(fin["estimated_cost"])
+    raw_summary: dict = {}
+    if actual > 0 or estimated > 0:
+        raw_summary = {
+            "estimated_cost": estimated,
+            "actual_cost": actual,
+            "projected_final_cost": actual if actual > 0 else estimated,
+        }
     return {
         "contract_value": float(fin["contract_value"]),
-        "estimated_cost": float(fin["estimated_cost"]),
-        "actual_cost": float(fin["actual_cost"]),
+        "estimated_cost": estimated,
+        "actual_cost": actual,
         "profit": float(fin["profit"]),
         "margin_pct": float(fin["margin_pct"]),
-        "raw_summary": {},
+        "raw_summary": raw_summary,
         "has_contract": bool(fin["has_contract"]),
         "has_estimated": bool(fin["has_estimated"]),
         "has_actual": bool(fin["has_actual"]),
@@ -1107,6 +1163,8 @@ def _render_custom_jobs_table(
             profit_cls = ""
             has_contract = bool(costs.get("has_contract"))
             has_estimated = bool(costs.get("has_estimated"))
+            has_actual = bool(costs.get("has_actual"))
+            actual_val = float(costs.get("actual_cost") or 0)
             has_profit_data = has_contract
             if has_profit_data:
                 if profit_val > 0:
@@ -1126,24 +1184,30 @@ def _render_custom_jobs_table(
                     unsafe_allow_html=True,
                 )
             with cols[7]:
+                actual_cls = _money_cell_class(actual_val, available=has_actual)
+                st.markdown(
+                    f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-money-actual{actual_cls}">{html.escape(_money_cell(actual_val, available=has_actual))}</div>',
+                    unsafe_allow_html=True,
+                )
+            with cols[8]:
                 profit_display_cls = _money_cell_class(profit_val, available=has_profit_data)
                 st.markdown(
                     f'<div class="ips-jobs-money ips-jobs-cell{profit_cls}{profit_display_cls}">{html.escape(_money_cell(profit_val, available=has_profit_data))}</div>',
                     unsafe_allow_html=True,
                 )
-            with cols[8]:
+            with cols[9]:
                 margin_display = _pct_cell(margin_val) if has_contract else "—"
                 margin_cls = profit_cls if has_contract else " ips-jobs-money-empty"
                 st.markdown(
                     f'<div class="ips-jobs-money ips-jobs-cell{margin_cls}">{html.escape(margin_display)}</div>',
                     unsafe_allow_html=True,
                 )
-            with cols[9]:
+            with cols[10]:
                 st.markdown(
                     f'<div class="ips-jobs-cell job-cell jobs-table-cell">{open_subjobs:,}</div>',
                     unsafe_allow_html=True,
                 )
-            with cols[10]:
+            with cols[11]:
                 st.markdown(
                     '<span class="ips-jobs-actions-cell ips-jobs-actions-toolbar job-actions-cell" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
@@ -1319,6 +1383,7 @@ def _seed_job_edit_form(job: dict) -> None:
     fin = _job_financial_snapshot(job)
     st.session_state[f"job_edit_contract_{job_key}"] = float(fin.get("contract_value") or 0)
     st.session_state[f"job_edit_estimated_{job_key}"] = float(fin.get("estimated_cost") or 0)
+    st.session_state[f"job_edit_billing_{job_key}"] = billing_type_label(job.get("billing_type"))
     po = _job_po_snapshot(job)
     st.session_state[f"job_edit_po_num_{job_key}"] = str(po.get("po_number") or "")
     st.session_state[f"job_edit_po_date_{job_key}"] = _as_date(po.get("po_date"))
@@ -2222,7 +2287,89 @@ def _render_field_job_detail_tabs(job: dict) -> None:
             _render_dialog_placeholder("Save this job before filing daily reports.")
 
 
-def _render_job_detail_tabs(job: dict) -> None:
+def _render_billing_type_select(*, key: str, initial: str = BILLING_TYPE_OPTIONS[0][0]) -> str:
+    labels = [label for _, label in BILLING_TYPE_OPTIONS]
+    values = [value for value, _ in BILLING_TYPE_OPTIONS]
+    initial_norm = normalize_billing_type(initial)
+    index = values.index(initial_norm) if initial_norm in values else 0
+    choice = st.selectbox("Billing type", labels, index=index, key=key)
+    label_to_value = {label: value for value, label in BILLING_TYPE_OPTIONS}
+    return label_to_value.get(choice, BILLING_TYPE_OPTIONS[0][0])
+
+
+def _render_job_overview_financials(job: dict, *, cost_summary: dict | None = None) -> None:
+    fin = _job_financial_snapshot(job, cost_summary=cost_summary)
+    is_tm = job_is_time_and_material(job)
+    billing_label = billing_type_label(job.get("billing_type"))
+    actual = float(fin.get("actual_cost") or 0)
+    has_actual = bool(fin.get("has_actual"))
+    remaining = fin.get("remaining_budget")
+    remaining_display = "—"
+    if remaining is not None and (float(fin.get("estimated_cost") or 0) > 0 or float(fin.get("contract_value") or 0) > 0):
+        remaining_display = _money_cell(float(remaining), available=True)
+
+    if is_tm:
+        fin_left = (
+            f'<div class="ips-detail-grid">'
+            f"{_detail_field('Billing Type', billing_label)}"
+            f"{_detail_field('Running Cost (Actual)', _money_cell(actual, available=has_actual))}"
+            f"{_detail_field('Labor to Date', _money_cell(float(fin.get('labor_cost') or 0), available=has_actual))}"
+            f"</div>"
+        )
+        fin_right = (
+            f'<div class="ips-detail-grid">'
+            f"{_detail_field('Materials to Date', _money_cell(float(fin.get('material_cost') or 0), available=has_actual))}"
+            f"{_detail_field('Equipment to Date', _money_cell(float(fin.get('equipment_cost') or 0), available=has_actual))}"
+            f"{_detail_field('Remaining vs Budget', remaining_display)}"
+            f"</div>"
+        )
+        fin_note = (
+            '<p style="margin:0.35rem 0 0;font-size:0.8125rem;color:#64748b;">'
+            "Time &amp; Materials jobs accumulate running cost from timekeeping, materials, equipment, and approved PO/expenses."
+            "</p>"
+        )
+    else:
+        fin_left = (
+            f'<div class="ips-detail-grid">'
+            f"{_detail_field('Billing Type', billing_label)}"
+            f"{_detail_field('Contract Value', _money_cell(float(fin['contract_value']), available=bool(fin['has_contract'])))}"
+            f"{_detail_field('Estimated Cost', _money_cell(float(fin['estimated_cost']), available=bool(fin['has_estimated'])))}"
+            f"{_detail_field('Running Cost (Actual)', _money_cell(actual, available=has_actual))}"
+            f"</div>"
+        )
+        fin_right = (
+            f'<div class="ips-detail-grid">'
+            f"{_detail_field('Gross Profit', _money_cell(float(fin['gross_profit']), available=bool(fin['has_contract'])))}"
+            f"{_detail_field('Margin %', _pct_cell(float(fin['margin_pct'])) if fin['has_contract'] else '—')}"
+            f"{_detail_field('Remaining vs Budget', remaining_display)}"
+            f"</div>"
+        )
+        fin_note = ""
+        if not _job_financials_editable(job):
+            fin_note = (
+                '<p style="margin:0.35rem 0 0;font-size:0.8125rem;color:#64748b;">'
+                "Contract and estimated cost are synced from the linked approved estimate."
+                "</p>"
+            )
+
+    st.markdown(
+        f'{_dialog_card("Financial Information", fin_left + fin_right + fin_note)}',
+        unsafe_allow_html=True,
+    )
+    if st.button(
+        "View cost breakdown",
+        key=f"jobs_overview_costing_{_job_session_key(job)}",
+        type="secondary",
+    ):
+        try:
+            from app.navigation import JOBS_DETAIL_FOCUS_TAB_KEY
+        except ImportError:
+            from navigation import JOBS_DETAIL_FOCUS_TAB_KEY  # type: ignore
+        st.session_state[JOBS_DETAIL_FOCUS_TAB_KEY] = "Job Costing"
+        st.rerun()
+
+
+def _render_job_detail_tabs(job: dict, *, cost_summary: dict | None = None) -> None:
     jn = _safe_value(job.get("job_number"))
     jname = _safe_value(job.get("job_name"))
     status = _safe_value(job.get("status"))
@@ -2273,30 +2420,7 @@ def _render_job_detail_tabs(job: dict) -> None:
             f"</div>",
             unsafe_allow_html=True,
         )
-        fin = _job_financial_snapshot(job)
-        fin_left = (
-            f'<div class="ips-detail-grid">'
-            f"{_detail_field('Contract Value', _money_cell(float(fin['contract_value']), available=bool(fin['has_contract'])))}"
-            f"{_detail_field('Estimated Cost', _money_cell(float(fin['estimated_cost']), available=bool(fin['has_estimated'])))}"
-            f"</div>"
-        )
-        fin_right = (
-            f'<div class="ips-detail-grid">'
-            f"{_detail_field('Projected Gross Profit', _money_cell(float(fin['gross_profit']), available=bool(fin['has_contract'])))}"
-            f"{_detail_field('Projected Margin %', _pct_cell(float(fin['margin_pct'])) if fin['has_contract'] else '—')}"
-            f"</div>"
-        )
-        fin_note = ""
-        if not _job_financials_editable(job):
-            fin_note = (
-                '<p style="margin:0.35rem 0 0;font-size:0.8125rem;color:#64748b;">'
-                "Contract and estimated cost are synced from the linked approved estimate."
-                "</p>"
-            )
-        st.markdown(
-            f'{_dialog_card("Financial Information", fin_left + fin_right + fin_note)}',
-            unsafe_allow_html=True,
-        )
+        _render_job_overview_financials(job, cost_summary=cost_summary)
         _render_job_customer_po_overview(job)
         if st.button(
             "Edit Overview",
@@ -2486,6 +2610,10 @@ def _render_job_edit_form(job: dict) -> None:
             st.date_input("Start date", key=f"job_edit_start_{job_key}")
             st.date_input("End date", key=f"job_edit_end_{job_key}")
             st.slider("Progress %", 0, 100, key=f"job_edit_prog_{job_key}")
+            _render_billing_type_select(
+                key=f"job_edit_billing_{job_key}",
+                initial=str(st.session_state.get(f"job_edit_billing_{job_key}") or job.get("billing_type") or ""),
+            )
 
         st.text_area("Scope of work", key=f"job_edit_scope_{job_key}", height=120)
         st.text_area("Notes", key=f"job_edit_notes_{job_key}", height=100)
@@ -2554,6 +2682,7 @@ def _render_job_edit_form(job: dict) -> None:
             ui["po_number"] = st.session_state.get(f"job_edit_po_num_{job_key}")
             ui["po_date"] = st.session_state.get(f"job_edit_po_date_{job_key}")
             ui["po_amount"] = st.session_state.get(f"job_edit_po_amt_{job_key}")
+        ui["billing_type"] = st.session_state.get(f"job_edit_billing_{job_key}")
         ok, msg = persist_job(ui, row_id=jid or None)
         if ok:
             st.session_state[edit_mode_key] = False
@@ -2661,7 +2790,7 @@ def render_job_detail_dialog(job: dict) -> None:
             if is_field_context():
                 _render_field_job_detail_tabs(job)
             else:
-                _render_job_detail_tabs(job)
+                _render_job_detail_tabs(job, cost_summary=cost_summary if cost_summary else None)
         with body_right:
             render_job_detail_activity_sidebar(job)
 
@@ -2794,6 +2923,7 @@ def _render_jobs_page() -> None:
                     except ImportError:
                         from services.jobs_service import MANUAL_JOB_STATUSES  # type: ignore
                     st.selectbox("Status", list(MANUAL_JOB_STATUSES), key="job_new_status")
+                    _render_billing_type_select(key="job_new_billing")
                 st.text_area("Description", key="job_new_desc")
                 st.text_input("Customer PO # (optional)", key="job_new_po_num")
                 _render_job_financial_inputs(
@@ -2829,6 +2959,7 @@ def _render_jobs_page() -> None:
                         "description": st.session_state.get("job_new_desc"),
                         "contract_value": st.session_state.get("job_new_contract"),
                         "estimated_cost": st.session_state.get("job_new_estimated"),
+                        "billing_type": st.session_state.get("job_new_billing"),
                         "po_number": st.session_state.get("job_new_po_num"),
                     }
                 )

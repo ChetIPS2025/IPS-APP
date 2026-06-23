@@ -291,6 +291,9 @@ def render_job_costing_tab(
     render_job_cost_detail_metrics(summary)
     render_job_cost_breakdown(summary)
 
+    render_job_expenses_section(job, key_prefix=key_prefix)
+    st.divider()
+
     _render_manual_adjustment_form(job, key_prefix=key_prefix)
 
     st.subheader("Transaction history")

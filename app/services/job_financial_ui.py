@@ -4,6 +4,47 @@ from __future__ import annotations
 
 from typing import Any
 
+BILLING_TYPE_FIXED = "fixed_price"
+BILLING_TYPE_TM = "time_and_material"
+
+BILLING_TYPE_OPTIONS: tuple[tuple[str, str], ...] = (
+    (BILLING_TYPE_FIXED, "Fixed Price"),
+    (BILLING_TYPE_TM, "Time & Materials"),
+)
+
+BILLING_TYPE_LABELS = dict(BILLING_TYPE_OPTIONS)
+
+
+def normalize_billing_type(raw: object) -> str:
+    raw_str = str(raw or "").strip()
+    for value, label in BILLING_TYPE_OPTIONS:
+        if raw_str.lower() == label.lower() or raw_str.lower() == value.lower():
+            return value
+    token = raw_str.lower().replace("-", "_").replace(" ", "_").replace("&", "_")
+    while "__" in token:
+        token = token.replace("__", "_")
+    if token in {
+        "tm",
+        "t_m",
+        "tandm",
+        "time_and_material",
+        "time_and_materials",
+        "time_material",
+        "time_materials",
+    }:
+        return BILLING_TYPE_TM
+    if "time" in token and "material" in token:
+        return BILLING_TYPE_TM
+    return BILLING_TYPE_FIXED
+
+
+def job_is_time_and_material(job: dict[str, Any]) -> bool:
+    return normalize_billing_type(job.get("billing_type")) == BILLING_TYPE_TM
+
+
+def billing_type_label(raw: object) -> str:
+    return BILLING_TYPE_LABELS.get(normalize_billing_type(raw), "Fixed Price")
+
 
 def parse_money(value: object) -> float | None:
     if value in (None, ""):
@@ -40,25 +81,28 @@ def job_list_financials_from_row(job: dict[str, Any]) -> dict[str, float | bool]
     """Fast list/detail snapshot from stored job columns (no ledger recompute)."""
     contract = float(job.get("awarded_amount") or job.get("contract_value") or 0)
     estimated = float(job.get("estimated_cost") or 0)
+    actual = round(float(job.get("actual_cost") or 0), 2)
+    has_actual = actual > 0.005
     profit_raw = job.get("projected_gross_profit")
     margin_raw = job.get("projected_margin_pct")
-    if profit_raw is not None:
+    if has_actual and contract > 0:
+        profit = round(contract - actual, 2)
+        margin = round((profit / contract) * 100.0, 1)
+    elif profit_raw is not None:
         profit = float(profit_raw)
+        margin = float(margin_raw) if margin_raw is not None else projected_margin_pct(contract, estimated)
     else:
         profit = projected_gross_profit(contract, estimated)
-    if margin_raw is not None:
-        margin = float(margin_raw)
-    else:
         margin = projected_margin_pct(contract, estimated)
     return {
         "contract_value": contract,
         "estimated_cost": estimated,
-        "actual_cost": 0.0,
+        "actual_cost": actual,
         "profit": profit,
         "margin_pct": margin,
         "has_contract": contract > 0,
         "has_estimated": estimated > 0,
-        "has_actual": False,
+        "has_actual": has_actual,
     }
 
 

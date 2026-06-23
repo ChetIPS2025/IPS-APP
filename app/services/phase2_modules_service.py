@@ -500,6 +500,8 @@ def normalize_job(row: dict[str, Any]) -> dict[str, Any]:
         "estimated_cost": _money_field(row, "estimated_cost"),
         "projected_gross_profit": _money_field(row, "projected_gross_profit"),
         "projected_margin_pct": _money_field(row, "projected_margin_pct"),
+        "actual_cost": _money_field(row, "actual_cost"),
+        "billing_type": str(row.get("billing_type") or "fixed_price").strip() or "fixed_price",
     }
 
 
@@ -1326,6 +1328,15 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
         payload["awarded_amount"] = contract_value
     if estimated_cost is not None:
         payload["estimated_cost"] = estimated_cost
+
+    if "billing_type" in ui:
+        try:
+            from app.services.job_financial_ui import normalize_billing_type
+        except ImportError:
+            from services.job_financial_ui import normalize_billing_type  # type: ignore
+        billing_type = normalize_billing_type(ui.get("billing_type"))
+        if not cols or "billing_type" in cols:
+            payload["billing_type"] = billing_type
 
     po_number = str(ui.get("po_number") or "").strip()
     if "po_number" in ui or po_number:

@@ -123,6 +123,61 @@ def equipment_internal_rate(asset: dict[str, Any] | None) -> tuple[float, str, f
     return 0.0, "day", 1.0
 
 
+def _invalidate_jobs_list_cache() -> None:
+    """Drop cached jobs catalog rows after actual_cost rollup changes."""
+    try:
+        from app.pages._core._data import _cached_jobs_rows, clear_catalog_session_datasets
+    except ImportError:
+        try:
+            from pages._core._data import _cached_jobs_rows, clear_catalog_session_datasets  # type: ignore
+        except ImportError:
+            return
+    try:
+        _cached_jobs_rows.clear()
+    except Exception:
+        pass
+    try:
+        clear_catalog_session_datasets()
+    except Exception:
+        pass
+
+
+def sum_actual_cost_for_job(job_id: str) -> float:
+    """Sum ledger total_cost for one job."""
+    jid = str(job_id or "").strip()
+    if not jid:
+        return 0.0
+    total = sum(_safe_float(t.get("total_cost")) for t in fetch_job_cost_transactions(jid))
+    return round(total, 2)
+
+
+def refresh_job_actual_cost(job_id: str) -> None:
+    """Persist jobs.actual_cost from the ledger (no-op if column missing)."""
+    jid = str(job_id or "").strip()
+    if not jid:
+        return
+    actual = sum_actual_cost_for_job(jid)
+    try:
+        from app.services.phase2_modules_service import table_column_names
+    except ImportError:
+        from services.phase2_modules_service import table_column_names  # type: ignore
+    cols = table_column_names("jobs")
+    if cols and "actual_cost" not in cols:
+        return
+    try:
+        _db().update_rows(
+            "jobs",
+            {
+                "actual_cost": actual,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+            {"id": jid},
+        )
+        _invalidate_jobs_list_cache()
+    except Exception as exc:
+        _LOG.debug("refresh_job_actual_cost skipped: %s", exc)
+
+
 def upsert_job_cost_transaction(payload: dict[str, Any]) -> bool:
     """Idempotent upsert keyed by (source_type, source_id). Returns False if table missing."""
     source_type = str(payload.get("source_type") or "").strip()
@@ -162,6 +217,7 @@ def upsert_job_cost_transaction(payload: dict[str, Any]) -> bool:
             db.update_rows(_TABLE, body, {"id": existing[0]["id"]})
         else:
             db.insert_row(_TABLE, body)
+        refresh_job_actual_cost(job_id)
         return True
     except Exception as exc:
         err = str(exc).lower()
@@ -177,10 +233,19 @@ def delete_job_cost_transaction(source_type: str, source_id: str) -> None:
     sid = str(source_id or "").strip()
     if not st or not sid:
         return
+    job_ids: list[str] = []
+    try:
+        existing = _db().fetch_by_match(_TABLE, {"source_type": st, "source_id": sid}, limit=5) or []
+        job_ids = [str(r.get("job_id") or "").strip() for r in existing if str(r.get("job_id") or "").strip()]
+    except Exception:
+        job_ids = []
     try:
         _db().delete_rows(_TABLE, {"source_type": st, "source_id": sid})
     except Exception as exc:
         _LOG.debug("delete_job_cost_transaction: %s", exc)
+        return
+    for jid in job_ids:
+        refresh_job_actual_cost(jid)
 
 
 def _safe_sync(fn, *args, **kwargs) -> None:
@@ -819,6 +884,7 @@ def sync_all_sources_for_job(job_id: str) -> None:
                     job_id=jid,
                     check_out_at=str(row.get("check_out_at") or ""),
                 )
+    refresh_job_actual_cost(jid)
 
 
 def create_manual_cost_adjustment(
@@ -878,10 +944,13 @@ def update_manual_cost_adjustment(txn_id: str, fields: dict[str, Any]) -> bool:
     unit = _safe_float(fields.get("unit_cost", row.get("unit_cost")))
     total = round(qty * unit, 2)
     if total <= 0:
+        jid = str(row.get("job_id") or "").strip()
         try:
             _db().delete_rows(_TABLE, {"id": tid})
         except Exception:
             return False
+        if jid:
+            refresh_job_actual_cost(jid)
         return True
     desc = str(fields.get("description") or row.get("description") or row.get("item_name") or "")[:500]
     return upsert_job_cost_transaction(
@@ -912,11 +981,14 @@ def delete_manual_cost_adjustment(txn_id: str) -> bool:
         return False
     if not rows or str(rows[0].get("source_type") or "") != SOURCE_MANUAL_ADJUSTMENT:
         return False
+    jid = str(rows[0].get("job_id") or "").strip()
     try:
         _db().delete_rows(_TABLE, {"id": tid})
-        return True
     except Exception:
         return False
+    if jid:
+        refresh_job_actual_cost(jid)
+    return True
 
 
 _JOB_COST_SYNCED_KEY = "_ips_job_cost_synced_job_ids"
