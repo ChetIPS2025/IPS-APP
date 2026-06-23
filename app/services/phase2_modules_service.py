@@ -484,7 +484,7 @@ def normalize_job(row: dict[str, Any]) -> dict[str, Any]:
             or "—"
         ),
         "supervisor": str(row.get("supervisor") or row.get("supervisor_name") or "—"),
-        "status": str(row.get("status") or "Draft"),
+        "status": str(row.get("status") or "Active"),
         "start_date": str(row.get("start_date") or "")[:10],
         "created_at": str(row.get("created_at") or "")[:10],
         "end_date": end,
@@ -1283,7 +1283,7 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
 
     payload: dict[str, Any] = {
         "job_name": _job_save_text(ui.get("job_name")),
-        "status": _job_save_text(ui.get("status"), default="Draft"),
+        "status": _job_save_text(ui.get("status"), default="Active"),
         "supervisor": _job_save_text(ui.get("supervisor")),
         "project_manager": _job_save_text(ui.get("project_manager")),
         "start_date": _job_save_date(ui.get("start_date")),
@@ -1380,7 +1380,7 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
         new_status = normalize_job_status(ui.get("status") or prior.get("status"))
         old_status = normalize_job_status(prior.get("status"))
         awarded_missing = _money_field(prior, "awarded_amount") <= 0
-        if new_status in {"Awarded", "Active"} and (old_status != new_status or awarded_missing):
+        if new_status == "Active" and (old_status != new_status or awarded_missing):
             sync = award_job_and_sync_estimate(
                 row_id,
                 new_status=new_status,

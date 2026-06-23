@@ -87,11 +87,11 @@ def _parse_estimate_json(raw: Any) -> dict[str, Any] | None:
 
 def job_status_needs_daily_report(status: Any) -> bool:
     """Active field jobs: expect a daily supervisor report when work is ongoing."""
-    s = " ".join(str(status or "").strip().split()).casefold()
-    if not s:
-        return False
-    tokens = ("in progress", "scheduled", "awarded")
-    return any(t in s for t in tokens)
+    try:
+        from app.services.jobs_service import normalize_job_status
+    except ImportError:
+        from services.jobs_service import normalize_job_status  # type: ignore
+    return normalize_job_status(status) in {"Active", "On Hold"}
 
 
 def report_has_any_delay(row: dict[str, Any] | None) -> bool:

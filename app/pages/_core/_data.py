@@ -49,7 +49,7 @@ _DEMO_JOBS: list[dict[str, Any]] = [
         "customer": "Acme Construction",
         "estimate_number": "E-10238",
         "supervisor": "Mark Johnson",
-        "status": "Estimate Pending",
+        "status": "Active",
         "start_date": "",
         "end_date": "",
         "progress": 0,
@@ -62,7 +62,7 @@ _DEMO_JOBS: list[dict[str, Any]] = [
         "customer": "Gulf Coast Industrial",
         "estimate_number": "E-10230",
         "supervisor": "Leland Daigle",
-        "status": "Draft",
+        "status": "Active",
         "start_date": "",
         "end_date": "",
         "progress": 0,
@@ -88,7 +88,7 @@ _DEMO_JOBS: list[dict[str, Any]] = [
         "customer": "Birla Carbons - USA",
         "estimate_number": "E-10250",
         "supervisor": "Leland Daigle",
-        "status": "Awarded",
+        "status": "Active",
         "start_date": "2025-06-01",
         "end_date": "2025-09-30",
         "progress": 0,
@@ -101,7 +101,7 @@ _DEMO_JOBS: list[dict[str, Any]] = [
         "customer": "Gulf Coast Industrial",
         "estimate_number": "E-10251",
         "supervisor": "Mark Johnson",
-        "status": "Awarded",
+        "status": "Active",
         "start_date": "2025-06-15",
         "end_date": "2025-07-31",
         "progress": 0,
@@ -418,20 +418,20 @@ def _job_awarded_date(job: dict[str, Any]) -> str:
 
 
 def load_awarded_jobs() -> list[dict[str, Any]]:
-    """All live jobs with status Awarded, sorted by job number."""
+    """Live active jobs for dashboard lists (legacy name retained for callers)."""
     try:
         from app.services.job_service import normalize_job_status_for_filter, sort_jobs_by_number_then_name
     except ImportError:
         from services.job_service import normalize_job_status_for_filter, sort_jobs_by_number_then_name  # type: ignore
 
-    awarded = [
+    active = [
         job
         for job in load_jobs()
         if not bool(job.get("is_deleted"))
-        and normalize_job_status_for_filter(job.get("status")) == "Awarded"
+        and normalize_job_status_for_filter(job.get("status")) == "Active"
     ]
     rows: list[dict[str, Any]] = []
-    for job in sort_jobs_by_number_then_name(awarded):
+    for job in sort_jobs_by_number_then_name(active):
         row = dict(job)
         row["awarded_date"] = _job_awarded_date(job)
         rows.append(row)

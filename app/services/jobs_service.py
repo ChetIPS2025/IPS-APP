@@ -38,25 +38,37 @@ __all__ = [
 _OPEN_JOB_STATUSES = frozenset(
     {
         "active",
+        "on hold",
         "awarded",
         "in progress",
         "open",
         "scheduled",
         "pending",
         "draft",
-        "on hold",
         "planning",
+        "estimate pending",
     }
 )
 
 MANUAL_JOB_STATUSES = (
-    "Draft",
-    "Pending",
-    "Awarded",
     "Active",
     "On Hold",
     "Completed",
     "Cancelled",
+)
+
+_LEGACY_JOB_STATUSES_TO_ACTIVE = frozenset(
+    {
+        "",
+        "draft",
+        "pending",
+        "awarded",
+        "planning",
+        "scheduled",
+        "in progress",
+        "open",
+        "estimate pending",
+    }
 )
 
 _JOB_ACTION_ROLES = frozenset({"admin", "supervisor", "project manager", "manager", "pm"})
@@ -66,28 +78,26 @@ def normalize_job_status(raw: object) -> str:
     """Canonical job status labels used across Jobs UI, dashboard, and filters."""
     s = str(raw or "").strip().lower().replace("_", " ")
     mapping = {
-        "": "Draft",
-        "draft": "Draft",
-        "pending": "Pending",
-        "planning": "Planning",
-        "scheduled": "Scheduled",
         "active": "Active",
-        "in progress": "Active",
-        "awarded": "Awarded",
         "on hold": "On Hold",
         "completed": "Completed",
         "complete": "Completed",
-        "closed": "Closed",
+        "closed": "Completed",
         "cancelled": "Cancelled",
         "canceled": "Cancelled",
         "archived": "Archived",
         "deleted": "Deleted",
-        "estimate pending": "Estimate Pending",
     }
     if s in mapping:
         return mapping[s]
+    if s in _LEGACY_JOB_STATUSES_TO_ACTIVE:
+        return "Active"
     label = str(raw or "").strip()
-    return label if label else "Draft"
+    if label in MANUAL_JOB_STATUSES:
+        return label
+    if label in {"Archived", "Deleted"}:
+        return label
+    return "Active"
 
 
 def _current_user_id() -> str | None:
@@ -219,7 +229,7 @@ def update_job_status(
     old_status = normalize_job_status(current_row.get("status"))
     if old_status in {"Deleted", "Archived"}:
         return ServiceResult(ok=False, error="Archived jobs cannot be updated.")
-    if old_status == status and status not in {"Awarded", "Active"}:
+    if old_status == status and status != "Active":
         return ServiceResult(ok=True, data={"status": status})
 
     actor = str(changed_by or _current_user_id() or "").strip() or None
@@ -240,7 +250,7 @@ def update_job_status(
         if reason_text:
             payload["cancellation_reason"] = reason_text
 
-    if status in {"Awarded", "Active"}:
+    if status == "Active":
         try:
             from app.services.estimate_job_workflow_service import award_job_and_sync_estimate
         except ImportError:

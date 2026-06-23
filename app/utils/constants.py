@@ -11,9 +11,6 @@ ROLES = (
 )
 
 JOB_STATUSES = (
-    "Draft",
-    "Pending",
-    "Awarded",
     "Active",
     "On Hold",
     "Completed",

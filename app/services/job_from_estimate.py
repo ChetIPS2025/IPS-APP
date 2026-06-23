@@ -55,7 +55,7 @@ ESTIMATE_STATUSES_ALLOWED_FOR_JOB_CREATION: FrozenSet[str] | None = frozenset(
 )
 
 # Only for :func:`create_job_from_estimate` — standalone jobs use the Job Database form default/status.
-JOB_STATUS_AFTER_ESTIMATE_CONVERSION = "Awarded"
+JOB_STATUS_AFTER_ESTIMATE_CONVERSION = "Active"
 
 
 def estimate_status_allows_job_creation(status: str | None) -> bool:

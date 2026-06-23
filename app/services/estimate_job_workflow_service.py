@@ -73,9 +73,9 @@ except ImportError:
 
 _LOG = logging.getLogger(__name__)
 
-JOB_STATUS_ESTIMATE_PENDING = "Estimate Pending"
+JOB_STATUS_ESTIMATE_PENDING = "Active"
 JOB_STATUS_AFTER_ESTIMATE_APPROVAL = "Active"
-JOB_AWARD_SYNC_STATUSES: FrozenSet[str] = frozenset({"Awarded", "Active"})
+JOB_AWARD_SYNC_STATUSES: FrozenSet[str] = frozenset({"Active"})
 
 ESTIMATE_STATUSES_APPROVABLE: FrozenSet[str] = frozenset({"draft", "pending", "sent"})
 ESTIMATE_STATUSES_ALREADY_APPROVED: FrozenSet[str] = frozenset(
@@ -265,7 +265,7 @@ def _sync_linked_job_row(
     payload: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
-    Ensure an existing/reused job is linked to the estimate and shows as Estimate Pending
+    Ensure an existing/reused job is linked to the estimate and set to Active
     until the estimate is approved.
     """
     jid = str(job.get("id") or "").strip()
@@ -535,7 +535,7 @@ def create_pending_job_from_estimate(
     _log_estimate_activity(eid, "Linked job auto-created", details=jn or new_id, actor_id=actor)
     _log_job_activity(new_id, "Job created from estimate", details=quote_number, actor_id=actor)
 
-    msg = f"Created linked job {jn or new_id} (Estimate Pending)."
+    msg = f"Created linked job {jn or new_id} (Active)."
     return CreateJobFromEstimateResult(ok=True, message=msg, job=inserted)
 
 
@@ -545,7 +545,7 @@ def ensure_linked_pending_job_for_estimate(
     estimate_row: dict[str, Any] | None = None,
 ) -> CreateJobFromEstimateResult:
     """
-    Ensure the estimate has a linked job in Estimate Pending status (create or sync).
+    Ensure the estimate has a linked job in Active status (create or sync).
 
     Safe to call after insert or update when the estimate has a customer.
     """
@@ -821,8 +821,8 @@ def award_job_and_sync_estimate(
     job_row: dict[str, Any] | None = None,
 ) -> ServiceResult:
     """
-    When a job is set to Awarded/Active, approve its linked estimate (if any) and return
-    job column updates for the caller to merge. Preserves Awarded vs Active from the Jobs UI.
+    When a job is set to Active, approve its linked estimate (if any) and return
+    job column updates for the caller to merge.
     """
     try:
         from app.services.jobs_service import normalize_job_status

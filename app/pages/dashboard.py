@@ -199,19 +199,19 @@ def render() -> None:
         return html.escape(str(row.get(field) or "—"))
 
     render_panel_card(
-        "Jobs Awarded",
+        "Active Jobs",
         data_table_html(
             load_awarded_jobs(),
             [
                 ("job_number", "Job #"),
                 ("job_name", "Project / Description"),
                 ("customer", "Customer"),
-                ("awarded_date", "Awarded Date"),
+                ("awarded_date", "Start Date"),
             ],
             col_fr=["0.55fr", "1.35fr", "0.95fr", "0.75fr"],
             cell_renderer=_dash_awarded_job_cell,
             table_class="ips-data-table-wrap ips-data-table-stable ips-dash-list-table",
-            empty_message="No awarded jobs.",
+            empty_message="No active jobs.",
         ),
         compact=True,
     )

@@ -1667,7 +1667,7 @@ def _show_new_estimate_dialog() -> None:
         else:
             st.caption("Expiration follows estimate date + 30 days until you change it.")
         st.selectbox("Status", lookup_options("estimate_statuses"), index=0, key="est_new_status")
-        st.caption("A linked job in **Estimate Pending** status is created automatically when you save.")
+        st.caption("A linked job in **Active** status is created automatically when you save.")
     with nc1:
         sync_new_estimate_number()
         st.text_input(

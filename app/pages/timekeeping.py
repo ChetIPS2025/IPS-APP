@@ -259,27 +259,11 @@ _ASSIGNMENT_EXCLUDED_JOB_STATUSES = frozenset(
 
 
 def _normalize_assignable_job_status(raw: object) -> str:
-    s = str(raw or "").strip().lower().replace("_", " ")
-    mapping = {
-        "": "Draft",
-        "draft": "Draft",
-        "planning": "Planning",
-        "scheduled": "Scheduled",
-        "active": "Active",
-        "awarded": "Awarded",
-        "on hold": "On Hold",
-        "completed": "Completed",
-        "closed": "Closed",
-        "cancelled": "Cancelled",
-        "canceled": "Cancelled",
-        "archived": "Archived",
-        "deleted": "Deleted",
-        "estimate pending": "Estimate Pending",
-    }
-    if s in mapping:
-        return mapping[s]
-    label = str(raw or "").strip()
-    return label if label else "Draft"
+    try:
+        from app.services.jobs_service import normalize_job_status
+    except ImportError:
+        from services.jobs_service import normalize_job_status  # type: ignore
+    return normalize_job_status(raw)
 
 
 def _job_row_assignable_for_timekeeping(job: dict[str, Any]) -> bool:

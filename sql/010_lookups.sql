@@ -114,7 +114,7 @@ select public.ips_seed_lookup_values('crews', array[
 ]);
 
 select public.ips_seed_lookup_values('job_statuses', array[
-    'Planning', 'Active', 'On Hold', 'Completed', 'Cancelled'
+    'Active', 'On Hold', 'Completed', 'Cancelled'
 ]);
 
 select public.ips_seed_lookup_values('estimate_statuses', array[

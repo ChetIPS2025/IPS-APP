@@ -891,9 +891,9 @@ def _jobs_summary_counts(
     counts: dict[str, float | int] = {
         "total": len(rows),
         "active": 0,
-        "awarded": 0,
-        "pending": 0,
-        "draft": 0,
+        "on_hold": 0,
+        "completed": 0,
+        "cancelled": 0,
         "open_subjobs": 0,
         "total_contract": 0.0,
         "total_actual": 0.0,
@@ -904,12 +904,12 @@ def _jobs_summary_counts(
         status = _normalize_job_status(job.get("status"))
         if status == "Active":
             counts["active"] += 1
-        elif status == "Awarded":
-            counts["awarded"] += 1
-        elif status == "Pending":
-            counts["pending"] += 1
-        elif status == "Draft":
-            counts["draft"] += 1
+        elif status == "On Hold":
+            counts["on_hold"] += 1
+        elif status == "Completed":
+            counts["completed"] += 1
+        elif status == "Cancelled":
+            counts["cancelled"] += 1
         jid = str(job.get("id") or "").strip()
         counts["open_subjobs"] += _job_open_subjobs_count(job, subjob_counts=subjob_counts)
         costs = _job_list_financials_from_row(job)
@@ -958,13 +958,13 @@ def _apply_jobs_view_filter(rows: list[dict], view: str) -> list[dict]:
         and _normalize_job_status(r.get("status")) not in {"Deleted", "Archived"}
     ]
     if view_norm == "Completed Jobs":
-        return [r for r in alive if _normalize_job_status(r.get("status")) in {"Completed", "Closed"}]
+        return [r for r in alive if _normalize_job_status(r.get("status")) == "Completed"]
     if view_norm == "Cancelled Jobs":
         return [r for r in alive if _normalize_job_status(r.get("status")) == "Cancelled"]
     return [
         r
         for r in alive
-        if _normalize_job_status(r.get("status")) not in {"Completed", "Closed", "Cancelled"}
+        if _normalize_job_status(r.get("status")) not in {"Completed", "Cancelled"}
     ]
 
 
@@ -1372,7 +1372,7 @@ def _seed_job_edit_form(job: dict) -> None:
     st.session_state.pop(f"job_edit_contact_{job_key}", None)
     st.session_state.pop(f"job_edit_cust_prev_{job_key}", None)
     st.session_state.pop(f"job_edit_loc_prev_{job_key}", None)
-    st.session_state[f"job_edit_status_{job_key}"] = str(job.get("status") or "Draft")
+    st.session_state[f"job_edit_status_{job_key}"] = _normalize_job_status(job.get("status"))
     st.session_state[f"job_edit_sup_{job_key}"] = str(job.get("supervisor") or "")
     st.session_state[f"job_edit_loc_{job_key}"] = str(job.get("location") or "")
     st.session_state[f"job_edit_start_{job_key}"] = _as_date(job.get("start_date"))
@@ -3013,9 +3013,9 @@ def _render_jobs_page() -> None:
     render_jobs_summary_cards(
         total=int(summary["total"]),
         active=int(summary["active"]),
-        awarded=int(summary["awarded"]),
-        pending=int(summary["pending"]),
-        draft=int(summary["draft"]),
+        on_hold=int(summary["on_hold"]),
+        completed=int(summary["completed"]),
+        cancelled=int(summary["cancelled"]),
         open_subjobs=int(summary["open_subjobs"]),
         total_contract=float(summary["total_contract"]),
         total_actual=float(summary["total_actual"]),

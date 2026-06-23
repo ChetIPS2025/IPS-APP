@@ -148,36 +148,25 @@ def normalize_job_status_for_filter(raw: object) -> str:
 
 
 _DASHBOARD_JOB_METRIC_BUCKETS: dict[str, str] = {
-    "Draft": "draft_jobs",
-    "Pending": "pending_jobs",
-    "Awarded": "jobs_awarded",
     "Active": "active_jobs",
     "On Hold": "on_hold_jobs",
-    "Estimate Pending": "estimate_pending_jobs",
     "Completed": "complete_jobs",
-    "Closed": "complete_jobs",
+    "Cancelled": "cancelled_jobs",
 }
 
 
 def dashboard_job_metrics(jobs: list[dict[str, Any]]) -> dict[str, int]:
-    """
-    Dashboard job KPI counts — each bucket is mutually exclusive by normalized status.
-
-    - jobs_awarded: won/accepted, not necessarily started
-    - active_jobs: work in progress
-    - pending_jobs: manual pending (not yet active)
-    - draft_jobs: draft / not yet submitted
-    - estimate_pending_jobs: waiting on estimate approval
-    - complete_jobs: finished (completed or closed)
-    """
+    """Dashboard job KPI counts by normalized status."""
     out = {
-        "jobs_awarded": 0,
         "active_jobs": 0,
+        "on_hold_jobs": 0,
+        "complete_jobs": 0,
+        "cancelled_jobs": 0,
+        # Legacy keys kept at zero for older dashboard widgets.
+        "jobs_awarded": 0,
         "pending_jobs": 0,
         "draft_jobs": 0,
-        "on_hold_jobs": 0,
         "estimate_pending_jobs": 0,
-        "complete_jobs": 0,
     }
     for job in jobs:
         if not isinstance(job, dict):
@@ -222,7 +211,7 @@ def is_job_eligible_for_weekly_timesheet(job: dict[str, Any]) -> bool:
     if not str(job.get("id") or "").strip():
         return False
     status = normalize_job_status_for_filter(job.get("status"))
-    if status in {"Deleted", "Archived", "Estimate Pending"}:
+    if status in {"Deleted", "Archived"}:
         return False
     num = job_number_display(job.get("job_number"))
     if num and _SUBJOB_STYLE_NUMBER_RE.match(num):

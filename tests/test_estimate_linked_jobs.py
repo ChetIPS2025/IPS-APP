@@ -67,7 +67,7 @@ class TestEstimateLinkedJobs(unittest.TestCase):
             },
         )
 
-        result = award_job_and_sync_estimate("job-1", new_status="Awarded")
+        result = award_job_and_sync_estimate("job-1", new_status="Active")
 
         self.assertTrue(result.ok)
         sync_mock.assert_called_once()

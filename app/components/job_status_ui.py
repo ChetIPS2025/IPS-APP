@@ -26,21 +26,14 @@ except ImportError:
 
 def job_status_pill_class(status: str) -> str:
     cls_map = {
-        "Draft": "ips-job-status-draft",
-        "Pending": "ips-job-status-pending",
-        "Planning": "ips-job-status-planning",
-        "Scheduled": "ips-job-status-scheduled",
         "Active": "ips-job-status-active",
-        "Awarded": "ips-job-status-awarded",
         "On Hold": "ips-job-status-on-hold",
         "Completed": "ips-job-status-completed",
-        "Closed": "ips-job-status-closed",
         "Cancelled": "ips-job-status-cancelled",
         "Deleted": "ips-job-status-deleted",
         "Archived": "ips-job-status-archived",
-        "Estimate Pending": "ips-job-status-estimate-pending",
     }
-    return cls_map.get(status, "ips-job-status-draft")
+    return cls_map.get(status, "ips-job-status-active")
 
 
 def job_status_pill_html(status: str) -> str:
@@ -49,65 +42,25 @@ def job_status_pill_html(status: str) -> str:
     return f'<span class="ips-job-status-pill {cls}">{html.escape(label)}</span>'
 
 
-ACTION_MENU_STATUS_OPTIONS: tuple[str, ...] = (
-    "Draft",
-    "Pending Review",
-    "Approved",
-    "In Progress",
-    "On Hold",
-    "Completed",
-    "Cancelled",
-)
+ACTION_MENU_STATUS_OPTIONS: tuple[str, ...] = MANUAL_JOB_STATUSES
 
 
 def action_display_to_backend_status(display: object) -> str:
     """Map Actions menu labels to persisted job status values."""
-    label = str(display or "").strip()
-    mapping = {
-        "Draft": "Draft",
-        "Pending Review": "Pending",
-        "Approved": "Awarded",
-        "Awarded": "Awarded",
-        "Active": "Active",
-        "In Progress": "Active",
-        "On Hold": "On Hold",
-        "Completed": "Completed",
-        "Cancelled": "Cancelled",
-    }
-    if label in mapping:
-        return mapping[label]
     return normalize_job_status(display)
 
 
 def backend_to_action_display_status(status: object) -> str:
     """Map stored job status to Actions menu label."""
-    norm = normalize_job_status(status)
-    mapping = {
-        "Draft": "Draft",
-        "Pending": "Pending Review",
-        "Awarded": "Approved",
-        "Active": "In Progress",
-        "On Hold": "On Hold",
-        "Completed": "Completed",
-        "Cancelled": "Cancelled",
-        "Planning": "Approved",
-        "Scheduled": "In Progress",
-        "Closed": "Completed",
-        "Estimate Pending": "Pending Review",
-    }
-    display = mapping.get(norm, norm)
-    if display in ACTION_MENU_STATUS_OPTIONS:
-        return display
-    return "Draft"
+    return normalize_job_status(status)
 
 
 def manual_job_status_options(current: object) -> list[str]:
     """Dropdown options for manual status changes."""
     cur = normalize_job_status(current)
-    opts = list(MANUAL_JOB_STATUSES)
-    if cur and cur not in opts and cur not in {"Deleted", "Archived"}:
-        return [cur, *[o for o in opts if o != cur]]
-    return opts
+    if cur in {"Deleted", "Archived"}:
+        return [cur, *MANUAL_JOB_STATUSES]
+    return list(MANUAL_JOB_STATUSES)
 
 
 def _job_is_archived(job: dict[str, Any]) -> bool:
@@ -127,10 +80,7 @@ def _sync_status_widget(
     *,
     action_menu: bool = False,
 ) -> None:
-    if action_menu:
-        current = backend_to_action_display_status(job.get("status"))
-    else:
-        current = normalize_job_status(job.get("status"))
+    current = normalize_job_status(job.get("status"))
     if st.session_state.get(f"{widget_key}_bound") != current:
         st.session_state[widget_key] = current
         st.session_state[f"{widget_key}_bound"] = current
@@ -139,16 +89,11 @@ def _sync_status_widget(
 
 def _apply_status_change(job_id: str, widget_key: str) -> None:
     raw = st.session_state.get(widget_key)
-    if st.session_state.get(f"{widget_key}_action_menu"):
-        new_status = action_display_to_backend_status(raw)
-        bound_value = backend_to_action_display_status(new_status)
-    else:
-        new_status = normalize_job_status(raw)
-        bound_value = new_status
+    new_status = normalize_job_status(raw)
     result = update_job_status(job_id, new_status)
     if result.ok:
-        st.session_state[f"{widget_key}_bound"] = bound_value
-        st.session_state[widget_key] = bound_value
+        st.session_state[f"{widget_key}_bound"] = new_status
+        st.session_state[widget_key] = new_status
         on_updated = st.session_state.get(f"{widget_key}_on_updated")
         if callable(on_updated):
             on_updated(job_id, new_status)
@@ -176,12 +121,8 @@ def render_job_status_change_select(
     _sync_status_widget(job, widget_key, action_menu=action_menu)
     if on_updated is not None:
         st.session_state[f"{widget_key}_on_updated"] = on_updated
-    if action_menu:
-        options = list(ACTION_MENU_STATUS_OPTIONS)
-        current = backend_to_action_display_status(job.get("status"))
-    else:
-        options = manual_job_status_options(job.get("status"))
-        current = normalize_job_status(job.get("status"))
+    options = manual_job_status_options(job.get("status"))
+    current = normalize_job_status(job.get("status"))
     index = options.index(current) if current in options else 0
 
     if action_menu:
