@@ -22,6 +22,11 @@ except ImportError:
     )
 
 try:
+    from app.components.job_expenses_section import render_job_expenses_section
+except ImportError:
+    from components.job_expenses_section import render_job_expenses_section  # type: ignore
+
+try:
     from app.services.job_cost_transaction_service import (
         COST_EQUIPMENT,
         COST_LABOR,

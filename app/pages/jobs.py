@@ -24,7 +24,6 @@ try:
     from app.components.job_ips_forms import render_job_ips_forms_tab
     from app.components.job_materials_ui import render_job_materials_tab
     from app.components.job_costing_tab import render_job_costing_tab
-    from app.components.job_expenses_section import render_job_expenses_section
     from app.components.job_cost_summary_cards import render_job_cost_summary_cards
     from app.components.job_detail_layout import (
         close_job_detail_footer_shell,
@@ -102,7 +101,6 @@ except ImportError:
     from components.job_ips_forms import render_job_ips_forms_tab  # type: ignore
     from components.job_materials_ui import render_job_materials_tab  # type: ignore
     from components.job_costing_tab import render_job_costing_tab  # type: ignore
-    from components.job_expenses_section import render_job_expenses_section  # type: ignore
     from components.job_detail_layout import (  # type: ignore
         close_job_detail_footer_shell,
         gather_job_detail_stats,
