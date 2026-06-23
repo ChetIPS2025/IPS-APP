@@ -760,6 +760,11 @@ def sync_estimate_job_links_and_financials(
     if internal_cost > 0:
         job_patch["estimated_cost"] = round(internal_cost, 2)
     try:
+        from app.services.job_po_service import apply_po_fields_to_job_payload, ensure_customer_po_document_from_estimate
+    except ImportError:
+        from services.job_po_service import apply_po_fields_to_job_payload, ensure_customer_po_document_from_estimate  # type: ignore
+    job_patch.update(apply_po_fields_to_job_payload(job, est, overwrite=True))
+    try:
         from app.services.job_financial_ui import apply_projected_financials_to_job_payload
     except ImportError:
         from services.job_financial_ui import apply_projected_financials_to_job_payload  # type: ignore
@@ -776,6 +781,10 @@ def sync_estimate_job_links_and_financials(
             update_rows_admin("jobs", filtered_patch, {"id": jid})
         except Exception as exc:
             return ServiceResult(ok=False, error=f"Could not update linked job: {exc}")
+        try:
+            ensure_customer_po_document_from_estimate(jid, eid, uploaded_by=actor or "", admin=True)
+        except Exception:
+            _LOG.debug("PO attachment sync skipped for job %s", jid, exc_info=True)
 
     quote = str(est.get("quote_number") or est.get("estimate_number") or "").strip()
     if job_activity:

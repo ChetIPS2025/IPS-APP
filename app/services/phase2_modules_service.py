@@ -1327,6 +1327,19 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
     if estimated_cost is not None:
         payload["estimated_cost"] = estimated_cost
 
+    po_number = str(ui.get("po_number") or "").strip()
+    if "po_number" in ui or po_number:
+        if not cols or "po_number" in cols:
+            payload["po_number"] = po_number
+    if "po_date" in ui:
+        po_date = _job_save_date(ui.get("po_date"))
+        if not cols or "po_date" in cols:
+            payload["po_date"] = po_date
+    if "po_amount" in ui:
+        po_amount = _job_save_money(ui.get("po_amount"))
+        if not cols or "po_amount" in cols:
+            payload["po_amount"] = po_amount if po_amount is not None else None
+
     prior: dict[str, Any] = {}
     if row_id:
         try:

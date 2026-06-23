@@ -472,6 +472,188 @@ def _job_financials_editable(job: dict) -> bool:
     return job_manual_financials_editable(job)
 
 
+def _job_po_snapshot(job: dict) -> dict:
+    try:
+        from app.services.job_po_service import job_po_snapshot
+    except ImportError:
+        from services.job_po_service import job_po_snapshot  # type: ignore
+    return job_po_snapshot(job)
+
+
+def _job_po_editable(job: dict) -> bool:
+    try:
+        from app.services.job_po_service import job_po_editable
+    except ImportError:
+        from services.job_po_service import job_po_editable  # type: ignore
+    return job_po_editable(job)
+
+
+def _customer_po_document_url(doc: dict | None) -> str:
+    if not doc:
+        return ""
+    path = str(doc.get("storage_path") or "").strip()
+    if not path:
+        return ""
+    try:
+        from app.services.weekly_job_timesheet_service import signed_url_for_timesheet
+    except ImportError:
+        from services.weekly_job_timesheet_service import signed_url_for_timesheet  # type: ignore
+    return signed_url_for_timesheet(path) or ""
+
+
+def _render_job_po_inputs(
+    *,
+    job_key: str,
+    po_number: str,
+    po_date: date | None,
+    po_amount: float,
+    editable: bool,
+    estimate_note: str = "",
+) -> None:
+    st.markdown("**Customer PO**")
+    if estimate_note:
+        st.caption(estimate_note)
+    pc1, pc2, pc3 = st.columns(3, gap="medium")
+    with pc1:
+        if editable:
+            st.text_input("PO Number", key=f"job_edit_po_num_{job_key}")
+        else:
+            st.markdown(f"**PO Number**  \n{html.escape(po_number or '—')}")
+    with pc2:
+        if editable:
+            st.date_input("PO Date", key=f"job_edit_po_date_{job_key}")
+        else:
+            st.markdown(f"**PO Date**  \n{fmt_date(po_date) if po_date else '—'}")
+    with pc3:
+        if editable:
+            st.number_input(
+                "PO Amount ($)",
+                min_value=0.0,
+                step=100.0,
+                format="%.2f",
+                key=f"job_edit_po_amt_{job_key}",
+            )
+        else:
+            st.markdown(
+                f"**PO Amount ($)**  \n{_money_cell(float(po_amount or 0), available=float(po_amount or 0) > 0)}"
+            )
+
+
+def _render_job_customer_po_upload(job: dict) -> None:
+    jid = str(job.get("id") or "").strip()
+    if not jid or not _job_po_editable(job):
+        return
+    job_key = _job_session_key(job)
+    pk = f"job_po_upload_{job_key}"
+    admin = _field_admin_read()
+    try:
+        from app.services.asset_document_util import guess_document_content_type
+        from app.services.job_documents import fetch_customer_po_document, upload_customer_po_document
+    except ImportError:
+        from services.asset_document_util import guess_document_content_type  # type: ignore
+        from services.job_documents import fetch_customer_po_document, upload_customer_po_document  # type: ignore
+
+    existing = fetch_customer_po_document(jid, admin=admin)
+    if existing:
+        url = _customer_po_document_url(existing)
+        name = str(existing.get("file_name") or "Customer PO")
+        if url:
+            st.link_button(f"Open {name}", url, use_container_width=False, key=f"{pk}_open")
+        else:
+            st.caption(f"Attached: {name}")
+    up = st.file_uploader(
+        "PO attachment (PDF or image)",
+        type=["pdf", "jpg", "jpeg", "png"],
+        key=f"{pk}_file",
+    )
+    if up and st.button("Upload Customer PO", key=f"{pk}_save", type="secondary"):
+        data = up.getvalue()
+        raw_name = str(getattr(up, "name", "") or "customer_po.pdf")
+        if not data:
+            st.warning("Choose a file first.")
+        else:
+            try:
+                ctype = guess_document_content_type(raw_name, str(getattr(up, "type", "") or ""))
+                upload_customer_po_document(
+                    job_id=jid,
+                    file_data=data,
+                    file_name=raw_name,
+                    content_type=ctype,
+                    uploaded_by=_current_document_uploader_name(),
+                    admin=admin,
+                )
+                st.success("Customer PO uploaded.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Could not upload PO: {exc}")
+
+
+def _render_job_customer_po_overview(job: dict) -> None:
+    po = _job_po_snapshot(job)
+    jid = str(job.get("id") or "").strip()
+    admin = _field_admin_read()
+    po_doc = None
+    if jid:
+        try:
+            from app.services.job_documents import fetch_customer_po_document
+        except ImportError:
+            from services.job_documents import fetch_customer_po_document  # type: ignore
+        po_doc = fetch_customer_po_document(jid, admin=admin)
+
+    po_left = (
+        f'<div class="ips-detail-grid">'
+        f"{_detail_field('PO Number', po.get('po_number') or '—')}"
+        f"{_detail_field('PO Date', fmt_date(po.get('po_date')) if po.get('po_date') else '—')}"
+        f"{_detail_field('PO Amount', _money_cell(float(po.get('po_amount') or 0), available=float(po.get('po_amount') or 0) > 0))}"
+        f"</div>"
+    )
+    doc_name = str((po_doc or {}).get("file_name") or "").strip()
+    po_right = f'<div class="ips-detail-grid">{_detail_field("PO File", doc_name or "—")}</div>'
+    note = ""
+    if po.get("locked"):
+        note = (
+            '<p style="margin:0.35rem 0 0;font-size:0.8125rem;color:#64748b;">'
+            "Customer PO is synced from the linked approved estimate."
+            "</p>"
+        )
+    elif po.get("estimate_id") and not po.get("has_po"):
+        note = (
+            '<p style="margin:0.35rem 0 0;font-size:0.8125rem;color:#64748b;">'
+            "A linked estimate is available — use Sync from estimate or edit the job to enter PO details."
+            "</p>"
+        )
+    st.markdown(
+        f'{_dialog_card("Customer PO", po_left + po_right + note)}',
+        unsafe_allow_html=True,
+    )
+    if po_doc:
+        url = _customer_po_document_url(po_doc)
+        if url:
+            st.link_button("Open PO attachment", url, key=f"job_po_open_{_job_session_key(job)}")
+    est_id = str(po.get("estimate_id") or "").strip()
+    if est_id and _job_po_editable(job) and st.button(
+        "Sync PO from estimate",
+        key=f"job_po_sync_{_job_session_key(job)}",
+        type="secondary",
+    ):
+        try:
+            from app.services.job_po_service import sync_job_po_from_estimate
+        except ImportError:
+            from services.job_po_service import sync_job_po_from_estimate  # type: ignore
+        result = sync_job_po_from_estimate(
+            jid,
+            job=job,
+            copy_attachment=True,
+            uploaded_by=_current_document_uploader_name(),
+            admin=admin,
+        )
+        if result.get("ok"):
+            st.success("Customer PO synced from estimate.")
+            st.rerun()
+        else:
+            st.error(str(result.get("error") or "Could not sync PO from estimate."))
+
+
 def _job_financial_snapshot(job: dict) -> dict[str, float | bool]:
     costs = _job_list_financials_from_row(job)
     contract = float(costs.get("contract_value") or 0)
@@ -1137,6 +1319,10 @@ def _seed_job_edit_form(job: dict) -> None:
     fin = _job_financial_snapshot(job)
     st.session_state[f"job_edit_contract_{job_key}"] = float(fin.get("contract_value") or 0)
     st.session_state[f"job_edit_estimated_{job_key}"] = float(fin.get("estimated_cost") or 0)
+    po = _job_po_snapshot(job)
+    st.session_state[f"job_edit_po_num_{job_key}"] = str(po.get("po_number") or "")
+    st.session_state[f"job_edit_po_date_{job_key}"] = _as_date(po.get("po_date"))
+    st.session_state[f"job_edit_po_amt_{job_key}"] = float(po.get("po_amount") or 0)
 
 
 def _open_jobs_detail_modal(job_id: str, _job: dict | None = None) -> None:
@@ -2111,6 +2297,7 @@ def _render_job_detail_tabs(job: dict) -> None:
             f'{_dialog_card("Financial Information", fin_left + fin_right + fin_note)}',
             unsafe_allow_html=True,
         )
+        _render_job_customer_po_overview(job)
         if st.button(
             "Edit Overview",
             key=f"jobs_overview_edit_{_job_session_key(job)}",
@@ -2319,6 +2506,21 @@ def _render_job_edit_form(job: dict) -> None:
             ),
         )
 
+        po = _job_po_snapshot(job)
+        po_editable = _job_po_editable(job)
+        _render_job_po_inputs(
+            job_key=job_key,
+            po_number=str(po.get("po_number") or ""),
+            po_date=_as_date(po.get("po_date")),
+            po_amount=float(po.get("po_amount") or 0),
+            editable=po_editable,
+            estimate_note=(
+                "Customer PO is managed by the linked approved estimate and cannot be edited here."
+                if not po_editable
+                else ""
+            ),
+        )
+
         btn_cancel, btn_spacer, btn_save = st.columns([1, 4, 1], gap="small")
         with btn_cancel:
             cancelled = st.form_submit_button("Cancel")
@@ -2348,6 +2550,10 @@ def _render_job_edit_form(job: dict) -> None:
         if _job_financials_editable(job):
             ui["contract_value"] = st.session_state.get(f"job_edit_contract_{job_key}")
             ui["estimated_cost"] = st.session_state.get(f"job_edit_estimated_{job_key}")
+        if _job_po_editable(job):
+            ui["po_number"] = st.session_state.get(f"job_edit_po_num_{job_key}")
+            ui["po_date"] = st.session_state.get(f"job_edit_po_date_{job_key}")
+            ui["po_amount"] = st.session_state.get(f"job_edit_po_amt_{job_key}")
         ok, msg = persist_job(ui, row_id=jid or None)
         if ok:
             st.session_state[edit_mode_key] = False
@@ -2355,6 +2561,9 @@ def _render_job_edit_form(job: dict) -> None:
             st.rerun()
         else:
             st.error(msg or "Could not save job.")
+
+    if bool(st.session_state.get(_job_edit_mode_key(job))):
+        _render_job_customer_po_upload(job)
 
 
 def _render_job_actions_panel(job: dict) -> None:
@@ -2586,6 +2795,7 @@ def _render_jobs_page() -> None:
                         from services.jobs_service import MANUAL_JOB_STATUSES  # type: ignore
                     st.selectbox("Status", list(MANUAL_JOB_STATUSES), key="job_new_status")
                 st.text_area("Description", key="job_new_desc")
+                st.text_input("Customer PO # (optional)", key="job_new_po_num")
                 _render_job_financial_inputs(
                     key_prefix="job_new",
                     contract_key="job_new_contract",
@@ -2619,6 +2829,7 @@ def _render_jobs_page() -> None:
                         "description": st.session_state.get("job_new_desc"),
                         "contract_value": st.session_state.get("job_new_contract"),
                         "estimated_cost": st.session_state.get("job_new_estimated"),
+                        "po_number": st.session_state.get("job_new_po_num"),
                     }
                 )
                 if apply_persist_feedback(ok, msg, clear_keys=("ips_job_form",)):

@@ -14,6 +14,8 @@ _LOG = logging.getLogger(__name__)
 
 TABLE = "documents_hub"
 JOB_MODULE = "jobs"
+CUSTOMER_PO_DOC_TYPE = "Customer PO"
+CUSTOMER_PO_LINKED_REF = "customer_po"
 
 
 def _upload_fn(*, admin: bool):
@@ -100,6 +102,64 @@ def upload_job_document(
     tid = str(task_id or "").strip()
     if tid:
         payload["task_id"] = tid
+    return insert_fn(TABLE, payload)
+
+
+def _is_customer_po_document(row: dict[str, Any]) -> bool:
+    dtype = str(row.get("doc_type") or "").strip().lower()
+    ref = str(row.get("linked_ref") or "").strip().lower()
+    if dtype == "customer po":
+        return True
+    return ref == CUSTOMER_PO_LINKED_REF or ref.startswith(f"{CUSTOMER_PO_LINKED_REF}:")
+
+
+def fetch_customer_po_document(job_id: str, *, admin: bool = False) -> dict[str, Any] | None:
+    """Most recent Customer PO document for a job, if any."""
+    for doc in fetch_job_documents(job_id, admin=admin, limit=500):
+        if _is_customer_po_document(doc):
+            return doc
+    return None
+
+
+def upload_customer_po_document(
+    *,
+    job_id: str,
+    file_data: bytes,
+    file_name: str,
+    content_type: str = "application/octet-stream",
+    uploaded_by: str = "",
+    notes: str = "",
+    admin: bool = False,
+) -> dict[str, Any]:
+    jid = str(job_id or "").strip()
+    if not jid:
+        raise ValueError("job_id required")
+    if not file_data:
+        raise ValueError("Empty file")
+    if not table_exists(TABLE, admin=admin):
+        raise RuntimeError("documents_hub table not found — run sql/008_documents.sql")
+    try:
+        from app.config import settings
+    except ImportError:
+        from config import settings  # type: ignore
+    bucket = getattr(settings, "storage_bucket", "ips-storage")
+    insert_fn, _, _ = write_fn(admin=admin)
+    upload = _upload_fn(admin=admin)
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    safe = re.sub(r"[^a-zA-Z0-9._-]+", "_", str(file_name or "customer_po").strip())[:160] or "customer_po"
+    storage_path = f"job_documents/{jid}/{ts}_{safe}"
+    upload(storage_path, file_data, content_type=content_type or "application/octet-stream", bucket=bucket)
+    payload: dict[str, Any] = {
+        "file_name": str(file_name or Path(storage_path).name)[:200],
+        "doc_type": CUSTOMER_PO_DOC_TYPE,
+        "linked_module": JOB_MODULE,
+        "linked_ref": CUSTOMER_PO_LINKED_REF,
+        "linked_record_id": jid,
+        "upload_date": date.today().isoformat(),
+        "uploaded_by": str(uploaded_by or "").strip()[:200],
+        "storage_path": storage_path,
+        "notes": str(notes or "").strip()[:2000],
+    }
     return insert_fn(TABLE, payload)
 
 

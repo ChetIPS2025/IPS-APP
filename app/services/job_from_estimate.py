@@ -690,6 +690,12 @@ def create_job_from_estimate(
     site_loc = _location_text_from_customer_location(customer_location_id) if customer_location_id else ""
     merged_location = site_loc or _safe_location(ej)
 
+    try:
+        from app.services.job_po_service import po_fields_from_estimate
+    except ImportError:
+        from services.job_po_service import po_fields_from_estimate  # type: ignore
+    po_fields = po_fields_from_estimate(row)
+
     # source_type omitted until jobs schema includes that column (sql/022); estimate_id marks estimate-linked jobs.
     payload: dict[str, Any] = {
         "customer_id": customer_id,
@@ -706,6 +712,7 @@ def create_job_from_estimate(
         "awarded_amount": awarded_f,
         "notes": _build_job_notes(row, ej),
     }
+    payload.update({k: v for k, v in po_fields.items() if v not in (None, "", 0, 0.0)})
     if _jobs_has_customer_contact_column():
         cc = row.get("customer_contact_id") or ej.get("customer_contact_id")
         if cc:
