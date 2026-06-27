@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import date, datetime, timezone
 from typing import Any
 
@@ -234,6 +235,16 @@ def _bool(value: Any, default: bool = False) -> bool:
 
 def _str(value: Any, default: str = "") -> str:
     return str(value or default).strip()
+
+
+def _uuid_or_none(value: Any) -> str | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        return str(uuid.UUID(raw))
+    except ValueError:
+        return None
 
 
 def normalize_material_line(row: dict[str, Any], estimate_id: str = "") -> dict[str, Any]:
@@ -597,19 +608,18 @@ def _material_insert_payload(estimate_id: str, data: dict[str, Any], sort_order:
     calc = calc_material_line(qty, unit_cost, markup_percent)
     return {
         "estimate_id": eid,
-        "pricing_item_id": data.get("pricing_item_id") or None,
-        "inventory_item_id": data.get("inventory_item_id") or None,
+        "pricing_item_id": _uuid_or_none(data.get("pricing_item_id")),
+        "inventory_item_id": _uuid_or_none(data.get("inventory_item_id")),
         "item_number": _str(data.get("item_number") or data.get("sku")),
         "sku": _str(data.get("sku") or data.get("item_number")),
         "description": _str(data.get("description")),
         "category": _str(data.get("category")),
-        "vendor_id": data.get("vendor_id") or None,
+        "vendor_id": _uuid_or_none(data.get("vendor_id")),
         "vendor": _str(data.get("vendor")),
         "qty": qty,
         "unit": _str(data.get("unit") or "EA"),
         "unit_cost": unit_cost,
         "total_cost": calc["cost_total"],
-        "cost_total": calc["cost_total"],
         "markup_percent": markup_percent,
         "markup_amount": calc["markup_amount"],
         "price_total": calc["price_total"],
@@ -665,19 +675,18 @@ def update_estimate_material(line_id: str, data: dict[str, Any]) -> ServiceResul
     markup_percent = _num(data.get("markup_percent"))
     calc = calc_material_line(qty, unit_cost, markup_percent)
     payload = {
-        "pricing_item_id": data.get("pricing_item_id") or None,
-        "inventory_item_id": data.get("inventory_item_id") or None,
+        "pricing_item_id": _uuid_or_none(data.get("pricing_item_id")),
+        "inventory_item_id": _uuid_or_none(data.get("inventory_item_id")),
         "item_number": _str(data.get("item_number") or data.get("sku")),
         "sku": _str(data.get("sku") or data.get("item_number")),
         "description": _str(data.get("description")),
         "category": _str(data.get("category")),
-        "vendor_id": data.get("vendor_id") or None,
+        "vendor_id": _uuid_or_none(data.get("vendor_id")),
         "vendor": _str(data.get("vendor")),
         "qty": qty,
         "unit": _str(data.get("unit") or "EA"),
         "unit_cost": unit_cost,
         "total_cost": calc["cost_total"],
-        "cost_total": calc["cost_total"],
         "markup_percent": markup_percent,
         "markup_amount": calc["markup_amount"],
         "price_total": calc["price_total"],

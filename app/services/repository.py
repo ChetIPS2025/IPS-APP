@@ -8,6 +8,35 @@ from typing import Any, Callable
 
 _LOG = logging.getLogger(__name__)
 
+# Fallback when the table has no rows yet — prevents sending columns that do not exist
+# (e.g. cost_total on estimate_line_items, which uses total_cost instead).
+TABLE_COLUMN_ALLOWLIST: dict[str, frozenset[str]] = {
+    "estimate_line_items": frozenset(
+        {
+            "estimate_id",
+            "inventory_item_id",
+            "pricing_item_id",
+            "item_number",
+            "sku",
+            "description",
+            "category",
+            "qty",
+            "unit",
+            "unit_cost",
+            "total_cost",
+            "markup",
+            "markup_percent",
+            "markup_amount",
+            "price_total",
+            "taxable",
+            "vendor",
+            "vendor_id",
+            "notes",
+            "sort_order",
+        }
+    ),
+}
+
 
 @dataclass
 class ServiceResult:
@@ -158,8 +187,13 @@ def table_column_names(table: str) -> frozenset[str]:
 
 
 def filter_payload_to_table(table: str, payload: dict[str, Any]) -> dict[str, Any]:
-    cols = table_column_names(table)
-    if not cols:
+    sampled = table_column_names(table)
+    allowlist = TABLE_COLUMN_ALLOWLIST.get(table)
+    if sampled:
+        cols = sampled
+    elif allowlist:
+        cols = allowlist
+    else:
         return payload
     return {k: v for k, v in payload.items() if k in cols}
 
@@ -178,6 +212,16 @@ def _friendly_repo_error(exc: Exception, *, table: str, action: str) -> str:
         return "That record already exists. Please refresh and try again."
     if "23502" in low or "not-null constraint" in low:
         return f"Missing required information for {table.replace('_', ' ')}. Check required fields and try again."
+    if "23503" in low or "foreign key" in low:
+        return (
+            f"Could not link one or more related records while trying to {action} {table.replace('_', ' ')}. "
+            "Refresh the page and try again."
+        )
+    if "pgrst204" in low or ("could not find" in low and "column" in low):
+        return (
+            f"Database schema for {table.replace('_', ' ')} is out of date. "
+            "Apply pending Supabase migrations, then refresh and try again."
+        )
     return friendly_auth_error_message(exc, operation=f"{action} {table}")
 
 
