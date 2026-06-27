@@ -309,6 +309,13 @@ _BATCH_ENTRY_CAPTION = (
     "Use + Add Row only if you need more."
 )
 
+# Pricing items: fewer empty starter rows; never pre-select the first catalog item.
+_MATERIAL_BATCH_ROW_COUNT = 3
+_MATERIAL_BATCH_CAPTION = (
+    f"{_MATERIAL_BATCH_ROW_COUNT} blank rows ready — pick an item or use Custom on each row, then save once. "
+    "Use + Add Row only if you need more."
+)
+
 
 def _new_blank_batch_row(**extra: str) -> dict[str, str]:
     return {"rid": uuid4().hex[:8], **extra}
@@ -722,6 +729,12 @@ def _sync_material_batch_pick(
         st.session_state[k(f"unit_{row_id}")] = str(item.get("unit") or "EA")
         st.session_state[k(f"mk_{row_id}")] = float(item.get("markup_pct") or default_markup)
         st.session_state[k(f"tax_{row_id}")] = bool(item.get("taxable", True))
+    elif pick == _CUSTOM_MATERIAL_LABEL:
+        st.session_state[k(f"desc_{row_id}")] = ""
+        st.session_state[k(f"uc_{row_id}")] = 0.0
+        st.session_state[k(f"unit_{row_id}")] = "EA"
+        st.session_state[k(f"mk_{row_id}")] = float(default_markup)
+        st.session_state[k(f"tax_{row_id}")] = True
     st.session_state[last_key] = pick
 
 
@@ -744,10 +757,13 @@ def _render_add_material_form(
     pick_labels = [*pg_labels, _CUSTOM_MATERIAL_LABEL] if pg_labels else [_CUSTOM_MATERIAL_LABEL]
     draft_key = _batch_draft_key("mat", key_prefix, eid)
     if draft_key not in st.session_state:
-        st.session_state[draft_key] = _initial_batch_draft_rows(pick=pick_labels[0])
+        st.session_state[draft_key] = _initial_batch_draft_rows(
+            _MATERIAL_BATCH_ROW_COUNT,
+            pick=_CUSTOM_MATERIAL_LABEL,
+        )
 
     _compact_form_card("Add Pricing Items")
-    st.caption(_BATCH_ENTRY_CAPTION)
+    st.caption(_MATERIAL_BATCH_CAPTION)
     if not pg_labels:
         st.info("No pricing guide items yet — use custom rows or add items under Pricing Guide.")
 
@@ -766,7 +782,7 @@ def _render_add_material_form(
         if not rid:
             continue
         if k(f"pick_{rid}") not in st.session_state:
-            st.session_state[k(f"pick_{rid}")] = row.get("pick") or pick_labels[0]
+            st.session_state[k(f"pick_{rid}")] = row.get("pick") or _CUSTOM_MATERIAL_LABEL
         if k(f"qty_{rid}") not in st.session_state:
             st.session_state[k(f"qty_{rid}")] = 1.0
         if k(f"uc_{rid}") not in st.session_state:
@@ -833,13 +849,13 @@ def _render_add_material_form(
 
     if remove_rid:
         remaining = [r for r in draft_rows if str(r.get("rid")) != remove_rid]
-        st.session_state[draft_key] = remaining or _single_batch_fallback_row(pick=pick_labels[0])
+        st.session_state[draft_key] = remaining or _single_batch_fallback_row(pick=_CUSTOM_MATERIAL_LABEL)
         st.rerun()
 
     add_col, _ = st.columns([1, 3], gap="small")
     with add_col:
         if st.button("+ Add Row", key=k("add_row"), use_container_width=True):
-            draft_rows.append({"rid": uuid4().hex[:8], "pick": pick_labels[0]})
+            draft_rows.append({"rid": uuid4().hex[:8], "pick": _CUSTOM_MATERIAL_LABEL})
             st.session_state[draft_key] = draft_rows
             st.rerun()
 
