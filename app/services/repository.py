@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from typing import Any, Callable
 
 _LOG = logging.getLogger(__name__)
+
+_PGRST204_COLUMN_RE = re.compile(r"Could not find the '([^']+)' column", re.I)
 
 # Fallback when the table has no rows yet — prevents sending columns that do not exist
 # (e.g. cost_total on estimate_line_items, which uses total_cost instead).
@@ -37,12 +40,11 @@ TABLE_COLUMN_ALLOWLIST: dict[str, frozenset[str]] = {
     ),
 }
 
-# Base migration (003) columns — safe fallback when the table has no sample rows yet.
+# Oldest deployed shape (062) when the table has no sample rows yet.
 TABLE_COLUMN_CORE: dict[str, frozenset[str]] = {
     "estimate_line_items": frozenset(
         {
             "estimate_id",
-            "inventory_item_id",
             "item_number",
             "description",
             "category",
@@ -50,9 +52,6 @@ TABLE_COLUMN_CORE: dict[str, frozenset[str]] = {
             "unit",
             "unit_cost",
             "total_cost",
-            "markup",
-            "vendor",
-            "notes",
             "sort_order",
         }
     ),
@@ -263,6 +262,53 @@ def _friendly_repo_error(exc: Exception, *, table: str, action: str) -> str:
     return friendly_auth_error_message(exc, operation=f"{action} {table}")
 
 
+def _insert_with_optional_columns(
+    table: str,
+    payload: dict[str, Any],
+    *,
+    use_admin: bool,
+    action: str,
+) -> ServiceResult:
+    """
+    Insert while dropping columns the remote schema does not recognize (PGRST204).
+
+    Needed when Supabase migrations lag behind the app or the table has no sample rows.
+    """
+    working = dict(payload)
+    last_exc: Exception | None = None
+
+    for _ in range(24):
+        filtered = filter_payload_to_table(table, working)
+        if not filtered:
+            break
+        try:
+            if use_admin:
+                row = _db().insert_row_admin(table, filtered)
+            else:
+                row = _db().insert_row(table, filtered)
+            clear_all_data_caches()
+            return ServiceResult(ok=True, data=row)
+        except Exception as exc:
+            last_exc = exc
+            match = _PGRST204_COLUMN_RE.search(str(exc))
+            if match:
+                col = match.group(1)
+                if col in working:
+                    working.pop(col)
+                    continue
+                if col == "markup" and "markup_percent" in working:
+                    working.pop("markup_percent")
+                    continue
+                if col == "markup_percent" and "markup" in working:
+                    working.pop("markup")
+                    continue
+            break
+
+    msg = _friendly_repo_error(last_exc or RuntimeError("Insert failed"), table=table, action=action)
+    _LOG.warning("insert %s (%s) failed: %s", table, "admin" if use_admin else "user", last_exc)
+    return ServiceResult(ok=False, error=msg)
+
+
 def insert_row(table: str, payload: dict[str, Any]) -> ServiceResult:
     try:
         from app.perf_debug import perf_span
@@ -270,28 +316,12 @@ def insert_row(table: str, payload: dict[str, Any]) -> ServiceResult:
         from perf_debug import perf_span  # type: ignore
 
     with perf_span(f"repo.insert_row:{table}"):
-        payload = filter_payload_to_table(table, payload)
-        try:
-            row = _db().insert_row(table, payload)
-            clear_all_data_caches()
-            return ServiceResult(ok=True, data=row)
-        except Exception as exc:
-            msg = _friendly_repo_error(exc, table=table, action="save to")
-            _LOG.warning("insert_row %s failed: %s", table, exc)
-            return ServiceResult(ok=False, error=msg)
+        return _insert_with_optional_columns(table, payload, use_admin=False, action="save to")
 
 
 def insert_row_admin(table: str, payload: dict[str, Any]) -> ServiceResult:
     """Server-side insert using service role (Streamlit writes when user JWT may be stale)."""
-    payload = filter_payload_to_table(table, payload)
-    try:
-        row = _db().insert_row_admin(table, payload)
-        clear_all_data_caches()
-        return ServiceResult(ok=True, data=row)
-    except Exception as exc:
-        msg = _friendly_repo_error(exc, table=table, action="save to")
-        _LOG.warning("insert_row_admin %s failed: %s", table, exc)
-        return ServiceResult(ok=False, error=msg)
+    return _insert_with_optional_columns(table, payload, use_admin=True, action="save to")
 
 
 def update_row(table: str, payload: dict[str, Any], match: dict[str, Any]) -> ServiceResult:
