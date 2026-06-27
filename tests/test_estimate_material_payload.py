@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from app.services.estimate_costing_service import _material_insert_payload, _uuid_or_none
-from app.services.repository import TABLE_COLUMN_ALLOWLIST, filter_payload_to_table
+from app.services.repository import TABLE_COLUMN_ALLOWLIST, TABLE_COLUMN_CORE, filter_payload_to_table
 
 
 def test_uuid_or_none_rejects_invalid_values():
@@ -34,6 +34,7 @@ def test_material_insert_payload_uses_total_cost_not_cost_total():
     assert "cost_total" not in payload
     assert payload["pricing_item_id"] == "550e8400-e29b-41d4-a716-446655440001"
     assert payload["inventory_item_id"] is None
+    assert payload["markup"] == 25
 
 
 def test_filter_payload_to_table_uses_allowlist_when_table_empty():
@@ -46,9 +47,23 @@ def test_filter_payload_to_table_uses_allowlist_when_table_empty():
         "cost_total": 10,
         "markup_percent": 25,
         "price_total": 12.5,
+        "pricing_item_id": "550e8400-e29b-41d4-a716-446655440001",
     }
     with patch("app.services.repository.table_column_names", return_value=frozenset()):
         filtered = filter_payload_to_table("estimate_line_items", raw)
     assert "cost_total" not in filtered
+    assert "pricing_item_id" not in filtered
     assert filtered["total_cost"] == 10
-    assert set(filtered.keys()).issubset(TABLE_COLUMN_ALLOWLIST["estimate_line_items"])
+    assert filtered["markup"] == 25
+    assert set(filtered.keys()).issubset(TABLE_COLUMN_CORE["estimate_line_items"])
+
+
+def test_filter_payload_to_table_maps_markup_percent_to_legacy_markup():
+    raw = {"markup_percent": 25.0, "description": "x", "qty": 1}
+    with patch(
+        "app.services.repository.table_column_names",
+        return_value=frozenset({"markup", "description", "qty"}),
+    ):
+        filtered = filter_payload_to_table("estimate_line_items", raw)
+    assert filtered["markup"] == 25.0
+    assert "markup_percent" not in filtered

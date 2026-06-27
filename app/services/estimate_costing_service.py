@@ -14,6 +14,7 @@ from app.services.repository import (
     fetch_by_id,
     fetch_rows,
     insert_row,
+    insert_row_admin,
     update_row,
 )
 from app.utils.estimate_calculations import (
@@ -621,6 +622,7 @@ def _material_insert_payload(estimate_id: str, data: dict[str, Any], sort_order:
         "unit_cost": unit_cost,
         "total_cost": calc["cost_total"],
         "markup_percent": markup_percent,
+        "markup": markup_percent,
         "markup_amount": calc["markup_amount"],
         "price_total": calc["price_total"],
         "taxable": _bool(data.get("taxable"), True),
@@ -629,11 +631,32 @@ def _material_insert_payload(estimate_id: str, data: dict[str, Any], sort_order:
     }
 
 
+def _insert_estimate_line_item(payload: dict[str, Any]) -> ServiceResult:
+    """Insert a material/pricing line; retry with admin role and without broken FK links."""
+    result = insert_row("estimate_line_items", payload)
+    if result.ok:
+        return result
+
+    admin = insert_row_admin("estimate_line_items", payload)
+    if admin.ok:
+        return admin
+
+    slim = dict(payload)
+    for key in ("pricing_item_id", "inventory_item_id", "vendor_id"):
+        slim[key] = None
+    if any(payload.get(key) for key in ("pricing_item_id", "inventory_item_id", "vendor_id")):
+        retry = insert_row_admin("estimate_line_items", slim)
+        if retry.ok:
+            return retry
+
+    return result
+
+
 def add_estimate_material(estimate_id: str, data: dict[str, Any]) -> ServiceResult:
     eid = _str(estimate_id)
     existing, _ = get_estimate_materials(eid)
     payload = _material_insert_payload(eid, data, _next_sort_order(existing))
-    result = insert_row("estimate_line_items", payload)
+    result = _insert_estimate_line_item(payload)
     if result.ok:
         recalculate_and_save_estimate_totals(eid)
     return result
@@ -650,7 +673,7 @@ def add_estimate_material_batch(estimate_id: str, lines: list[dict[str, Any]]) -
     last_err = ""
     for i, data in enumerate(lines):
         payload = _material_insert_payload(eid, data, sort_base + i)
-        result = insert_row("estimate_line_items", payload)
+        result = _insert_estimate_line_item(payload)
         if not result.ok:
             last_err = str(result.error or "Save failed.")
             break

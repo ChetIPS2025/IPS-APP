@@ -37,6 +37,27 @@ TABLE_COLUMN_ALLOWLIST: dict[str, frozenset[str]] = {
     ),
 }
 
+# Base migration (003) columns — safe fallback when the table has no sample rows yet.
+TABLE_COLUMN_CORE: dict[str, frozenset[str]] = {
+    "estimate_line_items": frozenset(
+        {
+            "estimate_id",
+            "inventory_item_id",
+            "item_number",
+            "description",
+            "category",
+            "qty",
+            "unit",
+            "unit_cost",
+            "total_cost",
+            "markup",
+            "vendor",
+            "notes",
+            "sort_order",
+        }
+    ),
+}
+
 
 @dataclass
 class ServiceResult:
@@ -189,13 +210,20 @@ def table_column_names(table: str) -> frozenset[str]:
 def filter_payload_to_table(table: str, payload: dict[str, Any]) -> dict[str, Any]:
     sampled = table_column_names(table)
     allowlist = TABLE_COLUMN_ALLOWLIST.get(table)
+    core = TABLE_COLUMN_CORE.get(table)
     if sampled:
         cols = sampled
+    elif core:
+        cols = core
     elif allowlist:
         cols = allowlist
     else:
         return payload
-    return {k: v for k, v in payload.items() if k in cols}
+    filtered = {k: v for k, v in payload.items() if k in cols}
+    if table == "estimate_line_items":
+        if "markup" in cols and "markup_percent" not in cols and "markup_percent" in payload:
+            filtered["markup"] = payload["markup_percent"]
+    return filtered
 
 
 def _friendly_repo_error(exc: Exception, *, table: str, action: str) -> str:
@@ -221,6 +249,16 @@ def _friendly_repo_error(exc: Exception, *, table: str, action: str) -> str:
         return (
             f"Database schema for {table.replace('_', ' ')} is out of date. "
             "Apply pending Supabase migrations, then refresh and try again."
+        )
+    if "returned no rows" in low:
+        return (
+            f"Could not save to {table.replace('_', ' ')} — the server rejected the write. "
+            "Refresh the page and try again."
+        )
+    if "22p02" in low or "invalid input syntax for type uuid" in low:
+        return (
+            f"Could not save to {table.replace('_', ' ')} — invalid record link. "
+            "Refresh the page and re-select the item."
         )
     return friendly_auth_error_message(exc, operation=f"{action} {table}")
 
