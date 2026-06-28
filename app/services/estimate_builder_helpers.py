@@ -71,6 +71,34 @@ def _dedupe_label(base: str, seen: dict[str, int], suffix: str) -> str:
     return f"{base} — {detail}" if detail else f"{base} ({count})"
 
 
+def filter_pricing_option_labels(
+    options: list[tuple[str, dict[str, Any]]],
+    search: str,
+) -> list[str]:
+    """Return pricing option labels matching *search* against label text and item metadata."""
+    query = str(search or "").strip().casefold()
+    if not query:
+        return [label for label, _ in options]
+    matched: list[str] = []
+    for label, item in options:
+        hay = " ".join(
+            str(item.get(key) or "")
+            for key in (
+                "description",
+                "sku",
+                "item_number",
+                "item_code",
+                "category",
+                "item_type",
+                "vendor",
+                "vendor_name",
+            )
+        ).casefold()
+        if query in hay or query in label.casefold():
+            matched.append(label)
+    return matched
+
+
 def _inventory_row_to_option(row: dict[str, Any]) -> dict[str, Any]:
     description = str(
         row.get("description")

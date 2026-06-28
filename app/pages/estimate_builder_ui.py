@@ -11,6 +11,7 @@ import streamlit as st
 try:
     from app.auth import current_role
     from app.components.record_modal import detail_field_html, dialog_card_html, safe_value
+    from app.components.searchable_select import render_searchable_selectbox
     from app.pages._core._crud import is_demo_id
     from app.services.estimate_costing_service import (
         DURATION_UNITS,
@@ -60,6 +61,7 @@ try:
 except ImportError:
     from auth import current_role  # type: ignore
     from components.record_modal import detail_field_html, dialog_card_html, safe_value  # type: ignore
+    from components.searchable_select import render_searchable_selectbox  # type: ignore
     from pages._core._crud import is_demo_id  # type: ignore
     from services.estimate_costing_service import (  # type: ignore
         DURATION_UNITS,
@@ -312,8 +314,8 @@ _BATCH_ENTRY_CAPTION = (
 # Pricing items: fewer empty starter rows; never pre-select the first catalog item.
 _MATERIAL_BATCH_ROW_COUNT = 3
 _MATERIAL_BATCH_CAPTION = (
-    f"{_MATERIAL_BATCH_ROW_COUNT} blank rows ready — pick an item or use Custom on each row, then save once. "
-    "Use + Add Row only if you need more."
+    f"{_MATERIAL_BATCH_ROW_COUNT} blank rows ready — type in Item to search the catalog, "
+    "or choose Custom on each row, then save once. Use + Add Row only if you need more."
 )
 
 
@@ -791,11 +793,12 @@ def _render_add_material_form(
             st.session_state[k(f"mk_{rid}")] = default_markup
         cols = st.columns([2.6, 0.75, 0.95, 0.75, 0.9, 0.9, 0.55], gap="small")
         with cols[0]:
-            pick = st.selectbox(
+            pick = render_searchable_selectbox(
                 "Item",
                 pick_labels,
                 key=k(f"pick_{rid}"),
-                label_visibility="collapsed",
+                placeholder="Type to search items…",
+                searchable_options=pg_opts,
             )
             _sync_material_batch_pick(k, rid, pick, pg_map, default_markup=default_markup)
             if pick == _CUSTOM_MATERIAL_LABEL:
