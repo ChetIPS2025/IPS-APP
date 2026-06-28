@@ -614,7 +614,24 @@ def _persist_estimate_partial(data: dict, row_id: str) -> tuple[bool, str]:
 
 
 def _persist_scope_of_work(data: dict, row_id: str) -> tuple[bool, str]:
-    return _persist_estimate_partial(data, row_id)
+    """Persist scope fields via dedicated patch (also mirrors into estimate_json)."""
+    est = get_estimate(row_id) or {"id": row_id}
+    try:
+        from app.estimate.persistence import patch_estimate_job_scope
+        from app.services.repository import clear_all_data_caches
+    except ImportError:
+        from estimate.persistence import patch_estimate_job_scope  # type: ignore
+        from services.repository import clear_all_data_caches  # type: ignore
+    ok, err = patch_estimate_job_scope(
+        row_id,
+        est,
+        scope_of_work=str(data.get("scope_of_work") or ""),
+        customer_responsibilities=str(data.get("customer_responsibilities") or ""),
+    )
+    if ok:
+        clear_all_data_caches()
+        return True, "Scope of work saved."
+    return False, err or "Could not save scope of work."
 
 
 def _on_estimate_scope_saved(eid: str) -> None:

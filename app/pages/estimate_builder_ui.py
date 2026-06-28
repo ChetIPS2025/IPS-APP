@@ -2442,7 +2442,8 @@ def render_scope_of_work_tab(
 
     st.caption(
         "Enter the full scope of work for proposals and field teams. "
-        "Keep the **Project** name short on Overview (for example, Orange Turnaround Extra Work)."
+        "Keep the **Project** name short on Overview (for example, Orange Turnaround Extra Work). "
+        "**Click Save scope** below to persist your text — switching tabs does not auto-save."
     )
     st.text_area(
         "Scope of Work",

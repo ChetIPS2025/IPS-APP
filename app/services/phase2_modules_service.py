@@ -68,6 +68,14 @@ def _parse_estimate_json(raw: Any) -> dict[str, Any]:
     return {}
 
 
+def _narrative_field(row: dict[str, Any], key: str) -> str:
+    """Read long-form narrative text from a column or estimate_json fallback."""
+    direct = str(row.get(key) or "").strip()
+    if direct:
+        return direct
+    return str(_parse_estimate_json(row.get("estimate_json")).get(key) or "").strip()
+
+
 def _estimate_json_get(row: dict[str, Any], key: str) -> str:
     ej = _parse_estimate_json(row.get("estimate_json"))
     if ej:
@@ -598,8 +606,8 @@ def normalize_estimate(
         "created_by": str(row.get("created_by") or row.get("prepared_by_name") or row.get("prepared_by") or "—"),
         "job_number": str(row.get("job_number") or "—"),
         "description": str(row.get("description") or ""),
-        "scope_of_work": str(row.get("scope_of_work") or ""),
-        "customer_responsibilities": str(row.get("customer_responsibilities") or ""),
+        "scope_of_work": _narrative_field(row, "scope_of_work"),
+        "customer_responsibilities": _narrative_field(row, "customer_responsibilities"),
         "notes": str(row.get("notes") or ""),
         "subtotal": _money_field(row, "subtotal", "total_cost", "total", "grand_total"),
         "tax": float(row.get("tax_amount") or row.get("tax") or 0),
