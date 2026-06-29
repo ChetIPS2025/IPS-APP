@@ -1341,9 +1341,11 @@ def _find_auth_user_id_by_email(email: str) -> str:
         found = find_auth_user_by_email_admin(em)
         if found:
             aid = str(found.get("id") or "").strip()
-            if aid:
+            if aid and _auth_user_email_matches(found, em):
                 auth_row = get_auth_user_by_id_admin(aid)
                 if auth_row and _auth_user_email_matches(auth_row, em):
+                    return aid
+                if _auth_user_email_matches(found, em):
                     return aid
     except Exception as exc:
         _LOG.warning("Auth email lookup failed for %s: %r", em, exc)
@@ -1900,9 +1902,13 @@ def list_auth_users_admin(*, page: int = 1, per_page: int = 200) -> list[dict[st
     except Exception as exc:
         raise RuntimeError(f"Could not list auth users: {exc!r}") from exc
 
-    users = getattr(res, "users", None)
-    if users is None and isinstance(res, dict):
-        users = res.get("users")
+    users: list[Any] | None = None
+    if isinstance(res, list):
+        users = res
+    else:
+        users = getattr(res, "users", None)
+        if users is None and isinstance(res, dict):
+            users = res.get("users")
     if users is None:
         return []
     out: list[dict[str, Any]] = []

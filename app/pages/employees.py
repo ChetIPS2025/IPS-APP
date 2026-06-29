@@ -799,7 +799,9 @@ def _render_login_panel_admin_details(exc: Exception, *, login: dict | None = No
                 f"- Supabase Auth user id: `{login.get('auth_user_id') or '—'}`  \n"
                 f"- Profile id: `{login.get('profile_id') or '—'}`  \n"
                 f"- Stored auth_user_id: `{login.get('stored_auth_user_id') or '—'}`  \n"
-                f"- Auth link stale: `{login.get('auth_link_stale')}`"
+                f"- Auth link stale: `{login.get('auth_link_stale')}`  \n"
+                f"- Auth unlinked: `{login.get('auth_unlinked')}`  \n"
+                f"- Profile exists: `{login.get('profile_exists')}`"
             )
         st.code(str(exc))
 

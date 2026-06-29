@@ -3,6 +3,29 @@
 from __future__ import annotations
 
 
+def test_list_auth_users_admin_accepts_direct_list_response(monkeypatch):
+    from app.db import list_auth_users_admin
+
+    class UserObj:
+        id = "auth-1"
+        email = "user@industrialplantsolution.com"
+        phone = None
+        created_at = None
+
+    class FakeAdmin:
+        class auth:
+            class admin:
+                @staticmethod
+                def list_users(page=None, per_page=None):
+                    return [UserObj()]
+
+    monkeypatch.setattr("app.db.get_admin_client", lambda: FakeAdmin())
+    rows = list_auth_users_admin(page=1, per_page=200)
+    assert len(rows) == 1
+    assert rows[0]["id"] == "auth-1"
+    assert rows[0]["email"] == "user@industrialplantsolution.com"
+
+
 def test_find_auth_user_id_by_email_from_list_users(monkeypatch):
     from app.db import _find_auth_user_id_by_email
 
