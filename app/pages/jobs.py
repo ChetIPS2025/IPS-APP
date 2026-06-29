@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 from datetime import date
+from typing import Any
 
 import streamlit as st
 
@@ -1975,12 +1976,101 @@ def _daily_update_entry_text(row: dict, *, source: str) -> str:
     return "\n\n".join(parts)
 
 
+def _emails_field_value(raw: Any) -> str:
+    """Format stored recipient list for a text area (comma or newline separated)."""
+    if raw is None:
+        return ""
+    if isinstance(raw, list):
+        return ", ".join(str(x or "").strip() for x in raw if str(x or "").strip())
+    return str(raw or "").strip()
+
+
+def _render_job_email_notifications_section(job: dict) -> None:
+    """Per-job email settings for daily supervisor reports and customer updates."""
+    jid = str(job.get("id") or "").strip()
+    if not jid:
+        return
+    if not _field_admin_read():
+        return
+    try:
+        from app.services.email_notifications import fetch_job_email_settings_row, upsert_job_email_settings
+    except ImportError:
+        from services.email_notifications import fetch_job_email_settings_row, upsert_job_email_settings  # type: ignore
+
+    job_key = _job_session_key(job)
+    existing = fetch_job_email_settings_row(jid, admin=True) or {}
+    with st.expander("Email notifications", expanded=bool(existing)):
+        st.caption(
+            "Customer and internal recipients for automated daily supervisor reports "
+            "and weekly Friday updates for this job."
+        )
+        with st.form(f"job_email_settings_{job_key}"):
+            customer = st.text_area(
+                "Customer recipients",
+                value=_emails_field_value(existing.get("customer_recipients")),
+                height=68,
+                placeholder="customer@example.com, billing@example.com",
+            )
+            internal = st.text_area(
+                "Internal recipients",
+                value=_emails_field_value(existing.get("internal_recipients")),
+                height=68,
+                placeholder="pm@company.com",
+            )
+            cc = st.text_area(
+                "CC recipients",
+                value=_emails_field_value(existing.get("cc_recipients")),
+                height=68,
+            )
+            c1, c2 = st.columns(2)
+            with c1:
+                enable_daily = st.checkbox(
+                    "Daily supervisor report emails",
+                    value=bool(existing.get("enable_daily_update_emails")),
+                )
+                enable_weekly = st.checkbox(
+                    "Weekly Friday update emails",
+                    value=bool(existing.get("enable_weekly_friday_update_emails")),
+                )
+            with c2:
+                enable_safety = st.checkbox(
+                    "Safety item update emails",
+                    value=bool(existing.get("enable_safety_item_update_emails")),
+                )
+                enable_budget = st.checkbox(
+                    "Budget / PO alert emails",
+                    value=bool(existing.get("enable_budget_po_alerts")),
+                )
+            is_active = st.checkbox("Active", value=bool(existing.get("is_active", True)))
+            notes = st.text_input("Notes", value=str(existing.get("notes") or ""))
+            if st.form_submit_button("Save email settings", type="primary"):
+                try:
+                    upsert_job_email_settings(
+                        jid,
+                        customer_recipients=customer,
+                        internal_recipients=internal,
+                        cc_recipients=cc,
+                        enable_daily=enable_daily,
+                        enable_weekly_friday=enable_weekly,
+                        enable_safety=enable_safety,
+                        enable_budget_po_alerts=enable_budget,
+                        is_active=is_active,
+                        notes=notes,
+                    )
+                    st.success("Email settings saved.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Could not save email settings: {exc}")
+
+
 def _render_job_daily_updates_tab(job: dict) -> None:
     """Daily field updates for the current job with add form and history."""
     jid = str(job.get("id") or "").strip()
     if not jid:
         _render_dialog_placeholder("Save this job before adding daily updates.")
         return
+
+    _render_job_email_notifications_section(job)
 
     add_active = _job_daily_update_add_active(jid)
     head_l, head_r = st.columns([3, 1], gap="small")

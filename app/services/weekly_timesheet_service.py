@@ -176,6 +176,16 @@ def approve_timesheet(
     }
     update_rows_admin(_SHEET_TABLE, extra, {"id": timesheet_id})
     _register_timesheet_documents(timesheet_id)
+    try:
+        from app.services.job_cost_transaction_service import sync_all_sources_for_job
+    except ImportError:
+        from services.job_cost_transaction_service import sync_all_sources_for_job  # type: ignore
+    jid = str(data.job_id or "").strip()
+    if jid:
+        try:
+            sync_all_sources_for_job(jid)
+        except Exception:
+            pass
     fresh = fetch_by_match_admin(_SHEET_TABLE, {"id": timesheet_id}, limit=1)
     return fresh[0] if fresh else row
 

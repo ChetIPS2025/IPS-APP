@@ -46,6 +46,7 @@ INVENTORY_TXN_TYPES = (
     "issue_to_job",
     "return_from_job",
     "consume_on_job",
+    "consume_in_shop",
     "adjustment",
 )
 
@@ -61,7 +62,7 @@ except ImportError:
     )
 
 _JOB_REQUIRED_TYPES = frozenset({"issue_to_job", "return_from_job", "consume_on_job"})
-_DECREASE_ON_HAND = frozenset({"check_out", "issue_to_job", "consume_on_job"})
+_DECREASE_ON_HAND = frozenset({"check_out", "issue_to_job", "consume_on_job", "consume_in_shop"})
 
 
 __all__ = [
@@ -84,6 +85,7 @@ __all__ = [
     "list_inventory",
     "normalize_inventory",
     "record_inventory_transaction",
+    "record_shop_inventory_consumption",
     "save_inventory_item",
     "update_inventory_item",
     "upload_inventory_image",
@@ -400,9 +402,19 @@ def _legacy_txn_type(transaction_type: str) -> str:
         "issue_to_job": "TO_JOB",
         "return_from_job": "RETURN",
         "consume_on_job": "CONSUME",
+        "consume_in_shop": "SHOP",
         "adjustment": "ADJUST",
     }
     return mapping.get(transaction_type, transaction_type.upper())
+
+
+def record_shop_inventory_consumption(data: dict[str, Any]) -> ServiceResult:
+    """Decrement on-hand inventory for shop use with a full transaction audit row."""
+    payload = dict(data)
+    payload["transaction_type"] = "consume_in_shop"
+    payload["destination_type"] = "shop"
+    payload["job_id"] = None
+    return record_inventory_transaction(payload)
 
 
 def record_inventory_transaction(data: dict[str, Any]) -> ServiceResult:
@@ -456,7 +468,7 @@ def record_inventory_transaction(data: dict[str, Any]) -> ServiceResult:
     elif txn_type == "return_from_job":
         new_qoh = prev_qoh + qty
         new_alloc = max(0.0, prev_alloc - qty)
-    elif txn_type == "consume_on_job":
+    elif txn_type in {"consume_on_job", "consume_in_shop"}:
         new_qoh = prev_qoh - qty
     elif txn_type == "adjustment":
         signed = float(data.get("signed_quantity") or data.get("quantity_delta") or qty)
@@ -506,6 +518,9 @@ def record_inventory_transaction(data: dict[str, Any]) -> ServiceResult:
         "subjob_id": data.get("subjob_id"),
         "destination_type": str(data.get("destination_type") or "")[:20] or None,
     }
+    device_label = str(data.get("device_label") or "").strip()
+    if device_label:
+        payload["device_label"] = device_label[:200]
     ins = insert_row(_TXN_TABLE, payload)
     if not ins.ok:
         update_row(_INV_TABLE, {

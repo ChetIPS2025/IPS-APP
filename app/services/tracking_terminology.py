@@ -22,6 +22,7 @@ INVENTORY_ADJUST_LABEL = "Adjust stock"
 INVENTORY_ACTION_LABELS: dict[str, str] = {
     "consume_on_job": "Used on job",
     "CONSUME": "Used on job",
+    "consume_in_shop": "Used in shop",
     "shop_use": "Used in shop",
     "SHOP": "Used in shop",
     "issue_to_job": "Used on job",

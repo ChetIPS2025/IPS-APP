@@ -1325,68 +1325,32 @@ def _render_inventory_scan_inner() -> None:
         st.success("Material consumed on job. Stock and job costing updated.")
         st.rerun()
 
-    new_qoh = qoh - qv
-
     try:
-        update_rows_admin(
-            _INV,
-            {"quantity_on_hand": float(new_qoh), "updated_at": ts},
-            {"id": iid},
-        )
-    except Exception as exc:
-        st.error(f"Could not update stock: {exc}")
-        st.stop()
-
-    jm_row: dict | None = None
-
-    txn_payload: dict[str, Any] = {
-        "inventory_item_id": iid,
-        "qty": float(-qv),
-        "txn_type": txn_type,
-        "job_id": jid,
-        "employee_id": emp_id,
-        "profile_id": prof_id,
-        "notes": note_s[:2000],
-    }
-    if cb:
-        txn_payload["created_by"] = cb[:500]
+        from app.services.inventory_service import record_shop_inventory_consumption
+    except ImportError:
+        from services.inventory_service import record_shop_inventory_consumption  # type: ignore
     ua_sub = request_user_agent()
     suf_sub = str(st.session_state.get("ips_inv_device_suffix") or "")
     auto_device_submit = format_device_label(device_family_from_user_agent(ua_sub), suf_sub)
     final_device = str(st.session_state.get("inv_scan_device_display") or "").strip() or auto_device_submit
     persist_device_label_to_browser(final_device)
     scan_extra = _scan_audit_fields(device_label=final_device, manual_actor=str(manual_actor or ""))
-    txn_payload.update(scan_extra)
-
-    pl: dict[str, Any] = dict(txn_payload)
-    exc: Exception | None = None
-    for _ in range(5):
-        try:
-            insert_row_admin(_TXN, pl)
-            exc = None
-            break
-        except Exception as e:
-            exc = e
-            low = str(e).lower()
-            if "scanned_by" in low or "device_label" in low:
-                pl.pop("scanned_by_user_id", None)
-                pl.pop("scanned_by_name", None)
-                pl.pop("device_label", None)
-            elif "created_by" in low:
-                pl.pop("created_by", None)
-            else:
-                break
-    if exc is not None:
-        if jm_row and jm_row.get("id"):
-            try:
-                delete_rows_admin(_JM, {"id": str(jm_row["id"])})
-            except Exception:
-                pass
-        try:
-            update_rows_admin(_INV, {"quantity_on_hand": float(qoh), "updated_at": ts}, {"id": iid})
-        except Exception:
-            pass
-        st.error(f"Transaction log failed; changes rolled back. {exc}")
+    shop_result = record_shop_inventory_consumption(
+        {
+            "inventory_item_id": iid,
+            "quantity": qv,
+            "allow_overdraw": allow_neg,
+            "notes": note_s[:2000] or f"{INVENTORY_USE_IN_SHOP_LABEL} (desktop scan)",
+            "scanned_by_user_id": prof_id,
+            "scanned_by_employee_id": emp_id,
+            "scanned_by_name": cb or str(manual_actor or "").strip() or scan_extra.get("scanned_by_name"),
+            "source": "inventory_scan_desktop",
+            "unit": str(item.get("unit") or "EA"),
+            **scan_extra,
+        }
+    )
+    if not shop_result.ok:
+        st.error(shop_result.error or "Could not record shop use.")
         st.stop()
 
     _log_qr_scan_event(
@@ -1395,9 +1359,9 @@ def _render_inventory_scan_inner() -> None:
         item_type="inventory",
         item_name=name,
         inventory_item_id=iid,
-        action_taken=inventory_action_label(txn_type),
-        job_id=jid,
-        destination_type="shop" if itype == INVENTORY_USE_IN_SHOP_LABEL else ("job" if jid else None),
+        action_taken=inventory_action_label("consume_in_shop"),
+        job_id=None,
+        destination_type="shop",
         quantity=qv,
         unit=str(item.get("unit") or "EA"),
         source="inventory_scan_desktop",
@@ -1651,7 +1615,11 @@ def _record_mobile_shop_use(
     qoh: float,
     allow_over: bool,
 ) -> tuple[bool, str]:
-    """Use in Shop from mobile QR scan — matches desktop Use in Shop (SHOP txn, no job)."""
+    """Use in Shop from mobile QR scan — routed through inventory_service audit."""
+    try:
+        from app.services.inventory_service import record_shop_inventory_consumption
+    except ImportError:
+        from services.inventory_service import record_shop_inventory_consumption  # type: ignore
 
     iid = str(item.get("id") or "")
     qv = float(qty or 0)
@@ -1661,79 +1629,23 @@ def _record_mobile_shop_use(
         return False, "Quantity exceeds quantity on hand."
 
     actor_name, phone_norm, _, phone_verified = _mobile_scan_actor_defaults()
-    new_qoh = qoh - qv
-    ts = datetime.now(timezone.utc).isoformat()
-    try:
-        from app.services.catalog_stock_policy_service import inventory_status_fields_for_qty
-    except ImportError:
-        from services.catalog_stock_policy_service import inventory_status_fields_for_qty  # type: ignore
-    try:
-        update_rows_admin(
-            _INV,
-            {
-                "quantity_on_hand": float(new_qoh),
-                "updated_at": ts,
-                **inventory_status_fields_for_qty(item, new_qoh),
-            },
-            {"id": iid},
-        )
-    except Exception as exc:
-        return False, f"Could not update stock: {exc}"
-
-    txn_payload: dict[str, Any] = {
-        "inventory_item_id": iid,
-        "qty": float(-qv),
-        "txn_type": "SHOP",
-        "job_id": None,
-        "employee_id": _profile_employee_id(),
-        "profile_id": _profile_uuid(),
-        "notes": f"{INVENTORY_USE_IN_SHOP_LABEL} (mobile QR scan)",
-        "scanned_by_user_id": _scan_profile_user_id() if is_authenticated() else None,
-        "scanned_by_name": actor_name[:500],
-        "scanned_by_phone": phone_norm or None,
-        "phone_verified": phone_verified,
-        "source": "qr_scan",
-        "destination_type": "shop",
-    }
-    cb = _created_by_label()
-    if cb:
-        txn_payload["created_by"] = cb[:500]
-
-    pl: dict[str, Any] = dict(txn_payload)
-    exc: Exception | None = None
-    for _ in range(5):
-        try:
-            insert_row_admin(_TXN, pl)
-            exc = None
-            break
-        except Exception as e:
-            exc = e
-            low = str(e).lower()
-            if "scanned_by" in low or "device_label" in low:
-                pl.pop("scanned_by_user_id", None)
-                pl.pop("scanned_by_name", None)
-                pl.pop("scanned_by_phone", None)
-                pl.pop("device_label", None)
-            elif "destination_type" in low:
-                pl.pop("destination_type", None)
-            elif "created_by" in low:
-                pl.pop("created_by", None)
-            else:
-                break
-    if exc is not None:
-        try:
-            update_rows_admin(
-                _INV,
-                {
-                    "quantity_on_hand": float(qoh),
-                    "updated_at": ts,
-                    **inventory_status_fields_for_qty(item, qoh),
-                },
-                {"id": iid},
-            )
-        except Exception:
-            pass
-        return False, f"Could not record transaction: {exc}"
+    result = record_shop_inventory_consumption(
+        {
+            "inventory_item_id": iid,
+            "quantity": qv,
+            "allow_overdraw": allow_over,
+            "notes": f"{INVENTORY_USE_IN_SHOP_LABEL} (mobile QR scan)",
+            "scanned_by_user_id": _scan_profile_user_id() if is_authenticated() else None,
+            "scanned_by_name": actor_name[:500],
+            "scanned_by_phone": phone_norm or None,
+            "scanned_by_employee_id": _profile_employee_id(),
+            "phone_verified": phone_verified,
+            "source": "qr_scan",
+            "unit": str(item.get("unit") or "EA"),
+        }
+    )
+    if not result.ok:
+        return False, result.error or "Could not record transaction."
     return True, ""
 
 

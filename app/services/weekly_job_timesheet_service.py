@@ -596,6 +596,14 @@ def build_timesheet_data(
     job = _fetch_job(job_id)
     if not job:
         raise ValueError("Job not found.")
+    try:
+        from app.services.job_cost_transaction_service import sync_all_sources_for_job
+    except ImportError:
+        from services.job_cost_transaction_service import sync_all_sources_for_job  # type: ignore
+    try:
+        sync_all_sources_for_job(job_id)
+    except Exception:
+        pass
     ws, we = week_bounds(monday_of_week(week_start))
     header = get_job_timesheet_header(job_id, week_start)
     try:
