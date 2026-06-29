@@ -1045,10 +1045,21 @@ def create_auth_user(
         raise RuntimeError("Password must be at least 6 characters.")
 
     try:
-        existing_email = fetch_by_match_admin("profiles", {"email": em_norm}, columns="id,email", limit=2)  # type: ignore[name-defined]
+        existing_email = fetch_by_match_admin("profiles", {"email": em_norm}, columns="id,email", limit=10)  # type: ignore[name-defined]
     except Exception:
         existing_email = []
-    if existing_email:
+    for row in existing_email or []:
+        pid = str(row.get("id") or "").strip()
+        if not pid:
+            continue
+        auth_row = get_auth_user_by_id_admin(pid)
+        if auth_row and _auth_user_email_matches(auth_row, em_norm):
+            raise RuntimeError("A login already exists for this email.")
+        if not auth_row:
+            _delete_profile_by_id_admin(pid)
+
+    existing_auth_id = _find_auth_user_id_by_email(em_norm)
+    if existing_auth_id:
         raise RuntimeError("A login already exists for this email.")
 
     role_norm = str(role or "viewer").strip().lower() or "viewer"
@@ -1218,15 +1229,19 @@ def find_auth_user_by_email_admin(email: str) -> dict[str, Any] | None:
     em = str(email or "").strip().lower()
     if not em:
         return None
-    for page in range(1, 51):
-        batch = list_auth_users_admin(page=page, per_page=200)
-        if not batch:
-            break
-        for row in batch:
-            if str(row.get("email") or "").strip().lower() == em:
-                return row
-        if len(batch) < 200:
-            break
+    try:
+        for page in range(1, 51):
+            batch = list_auth_users_admin(page=page, per_page=200)
+            if not batch:
+                break
+            for row in batch:
+                if str(row.get("email") or "").strip().lower() == em:
+                    return row
+            if len(batch) < 200:
+                break
+    except Exception as exc:
+        _LOG.warning("find_auth_user_by_email_admin failed for %s: %r", em, exc)
+        return None
     return None
 
 
@@ -1293,9 +1308,12 @@ def resolve_auth_user_id(
         profile_auth_id = _auth_user_id_from_profile_email(em)
         if profile_auth_id:
             return profile_auth_id
-        found = find_auth_user_by_email_admin(em)
-        if found and str(found.get("id") or "").strip():
-            return str(found["id"])
+        try:
+            found = find_auth_user_by_email_admin(em)
+            if found and str(found.get("id") or "").strip():
+                return str(found["id"])
+        except Exception as exc:
+            _LOG.warning("resolve_auth_user_id email lookup failed for %s: %r", em, exc)
     legacy_profile = str(profile_id or "").strip()
     if legacy_profile:
         auth_row = get_auth_user_by_id_admin(legacy_profile)
@@ -1312,6 +1330,24 @@ def _delete_profile_by_id_admin(profile_id: str) -> None:
         get_admin_client().table("profiles").delete().eq("id", pid).execute()
     except Exception as exc:
         _LOG.warning("Could not delete profile %s: %s", pid, exc)
+
+
+def _find_auth_user_id_by_email(email: str) -> str:
+    """Best-effort auth.users.id lookup by email (list_users + verified profiles)."""
+    em = str(email or "").strip().lower()
+    if not em:
+        return ""
+    try:
+        found = find_auth_user_by_email_admin(em)
+        if found:
+            aid = str(found.get("id") or "").strip()
+            if aid:
+                auth_row = get_auth_user_by_id_admin(aid)
+                if auth_row and _auth_user_email_matches(auth_row, em):
+                    return aid
+    except Exception as exc:
+        _LOG.warning("Auth email lookup failed for %s: %r", em, exc)
+    return _auth_user_id_from_profile_email(em)
 
 
 def _remove_orphan_profiles_for_email(
@@ -1477,6 +1513,8 @@ def set_login_password_admin(
         profile_id=profile_id,
         employee_id=workforce_id,
     )
+    if not auth_id:
+        auth_id = _find_auth_user_id_by_email(em)
 
     if auth_id:
         linked = get_auth_user_by_id_admin(auth_id) or {}
@@ -1522,9 +1560,8 @@ def set_login_password_admin(
         lower = str(exc).lower()
         if "already exists" not in lower and "duplicate" not in lower and "registered" not in lower:
             raise
-        auth_id = _auth_user_id_from_profile_email(em) or str(
-            (find_auth_user_by_email_admin(em) or {}).get("id") or ""
-        ).strip()
+        _remove_orphan_profiles_for_email(em)
+        auth_id = _find_auth_user_id_by_email(em)
         if not auth_id:
             raise RuntimeError(
                 "A login already exists for this email, but it could not be linked. "

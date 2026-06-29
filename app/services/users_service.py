@@ -178,16 +178,27 @@ def resolve_employee_auth_login(employee_id: str) -> dict[str, Any]:
         profile_id=profile_id,
         employee_id=eid,
     )
+    profile_exists = bool(profile)
+    auth_candidate = ""
+    if email and not auth_user_id:
+        try:
+            from app.db import _find_auth_user_id_by_email
+        except ImportError:
+            from db import _find_auth_user_id_by_email  # type: ignore
+        auth_candidate = _find_auth_user_id_by_email(email)
+    auth_unlinked = bool(not auth_user_id and (profile_exists or auth_candidate))
     return {
         "employee_id": eid,
         "email": email,
-        "auth_user_id": auth_user_id,
+        "auth_user_id": auth_user_id or auth_candidate,
         "profile_id": profile_id,
         "has_login": bool(auth_user_id),
         "stored_auth_user_id": stored_auth_id,
         "auth_link_stale": bool(
             stored_auth_id and auth_user_id and stored_auth_id != auth_user_id
         ),
+        "auth_unlinked": auth_unlinked,
+        "profile_exists": profile_exists,
     }
 
 

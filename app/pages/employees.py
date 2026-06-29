@@ -872,11 +872,13 @@ def _resend_employee_invite(emp: dict) -> str:
 
 
 def _admin_auth_status_label(login: dict) -> tuple[str, str]:
-    """Return auth status value and CSS modifier (connected / missing / stale)."""
+    """Return auth status value and CSS modifier (connected / missing / stale / unlinked)."""
     if login.get("auth_link_stale"):
         return "Stale", "stale"
     if login.get("has_login"):
         return "Connected", "connected"
+    if login.get("auth_unlinked"):
+        return "Unlinked", "stale"
     return "Missing", "missing"
 
 
@@ -926,6 +928,11 @@ def _render_user_login_panel(emp: dict, rk: str) -> None:
     status_value, _ = _admin_auth_status_label(login)
     if status_value == "Missing":
         st.caption("No app login is linked yet. Reset Password will create one for this email.")
+    elif status_value == "Unlinked":
+        st.caption(
+            "A login or profile exists for this email but is not linked to this employee. "
+            "Reset Password will link the account and set the password."
+        )
     elif status_value == "Stale":
         st.caption("Auth link is stale. Reset Password will refresh the link to the correct login.")
 
