@@ -12789,6 +12789,23 @@ body.ips-auth-login [data-testid="stVerticalBlockBorderWrapper"].st-key-ips_logi
   color: {TEXT};
   margin: 0 0 0.5rem;
 }}
+.ips-report-source {{
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.12rem 0.45rem;
+  border-radius: 4px;
+  margin-left: 0.45rem;
+  vertical-align: middle;
+  display: inline-block;
+}}
+.ips-report-source-live {{
+  color: #166534;
+  background: #dcfce7;
+}}
+.ips-report-source-sample {{
+  color: #92400e;
+  background: #fef3c7;
+}}
 .ips-lookup-panel {{
   background: {CARD_BG};
   border: 1px solid {BORDER};
