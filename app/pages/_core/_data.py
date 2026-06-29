@@ -183,36 +183,116 @@ def _cached_jobs_rows() -> tuple[tuple[dict[str, Any], ...], bool]:
     return tuple(rows), used
 
 
-def load_dashboard_kpis() -> dict[str, Any]:
+def load_dashboard_kpis(
+    *,
+    period_start: date | None = None,
+    period_end: date | None = None,
+) -> dict[str, Any]:
     try:
-        from app.services.job_service import dashboard_job_metrics
+        from app.services.dashboard_metrics_service import compute_dashboard_kpis
     except ImportError:
-        from services.job_service import dashboard_job_metrics  # type: ignore
+        from services.dashboard_metrics_service import compute_dashboard_kpis  # type: ignore
 
     estimates = load_estimates()
     jobs = load_jobs()
-    if estimates or jobs:
-        open_est = sum(1 for e in estimates if str(e.get("status", "")).lower() in {"draft", "sent", "pending"})
-        return {
-            "total_sales": 245680.50,
-            "open_invoices": 125430.25,
-            "open_estimates": open_est or len(estimates),
-            "inventory_value": 98765.30,
-            **dashboard_job_metrics(jobs),
-        }
+    inventory = load_inventory()
+    kpis = compute_dashboard_kpis(
+        estimates,
+        jobs,
+        inventory,
+        period_start=period_start,
+        period_end=period_end,
+    )
+    if kpis.get("has_live_data"):
+        return kpis
     return {
-        "total_sales": 245680.50,
-        "open_invoices": 125430.25,
-        "open_estimates": 14,
-        "inventory_value": 98765.30,
-        "jobs_awarded": 2,
-        "active_jobs": 1,
-        "pending_jobs": 0,
-        "draft_jobs": 0,
-        "on_hold_jobs": 0,
-        "estimate_pending_jobs": 1,
-        "complete_jobs": 1,
+        **kpis,
+        "total_sales": kpis.get("total_sales") or 245680.50,
+        "open_invoices": kpis.get("open_invoices") or 125430.25,
+        "open_estimates": kpis.get("open_estimates") or 14,
+        "inventory_value": kpis.get("inventory_value") or 98765.30,
+        "jobs_awarded": kpis.get("jobs_awarded") or 2,
+        "active_jobs": kpis.get("active_jobs") or 1,
+        "pending_jobs": kpis.get("pending_jobs") or 0,
+        "draft_jobs": kpis.get("draft_jobs") or 0,
+        "on_hold_jobs": kpis.get("on_hold_jobs") or 0,
+        "estimate_pending_jobs": kpis.get("estimate_pending_jobs") or 1,
+        "complete_jobs": kpis.get("complete_jobs") or 1,
+        "sales_caption": "Demo data — connect Supabase for live KPIs",
+        "quotes_caption": "Demo data",
+        "estimates_caption": "Demo data",
+        "inventory_caption": "Demo data",
     }
+
+
+def dashboard_sales_series(
+    *,
+    period_start: date,
+    period_end: date,
+) -> tuple[list[str], dict[str, list[float]]]:
+    try:
+        from app.services.dashboard_metrics_service import sales_overview_series
+    except ImportError:
+        from services.dashboard_metrics_service import sales_overview_series  # type: ignore
+
+    labels, series = sales_overview_series(
+        load_estimates(),
+        load_jobs(),
+        period_start=period_start,
+        period_end=period_end,
+    )
+    if labels and series:
+        return labels, series
+    return demo_sales_series()
+
+
+def dashboard_sales_categories(
+    *,
+    period_start: date,
+    period_end: date,
+) -> dict[str, float]:
+    try:
+        from app.services.dashboard_metrics_service import sales_by_category
+    except ImportError:
+        from services.dashboard_metrics_service import sales_by_category  # type: ignore
+
+    cats = sales_by_category(
+        load_estimates(),
+        period_start=period_start,
+        period_end=period_end,
+    )
+    if cats:
+        return cats
+    return demo_sales_categories()
+
+
+def dashboard_quote_aging_bars() -> list[tuple[str, float, str]]:
+    try:
+        from app.services.dashboard_metrics_service import open_quotes_aging_bars
+    except ImportError:
+        from services.dashboard_metrics_service import open_quotes_aging_bars  # type: ignore
+
+    bars = open_quotes_aging_bars(load_estimates())
+    if bars:
+        return bars
+    return [
+        ("0–30 days", 82000, "#22c55e"),
+        ("31–60 days", 28000, "#f59e0b"),
+        ("61–90 days", 12000, "#f97316"),
+        ("90+ days", 5430, "#ef4444"),
+    ]
+
+
+def dashboard_upcoming_deadlines() -> list[dict[str, str]]:
+    try:
+        from app.services.dashboard_metrics_service import upcoming_deadlines
+    except ImportError:
+        from services.dashboard_metrics_service import upcoming_deadlines  # type: ignore
+
+    items = upcoming_deadlines(load_estimates(), load_jobs())
+    if items:
+        return items
+    return demo_deadlines()
 
 
 def demo_sales_series() -> tuple[list[str], dict[str, list[float]]]:

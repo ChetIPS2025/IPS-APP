@@ -183,6 +183,8 @@ def clear_data_cache_for_table(table: str) -> None:
             "employee_timekeeping_weeks": clear_timekeeping_catalog_cache,
             "job_cost_transactions": clear_jobs_catalog_cache,
             "job_expenses": clear_jobs_catalog_cache,
+            "ips_lookup_values": _clear_db_read_caches,
+            "ips_lookup_tables": _clear_db_read_caches,
         }
         handler = _handlers.get(name)
         if handler is not None and callable(handler):

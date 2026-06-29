@@ -634,3 +634,107 @@ def run_weekly_friday_customer_updates(*, friday: date | None = None) -> dict[st
 
     return {"sent": sent, "skipped": skipped, "failed": failed}
 
+
+def pipeline_digest_recipients(*, override: list[str] | None = None) -> list[str]:
+    if override:
+        return _valid_emails(_norm_list(override))
+    return _valid_emails(_norm_list(getattr(settings, "pipeline_digest_recipients", "") or ""))
+
+
+def _pipeline_attention_rows() -> list[dict[str, Any]]:
+    try:
+        from app.services.pipeline_service import build_pipeline_rows, filter_pipeline_rows
+    except ImportError:
+        from services.pipeline_service import build_pipeline_rows, filter_pipeline_rows  # type: ignore
+
+    try:
+        from app.pages._core._data import load_estimates, load_jobs
+    except ImportError:
+        from pages._core._data import load_estimates, load_jobs  # type: ignore
+
+    rows = build_pipeline_rows(load_estimates(), load_jobs())
+    return filter_pipeline_rows(rows, view="Needs Attention")
+
+
+def _pipeline_digest_bodies(rows: list[dict[str, Any]]) -> tuple[str, str]:
+    lines_txt: list[str] = []
+    rows_html: list[str] = []
+    for row in rows[:50]:
+        q = str(row.get("quote_number") or "—")
+        j = str(row.get("job_number") or "—")
+        cust = str(row.get("customer") or "—")
+        hint = str(row.get("stale_hint") or "Needs follow-up")
+        val = float(row.get("value") or 0)
+        val_txt = f"${val:,.2f}" if val else "—"
+        lines_txt.append(f"- {q} / {j} — {cust} — {hint} — {val_txt}")
+        rows_html.append(
+            "<tr>"
+            f"<td style='padding:6px 8px;border-bottom:1px solid #e5e7eb'>{_escape(q)}</td>"
+            f"<td style='padding:6px 8px;border-bottom:1px solid #e5e7eb'>{_escape(j)}</td>"
+            f"<td style='padding:6px 8px;border-bottom:1px solid #e5e7eb'>{_escape(cust)}</td>"
+            f"<td style='padding:6px 8px;border-bottom:1px solid #e5e7eb'>{_escape(hint)}</td>"
+            f"<td style='padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right'>{_escape(val_txt)}</td>"
+            "</tr>"
+        )
+    extra = len(rows) - 50
+    if extra > 0:
+        lines_txt.append(f"... and {extra} more")
+    text = (
+        f"Pipeline attention digest — {len(rows)} item(s) need follow-up.\n\n"
+        + "\n".join(lines_txt)
+    )
+    html_body = (
+        "<div style='font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial'>"
+        f"<h3>Pipeline needs attention ({len(rows)})</h3>"
+        "<p>Quotes and jobs flagged for follow-up in IPS Pipeline.</p>"
+        "<table style='border-collapse:collapse;width:100%;max-width:960px'>"
+        "<thead><tr>"
+        "<th style='text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb'>Quote</th>"
+        "<th style='text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb'>Job</th>"
+        "<th style='text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb'>Customer</th>"
+        "<th style='text-align:left;padding:6px 8px;border-bottom:2px solid #e5e7eb'>Reason</th>"
+        "<th style='text-align:right;padding:6px 8px;border-bottom:2px solid #e5e7eb'>Value</th>"
+        "</tr></thead><tbody>"
+        + "".join(rows_html)
+        + "</tbody></table>"
+        + (f"<p style='margin-top:12px;color:#64748b'>+ {extra} more not shown.</p>" if extra > 0 else "")
+        + "</div>"
+    )
+    return text, html_body
+
+
+def run_pipeline_attention_digest(
+    *,
+    recipients: list[str] | None = None,
+) -> dict[str, int]:
+    """
+    Email supervisors/ops a digest of pipeline rows in the **Needs Attention** view.
+
+    Recipients: ``recipients`` arg, else ``PIPELINE_DIGEST_RECIPIENTS`` env (comma-separated).
+    """
+    rows = _pipeline_attention_rows()
+    to_list = pipeline_digest_recipients(override=recipients)
+    if not rows:
+        return {"sent": 0, "skipped": 1, "failed": 0}
+    if not to_list:
+        return {"sent": 0, "skipped": 1, "failed": 0}
+
+    ds = date.today().isoformat()
+    subj = f"Pipeline Attention — {len(rows)} item(s) — {ds}"
+    text_body, html_body = _pipeline_digest_bodies(rows)
+    try:
+        _send_email(
+            to_emails=to_list,
+            cc_emails=[],
+            bcc_emails=[],
+            subject=subj,
+            text_body=text_body,
+            html_body=html_body,
+            notification_type="pipeline_attention_digest",
+            job_id=None,
+            meta={"stale_count": len(rows), "report_date": ds},
+        )
+        return {"sent": 1, "skipped": 0, "failed": 0}
+    except Exception:
+        return {"sent": 0, "skipped": 0, "failed": 1}
+

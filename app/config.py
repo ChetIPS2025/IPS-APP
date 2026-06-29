@@ -264,6 +264,9 @@ class Settings:
     email_api_key: str = field(default_factory=lambda: _strip_env("EMAIL_API_KEY"))
     email_from: str = field(default_factory=lambda: _strip_env("EMAIL_FROM", "IPS Updates <no-reply@ips-app.local>"))
     email_reply_to: str = field(default_factory=lambda: _strip_env("EMAIL_REPLY_TO", ""))
+    pipeline_digest_recipients: str = field(
+        default_factory=lambda: _strip_env("PIPELINE_DIGEST_RECIPIENTS", "")
+    )
 
     # Operations
     log_level: str = field(default_factory=lambda: _strip_env("LOG_LEVEL", "INFO"))

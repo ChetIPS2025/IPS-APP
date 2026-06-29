@@ -313,7 +313,32 @@ def _render_pipeline_page() -> None:
 
     stale_n = int(summary.get("stale_count") or 0)
     if stale_n:
-        st.caption(f"{stale_n} record{'s' if stale_n != 1 else ''} need attention (aging sent quotes, unlinked approvals, or not-started jobs).")
+        cap_col, digest_col = st.columns([4, 1])
+        with cap_col:
+            st.caption(
+                f"{stale_n} record{'s' if stale_n != 1 else ''} need attention "
+                "(aging sent quotes, unlinked approvals, or not-started jobs)."
+            )
+        with digest_col:
+            try:
+                from app.services.email_notifications import pipeline_digest_recipients, run_pipeline_attention_digest
+            except ImportError:
+                from services.email_notifications import (  # type: ignore
+                    pipeline_digest_recipients,
+                    run_pipeline_attention_digest,
+                )
+            if pipeline_digest_recipients() and st.button(
+                "Email digest",
+                key="pipeline_email_digest",
+                use_container_width=True,
+            ):
+                result = run_pipeline_attention_digest()
+                if result.get("sent"):
+                    st.success("Pipeline attention digest sent.")
+                elif result.get("failed"):
+                    st.error("Could not send digest — check email settings.")
+                else:
+                    st.info("Nothing to send.")
 
     st.caption(f"Showing {len(filtered)} pipeline record{'s' if len(filtered) != 1 else ''}.")
     page_rows, page_idx, total_pages, total_rows = paginate_rows(filtered, _TABLE_KEY)

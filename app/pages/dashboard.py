@@ -17,11 +17,13 @@ try:
     from app.components.headers import render_dashboard_quick_actions, render_page_brand_header
     from app.components.tables import data_table_html
     from app.pages._core._data import (
+        dashboard_quote_aging_bars,
+        dashboard_sales_categories,
+        dashboard_sales_series,
+        dashboard_upcoming_deadlines,
         demo_deadlines,
         demo_job_status,
         load_awarded_jobs,
-        demo_sales_categories,
-        demo_sales_series,
         load_dashboard_kpis,
         load_recent_company_updates,
         load_recent_item_activity,
@@ -39,11 +41,13 @@ except ImportError:
     from components.headers import render_dashboard_quick_actions, render_page_brand_header  # type: ignore
     from components.tables import data_table_html  # type: ignore
     from pages._core._data import (  # type: ignore
+        dashboard_quote_aging_bars,
+        dashboard_sales_categories,
+        dashboard_sales_series,
+        dashboard_upcoming_deadlines,
         demo_deadlines,
         demo_job_status,
         load_awarded_jobs,
-        demo_sales_categories,
-        demo_sales_series,
         load_dashboard_kpis,
         load_recent_company_updates,
         load_recent_item_activity,
@@ -103,15 +107,15 @@ def render() -> None:
 
     render_dashboard_company_updates_section(load_recent_company_updates(limit=8))
 
-    kpis = load_dashboard_kpis()
+    kpis = load_dashboard_kpis(period_start=start, period_end=end)
     ot = "d" + "iv"
     st.markdown(f'<{ot} class="ips-kpi-grid">', unsafe_allow_html=True)
     k1, k2, k3, k4 = st.columns(4)
     for col, *args in [
-        (k1, "Total Sales", fmt_currency(kpis["total_sales"]), "💵", "#dbeafe", "↑ 12.5% vs previous period", "up"),
-        (k2, "Open Invoices", fmt_currency(kpis["open_invoices"]), "🧾", "#dcfce7", "↑ 8.3% vs previous period", "up"),
-        (k3, "Open Estimates", str(kpis["open_estimates"]), "📋", "#f3e8ff", "↓ 2 vs previous period", "down"),
-        (k4, "Inventory Value", fmt_currency(kpis["inventory_value"]), "📦", "#e0f2fe", "↑ 6.7% vs previous period", "up"),
+        (k1, "Total Sales", fmt_currency(kpis["total_sales"]), "💵", "#dbeafe", kpis.get("sales_caption", ""), kpis.get("sales_trend", "flat")),
+        (k2, "Open Quote Value", fmt_currency(kpis["open_invoices"]), "🧾", "#dcfce7", kpis.get("quotes_caption", ""), kpis.get("quotes_trend", "flat")),
+        (k3, "Open Estimates", str(kpis["open_estimates"]), "📋", "#f3e8ff", kpis.get("estimates_caption", ""), kpis.get("estimates_trend", "flat")),
+        (k4, "Inventory Value", fmt_currency(kpis["inventory_value"]), "📦", "#e0f2fe", kpis.get("inventory_caption", ""), kpis.get("inventory_trend", "flat")),
     ]:
         with col:
             render_kpi_card(*args)
@@ -130,8 +134,8 @@ def render() -> None:
     st.markdown(f"</{ot}>", unsafe_allow_html=True)
 
     row1_l, row1_m, row1_r = st.columns([2.2, 1.2, 1], gap="medium")
-    labels, series = demo_sales_series()
-    cats = demo_sales_categories()
+    labels, series = dashboard_sales_series(period_start=start, period_end=end)
+    cats = dashboard_sales_categories(period_start=start, period_end=end)
 
     with row1_l:
         st.markdown(f'<{ot} class="ips-panel-card"><p class="ips-panel-title">Sales Overview</p>', unsafe_allow_html=True)
@@ -162,19 +166,15 @@ def render() -> None:
         render_donut_chart(status, center_label="Jobs", center_value=str(sum(status.values())), money_legend=False)
         st.markdown(f"</{ot}>", unsafe_allow_html=True)
     with row2_m:
-        st.markdown(f'<{ot} class="ips-panel-card"><p class="ips-panel-title">Aging Invoices</p>', unsafe_allow_html=True)
-        render_horizontal_bars(
-            [
-                ("0–30 days", 82000, "#22c55e"),
-                ("31–60 days", 28000, "#f59e0b"),
-                ("61–90 days", 12000, "#f97316"),
-                ("90+ days", 5430, "#ef4444"),
-            ]
-        )
+        st.markdown(f'<{ot} class="ips-panel-card"><p class="ips-panel-title">Open Quote Aging</p>', unsafe_allow_html=True)
+        render_horizontal_bars(dashboard_quote_aging_bars())
         st.markdown(f"</{ot}>", unsafe_allow_html=True)
     with row2_r:
         st.markdown(f'<{ot} class="ips-panel-card"><p class="ips-panel-title">Upcoming Deadlines</p>', unsafe_allow_html=True)
-        for d in demo_deadlines():
+        deadlines = dashboard_upcoming_deadlines()
+        if not deadlines:
+            deadlines = demo_deadlines()
+        for d in deadlines:
             st.markdown(
                 f'<{ot} class="ips-deadline-row">'
                 f'<span>{html.escape(d["title"])}<br><span class="ips-activity-meta">{fmt_date(d["date"])}</span></span>'

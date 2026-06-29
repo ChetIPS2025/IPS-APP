@@ -26,8 +26,6 @@ try:
         show_modal_if_pending,
     )
     from app.components.tabs import render_tabs
-    from app.pages._core._data import persist_lookup_table
-    from app.pages._core._crud import apply_persist_feedback
     from app.pages._core._session import nav_slug, select_key
     from app.utils.constants import LOOKUP_TABLES
 except ImportError:
@@ -52,7 +50,6 @@ except ImportError:
         show_modal_if_pending,
     )
     from components.tabs import render_tabs  # type: ignore
-    from pages._core._data import persist_lookup_table  # type: ignore
     from pages._core._crud import apply_persist_feedback  # type: ignore
     from pages._core._session import nav_slug, select_key  # type: ignore
     from utils.constants import LOOKUP_TABLES  # type: ignore
@@ -65,37 +62,76 @@ _TABLE_KEY = "admin_lookup_list"
 _MODAL_KEY = "ips_admin_lookup_modal_id"
 _CACHE_KEY = "_ips_admin_lookup_modal_by_id"
 _LOOKUP_TABLE_CTX = "ips_admin_lookup_table_ctx"
+_ENTRIES_SUFFIX = "_entries"
+_SOURCE_SUFFIX = "_source"
 
 
 def _lookup_session_key(table_name: str) -> str:
     return f"ips_lookup_{table_name.lower().replace(' ', '_')}"
 
 
-def _get_lookup_items(table_name: str) -> list[str]:
-    key = _lookup_session_key(table_name)
-    if key not in st.session_state:
+def _lookup_entries_key(table_name: str) -> str:
+    return f"{_lookup_session_key(table_name)}{_ENTRIES_SUFFIX}"
+
+
+def _lookup_source_key(table_name: str) -> str:
+    return f"{_lookup_session_key(table_name)}{_SOURCE_SUFFIX}"
+
+
+def _load_lookup_entries_from_service(table_name: str) -> tuple[list[dict], str]:
+    try:
+        from app.services.lookup_service import load_lookup_entries_for_label
+    except ImportError:
+        from services.lookup_service import load_lookup_entries_for_label  # type: ignore
+    try:
+        return load_lookup_entries_for_label(table_name)
+    except Exception:
         try:
-            from app.services.lookup_service import (
-                constants_fallback_for_label,
-                load_lookup_for_label,
-            )
+            from app.services.lookup_service import constants_fallback_for_label
         except ImportError:
-            from services.lookup_service import (  # type: ignore
-                constants_fallback_for_label,
-                load_lookup_for_label,
-            )
-        try:
-            db_vals = load_lookup_for_label(table_name)
-        except Exception:
-            db_vals = []
-        if not db_vals:
-            db_vals = constants_fallback_for_label(table_name)
-        st.session_state[key] = list(db_vals)
+            from services.lookup_service import constants_fallback_for_label  # type: ignore
+        vals = constants_fallback_for_label(table_name)
+        return [{"id": f"local-{i}", "value": v, "from_db": False} for i, v in enumerate(vals)], "constants"
+
+
+def _get_lookup_entries(table_name: str) -> list[dict]:
+    key = _lookup_entries_key(table_name)
+    if key not in st.session_state:
+        entries, source = _load_lookup_entries_from_service(table_name)
+        st.session_state[key] = list(entries)
+        st.session_state[_lookup_source_key(table_name)] = source
     return list(st.session_state[key])
 
 
-def _lookup_rows(table_name: str, items: list[str]) -> list[dict]:
-    return [{"id": str(i), "value": val, "table": table_name} for i, val in enumerate(items)]
+def _lookup_source_label(table_name: str) -> str:
+    source = str(st.session_state.get(_lookup_source_key(table_name)) or "unknown")
+    if source == "database":
+        return "Loaded from Supabase"
+    if source == "constants":
+        return "Using app constants — save to create DB records"
+    return "No values configured"
+
+
+def _get_lookup_items(table_name: str) -> list[str]:
+    return [str(e.get("value") or "") for e in _get_lookup_entries(table_name)]
+
+
+def _set_lookup_entries(table_name: str, entries: list[dict]) -> None:
+    st.session_state[_lookup_entries_key(table_name)] = list(entries)
+
+
+def _clear_lookup_session(table_name: str) -> None:
+    base = _lookup_session_key(table_name)
+    for suffix in ("", _ENTRIES_SUFFIX, _SOURCE_SUFFIX):
+        st.session_state.pop(f"{base}{suffix}", None)
+    st.session_state.pop(f"{base}_new", None)
+
+
+def _lookup_rows(table_name: str, entries: list[dict]) -> list[dict]:
+    return [
+        {"id": str(ent.get("id") or i), "value": str(ent.get("value") or ""), "table": table_name}
+        for i, ent in enumerate(entries)
+    ]
 
 
 def _clear_lookup_modal() -> None:
@@ -132,9 +168,8 @@ def _render_lookup_view(row: dict) -> None:
 
 def _render_lookup_edit(row: dict) -> None:
     table_name = str(row.get("table") or "")
-    idx = int(str(row.get("id") or "0"))
+    row_id = str(row.get("id") or "")
     rk = record_session_key(row, "id")
-    items_key = _lookup_session_key(table_name)
     edit_key = f"lookup_edit_val_{rk}"
 
     render_edit_form_header("Edit Lookup Value")
@@ -144,10 +179,11 @@ def _render_lookup_edit(row: dict) -> None:
     removed = False
     with btn_remove:
         if st.button("Remove", key=f"lookup_edit_remove_{rk}"):
-            items = _get_lookup_items(table_name)
-            if 0 <= idx < len(items):
-                items.pop(idx)
-                st.session_state[items_key] = items
+            entries = _get_lookup_entries(table_name)
+            _set_lookup_entries(
+                table_name,
+                [e for e in entries if str(e.get("id") or "") != row_id],
+            )
             removed = True
     with btn_save:
         saved = st.button("Save Changes", key=f"lookup_edit_save_{rk}", type="primary")
@@ -157,12 +193,17 @@ def _render_lookup_edit(row: dict) -> None:
         st.rerun()
     if saved:
         new_val = str(st.session_state.get(edit_key) or "").strip()
-        items = _get_lookup_items(table_name)
-        if new_val and 0 <= idx < len(items):
-            items[idx] = new_val
-            st.session_state[items_key] = items
+        entries = _get_lookup_entries(table_name)
+        updated: list[dict] = []
+        for ent in entries:
+            if str(ent.get("id") or "") == row_id:
+                if new_val:
+                    updated.append({**ent, "value": new_val})
+            else:
+                updated.append(ent)
+        _set_lookup_entries(table_name, updated)
         set_view_mode(_MODULE, rk)
-        st.success("Lookup value updated (session).")
+        st.success("Updated — click **Save lookup table** to persist to Supabase.")
         st.rerun()
 
 
@@ -203,17 +244,17 @@ def _show_lookup_detail_modal() -> None:
 
 def _render_lookup_editor() -> None:
     table = st.selectbox("Lookup table", LOOKUP_TABLES, key=_LOOKUP_TAB)
-    items = _get_lookup_items(table)
+    entries = _get_lookup_entries(table)
     key = _lookup_session_key(table)
     st.session_state[_LOOKUP_TABLE_CTX] = table
 
     ot = "d" + "iv"
     st.markdown(f'<{ot} class="ips-lookup-panel">', unsafe_allow_html=True)
-    st.markdown(f"**{table}** — {len(items)} value(s)")
-    st.caption("Values load from Supabase `ips_lookup_*` when available; otherwise from app constants.")
-    st.caption("Click a row to view or edit a lookup value.")
+    st.markdown(f"**{table}** — {len(entries)} value(s)")
+    st.caption(_lookup_source_label(table))
+    st.caption("Click a row to view or edit. Changes persist after **Save lookup table**.")
 
-    rows = _lookup_rows(table, items)
+    rows = _lookup_rows(table, entries)
     build_modal_cache(rows, cache_key=_CACHE_KEY)
     render_clickable_table(
         rows,
@@ -231,13 +272,25 @@ def _render_lookup_editor() -> None:
         new_val = st.text_input("Add value", key=f"{key}_new", placeholder="New entry…", label_visibility="collapsed")
     with nc2:
         if st.button("Add", key=f"{key}_add", use_container_width=True) and new_val.strip():
-            st.session_state[key] = _get_lookup_items(table) + [new_val.strip()]
+            entries = _get_lookup_entries(table)
+            try:
+                from app.services.lookup_service import _new_local_id
+            except ImportError:
+                from services.lookup_service import _new_local_id  # type: ignore
+            entries.append({"id": _new_local_id(), "value": new_val.strip(), "from_db": False})
+            _set_lookup_entries(table, entries)
             st.session_state[f"{key}_new"] = ""
             st.rerun()
 
     if st.button("Save lookup table", key=f"{key}_save", type="primary"):
-        ok, msg = persist_lookup_table(table, st.session_state[key])
-        apply_persist_feedback(ok, msg)
+        try:
+            from app.services.lookup_service import sync_lookup_for_label
+        except ImportError:
+            from services.lookup_service import sync_lookup_for_label  # type: ignore
+        ok, msg = sync_lookup_for_label(table, _get_lookup_entries(table))
+        if apply_persist_feedback(ok, msg):
+            _clear_lookup_session(table)
+            st.rerun()
     st.markdown(f"</{ot}>", unsafe_allow_html=True)
 
 
