@@ -619,8 +619,3 @@ def render_table_action_bar(
 
 # Preferred alias for new code (same as :func:`render_table_action_bar`).
 render_selection_action_bar = render_table_action_bar
-
-# Deprecated aliases (avoid breaking older imports)
-selection_get = get_selected_ids
-selection_set = set_selected_ids
-selection_clear = clear_selected_ids

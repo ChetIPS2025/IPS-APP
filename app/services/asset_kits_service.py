@@ -6,7 +6,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from app.services.repository import ServiceResult, clear_all_data_caches, delete_row, fetch_rows, insert_row, update_row
+from app.services.repository import ServiceResult, delete_row, fetch_rows, insert_row, update_row
 
 _KIT_ITEMS = "asset_kit_items"
 _KIT_AUDITS = "asset_kit_audits"
@@ -254,8 +254,6 @@ def recalculate_asset_kit_value(parent_asset_id: str) -> ServiceResult:
         "current_value": round(total, 2),
     }
     result = update_row(_ASSETS, payload, {"id": pid})
-    if result.ok:
-        clear_all_data_caches()
     return ServiceResult(
         ok=result.ok,
         data={
@@ -674,7 +672,6 @@ def create_asset_kit_audit(
             "notes": audit_data.get("notes"),
         }
     )
-    clear_all_data_caches()
     return ServiceResult(
         ok=True,
         data={
@@ -713,7 +710,6 @@ def assign_asset_kit(parent_asset_id: str, data: dict[str, Any]) -> ServiceResul
                 "notes": data.get("notes"),
             }
         )
-        clear_all_data_caches()
     return result
 
 

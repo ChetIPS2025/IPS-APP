@@ -9,12 +9,12 @@ from typing import Any
 
 try:
     from app.services.asset_classification_service import _map_category_to_hand_tool
-    from app.services.repository import ServiceResult, clear_all_data_caches, update_row_admin
+    from app.services.repository import ServiceResult, update_row_admin
     from app.services.serialized_tool_service import create_serialized_tool
     from app.services.small_hand_tool_service import HAND_TOOL_CATEGORIES, save_hand_tool
 except ImportError:
     from services.asset_classification_service import _map_category_to_hand_tool  # type: ignore
-    from services.repository import ServiceResult, clear_all_data_caches, update_row_admin  # type: ignore
+    from services.repository import ServiceResult, update_row_admin  # type: ignore
     from services.serialized_tool_service import create_serialized_tool  # type: ignore
     from services.small_hand_tool_service import HAND_TOOL_CATEGORIES, save_hand_tool  # type: ignore
 
@@ -202,8 +202,6 @@ def merge_serialized_tool_from_intake(asset_id: str, data: dict[str, Any]) -> Se
     except ImportError:
         from services.serialized_tool_service import merge_serialized_tool_fields  # type: ignore
     result = merge_serialized_tool_fields(asset_id, data)
-    if result.ok:
-        clear_all_data_caches()
     return result
 
 
@@ -317,7 +315,6 @@ def bulk_import_tools(
             summary = "; ".join(unique_msgs[:5])
         return ServiceResult(ok=False, error=summary, data={"created": 0, "errors": errors})
 
-    clear_all_data_caches()
     return ServiceResult(
         ok=True,
         data={"created": created, "errors": errors, "message": f"Imported {created} item(s)."},
@@ -390,16 +387,13 @@ def attach_tool_photos_bundle(
         from app.services.upload_media_strategy import attach_asset_photos_bundle
     except ImportError:
         from services.upload_media_strategy import attach_asset_photos_bundle  # type: ignore
-    result = attach_asset_photos_bundle(
+    return attach_asset_photos_bundle(
         asset_id,
         uploads,
         primary_preview_bytes=primary_preview_bytes,
         primary_preview_filename=primary_preview_filename,
         uploaded_by=uploaded_by,
     )
-    if result.ok:
-        clear_all_data_caches()
-    return result
 
 
 def attach_tool_receipt(asset: dict[str, Any], uploaded: Any, *, uploaded_by: str | None = None) -> ServiceResult:
@@ -417,7 +411,6 @@ def attach_tool_receipt(asset: dict[str, Any], uploaded: Any, *, uploaded_by: st
             notes="Quick Add Tool receipt",
             uploaded_by=uploaded_by,
         )
-        clear_all_data_caches()
         return ServiceResult(ok=True, data={"attached": True})
     except Exception as exc:
         return ServiceResult(ok=False, error=str(exc))

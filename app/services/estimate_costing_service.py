@@ -9,7 +9,7 @@ from typing import Any
 
 from app.services.repository import (
     ServiceResult,
-    clear_all_data_caches,
+    clear_data_cache_for_table,
     delete_row,
     fetch_by_id,
     fetch_rows,
@@ -495,7 +495,7 @@ def get_estimate_travel(estimate_id: str) -> tuple[list[dict[str, Any]], bool]:
 
 def clear_estimate_cache() -> None:
     _reset_equipment_storage_cache()
-    clear_all_data_caches()
+    clear_data_cache_for_table("estimates")
 
 
 def get_estimate_bundle(estimate_id: str, *, demo_materials: list[dict[str, Any]] | None = None) -> dict[str, Any]:
@@ -590,7 +590,6 @@ def recalculate_and_save_estimate_totals(estimate_id: str) -> ServiceResult:
     payload = _estimate_totals_persist_payload(totals)
     result = update_row("estimates", payload, {"id": eid})
     if result.ok:
-        clear_all_data_caches()
         return ServiceResult(ok=True, data={**totals, **payload})
     return result
 
@@ -1554,8 +1553,6 @@ def save_category_markup_settings(
     )
 
     result = update_row("estimates", payload, {"id": eid})
-    if result.ok:
-        clear_all_data_caches()
     return result
 
 
@@ -1591,8 +1588,6 @@ def save_global_markup_settings(
     result = update_row("estimates", payload, {"id": eid})
     if not result.ok:
         return result
-
-    clear_all_data_caches()
 
     if apply_to_existing_lines:
         apply_result = apply_estimate_markup_defaults_to_lines(eid)

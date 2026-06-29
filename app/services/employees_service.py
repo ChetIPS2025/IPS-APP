@@ -24,7 +24,7 @@ from app.services.phase2_modules_service import (
     save_certification,
     save_employee,
 )
-from app.services.repository import ServiceResult, clear_all_data_caches
+from app.services.repository import ServiceResult, clear_data_cache_for_table
 
 __all__ = [
     "clear_certifications_cache",
@@ -47,7 +47,7 @@ __all__ = [
 
 
 def clear_certifications_cache() -> None:
-    clear_all_data_caches()
+    clear_data_cache_for_table("employee_certifications")
 
 
 def get_employee_certifications(employee_id: str | None = None) -> list[dict[str, Any]]:
@@ -73,7 +73,4 @@ def update_employee_certification(cert_id: str, data: dict[str, Any]) -> Service
 
 
 def delete_employee_certification(cert_id: str) -> ServiceResult:
-    result = delete_certification(str(cert_id or "").strip())
-    if result.ok:
-        clear_certifications_cache()
-    return result
+    return delete_certification(str(cert_id or "").strip())

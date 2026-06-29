@@ -20,7 +20,6 @@ try:
     from app.services.assets_service import ensure_asset_qr_tokens
     from app.services.repository import (
         ServiceResult,
-        clear_all_data_caches,
         fetch_rows,
         insert_row,
         insert_row_admin,
@@ -42,7 +41,6 @@ except ImportError:
     from services.assets_service import ensure_asset_qr_tokens  # type: ignore
     from services.repository import (  # type: ignore
         ServiceResult,
-        clear_all_data_caches,
         fetch_rows,
         insert_row,
         insert_row_admin,
@@ -347,7 +345,6 @@ def merge_serialized_tool_fields(asset_id: str, data: dict[str, Any]) -> Service
     result = update_row_admin(_ASSETS, updates, {"id": aid})
     if not result.ok:
         return result
-    clear_all_data_caches()
     merged = {**existing, **updates}
     return ServiceResult(ok=True, data={"updated": True, "asset": merged})
 
@@ -436,7 +433,6 @@ def create_serialized_tool(data: dict[str, Any]) -> ServiceResult:
             if not kit_result or not kit_result.ok:
                 warning = (kit_result.error if kit_result else "Could not link tool to trailer.")
                 return ServiceResult(ok=True, data={**(result.data or {}), "warning": warning})
-    clear_all_data_caches()
     return result
 
 
@@ -475,7 +471,6 @@ def assign_tool_to_trailer(tool_id: str, trailer_id: str) -> ServiceResult:
     kit_result = _sync_kit_item_for_tool(tid, pid, tool_row=tool)
     if kit_result and not kit_result.ok:
         return ServiceResult(ok=False, error=kit_result.error or "Tool saved but trailer link failed.")
-    clear_all_data_caches()
     return ServiceResult(ok=True, data={"tool_id": tid, "trailer_id": pid})
 
 
@@ -525,7 +520,6 @@ def dispatch_trailer_to_job(
                     str(item.get("id")),
                     {"status": "Present"},
                 )
-    clear_all_data_caches()
     return result
 
 
@@ -579,7 +573,6 @@ def checkout_serialized_tool(
                     "assigned_to_name": employee_name,
                 },
             )
-    clear_all_data_caches()
     return result
 
 
@@ -624,7 +617,6 @@ def checkin_serialized_tool(tool_id: str, *, notes: str = "") -> ServiceResult:
                     "assigned_to_name": "",
                 },
             )
-    clear_all_data_caches()
     return result
 
 
@@ -670,7 +662,6 @@ def mark_serialized_tool_status(
                     "condition": payload.get("condition") or _clean_text(kit_item.get("condition")),
                 },
             )
-    clear_all_data_caches()
     return result
 
 
@@ -707,7 +698,6 @@ def audit_trailer_tools(
             },
             {"id": child_id},
         )
-    clear_all_data_caches()
     return result
 
 

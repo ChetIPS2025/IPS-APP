@@ -68,11 +68,11 @@ _HIGH_CONFIDENCE_FIELDS = frozenset({"model_number", "item_number", "sku"})
 try:
     from app.config import ROOT_DIR
     from app.db import create_signed_url, update_rows_admin, upload_bytes_admin
-    from app.services.repository import ServiceResult, clear_all_data_caches, filter_payload_to_table
+    from app.services.repository import ServiceResult, clear_data_cache_for_table, filter_payload_to_table
 except ImportError:
     from config import ROOT_DIR  # type: ignore
     from db import create_signed_url, update_rows_admin, upload_bytes_admin  # type: ignore
-    from services.repository import ServiceResult, clear_all_data_caches, filter_payload_to_table  # type: ignore
+    from services.repository import ServiceResult, clear_data_cache_for_table, filter_payload_to_table  # type: ignore
 
 
 @dataclass
@@ -376,7 +376,7 @@ def _update_item_image_row(table: str, payload: dict[str, Any], record_id: str) 
             ok=False,
             error=f"Could not save image metadata to {table} (no row updated).",
         )
-    clear_all_data_caches()
+    clear_data_cache_for_table(table)
     return ServiceResult(ok=True, data=rows[0])
 
 

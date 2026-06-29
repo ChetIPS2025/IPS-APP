@@ -156,10 +156,4 @@ def ensure_estimate_expiration_persisted(estimate_id: str) -> bool:
     if not exp_d:
         return False
     result = update_row("estimates", {"expiration_date": exp_d.isoformat()}, {"id": eid})
-    if result.ok:
-        try:
-            from app.services.phase2_modules_service import clear_all_data_caches
-        except ImportError:
-            from services.phase2_modules_service import clear_all_data_caches  # type: ignore
-        clear_all_data_caches()
     return bool(result.ok)

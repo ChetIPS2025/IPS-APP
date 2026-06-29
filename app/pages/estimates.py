@@ -483,11 +483,6 @@ def _on_estimate_cost_builder_saved(estimate_id: str) -> None:
         return
     st.session_state.pop(f"_est_rollups_synced_{eid}", None)
     _refresh_estimate_modal_cache(eid)
-    try:
-        from app.services.phase2_modules_service import clear_all_data_caches
-    except ImportError:
-        from services.phase2_modules_service import clear_all_data_caches  # type: ignore
-    clear_all_data_caches()
     _clear_cost_builder_options_cache()
 
 
@@ -649,10 +644,10 @@ def _persist_scope_of_work(data: dict, row_id: str) -> tuple[bool, str]:
     est = get_estimate(row_id) or {"id": row_id}
     try:
         from app.estimate.persistence import patch_estimate_job_scope
-        from app.services.repository import clear_all_data_caches
+        from app.services.repository import clear_data_cache_for_table
     except ImportError:
         from estimate.persistence import patch_estimate_job_scope  # type: ignore
-        from services.repository import clear_all_data_caches  # type: ignore
+        from services.repository import clear_data_cache_for_table  # type: ignore
     ok, err = patch_estimate_job_scope(
         row_id,
         est,
@@ -660,7 +655,7 @@ def _persist_scope_of_work(data: dict, row_id: str) -> tuple[bool, str]:
         customer_responsibilities=str(data.get("customer_responsibilities") or ""),
     )
     if ok:
-        clear_all_data_caches()
+        clear_data_cache_for_table("estimates")
         return True, "Scope of work saved."
     return False, err or "Could not save scope of work."
 
@@ -1038,10 +1033,10 @@ def _render_approve_confirmation_panel(rows_by_id: dict[str, dict]) -> None:
             res = approve_estimate_and_sync_job(eid)
             if res.ok:
                 try:
-                    from app.services.phase2_modules_service import clear_all_data_caches
+                    from app.services.repository import clear_data_cache_for_table
                 except ImportError:
-                    from services.phase2_modules_service import clear_all_data_caches  # type: ignore
-                clear_all_data_caches()
+                    from services.repository import clear_data_cache_for_table  # type: ignore
+                clear_data_cache_for_table("estimates")
                 st.session_state.pop(_PENDING_APPROVE_KEY, None)
                 st.success(res.message or "Estimate approved and linked job activated.")
                 st.rerun()
@@ -1491,10 +1486,10 @@ def _render_estimate_revision_panel(est: dict) -> None:
                     )
                     if result.ok:
                         try:
-                            from app.services.phase2_modules_service import clear_all_data_caches
+                            from app.services.repository import clear_data_cache_for_table
                         except ImportError:
-                            from services.phase2_modules_service import clear_all_data_caches  # type: ignore
-                        clear_all_data_caches()
+                            from services.repository import clear_data_cache_for_table  # type: ignore
+                        clear_data_cache_for_table("estimates")
                         _refresh_estimate_modal_cache(eid)
                         _exit_revise_mode(est)
                         msg = "Revision completed."
@@ -1520,10 +1515,10 @@ def _render_estimate_revision_panel(est: dict) -> None:
                     result = cancel_approved_estimate_revision(eid, baseline_snapshot=baseline)
                     if result.ok:
                         try:
-                            from app.services.phase2_modules_service import clear_all_data_caches
+                            from app.services.repository import clear_data_cache_for_table
                         except ImportError:
-                            from services.phase2_modules_service import clear_all_data_caches  # type: ignore
-                        clear_all_data_caches()
+                            from services.repository import clear_data_cache_for_table  # type: ignore
+                        clear_data_cache_for_table("estimates")
                         _refresh_estimate_modal_cache(eid)
                         _exit_revise_mode(est)
                         st.info("Revision cancelled. Linked job contract was not changed.")

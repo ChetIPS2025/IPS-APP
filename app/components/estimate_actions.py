@@ -19,7 +19,7 @@ try:
         estimate_status_approvable,
         estimate_visible_in_approved_view,
     )
-    from app.services.phase2_modules_service import clear_all_data_caches
+    from app.services.repository import clear_data_cache_for_table
 except ImportError:
     from auth import current_role  # type: ignore
     from components.action_styles import danger_solid_button, success_solid_button  # type: ignore
@@ -31,7 +31,7 @@ except ImportError:
         estimate_status_approvable,
         estimate_visible_in_approved_view,
     )
-    from services.phase2_modules_service import clear_all_data_caches  # type: ignore
+    from services.repository import clear_data_cache_for_table  # type: ignore
 
 
 def _confirm_state_key(estimate_id: str, action: str) -> str:
@@ -153,7 +153,7 @@ def render_estimate_action_buttons(
 def _handle_approve(estimate_id: str, on_approve: Callable[[], None] | None) -> bool:
     res = approve_estimate_and_sync_job(estimate_id)
     if res.ok:
-        clear_all_data_caches()
+        clear_data_cache_for_table("estimates")
         st.success(res.message or "Estimate approved and linked job activated.")
         if on_approve:
             on_approve()
@@ -169,7 +169,7 @@ def _handle_delete(estimate_id: str, on_delete: Callable[[], None] | None) -> bo
         from services.delete_safety import delete_estimate_unlink_first  # type: ignore
     try:
         delete_estimate_unlink_first(estimate_id)
-        clear_all_data_caches()
+        clear_data_cache_for_table("estimates")
         st.success("Estimate deleted.")
         if on_delete:
             on_delete()

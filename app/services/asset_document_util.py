@@ -138,10 +138,10 @@ def persist_asset_document_upload(
                 pass
             raise
     try:
-        from app.services.repository import clear_all_data_caches
+        from app.services.repository import clear_data_cache_for_table
     except ImportError:
-        from services.repository import clear_all_data_caches  # type: ignore
-    clear_all_data_caches()
+        from services.repository import clear_data_cache_for_table  # type: ignore
+    clear_data_cache_for_table("asset_documents")
     return row
 
 
@@ -159,7 +159,7 @@ def delete_asset_document_record(doc: dict[str, Any]) -> None:
     if doc_id:
         delete_rows_admin("asset_documents", {"id": doc_id})
     try:
-        from app.services.repository import clear_all_data_caches
+        from app.services.repository import clear_data_cache_for_table
     except ImportError:
-        from services.repository import clear_all_data_caches  # type: ignore
-    clear_all_data_caches()
+        from services.repository import clear_data_cache_for_table  # type: ignore
+    clear_data_cache_for_table("asset_documents")

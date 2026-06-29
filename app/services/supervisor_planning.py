@@ -248,18 +248,6 @@ TASK_STATUSES: tuple[str, ...] = (
 )
 
 
-def rollup_goal_result_from_task_outcomes(outcomes: list[str]) -> str:
-    """Legacy helper (goal rollup); unused in task-only UI."""
-    if not outcomes:
-        return "missed"
-    norm = [str(x or "").strip().lower() for x in outcomes]
-    if all(x == "complete" for x in norm):
-        return "met"
-    if all(x == "not_started" for x in norm):
-        return "missed"
-    return "partial"
-
-
 def job_task_status_from_outcome(outcome: str) -> str:
     """Normalize status slug (legacy EOD mapping)."""
     o = str(outcome or "").strip().lower()

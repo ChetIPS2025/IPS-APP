@@ -6,11 +6,11 @@ from typing import Any, Literal
 
 try:
     from app.services.asset_kits_service import asset_is_kit
-    from app.services.repository import ServiceResult, clear_all_data_caches, fetch_rows, update_row
+    from app.services.repository import ServiceResult, fetch_rows, update_row
     from app.services.small_hand_tool_service import save_hand_tool
 except ImportError:
     from services.asset_kits_service import asset_is_kit  # type: ignore
-    from services.repository import ServiceResult, clear_all_data_caches, fetch_rows, update_row  # type: ignore
+    from services.repository import ServiceResult, fetch_rows, update_row  # type: ignore
     from services.small_hand_tool_service import save_hand_tool  # type: ignore
 
 TrackingType = Literal["equipment", "serialized", "quantity"]
@@ -333,7 +333,6 @@ def reclassify_asset(
                 from services.assets_service import rebuild_asset_qr  # type: ignore
             merged = {**asset, **payload}
             rebuild_asset_qr(merged)
-        clear_all_data_caches()
         data = dict(result.data or {})
         data["tracking_type"] = bucket
         data["tab"] = TRACKING_TAB_LABELS[bucket]

@@ -62,7 +62,7 @@ try:
         options_with_current,
         permission_role_options,
     )
-    from app.services.repository import clear_all_data_caches
+    from app.services.repository import clear_data_cache_for_table
     from app.services.users_service import (
         admin_reset_employee_password,
         can_manage_user_actions,
@@ -127,7 +127,7 @@ except ImportError:
         options_with_current,
         permission_role_options,
     )
-    from services.repository import clear_all_data_caches  # type: ignore
+    from services.repository import clear_data_cache_for_table  # type: ignore
     from services.users_service import (  # type: ignore
         admin_reset_employee_password,
         can_manage_user_actions,
@@ -859,7 +859,7 @@ def _send_employee_invite(emp: dict) -> str:
         employee_id=eid or None,
         require_employee_link=False,
     )
-    clear_all_data_caches()
+    clear_data_cache_for_table("users")
     return email
 
 

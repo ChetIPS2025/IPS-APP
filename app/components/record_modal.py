@@ -363,23 +363,6 @@ def render_modal_edit_button(
         st.button("Edit", key=f"{prefix}_edit", type="primary", on_click=_edit)
 
 
-def render_modal_actions(
-    *,
-    module: str,
-    record_key: str,
-    record: dict[str, Any],
-    on_close: Callable[[], None],
-    key_prefix: str | None = None,
-) -> None:
-    """Deprecated: use ``render_modal_edit_button``."""
-    _ = record, on_close
-    render_modal_edit_button(
-        module=module,
-        record_key=record_key,
-        key_prefix=key_prefix,
-    )
-
-
 def render_modal_meta_grid(cards: list[tuple[str, object]]) -> None:
     body = "".join(meta_card_html(label, value) for label, value in cards)
     st.markdown(f'<div class="ips-dialog-meta-grid">{body}</div>', unsafe_allow_html=True)

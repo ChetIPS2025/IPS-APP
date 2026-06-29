@@ -8,7 +8,7 @@ import re
 from typing import Any
 
 try:
-    from app.services.repository import ServiceResult, clear_all_data_caches
+    from app.services.repository import ServiceResult
     from app.services.small_hand_tool_service import (
         HAND_TOOL_CATEGORIES,
         HAND_TOOL_CONDITIONS,
@@ -16,7 +16,7 @@ try:
         import_hand_tool_row,
     )
 except ImportError:
-    from services.repository import ServiceResult, clear_all_data_caches  # type: ignore
+    from services.repository import ServiceResult  # type: ignore
     from services.small_hand_tool_service import (  # type: ignore
         HAND_TOOL_CATEGORIES,
         HAND_TOOL_CONDITIONS,
@@ -356,7 +356,6 @@ def bulk_import_hand_tools(rows: list[dict[str, Any]]) -> ServiceResult:
         else:
             errors.append(f"Row {row_num}: {result.error or 'failed'}")
 
-    clear_all_data_caches()
     if created == 0 and errors:
         return ServiceResult(
             ok=False,

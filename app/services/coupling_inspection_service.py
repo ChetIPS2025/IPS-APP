@@ -26,7 +26,7 @@ try:
         normalize_torque_rows,
         specs_for_model,
     )
-    from app.services.repository import ServiceResult, clear_all_data_caches, fetch_by_id
+    from app.services.repository import ServiceResult, clear_data_cache_for_table, fetch_by_id
     from app.services.task_photos import compress_image_bytes
 except ImportError:
     from auth import current_profile  # type: ignore
@@ -46,7 +46,7 @@ except ImportError:
         normalize_torque_rows,
         specs_for_model,
     )
-    from services.repository import ServiceResult, clear_all_data_caches, fetch_by_id  # type: ignore
+    from services.repository import ServiceResult, clear_data_cache_for_table, fetch_by_id  # type: ignore
     from services.task_photos import compress_image_bytes  # type: ignore
 
 _LOG = logging.getLogger(__name__)
@@ -644,7 +644,7 @@ def save_coupling_inspection(
     try:
         if rid:
             rows = update_rows_admin(TABLE, payload, {"id": rid})
-            clear_all_data_caches()
+            clear_data_cache_for_table(TABLE)
             row = rows[0] if rows else None
             if row and rid:
                 _sync_child_records(rid, {**data, **payload, "signatures_meta": sig_meta})
@@ -653,7 +653,7 @@ def save_coupling_inspection(
         if "created_by" not in payload or not payload.get("created_by"):
             payload["created_by"] = (current_profile() or {}).get("id")
         row = insert_row_admin(TABLE, payload)
-        clear_all_data_caches()
+        clear_data_cache_for_table(TABLE)
         new_id = str(row.get("id") or "") if row else ""
         if new_id:
             _sync_child_records(new_id, {**data, **payload, "signatures_meta": sig_meta})

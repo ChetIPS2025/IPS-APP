@@ -9,7 +9,6 @@ try:
     from app.services.asset_kits_service import asset_is_kit, get_asset_kit_items, list_all_kit_items_enriched
     from app.services.repository import (
         ServiceResult,
-        clear_all_data_caches,
         delete_row,
         fetch_rows,
         insert_row,
@@ -20,7 +19,6 @@ except ImportError:
     from services.asset_kits_service import asset_is_kit, get_asset_kit_items, list_all_kit_items_enriched  # type: ignore
     from services.repository import (  # type: ignore
         ServiceResult,
-        clear_all_data_caches,
         delete_row,
         fetch_rows,
         insert_row,
@@ -275,7 +273,6 @@ def save_hand_tool(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceR
 
     if result.ok and storage == "Tool Trailer" and container_id:
         _sync_kit_item_for_hand_tool(container_id, result.data or payload, row_id=row_id)
-    clear_all_data_caches()
     return result
 
 
@@ -293,8 +290,6 @@ def import_hand_tool_row(ui: dict[str, Any]) -> ServiceResult:
     if result.ok and storage == "Tool Trailer" and container_id:
         row_id = _clean_text((result.data or {}).get("id"))
         _sync_kit_item_for_hand_tool(container_id, result.data or payload, row_id=row_id or None)
-    if result.ok:
-        clear_all_data_caches()
     return result
 
 
@@ -376,7 +371,6 @@ def adjust_hand_tool_quantity(tool_id: str, delta: float, *, notes: str = "") ->
         cid = _clean_text(row.get("container_asset_id"))
         if cid:
             _sync_kit_item_for_hand_tool(cid, {**row, "quantity_on_hand": new_qty, "notes": note_text}, row_id=tid)
-    clear_all_data_caches()
     return result
 
 

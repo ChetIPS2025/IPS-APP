@@ -599,11 +599,6 @@ def sign_out() -> None:
     clear_streamlit_db_read_cache()
 
 
-def require_login() -> bool:
-    """Deprecated alias for :func:`is_authenticated`. Do not use for page gating."""
-    return is_authenticated()
-
-
 def current_profile() -> dict:
     return st.session_state.get("auth_profile") or {}
 

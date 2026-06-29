@@ -37,7 +37,7 @@ try:
     from app.services.phase2_modules_service import delete_employee as delete_employee_row, normalize_employee
     from app.services.repository import (
         ServiceResult,
-        clear_all_data_caches,
+        clear_data_cache_for_table,
         fetch_by_id,
         fetch_rows,
         filter_payload_to_table,
@@ -56,7 +56,7 @@ except ImportError:
     from services.phase2_modules_service import delete_employee as delete_employee_row, normalize_employee  # type: ignore
     from services.repository import (  # type: ignore
         ServiceResult,
-        clear_all_data_caches,
+        clear_data_cache_for_table,
         fetch_by_id,
         fetch_rows,
         filter_payload_to_table,
@@ -322,7 +322,7 @@ def admin_reset_employee_password(
     except Exception as exc:
         return ServiceResult(ok=False, error=str(exc).strip() or "Could not reset this user's password.")
 
-    clear_all_data_caches()
+    clear_data_cache_for_table("users")
     return ServiceResult(
         ok=True,
         data={
@@ -394,7 +394,7 @@ def activate_user(
         except Exception as exc:
             auth_warning = f"User activated, but profile update failed: {exc}"
 
-    clear_all_data_caches()
+    clear_data_cache_for_table("users")
     data: dict[str, Any] = {"employee_id": uid}
     if auth_warning:
         data["warning"] = auth_warning
@@ -448,7 +448,7 @@ def soft_delete_user(
         except Exception as exc:
             auth_warning = f"User archived, but profile update failed: {exc}"
 
-    clear_all_data_caches()
+    clear_data_cache_for_table("users")
     data: dict[str, Any] = {
         "employee_id": uid,
         "profile_id": str(profile.get("id") or "") if profile else "",
@@ -506,7 +506,7 @@ def deactivate_user(
         except Exception as exc:
             auth_warning = f"Employee deactivated, but profile update failed: {exc}"
 
-    clear_all_data_caches()
+    clear_data_cache_for_table("users")
     data: dict[str, Any] = {
         "employee_id": uid,
         "profile_id": str(profile.get("id") or "") if profile else "",
@@ -569,7 +569,7 @@ def hard_delete_user(
                 msg = f"Login removed, but employee delete failed: {msg}"
             return ServiceResult(ok=False, error=msg, data={"auth_deleted": auth_deleted})
 
-    clear_all_data_caches()
+    clear_data_cache_for_table("users")
     warnings: list[str] = []
     if auth_warning:
         warnings.append(

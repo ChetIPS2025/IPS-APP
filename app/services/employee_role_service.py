@@ -153,11 +153,11 @@ def sync_linked_profile_permission_role(
     """Update linked profile role when employee permission changes. Returns warning or None."""
     try:
         from app.db import update_rows_admin
-        from app.services.repository import clear_all_data_caches, filter_payload_to_table
+        from app.services.repository import clear_data_cache_for_table, filter_payload_to_table
         from app.services.users_service import _find_profile_for_employee
     except ImportError:
         from db import update_rows_admin  # type: ignore
-        from services.repository import clear_all_data_caches, filter_payload_to_table  # type: ignore
+        from services.repository import clear_data_cache_for_table, filter_payload_to_table  # type: ignore
         from services.users_service import _find_profile_for_employee  # type: ignore
 
     eid = str(employee_id or "").strip()
@@ -172,7 +172,7 @@ def sync_linked_profile_permission_role(
     payload = filter_payload_to_table("profiles", {"role": auth_role})
     try:
         update_rows_admin("profiles", payload, {"id": str(profile["id"])})
-        clear_all_data_caches()
+        clear_data_cache_for_table("user_profiles")
     except Exception as exc:
         return f"User saved, but login permission update failed: {exc}"
     return None
