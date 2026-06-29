@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date, timedelta
 from typing import Any
 
 try:
@@ -11,11 +12,14 @@ except ImportError:
 
 PIPELINE_VIEWS: tuple[str, ...] = (
     "All Pipeline",
+    "Needs Attention",
     "Open Quotes",
     "Approved Quotes",
     "Active Jobs",
     "All Jobs",
 )
+
+PIPELINE_STALE_SENT_DAYS = 14
 
 _ESTIMATE_STATUS_OPEN = frozenset({"draft", "pending", "sent"})
 _ESTIMATE_STATUS_APPROVED = frozenset({"approved", "awarded"})
@@ -48,6 +52,24 @@ def _customer_label(row: dict[str, Any]) -> str:
         if val and val not in {"—", "-"}:
             return val
     return "—"
+
+
+def _supervisor_label(row: dict[str, Any]) -> str:
+    for key in ("supervisor_name", "supervisor"):
+        val = str(row.get(key) or "").strip()
+        if val and val not in {"—", "-"}:
+            return val
+    return "—"
+
+
+def _parse_iso_date(raw: object) -> date | None:
+    text = str(raw or "").strip()[:10]
+    if not text:
+        return None
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        return None
 
 
 def _money_value(row: dict[str, Any], *keys: str) -> float:
@@ -159,10 +181,14 @@ def build_pipeline_rows(
                     "estimate_status": est_status,
                     "job_status": job_status,
                     "customer": _customer_label(est) if _customer_label(est) != "—" else _customer_label(linked),
+                    "supervisor": _supervisor_label(linked),
                     "project": _project_title(
                         est,
                         fallback_keys=("project_name", "description", "estimate_description"),
                     ),
+                    "estimate_date": est.get("estimate_date") or est.get("created_at"),
+                    "job_start_date": linked.get("start_date"),
+                    "progress": linked.get("progress"),
                     "value": _money_value(
                         linked,
                         "contract_value",
@@ -188,10 +214,14 @@ def build_pipeline_rows(
                 "estimate_status": est_status,
                 "job_status": "",
                 "customer": _customer_label(est),
+                "supervisor": "",
                 "project": _project_title(
                     est,
                     fallback_keys=("project_name", "description", "estimate_description"),
                 ),
+                "estimate_date": est.get("estimate_date") or est.get("created_at"),
+                "job_start_date": "",
+                "progress": None,
                 "value": _money_value(est, "customer_price", "total"),
                 "estimate_id": eid,
                 "job_id": "",
@@ -220,7 +250,11 @@ def build_pipeline_rows(
                 "estimate_status": "",
                 "job_status": job_status,
                 "customer": _customer_label(job),
+                "supervisor": _supervisor_label(job),
                 "project": _project_title(job, fallback_keys=("job_name", "description", "project_name")),
+                "estimate_date": "",
+                "job_start_date": job.get("start_date"),
+                "progress": job.get("progress"),
                 "value": _money_value(job, "contract_value", "awarded_amount"),
                 "estimate_id": "",
                 "job_id": jid,
@@ -229,7 +263,70 @@ def build_pipeline_rows(
         )
 
     rows.sort(key=_sort_key, reverse=True)
-    return rows
+    return annotate_pipeline_rows(rows)
+
+
+def pipeline_stale_hint(row: dict[str, Any], *, today: date | None = None) -> str | None:
+    """Human-readable reason a row needs follow-up, or None if current."""
+    ref = today or date.today()
+    record_type = str(row.get("record_type") or "")
+    est_status = _norm_status(row.get("estimate_status"))
+
+    if record_type == "quote" and est_status in _ESTIMATE_STATUS_APPROVED:
+        return "Approved — no job linked yet"
+
+    if record_type == "quote" and est_status == "sent":
+        est_d = _parse_iso_date(row.get("estimate_date"))
+        if est_d:
+            age = (ref - est_d).days
+            if age >= PIPELINE_STALE_SENT_DAYS:
+                return f"Sent {age}d ago — no response"
+
+    if row.get("has_job") and _norm_status(row.get("job_status") or "active") == "active":
+        start_d = _parse_iso_date(row.get("job_start_date"))
+        if start_d and start_d <= ref:
+            try:
+                progress = float(row.get("progress") or 0)
+            except (TypeError, ValueError):
+                progress = 0.0
+            if progress <= 0:
+                return "Active job — not started"
+
+    return None
+
+
+def annotate_pipeline_rows(
+    rows: list[dict[str, Any]],
+    *,
+    today: date | None = None,
+) -> list[dict[str, Any]]:
+    ref = today or date.today()
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        hint = pipeline_stale_hint(row, today=ref)
+        out.append({**row, "stale_hint": hint or "", "is_stale": bool(hint)})
+    return out
+
+
+def pipeline_filter_options(rows: list[dict[str, Any]]) -> dict[str, list[str]]:
+    customers = sorted(
+        {
+            str(r.get("customer") or "").strip()
+            for r in rows
+            if str(r.get("customer") or "").strip() not in {"", "—", "-"}
+        }
+    )
+    supervisors = sorted(
+        {
+            str(r.get("supervisor") or "").strip()
+            for r in rows
+            if str(r.get("supervisor") or "").strip() not in {"", "—", "-"}
+        }
+    )
+    return {
+        "customer": ["All"] + customers,
+        "supervisor": ["All"] + supervisors,
+    }
 
 
 def filter_pipeline_rows(
@@ -237,11 +334,15 @@ def filter_pipeline_rows(
     *,
     view: str = "All Pipeline",
     search: str = "",
+    customer: str = "All",
+    supervisor: str = "All",
 ) -> list[dict[str, Any]]:
     view_norm = str(view or "All Pipeline").strip()
     out = list(rows)
 
-    if view_norm == "Open Quotes":
+    if view_norm == "Needs Attention":
+        out = [r for r in out if r.get("is_stale")]
+    elif view_norm == "Open Quotes":
         out = [
             r
             for r in out
@@ -264,6 +365,14 @@ def filter_pipeline_rows(
         ]
     elif view_norm == "All Jobs":
         out = [r for r in out if r.get("has_job")]
+
+    cust = str(customer or "All").strip()
+    if cust and cust != "All":
+        out = [r for r in out if str(r.get("customer") or "") == cust]
+
+    sup = str(supervisor or "All").strip()
+    if sup and sup != "All":
+        out = [r for r in out if str(r.get("supervisor") or "") == sup]
 
     query = str(search or "").strip().casefold()
     if query:
@@ -295,10 +404,12 @@ def pipeline_summary(rows: list[dict[str, Any]]) -> dict[str, int | float]:
         if r.get("has_job") and _norm_status(r.get("job_status") or "active") in _JOB_ACTIVE | {"active"}
     )
     pipeline_value = sum(float(r.get("value") or 0) for r in rows)
+    stale_count = sum(1 for r in rows if r.get("is_stale"))
     return {
         "total": len(rows),
         "open_quotes": open_quotes,
         "approved_quotes": approved_quotes,
         "active_jobs": active_jobs,
+        "stale_count": stale_count,
         "pipeline_value": round(pipeline_value, 2),
     }
