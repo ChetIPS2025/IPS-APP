@@ -20,6 +20,8 @@ Each item has an **ID** for tracking in [`FIX_ORDER.md`](FIX_ORDER.md) and [`DAT
 | XP-001 – XP-005 | Cross-module handoffs: Jobs→Costing, Estimates→Materials, Coupling launcher guard, Timekeeping→Timesheets, scan embed routes. |
 | SP-001, PP-003 | Shop/job inventory scans route through `record_shop_inventory_consumption` / `record_inventory_transaction`. |
 | SP-005 | Estimate Materials: CSV export, Edit Estimate, Add from Inventory, Add Custom Item wired. |
+| SV-001, SV-006, OR-001 | Estimates view selectbox live; customer open counts use `status_maps`; Estimate Materials in office sidebar. |
+| SV-003, SV-004 | Central `status_maps.py`; task labels/DB writes preserve In Progress/Blocked; asset normalizer unified. |
 | Field loop | Scans, labor rollup, per-job email settings feed job costing (see commits on `main` May–Jun 2026). |
 
 ---
@@ -76,12 +78,12 @@ Each item has an **ID** for tracking in [`FIX_ORDER.md`](FIX_ORDER.md) and [`DAT
 
 | ID | Status | Module(s) | Issue | Notes |
 |----|--------|-----------|-------|-------|
-| SV-001 | open | Estimates | List `view_filter` hardcoded to `"Active Estimates"`. Approved/Awarded/Rejected hidden regardless of DB. | `estimates.py` |
-| SV-002 | open | Tasks | UI Open/Closed vs DB `Open`/`Complete` vs constants (In Progress, Done, Cancelled). | `task_display_helpers.py` |
-| SV-003 | open | Tasks | `normalize_task_status` treats In Progress/Blocked as Open. | `task_display_helpers.py` |
-| SV-004 | open | Assets | Page normalizer vs `ASSET_STATUSES` in constants disagree. | `assets.py`, `constants.py` |
+| SV-001 | fixed | Estimates | ~~Hardcoded view filter~~ `estimates_view` selectbox drives `_apply_estimate_view_filter`. | `estimates.py` |
+| SV-002 | open | Tasks | UI Open/Closed vs DB `Open`/`Complete` vs constants (In Progress, Done, Cancelled). | `task_display_helpers.py`, `status_maps.py` |
+| SV-003 | fixed | Tasks | ~~In Progress/Blocked collapsed to Open~~ `task_status_to_db` preserves granular statuses; Open/Closed bucket only for filters. | `status_maps.py`, `task_display_helpers.py` |
+| SV-004 | partial | Assets | Page normalizer delegates to `status_maps.normalize_asset_status`; legacy DB values may still differ from `ASSET_STATUSES`. | `assets.py`, `status_maps.py` |
 | SV-005 | open | Jobs | Jobs normalizer vs `JOB_STATUSES` in constants disagree. | `jobs.py`, `constants.py` |
-| SV-006 | open | Customers | Open job/estimate counts use closed-status sets that don't match Jobs/Estimates filters. | `customers.py` |
+| SV-006 | fixed | Customers | ~~Mismatched closed sets~~ Counts use `is_job_open_for_customer_count` / `is_estimate_open_for_customer_count`. | `customers.py`, `status_maps.py` |
 
 ---
 
@@ -113,7 +115,7 @@ Each item has an **ID** for tracking in [`FIX_ORDER.md`](FIX_ORDER.md) and [`DAT
 
 | ID | Status | Module | Issue | Notes |
 |----|--------|--------|-------|-------|
-| OR-001 | partial | `estimate_materials` | Handoff from Estimates works; still **not** in office `NAV_PAGES` sidebar. | `constants.NAV_PAGES`, `estimates.py` |
+| OR-001 | fixed | `estimate_materials` | Handoff from Estimates + office sidebar entry in `NAV_PAGES`. | `constants.NAV_PAGES`, `estimates.py` |
 | OR-002 | open | `employee_certifications` | Not in office sidebar; in field nav only. | `FIELD_NAV_PAGES` |
 | OR-003 | partial | `employee_documents` | Persist path fixed (DL-003); still not in office sidebar; overlaps Documents hub. | Nav + `employee_documents.py` |
 
@@ -134,11 +136,11 @@ Each item has an **ID** for tracking in [`FIX_ORDER.md`](FIX_ORDER.md) and [`DAT
 | Priority | Module | Open bug IDs |
 |----------|--------|--------------|
 | High | Timekeeping / Weekly Timesheets | SS-004, DL-005 |
-| High | Tasks | NP-004, SV-002, SV-003 |
+| High | Tasks | NP-004, SV-002 |
 | High | Job Costing | DL-004 |
-| Medium | Estimates / Materials | SV-001, OR-001 (sidebar) |
+| Medium | Estimates / Materials | — |
 | Medium | Pricing Guide | SP-002 |
-| Medium | Customers | SV-006 |
+| Medium | Customers | — |
 | Medium | Assets | SV-004, CD-001–CD-003 |
 | Medium | Admin / Settings | NP-003, SP-003 |
 | Medium | Coupling Inspection | XP-003 (docs), SS-005 |

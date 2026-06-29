@@ -2,28 +2,44 @@
 
 from __future__ import annotations
 
-import re
+try:
+    from app.services.status_maps import (
+        normalize_task_status,
+        normalize_task_status_label,
+        task_priority_to_db,
+        task_status_filter_bucket,
+        task_status_to_db,
+    )
+except ImportError:
+    from services.status_maps import (  # type: ignore
+        normalize_task_status,
+        normalize_task_status_label,
+        task_priority_to_db,
+        task_status_filter_bucket,
+        task_status_to_db,
+    )
 
-_EMOJI_PREFIX = re.compile(
-    r"^[\U0001F300-\U0001FAFF\U00002600-\U000027BF\u2705\u2B50\uFE0F?\s]+"
-)
-
-_CLOSED_ALIASES = frozenset({"done", "complete", "completed", "closed"})
+__all__ = [
+    "display_to_priority",
+    "display_to_status",
+    "normalize_task_priority",
+    "normalize_task_status",
+    "priority_to_db",
+    "priority_to_display",
+    "status_to_db",
+    "status_to_display",
+]
 
 
 def _strip_emoji(value: object) -> str:
+    import re
+
+    _EMOJI_PREFIX = re.compile(
+        r"^[\U0001F300-\U0001FAFF\U00002600-\U000027BF\u2705\u2B50\uFE0F?\s]+"
+    )
     raw = str(value or "").strip()
     cleaned = _EMOJI_PREFIX.sub("", raw).strip()
     return cleaned or raw
-
-
-def normalize_task_status(value: object) -> str:
-    cleaned = _strip_emoji(value)
-    if not cleaned:
-        return "Open"
-    if cleaned.lower() in _CLOSED_ALIASES:
-        return "Closed"
-    return "Open"
 
 
 def normalize_task_priority(value: object) -> str:
@@ -39,7 +55,7 @@ def normalize_task_priority(value: object) -> str:
 
 
 def status_to_display(value: object) -> str:
-    return "✅ Closed" if normalize_task_status(value) == "Closed" else "🔵 Open"
+    return "✅ Closed" if task_status_filter_bucket(value) == "Closed" else "🔵 Open"
 
 
 def priority_to_display(value: object) -> str:
@@ -52,17 +68,16 @@ def priority_to_display(value: object) -> str:
 
 
 def display_to_status(value: object) -> str:
-    return normalize_task_status(_strip_emoji(value))
+    return normalize_task_status_label(_strip_emoji(value))
 
 
 def display_to_priority(value: object) -> str:
     return normalize_task_priority(_strip_emoji(value))
 
 
-def status_to_db(value: object) -> str:
-    return "Complete" if normalize_task_status(value) == "Closed" else "Open"
-
-
 def priority_to_db(value: object) -> str:
-    pri = normalize_task_priority(value)
-    return "Normal" if pri == "Medium" else pri
+    return task_priority_to_db(normalize_task_priority(value))
+
+
+def status_to_db(value: object) -> str:
+    return task_status_to_db(value)

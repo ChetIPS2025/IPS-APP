@@ -351,32 +351,11 @@ _ASSET_TABS = [
 
 
 def _normalize_asset_status(raw: object) -> str:
-    s = str(raw or "").strip().lower().replace("_", " ")
-    mapping = {
-        "": "Available",
-        "available": "Available",
-        "in service": "In Service",
-        "in_service": "In Service",
-        "assigned": "Assigned",
-        "out for repair": "Out for Repair",
-        "repair": "Out for Repair",
-        "maintenance due": "Maintenance Due",
-        "maintenance_due": "Maintenance Due",
-        "maintenance": "Maintenance Due",
-        "retired": "Retired",
-        "sold": "Sold",
-        "lost": "Lost",
-        "checked out": "Checked Out",
-        "checked_out": "Checked Out",
-        "active": "In Service",
-        "overdue": "Overdue",
-        "down": "Down",
-        "out of service": "Out of Service",
-    }
-    if s in mapping:
-        return mapping[s]
-    label = str(raw or "").strip()
-    return label if label else "Available"
+    try:
+        from app.services.status_maps import normalize_asset_status
+    except ImportError:
+        from services.status_maps import normalize_asset_status  # type: ignore
+    return normalize_asset_status(raw)
 
 
 def _asset_number(row: dict) -> str:

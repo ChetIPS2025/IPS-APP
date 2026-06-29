@@ -181,9 +181,6 @@ _CONTACT_TABS = [
     "Activity",
 ]
 
-_CLOSED_JOB_STATUSES = frozenset({"completed", "complete", "closed", "cancelled", "canceled"})
-_CLOSED_EST_STATUSES = frozenset({"awarded", "completed", "complete", "closed", "cancelled", "canceled"})
-
 SELECTED_CUSTOMER_KEY = "selected_customer_id"
 SHOW_CUSTOMER_MODAL_KEY = "show_customer_detail_modal"
 _ALL_CUSTOMER_IDS_KEY = "_ips_customers_visible_ids"
@@ -419,19 +416,30 @@ def _open_counts_by_customer_name(
     jobs: list[dict],
     estimates: list[dict],
 ) -> tuple[dict[str, int], dict[str, int]]:
+    try:
+        from app.services.status_maps import (
+            is_estimate_open_for_customer_count,
+            is_job_open_for_customer_count,
+        )
+    except ImportError:
+        from services.status_maps import (  # type: ignore
+            is_estimate_open_for_customer_count,
+            is_job_open_for_customer_count,
+        )
+
     open_jobs: dict[str, int] = {}
     open_ests: dict[str, int] = {}
     for job in jobs:
         name = str(job.get("customer") or "").strip().lower()
         if not name:
             continue
-        if str(job.get("status") or "").strip().lower() not in _CLOSED_JOB_STATUSES:
+        if is_job_open_for_customer_count(job):
             open_jobs[name] = open_jobs.get(name, 0) + 1
     for est in estimates:
         name = str(est.get("customer") or "").strip().lower()
         if not name:
             continue
-        if str(est.get("status") or "").strip().lower() not in _CLOSED_EST_STATUSES:
+        if is_estimate_open_for_customer_count(est):
             open_ests[name] = open_ests.get(name, 0) + 1
     return open_jobs, open_ests
 
