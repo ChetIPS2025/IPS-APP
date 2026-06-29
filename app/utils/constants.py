@@ -173,6 +173,7 @@ LOOKUP_TABLES = (
 
 NAV_PAGES: list[tuple[str, str, str]] = [
     ("dashboard", "Dashboard", "layout-dashboard"),
+    ("pipeline", "Pipeline", "git-merge"),
     ("jobs", "Jobs", "briefcase"),
     ("customers", "Customers", "building"),
     ("estimates", "Estimates", "file-text"),

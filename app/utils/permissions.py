@@ -10,6 +10,7 @@ _ROLE_PAGES: dict[str, frozenset[str]] = {
         p[0]
         for p in [
             ("dashboard",),
+            ("pipeline",),
             ("jobs",),
             ("customers",),
             ("estimates",),
@@ -38,6 +39,7 @@ _ROLE_PAGES: dict[str, frozenset[str]] = {
     "supervisor": frozenset(
         {
             "dashboard",
+            "pipeline",
             "jobs",
             "customers",
             "estimates",
@@ -65,6 +67,7 @@ _ROLE_PAGES: dict[str, frozenset[str]] = {
     "project manager": frozenset(
         {
             "dashboard",
+            "pipeline",
             "jobs",
             "customers",
             "estimates",

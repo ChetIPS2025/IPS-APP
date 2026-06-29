@@ -24,6 +24,7 @@ ACTIVE_MODULE_SLUGS: frozenset[str] = frozenset(
     {
         "dashboard",
         "jobs",
+        "pipeline",
         "customers",
         "estimates",
         "pricing_guide",
@@ -63,6 +64,7 @@ LEGACY_PAGE_LABEL_TO_SLUG: dict[str, str] = {
     "Company Updates": "company_updates",
     "Jobs": "jobs",
     "Job Database": "jobs",
+    "Pipeline": "pipeline",
     "Customers": "customers",
     "Customer Database": "customers",
     "Estimates": "estimates",

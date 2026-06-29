@@ -28,6 +28,7 @@ try:
         field_day,
         inventory,
         jobs,
+        pipeline,
         reports,
         settings,
         tasks,
@@ -59,6 +60,7 @@ except ImportError:
         field_day,
         inventory,
         jobs,
+        pipeline,
         reports,
         settings,
         tasks,
@@ -72,6 +74,7 @@ except ImportError:
 BUILT_MODULES: dict[str, object] = {
     "dashboard": dashboard.render,
     "jobs": jobs.render,
+    "pipeline": pipeline.render,
     "customers": customers.render,
     "estimates": estimates.render,
     "pricing_guide": pricing_guide.render,
