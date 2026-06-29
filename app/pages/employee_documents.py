@@ -8,6 +8,7 @@ import streamlit as st
 
 try:
     from app.auth import current_role
+    from app.components.action_styles import success_solid_button
     from app.components.clickable_table import render_clickable_table
     from app.components.headers import render_page_brand_header
     from app.components.layout import render_filter_bar as layout_filter_bar
@@ -32,13 +33,22 @@ try:
         set_view_mode,
         show_modal_if_pending,
     )
-    from app.pages._core._data import ACTIVE_EMPLOYEE_KEY, get_employee, load_employee_documents, load_employees
+    from app.pages._core._crud import is_demo_id
+    from app.pages._core._data import (
+        ACTIVE_EMPLOYEE_KEY,
+        get_employee,
+        load_employee_documents,
+        load_employees,
+        persist_employee_document,
+    )
+    from app.services.employee_documents_service import get_employee_document_url
     from app.utils.constants import DOCUMENT_TYPES
     from app.utils.formatting import fmt_date
     from app.utils.permissions import can_view_hr_documents, normalize_role
     from app.pages._core._session import select_key
 except ImportError:
     from auth import current_role  # type: ignore
+    from components.action_styles import success_solid_button  # type: ignore
     from components.clickable_table import render_clickable_table  # type: ignore
     from components.headers import render_page_brand_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
@@ -63,7 +73,15 @@ except ImportError:
         set_view_mode,
         show_modal_if_pending,
     )
-    from pages._core._data import ACTIVE_EMPLOYEE_KEY, get_employee, load_employee_documents, load_employees  # type: ignore
+    from pages._core._crud import is_demo_id  # type: ignore
+    from pages._core._data import (  # type: ignore
+        ACTIVE_EMPLOYEE_KEY,
+        get_employee,
+        load_employee_documents,
+        load_employees,
+        persist_employee_document,
+    )
+    from services.employee_documents_service import get_employee_document_url  # type: ignore
     from utils.constants import DOCUMENT_TYPES  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
     from utils.permissions import can_view_hr_documents, normalize_role  # type: ignore
@@ -138,11 +156,18 @@ def _render_doc_view_tabs(doc: dict) -> None:
         )
         st.markdown(dialog_card_html("Access", access_html), unsafe_allow_html=True)
     with tab_attachments:
-        placeholder_html("Document preview and download will appear here when connected to Supabase.")
+        url = get_employee_document_url(doc)
+        if url:
+            st.link_button("Open / download file", url, type="primary")
+        elif str(doc.get("storage_path") or "").strip():
+            st.caption("File is stored but could not generate a download link.")
+        else:
+            placeholder_html("No file attached to this document record.")
 
 
-def _render_doc_edit_form(doc: dict, *, hr_ok: bool) -> None:
+def _render_doc_edit_form(doc: dict, *, hr_ok: bool, employee_id: str) -> None:
     rk = record_session_key(doc, "id")
+    did = str(doc.get("id") or "")
     if f"doc_edit_type_{rk}" not in st.session_state:
         _seed_doc_edit_form(doc)
 
@@ -150,6 +175,7 @@ def _render_doc_edit_form(doc: dict, *, hr_ok: bool) -> None:
     st.selectbox("Document type", DOCUMENT_TYPES, key=f"doc_edit_type_{rk}")
     st.date_input("Expiration date (optional)", key=f"doc_edit_exp_{rk}", value=None)
     st.checkbox("Restricted / private (HR only)", key=f"doc_edit_restricted_{rk}", disabled=not hr_ok)
+    st.file_uploader("Replace attachment (optional)", key=f"doc_edit_file_{rk}")
 
     cancelled, saved = render_save_cancel_actions(
         module=_MODULE,
@@ -160,12 +186,28 @@ def _render_doc_edit_form(doc: dict, *, hr_ok: bool) -> None:
     if cancelled:
         st.rerun()
     if saved:
-        set_view_mode(_MODULE, rk)
-        st.success("Document updated (demo).")
-        st.rerun()
+        if is_demo_id(did):
+            st.error("Demo records cannot be saved to the database.")
+            return
+        ok, msg = persist_employee_document(
+            {
+                "employee_id": employee_id or doc.get("employee_id"),
+                "doc_type": st.session_state.get(f"doc_edit_type_{rk}"),
+                "file_name": doc.get("file_name"),
+                "expiration_date": st.session_state.get(f"doc_edit_exp_{rk}"),
+                "is_restricted": st.session_state.get(f"doc_edit_restricted_{rk}"),
+            },
+            row_id=did or None,
+            uploaded_file=st.session_state.get(f"doc_edit_file_{rk}"),
+        )
+        if ok:
+            set_view_mode(_MODULE, rk)
+            st.success(msg or "Document updated.")
+            st.rerun()
+        st.error(msg or "Could not update document.")
 
 
-def render_doc_detail_dialog(doc: dict, *, hr_ok: bool) -> None:
+def render_doc_detail_dialog(doc: dict, *, hr_ok: bool, employee_id: str) -> None:
     rk = record_session_key(doc, "id")
     st.session_state.setdefault(edit_mode_key(_MODULE, rk), False)
     edit_mode = is_edit_mode(_MODULE, rk)
@@ -190,10 +232,14 @@ def render_doc_detail_dialog(doc: dict, *, hr_ok: bool) -> None:
     )
 
     if edit_mode:
-        _render_doc_edit_form(doc, hr_ok=hr_ok)
+        _render_doc_edit_form(doc, hr_ok=hr_ok, employee_id=employee_id)
     else:
         _render_doc_view_tabs(doc)
-        st.button("Download", key=f"doc_modal_dl_{rk}", type="primary")
+        url = get_employee_document_url(doc)
+        if url:
+            st.link_button("Download", url, type="primary", key=f"doc_modal_dl_{rk}")
+        else:
+            st.button("Download", key=f"doc_modal_dl_{rk}", type="primary", disabled=True)
 
 
 @st.dialog("Document Details", width="large", on_dismiss=_clear_doc_modal)
@@ -208,7 +254,8 @@ def _show_doc_detail_modal() -> None:
         return
     role_norm = normalize_role(current_role())
     hr_ok = can_view_hr_documents(role_norm)
-    render_doc_detail_dialog(doc, hr_ok=hr_ok)
+    employee_id = str(st.session_state.get(ACTIVE_EMPLOYEE_KEY) or "")
+    render_doc_detail_dialog(doc, hr_ok=hr_ok, employee_id=employee_id)
 
 
 def _doc_display_cell(field: str, row: dict) -> str:
@@ -285,10 +332,36 @@ def render() -> None:
             with fc2:
                 st.date_input("Expiration date (optional)", key="doc_new_exp", value=None)
                 st.checkbox("Restricted / private (HR only)", key="doc_new_restricted", disabled=not hr_ok)
-            if st.button("Save upload", key="doc_save_new", type="primary"):
-                st.success("Document uploaded (demo).")
-                st.session_state["ips_doc_form_open"] = False
-                st.rerun()
+            if success_solid_button("Save upload", "doc_save_new", use_container_width=False):
+                uploaded = st.session_state.get("doc_new_file")
+                if not eid:
+                    st.error("Select an employee before uploading.")
+                elif is_demo_id(eid):
+                    st.error("Cannot upload documents for demo employees. Select a live employee record.")
+                elif uploaded is None:
+                    st.error("Choose a file to upload.")
+                else:
+                    try:
+                        from app.auth import current_profile
+                    except ImportError:
+                        from auth import current_profile  # type: ignore
+                    prof = current_profile() or {}
+                    ok, msg = persist_employee_document(
+                        {
+                            "employee_id": eid,
+                            "doc_type": st.session_state.get("doc_new_type"),
+                            "file_name": str(getattr(uploaded, "name", "") or "document"),
+                            "uploaded_by": str(prof.get("full_name") or prof.get("email") or "User"),
+                            "expiration_date": st.session_state.get("doc_new_exp"),
+                            "is_restricted": st.session_state.get("doc_new_restricted"),
+                        },
+                        uploaded_file=uploaded,
+                    )
+                    if ok:
+                        st.session_state["ips_doc_form_open"] = False
+                        st.success(msg or "Document uploaded.")
+                        st.rerun()
+                    st.error(msg or "Could not upload document.")
 
     build_modal_cache(filtered, cache_key=_CACHE_KEY)
     render_clickable_table(

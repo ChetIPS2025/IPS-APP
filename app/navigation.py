@@ -168,6 +168,21 @@ def navigate_to_estimate_materials(estimate_id: str) -> None:
     set_nav_slug("estimate_materials")
 
 
+def navigate_to_estimate_detail(estimate_id: str) -> None:
+    """Open Estimates module with the estimate detail modal focused."""
+    eid = str(estimate_id or "").strip()
+    if not eid:
+        return
+    try:
+        from app.pages._core._data import ACTIVE_ESTIMATE_KEY
+    except ImportError:
+        from pages._core._data import ACTIVE_ESTIMATE_KEY  # type: ignore
+    st.session_state[ACTIVE_ESTIMATE_KEY] = eid
+    st.session_state["selected_estimate_id"] = eid
+    st.session_state["show_estimate_detail_modal"] = True
+    set_nav_slug("estimates")
+
+
 def navigate_to_weekly_timesheet(*, job_id: str = "", week_start: str | None = None) -> None:
     """Open Weekly Timesheets with optional job and week prefill."""
     jid = str(job_id or "").strip()
@@ -319,6 +334,7 @@ __all__ = [
     "apply_pending_navigation",
     "current_nav_slug",
     "ensure_nav_defaults",
+    "navigate_to_estimate_detail",
     "navigate_to_estimate_materials",
     "navigate_to_weekly_timesheet",
     "normalize_nav_slug",

@@ -2379,6 +2379,34 @@ def persist_document(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[
     return _persist_result(save_document_hub(ui, row_id=row_id), success="Document saved.")
 
 
+def persist_employee_document(
+    ui: dict[str, Any],
+    *,
+    row_id: str | None = None,
+    uploaded_file: Any = None,
+) -> tuple[bool, str]:
+    if _demo_blocked(row_id):
+        return False, _DEMO_SAVE_MSG
+    eid = str(ui.get("employee_id") or "").strip()
+    if _demo_blocked(eid):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.employee_documents_service import save_employee_document
+    except ImportError:
+        from services.employee_documents_service import save_employee_document  # type: ignore
+    result = save_employee_document(ui, row_id=row_id, uploaded_file=uploaded_file)
+    err = None
+    try:
+        from app.services.repository import user_facing_error
+    except ImportError:
+        from services.repository import user_facing_error  # type: ignore
+    err = user_facing_error(result)
+    if err:
+        return False, err
+    msg = str((result.data or {}).get("message") or "Document saved.")
+    return True, msg
+
+
 def persist_company_update(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
     if _demo_blocked(row_id):
         return False, _DEMO_SAVE_MSG

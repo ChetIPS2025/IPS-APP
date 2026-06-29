@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import csv
 import html
+import io
 
 import streamlit as st
 
@@ -38,6 +40,7 @@ try:
         get_estimate,
         load_estimate_materials,
         load_estimates,
+        load_inventory,
         lookup_options,
         materials_summary,
         persist_estimate_material,
@@ -79,6 +82,7 @@ except ImportError:
         get_estimate,
         load_estimate_materials,
         load_estimates,
+        load_inventory,
         lookup_options,
         materials_summary,
         persist_estimate_material,
@@ -291,6 +295,52 @@ def _mat_display_cell(field: str, row: dict) -> str:
     return str(val).strip() if val is not None and str(val).strip() else "—"
 
 
+def _materials_csv_bytes(materials: list[dict], *, estimate_number: str) -> bytes:
+    buf = io.StringIO()
+    fieldnames = [
+        "item_number",
+        "description",
+        "category",
+        "qty",
+        "unit",
+        "unit_cost",
+        "total_cost",
+    ]
+    writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    for row in materials:
+        writer.writerow({k: row.get(k, "") for k in fieldnames})
+    return buf.getvalue().encode("utf-8")
+
+
+def _inventory_picker_options(items: list[dict]) -> tuple[list[str], dict[str, dict]]:
+    labels: list[str] = []
+    by_id: dict[str, dict] = {}
+    for item in items:
+        iid = str(item.get("id") or "").strip()
+        if not iid or is_demo_id(iid):
+            continue
+        label = f"{item.get('sku') or '—'} — {item.get('name') or 'Item'}"
+        labels.append(label)
+        by_id[label] = item
+    return labels, by_id
+
+
+def _persist_inventory_material_line(*, estimate_id: str, inv: dict, qty: float) -> tuple[bool, str]:
+    unit_cost = float(inv.get("unit_cost") or inv.get("average_cost") or 0)
+    return persist_estimate_material(
+        {
+            "estimate_id": estimate_id,
+            "item_number": str(inv.get("sku") or inv.get("id") or ""),
+            "description": str(inv.get("name") or "Inventory item"),
+            "category": str(inv.get("category") or lookup_options("inventory_categories")[0]),
+            "qty": max(float(qty or 1), 0.0),
+            "unit": "EA",
+            "unit_cost": unit_cost,
+        }
+    )
+
+
 def render() -> None:
     try:
         from app.pages._core._access import begin_module
@@ -308,20 +358,6 @@ def render() -> None:
     if default_id not in est_opts:
         default_id = list(est_opts.keys())[0]
 
-    est_hdr = get_estimate(default_id) or estimates[0]
-    hdr_l, hdr_r = st.columns([3, 1])
-    with hdr_l:
-        render_page_header(
-            f"Estimate {est_hdr.get('estimate_number')} — Materials",
-            str(est_hdr.get("project_name") or ""),
-        )
-        if st.button("← Back to Estimates", key="mat_back_est"):
-            st.session_state[SESSION_NAV_KEY] = "estimates"
-            st.rerun()
-    with hdr_r:
-        st.button("Export", key="mat_export", use_container_width=True)
-        st.button("Edit Estimate", key="mat_edit", type="primary", use_container_width=True)
-
     pick = st.selectbox(
         "Estimate",
         options=list(est_opts.keys()),
@@ -332,10 +368,37 @@ def render() -> None:
     )
     st.session_state[ACTIVE_ESTIMATE_KEY] = pick
     est = get_estimate(pick) or estimates[0]
-    _render_summary_card(est)
-
     materials = load_estimate_materials(pick)
     summ = materials_summary(materials)
+
+    hdr_l, hdr_r = st.columns([3, 1])
+    with hdr_l:
+        render_page_header(
+            f"Estimate {est.get('estimate_number')} — Materials",
+            str(est.get("project_name") or ""),
+        )
+        if st.button("← Back to Estimates", key="mat_back_est"):
+            st.session_state[SESSION_NAV_KEY] = "estimates"
+            st.rerun()
+    with hdr_r:
+        export_name = f"estimate_{est.get('estimate_number') or pick}_materials.csv"
+        st.download_button(
+            "Export",
+            data=_materials_csv_bytes(materials, estimate_number=str(est.get("estimate_number") or "")),
+            file_name=export_name,
+            mime="text/csv",
+            key="mat_export",
+            use_container_width=True,
+        )
+        if st.button("Edit Estimate", key="mat_edit", type="primary", use_container_width=True):
+            try:
+                from app.navigation import navigate_to_estimate_detail
+            except ImportError:
+                from navigation import navigate_to_estimate_detail  # type: ignore
+            navigate_to_estimate_detail(pick)
+            st.rerun()
+
+    _render_summary_card(est)
 
     mat_tab = render_tabs(
         ["Materials", "Add Items", "Summary"],
@@ -348,9 +411,13 @@ def render() -> None:
         with c1:
             st.text_input("Search", placeholder="Search materials…", key="mat_search", label_visibility="collapsed")
         with c2:
-            st.button("Add from Inventory", key="mat_add_inv", use_container_width=True)
+            if st.button("Add from Inventory", key="mat_add_inv", use_container_width=True):
+                st.session_state["ips_mat_inv_panel"] = True
+                st.session_state.pop("ips_mat_form", None)
         with c3:
-            st.button("Add Custom Item", key="mat_add_custom", use_container_width=True)
+            if st.button("Add Custom Item", key="mat_add_custom", use_container_width=True):
+                st.session_state["ips_mat_form"] = True
+                st.session_state.pop("ips_mat_inv_panel", None)
         with c4:
             if st.button("+ Add Material", key="mat_add", type="primary", use_container_width=True):
                 st.session_state["ips_mat_form"] = True
@@ -359,6 +426,33 @@ def render() -> None:
 
     if mat_tab == "Add Items":
         st.caption("Add lines using **Add from Inventory**, **Add Custom Item**, or **+ Add Material** above.")
+
+    if st.session_state.get("ips_mat_inv_panel"):
+        with st.expander("Add from inventory", expanded=True):
+            inv_labels, inv_by_label = _inventory_picker_options(load_inventory())
+            if not inv_labels:
+                st.warning("No live inventory items available.")
+            else:
+                picked_label = st.selectbox("Inventory item", inv_labels, key="mat_inv_pick")
+                st.number_input("Qty", min_value=0.0, value=1.0, key="mat_inv_qty")
+                add_col, cancel_col = st.columns(2)
+                with add_col:
+                    if st.button("Add line", key="mat_inv_save", type="primary", use_container_width=True):
+                        inv = inv_by_label.get(str(st.session_state.get("mat_inv_pick") or picked_label))
+                        if not inv:
+                            st.error("Select an inventory item.")
+                        else:
+                            ok, msg = _persist_inventory_material_line(
+                                estimate_id=pick,
+                                inv=inv,
+                                qty=float(st.session_state.get("mat_inv_qty") or 1),
+                            )
+                            if apply_persist_feedback(ok, msg, clear_keys=("ips_mat_inv_panel",)):
+                                st.rerun()
+                with cancel_col:
+                    if st.button("Cancel", key="mat_inv_cancel", use_container_width=True):
+                        st.session_state.pop("ips_mat_inv_panel", None)
+                        st.rerun()
 
     if st.session_state.get("ips_mat_form"):
         with st.expander("Add material line", expanded=True):

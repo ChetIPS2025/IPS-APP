@@ -13,6 +13,7 @@ from app.navigation import (
     JOBS_DETAIL_FOCUS_TAB_KEY,
     WJT_PREFILL_JOB_KEY,
     WJT_PREFILL_WEEK_KEY,
+    navigate_to_estimate_detail,
     navigate_to_estimate_materials,
     navigate_to_weekly_timesheet,
     open_jobs_job_costing,
@@ -37,6 +38,13 @@ class TestNavigationHandoffs(unittest.TestCase):
         navigate_to_estimate_materials("est-9")
         self.assertEqual(st.session_state["ips_active_estimate_id"], "est-9")
         self.assertEqual(st.session_state["ips_nav_page"], "estimate_materials")
+
+    def test_navigate_to_estimate_detail(self) -> None:
+        navigate_to_estimate_detail("est-77")
+        self.assertEqual(st.session_state["ips_active_estimate_id"], "est-77")
+        self.assertEqual(st.session_state["selected_estimate_id"], "est-77")
+        self.assertTrue(st.session_state["show_estimate_detail_modal"])
+        self.assertEqual(st.session_state["ips_nav_page"], "estimates")
 
     def test_navigate_to_weekly_timesheet_prefill(self) -> None:
         navigate_to_weekly_timesheet(job_id="job-1", week_start="2026-05-26")
