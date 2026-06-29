@@ -2392,6 +2392,17 @@ def render() -> None:
     if not begin_module("assets"):
         return
     try:
+        from app.navigation import ASSET_SCAN_EMBED_KEY
+    except ImportError:
+        from navigation import ASSET_SCAN_EMBED_KEY  # type: ignore
+    if st.session_state.pop(ASSET_SCAN_EMBED_KEY, False):
+        try:
+            from app.pages.asset_scan import render_asset_scan_page
+        except ImportError:
+            from pages.asset_scan import render_asset_scan_page  # type: ignore
+        render_asset_scan_page()
+        return
+    try:
         from app.services.asset_qr import apply_pending_asset_deeplink
     except ImportError:
         from services.asset_qr import apply_pending_asset_deeplink  # type: ignore

@@ -434,6 +434,7 @@ def render_weekly_timesheet_builder(
     *,
     job_options: dict[str, str] | None = None,
     default_job_id: str = "",
+    default_week_start: date | None = None,
     fixed_job_id: str = "",
     embedded: bool = False,
     key_prefix: str = "wjt",
@@ -456,6 +457,11 @@ def render_weekly_timesheet_builder(
     _init_week_state(kp)
     state_key = _week_start_key(kp)
     picker_key = _week_picker_key(kp)
+    if default_week_start is not None and f"{kp}_week_prefilled" not in st.session_state:
+        ws_seed = monday_of_week(default_week_start)
+        st.session_state[state_key] = ws_seed
+        st.session_state[picker_key] = ws_seed
+        st.session_state[f"{kp}_week_prefilled"] = True
     week_start = st.session_state.get(state_key, today_mon)
     if not isinstance(week_start, date):
         week_start = today_mon

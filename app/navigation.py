@@ -56,6 +56,11 @@ JOBS_DETAIL_FOCUS_TAB_KEY = "jobs_detail_focus_tab"
 _JOBS_MODAL_SESSION_KEY = "ips_jobs_detail_modal_id"
 _JOBS_SELECTED_KEY = "selected_job_id"
 _JOBS_SHOW_MODAL_KEY = "show_job_detail_modal"
+JC_FOCUS_JOB_KEY = "jc_focus_job_id"
+WJT_PREFILL_JOB_KEY = "wjt_prefill_job_id"
+WJT_PREFILL_WEEK_KEY = "wjt_prefill_week_start"
+INVENTORY_SCAN_EMBED_KEY = "_ips_inventory_scan_embed"
+ASSET_SCAN_EMBED_KEY = "_ips_asset_scan_embed"
 
 # Legacy sidebar / deep-link labels from ``app.ui`` → rebuilt module slugs.
 LEGACY_PAGE_LABEL_TO_SLUG: dict[str, str] = {
@@ -131,15 +136,47 @@ PENDING_NAV_ALIASES: dict[str, str] = {
 }
 
 
-def redirect_to_jobs_job_costing(*, job_id: str = "") -> None:
+def open_jobs_job_costing(*, job_id: str = "") -> None:
     """Open Jobs module with Job Details on the Job Costing tab."""
-    jid = str(job_id or st.session_state.pop("jc_focus_job_id", "") or "").strip()
-    set_nav_slug("jobs")
+    jid = str(job_id or "").strip()
     if jid:
-        st.session_state[JOBS_DETAIL_FOCUS_TAB_KEY] = "Job Costing"
+        st.session_state[JC_FOCUS_JOB_KEY] = jid
         st.session_state[_JOBS_SELECTED_KEY] = jid
         st.session_state[_JOBS_SHOW_MODAL_KEY] = True
         st.session_state[_JOBS_MODAL_SESSION_KEY] = jid
+    st.session_state[JOBS_DETAIL_FOCUS_TAB_KEY] = "Job Costing"
+    set_nav_slug("jobs")
+
+
+def redirect_to_jobs_job_costing(*, job_id: str = "") -> None:
+    """Open Jobs module with Job Details on the Job Costing tab."""
+    jid = str(job_id or "").strip()
+    if not jid:
+        jid = str(st.session_state.pop(JC_FOCUS_JOB_KEY, "") or "").strip()
+    open_jobs_job_costing(job_id=jid)
+
+
+def navigate_to_estimate_materials(estimate_id: str) -> None:
+    """Open Estimate Materials for the given estimate."""
+    eid = str(estimate_id or "").strip()
+    try:
+        from app.pages._core._data import ACTIVE_ESTIMATE_KEY
+    except ImportError:
+        from pages._core._data import ACTIVE_ESTIMATE_KEY  # type: ignore
+    if eid:
+        st.session_state[ACTIVE_ESTIMATE_KEY] = eid
+    set_nav_slug("estimate_materials")
+
+
+def navigate_to_weekly_timesheet(*, job_id: str = "", week_start: str | None = None) -> None:
+    """Open Weekly Timesheets with optional job and week prefill."""
+    jid = str(job_id or "").strip()
+    if jid:
+        st.session_state[WJT_PREFILL_JOB_KEY] = jid
+    ws = str(week_start or "").strip()[:10]
+    if ws:
+        st.session_state[WJT_PREFILL_WEEK_KEY] = ws
+    set_nav_slug("weekly_timesheets")
 
 _SCAN_INVENTORY_LABELS = frozenset({"Scan Inventory", "Inventory Scan"})
 _SCAN_ASSET_LABELS = frozenset({"Asset Scanner", "Scan Asset", "Asset Scan"})
@@ -167,10 +204,10 @@ def apply_pending_navigation() -> None:
         return
 
     if label in _SCAN_INVENTORY_LABELS:
-        st.session_state[_INVENTORY_SCAN_SESSION_KEY] = True
+        set_nav_slug("scan_inventory")
         return
     if label in _SCAN_ASSET_LABELS:
-        st.session_state[_ASSET_SCAN_SESSION_KEY] = True
+        set_nav_slug("scan_asset")
         return
     if label in {"Asset Detail", "Asset Manager"}:
         set_nav_slug("assets")
@@ -178,7 +215,7 @@ def apply_pending_navigation() -> None:
     if label in {"Users", "Employees", "People", "Employee Toolbox"}:
         set_nav_slug("employees")
         return
-    if label in {"Job Costing", "Jobs"} and str(st.session_state.get("jc_focus_job_id") or "").strip():
+    if label in {"Job Costing", "Jobs"} and str(st.session_state.get(JC_FOCUS_JOB_KEY) or "").strip():
         redirect_to_jobs_job_costing()
         return
     if label == "Job Costing":
@@ -219,11 +256,17 @@ def current_nav_slug() -> str:
 def set_nav_slug(slug: str) -> None:
     raw = str(slug or "").strip()
     if raw == "scan_inventory":
-        st.session_state[_INVENTORY_SCAN_SESSION_KEY] = True
+        st.session_state[SESSION_NAV_KEY] = "inventory"
+        st.session_state[INVENTORY_SCAN_EMBED_KEY] = True
+        st.session_state.pop(_INVENTORY_SCAN_SESSION_KEY, None)
         return
     if raw == "scan_asset":
-        st.session_state[_ASSET_SCAN_SESSION_KEY] = True
+        st.session_state[SESSION_NAV_KEY] = "assets"
+        st.session_state[ASSET_SCAN_EMBED_KEY] = True
+        st.session_state.pop(_ASSET_SCAN_SESSION_KEY, None)
         return
+    st.session_state.pop(INVENTORY_SCAN_EMBED_KEY, None)
+    st.session_state.pop(ASSET_SCAN_EMBED_KEY, None)
     st.session_state[SESSION_NAV_KEY] = normalize_nav_slug(raw)
 
 
@@ -263,16 +306,24 @@ def __getattr__(name: str):
 
 __all__ = [
     "ACTIVE_MODULE_SLUGS",
+    "ASSET_SCAN_EMBED_KEY",
     "BUILT_MODULES",
+    "INVENTORY_SCAN_EMBED_KEY",
     "IPS_NAV_PENDING_KEY",
+    "JC_FOCUS_JOB_KEY",
     "JOBS_DETAIL_FOCUS_TAB_KEY",
     "LEGACY_PAGE_LABEL_TO_SLUG",
     "PENDING_NAV_ALIASES",
+    "WJT_PREFILL_JOB_KEY",
+    "WJT_PREFILL_WEEK_KEY",
     "apply_pending_navigation",
     "current_nav_slug",
     "ensure_nav_defaults",
+    "navigate_to_estimate_materials",
+    "navigate_to_weekly_timesheet",
     "normalize_nav_slug",
     "on_nav_change",
+    "open_jobs_job_costing",
     "queue_pending_nav",
     "redirect_to_jobs_job_costing",
     "render_module",

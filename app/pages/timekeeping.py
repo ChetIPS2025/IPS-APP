@@ -3577,7 +3577,27 @@ def render() -> None:
         st.markdown("**Weekly job timesheets**")
         st.caption("Build customer-facing weekly timesheets from timekeeping hours and job expenses.")
         if st.button("Open Weekly Timesheets", key="tk_open_weekly_ts", use_container_width=False):
-            st.session_state["ips_nav_page"] = "weekly_timesheets"
+            try:
+                from app.navigation import navigate_to_weekly_timesheet
+            except ImportError:
+                from navigation import navigate_to_weekly_timesheet  # type: ignore
+            prefill_job = ""
+            tc_id = str(st.session_state.get(SELECTED_TIMECARD_KEY) or "").strip()
+            if tc_id:
+                for row in filtered:
+                    if str(row.get("id") or "") == tc_id:
+                        prefill_job = str(row.get("primary_job_id") or row.get("job_id") or "").strip()
+                        break
+            if not prefill_job:
+                try:
+                    from app.utils.field_context import get_field_job_id
+                except ImportError:
+                    from utils.field_context import get_field_job_id  # type: ignore
+                prefill_job = str(get_field_job_id() or "").strip()
+            navigate_to_weekly_timesheet(
+                job_id=prefill_job,
+                week_start=_current_week_start().isoformat(),
+            )
             st.rerun()
 
 

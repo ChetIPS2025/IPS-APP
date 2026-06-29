@@ -903,6 +903,17 @@ def render() -> None:
         from pages._core._access import begin_module  # type: ignore
     if not begin_module("inventory"):
         return
+    try:
+        from app.navigation import INVENTORY_SCAN_EMBED_KEY
+    except ImportError:
+        from navigation import INVENTORY_SCAN_EMBED_KEY  # type: ignore
+    if st.session_state.pop(INVENTORY_SCAN_EMBED_KEY, False):
+        try:
+            from app.pages.inventory_scan import render_inventory_scan_page
+        except ImportError:
+            from pages.inventory_scan import render_inventory_scan_page  # type: ignore
+        render_inventory_scan_page()
+        return
     inject_inventory_module_css()
     if is_field_context():
         inject_field_row_expand_css()

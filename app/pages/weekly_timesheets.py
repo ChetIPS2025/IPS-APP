@@ -30,8 +30,18 @@ def render() -> None:
     )
 
     pre_job = str(st.session_state.pop("wjt_prefill_job_id", "") or "").strip()
+    pre_week_raw = str(st.session_state.pop("wjt_prefill_week_start", "") or "").strip()[:10]
+    pre_week = None
+    if pre_week_raw:
+        try:
+            from datetime import date
+
+            pre_week = date.fromisoformat(pre_week_raw)
+        except ValueError:
+            pre_week = None
     render_weekly_timesheet_builder(
         job_options=weekly_timesheet_job_options(),
         default_job_id=pre_job,
+        default_week_start=pre_week,
         key_prefix="wjt",
     )

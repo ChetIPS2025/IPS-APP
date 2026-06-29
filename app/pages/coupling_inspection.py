@@ -657,6 +657,50 @@ def _render_existing_list(ctx: dict[str, str | None]) -> str | None:
     return str(rows[options.index(pick) - 1].get("id") or "")
 
 
+def _render_context_picker() -> None:
+    """Let users pick job/equipment when opening Coupling Inspection from the sidebar."""
+    try:
+        from app.components.coupling_inspection_launcher import open_coupling_inspection
+    except ImportError:
+        from components.coupling_inspection_launcher import open_coupling_inspection  # type: ignore
+    try:
+        from app.pages._core._data import load_assets, load_jobs
+    except ImportError:
+        from pages._core._data import load_assets, load_jobs  # type: ignore
+    try:
+        from app.services.jobs_service import job_row_select_label
+    except ImportError:
+        from services.jobs_service import job_row_select_label  # type: ignore
+
+    st.info("Select a job and/or equipment record, then continue.")
+    assets = [a for a in load_assets() if str(a.get("id") or "").strip()]
+    job_opts = ["— Select job —"] + [job_row_select_label(j) for j in jobs]
+    asset_opts = ["— Select equipment —"] + [
+        f"{a.get('asset_number') or a.get('asset_tag') or '—'} — {a.get('name') or a.get('asset_name') or 'Asset'}"
+        for a in assets
+    ]
+    c1, c2 = st.columns(2)
+    with c1:
+        job_pick = st.selectbox("Job", job_opts, key="ci_ctx_job_pick")
+    with c2:
+        asset_pick = st.selectbox("Equipment", asset_opts, key="ci_ctx_asset_pick")
+    if st.button("Continue", key="ci_ctx_continue", type="primary"):
+        job_id = None
+        if job_pick != job_opts[0]:
+            ix = job_opts.index(job_pick) - 1
+            if 0 <= ix < len(jobs):
+                job_id = str(jobs[ix].get("id") or "").strip() or None
+        equip_id = None
+        if asset_pick != asset_opts[0]:
+            ix = asset_opts.index(asset_pick) - 1
+            if 0 <= ix < len(assets):
+                equip_id = str(assets[ix].get("id") or "").strip() or None
+        if not job_id and not equip_id:
+            st.warning("Select at least a job or an equipment record.")
+            return
+        open_coupling_inspection(job_id=job_id, equipment_id=equip_id)
+
+
 def render() -> None:
     if not begin_module("coupling_inspection", inject_css=True):
         return
@@ -665,7 +709,7 @@ def render() -> None:
 
     ctx = coupling_inspection_context()
     if not ctx.get("job_id") and not ctx.get("equipment_id") and not ctx.get("inspection_id"):
-        st.warning("Open Coupling Inspection from a **Job** or **Equipment** record (Inspection Forms).")
+        _render_context_picker()
         return
 
     if not ctx.get("inspection_id"):

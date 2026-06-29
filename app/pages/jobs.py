@@ -2469,10 +2469,10 @@ def _render_job_overview_financials(job: dict, *, cost_summary: dict | None = No
         type="secondary",
     ):
         try:
-            from app.navigation import JOBS_DETAIL_FOCUS_TAB_KEY
+            from app.navigation import open_jobs_job_costing
         except ImportError:
-            from navigation import JOBS_DETAIL_FOCUS_TAB_KEY  # type: ignore
-        st.session_state[JOBS_DETAIL_FOCUS_TAB_KEY] = "Job Costing"
+            from navigation import open_jobs_job_costing  # type: ignore
+        open_jobs_job_costing(job_id=str(job.get("id") or ""))
         st.rerun()
 
 

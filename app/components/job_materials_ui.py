@@ -530,12 +530,11 @@ def render_job_materials_tab(job: dict, *, key_prefix: str = "job_mat") -> None:
     bc1, bc2 = st.columns([1, 1], gap="small")
     with bc2:
         if st.button("Open Job Costing", key=f"{key_prefix}_open_jc", use_container_width=True):
-            st.session_state["jc_focus_job_id"] = jid
             try:
-                from app.navigation import queue_pending_nav
+                from app.navigation import open_jobs_job_costing
             except ImportError:
-                from navigation import queue_pending_nav  # type: ignore
-            queue_pending_nav("Job Costing")
+                from navigation import open_jobs_job_costing  # type: ignore
+            open_jobs_job_costing(job_id=jid)
             st.rerun()
 
     st.markdown("#### Materials used")

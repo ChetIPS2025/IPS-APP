@@ -1383,6 +1383,22 @@ def _render_estimate_detail_tabs(est: dict) -> None:
             f"</div>"
         )
         st.markdown(dialog_card_html("Financial Summary", fin_html), unsafe_allow_html=True)
+        mat_c1, mat_c2 = st.columns(2, gap="small")
+        with mat_c1:
+            if st.button(
+                "Open Estimate Materials",
+                key=f"est_open_materials_{eid}",
+                use_container_width=True,
+                disabled=not eid or is_demo_id(eid),
+            ):
+                try:
+                    from app.navigation import navigate_to_estimate_materials
+                except ImportError:
+                    from navigation import navigate_to_estimate_materials  # type: ignore
+                navigate_to_estimate_materials(eid)
+                st.rerun()
+        with mat_c2:
+            st.caption("Material takeoff and pricing lines for this estimate.")
         st.caption("Open the **Scope of Work** tab to view or edit the full project scope.")
 
     with tab_scope:

@@ -315,21 +315,28 @@ def main() -> None:
 
     apply_pending_navigation()
 
-    if inventory_scan_route_active():
-        try:
-            from app.pages.inventory_scan import render_inventory_scan_page
-        except ImportError:
-            from pages.inventory_scan import render_inventory_scan_page  # type: ignore
-        render_inventory_scan_page()
-        st.stop()
-
-    if asset_scan_route_active():
-        try:
-            from app.pages.asset_scan import render_asset_scan_page
-        except ImportError:
-            from pages.asset_scan import render_asset_scan_page  # type: ignore
-        render_asset_scan_page()
-        st.stop()
+    try:
+        from app.auth import is_authenticated as _auth_check
+        from app.navigation import (
+            ASSET_SCAN_EMBED_KEY,
+            INVENTORY_SCAN_EMBED_KEY,
+        )
+        from app.pages.asset_scan import asset_scan_route_active
+        from app.pages.inventory_scan import inventory_scan_route_active
+    except ImportError:
+        from auth import is_authenticated as _auth_check  # type: ignore
+        from navigation import ASSET_SCAN_EMBED_KEY, INVENTORY_SCAN_EMBED_KEY  # type: ignore
+        from pages.asset_scan import asset_scan_route_active  # type: ignore
+        from pages.inventory_scan import inventory_scan_route_active  # type: ignore
+    if _auth_check():
+        if inventory_scan_route_active():
+            st.session_state[SESSION_NAV_KEY] = "inventory"
+            st.session_state[INVENTORY_SCAN_EMBED_KEY] = True
+            st.session_state.pop("_ips_inventory_scan_page", None)
+        elif asset_scan_route_active():
+            st.session_state[SESSION_NAV_KEY] = "assets"
+            st.session_state[ASSET_SCAN_EMBED_KEY] = True
+            st.session_state.pop("_ips_asset_scan_page", None)
 
     ensure_nav_defaults()
     prev_slug = st.session_state.get("_ips_last_slug")
