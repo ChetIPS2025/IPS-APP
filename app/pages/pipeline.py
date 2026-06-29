@@ -10,7 +10,6 @@ try:
     from app.components.headers import render_page_brand_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_pagination import paginate_rows, reset_table_page
-    from app.navigation import set_nav_slug
     from app.pages._core._data import load_estimates, load_jobs
     from app.services.pipeline_service import (
         PIPELINE_VIEWS,
@@ -23,7 +22,6 @@ except ImportError:
     from components.headers import render_page_brand_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_pagination import paginate_rows, reset_table_page  # type: ignore
-    from navigation import set_nav_slug  # type: ignore
     from pages._core._data import load_estimates, load_jobs  # type: ignore
     from services.pipeline_service import (  # type: ignore
         PIPELINE_VIEWS,
@@ -37,13 +35,21 @@ _TABLE_KEY = "pipeline_list"
 _DEFAULT_VIEW = "All Pipeline"
 
 
+def _set_nav_slug(slug: str) -> None:
+    try:
+        from app.navigation import set_nav_slug
+    except ImportError:
+        from navigation import set_nav_slug  # type: ignore
+    set_nav_slug(slug)
+
+
 def _open_estimate(estimate_id: str) -> None:
     eid = str(estimate_id or "").strip()
     if not eid:
         return
     st.session_state["selected_estimate_id"] = eid
     st.session_state["show_estimate_detail_modal"] = True
-    set_nav_slug("estimates")
+    _set_nav_slug("estimates")
     st.rerun()
 
 
@@ -53,18 +59,18 @@ def _open_job(job_id: str) -> None:
         return
     st.session_state["selected_job_id"] = jid
     st.session_state["show_job_detail_modal"] = True
-    set_nav_slug("jobs")
+    _set_nav_slug("jobs")
     st.rerun()
 
 
 def _new_quote() -> None:
-    set_nav_slug("estimates")
+    _set_nav_slug("estimates")
     st.session_state["ips_est_new_dialog_open"] = True
     st.rerun()
 
 
 def _new_job() -> None:
-    set_nav_slug("jobs")
+    _set_nav_slug("jobs")
     st.session_state["ips_job_form"] = True
     st.rerun()
 

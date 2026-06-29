@@ -227,10 +227,39 @@ def set_nav_slug(slug: str) -> None:
     st.session_state[SESSION_NAV_KEY] = normalize_nav_slug(raw)
 
 
-try:
-    from app.phase2 import BUILT_MODULES, ensure_nav_defaults, on_nav_change, render_module
-except ImportError:
-    from phase2 import BUILT_MODULES, ensure_nav_defaults, on_nav_change, render_module  # type: ignore
+def ensure_nav_defaults() -> None:
+    try:
+        from app.phase2 import ensure_nav_defaults as _impl
+    except ImportError:
+        from phase2 import ensure_nav_defaults as _impl  # type: ignore
+    _impl()
+
+
+def on_nav_change(prev_slug: str, new_slug: str) -> None:
+    try:
+        from app.phase2 import on_nav_change as _impl
+    except ImportError:
+        from phase2 import on_nav_change as _impl  # type: ignore
+    _impl(prev_slug, new_slug)
+
+
+def render_module(slug: str | None = None) -> None:
+    try:
+        from app.phase2 import render_module as _impl
+    except ImportError:
+        from phase2 import render_module as _impl  # type: ignore
+    _impl(slug)
+
+
+def __getattr__(name: str):
+    if name == "BUILT_MODULES":
+        try:
+            from app.phase2 import BUILT_MODULES
+        except ImportError:
+            from phase2 import BUILT_MODULES  # type: ignore
+        return BUILT_MODULES
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "ACTIVE_MODULE_SLUGS",

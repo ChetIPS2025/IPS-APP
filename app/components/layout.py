@@ -9,11 +9,9 @@ import streamlit as st
 
 try:
     from app.components.buttons import render_detail_actions
-    from app.components.sidebar import render_sidebar
     from app.styles import inject_global_css
 except ImportError:
     from components.buttons import render_detail_actions  # type: ignore
-    from components.sidebar import render_sidebar  # type: ignore
     from styles import inject_global_css  # type: ignore
 
 _OT, _CT = "d" + "iv", "/" + "d" + "iv"
@@ -21,6 +19,10 @@ _OT, _CT = "d" + "iv", "/" + "d" + "iv"
 
 def render_page_shell(page_fn: Callable[[], None], *, page_slug: str) -> None:
     """Inject CSS, render sidebar, then run the page body."""
+    try:
+        from app.components.sidebar import render_sidebar
+    except ImportError:
+        from components.sidebar import render_sidebar  # type: ignore
     inject_global_css()
     render_sidebar(page_slug)
     st.markdown(
