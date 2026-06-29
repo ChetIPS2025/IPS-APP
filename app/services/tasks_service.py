@@ -15,7 +15,7 @@ from app.services.phase2_modules_service import (
     normalize_task,
     save_task,
 )
-from app.services.repository import ServiceResult, clear_all_data_caches, update_row
+from app.services.repository import ServiceResult, update_row
 from app.services.task_display_helpers import (
     display_to_priority,
     display_to_status,
@@ -131,7 +131,11 @@ def clear_tasks_cache() -> None:
     import streamlit as st
 
     st.session_state.pop("_ips_tasks_by_job_index", None)
-    clear_all_data_caches()
+    try:
+        from app.services.repository import clear_data_cache_for_table
+    except ImportError:
+        from services.repository import clear_data_cache_for_table  # type: ignore
+    clear_data_cache_for_table("todos")
 
 
 def delete_job_subjob(task_id: str, *, job_id: str | None = None) -> ServiceResult:

@@ -17,7 +17,7 @@ from app.services.phase2_modules_service import (
     normalize_job,
     save_job,
 )
-from app.services.repository import ServiceResult, clear_all_data_caches, update_row
+from app.services.repository import ServiceResult, update_row
 
 __all__ = [
     "MANUAL_JOB_STATUSES",
@@ -139,8 +139,6 @@ def complete_job(job_id: str, *, completed_by: str | None = None) -> ServiceResu
     if actor:
         payload["completed_by"] = actor
     result = update_row("jobs", payload, {"id": jid})
-    if result.ok:
-        clear_all_data_caches()
     return result
 
 
@@ -165,8 +163,6 @@ def cancel_job(
     if reason_text:
         payload["cancellation_reason"] = reason_text
     result = update_row("jobs", payload, {"id": jid})
-    if result.ok:
-        clear_all_data_caches()
     return result
 
 
@@ -192,8 +188,6 @@ def soft_delete_job(
     if reason_text:
         payload["delete_reason"] = reason_text
     result = update_row("jobs", payload, {"id": jid})
-    if result.ok:
-        clear_all_data_caches()
     return result
 
 
@@ -273,7 +267,6 @@ def update_job_status(
     if not result.ok:
         return result
 
-    clear_all_data_caches()
     try:
         from app.auth import current_profile
         from app.services.job_timeline import EVENT_STATUS, log_job_event

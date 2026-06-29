@@ -51,7 +51,7 @@ from app.services.phase2_modules_service import (
 )
 
 from app.services.asset_document_util import ASSET_DOCUMENTS_BUCKET
-from app.services.repository import ServiceResult, clear_all_data_caches, fetch_rows, insert_row, update_row
+from app.services.repository import ServiceResult, fetch_rows, insert_row, update_row
 
 
 
@@ -146,13 +146,12 @@ __all__ = [
 
 
 def clear_assets_cache() -> None:
-    clear_all_data_caches()
-    clear_asset_image_url_cache()
     try:
-        from app.pages._core._data import clear_assets_list_cache
+        from app.services.repository import clear_data_cache_for_table
     except ImportError:
-        from pages._core._data import clear_assets_list_cache  # type: ignore
-    clear_assets_list_cache()
+        from services.repository import clear_data_cache_for_table  # type: ignore
+    clear_data_cache_for_table("assets")
+    clear_asset_image_url_cache()
     try:
         from app.services.pricing_guide_images import clear_catalog_image_maps_cache
 

@@ -108,10 +108,10 @@ def save_job_expense(
         from services.job_cost_transaction_service import _safe_sync, sync_job_expense  # type: ignore
     _safe_sync(sync_job_expense, saved_id)
     try:
-        from app.services.repository import clear_all_data_caches
+        from app.services.repository import clear_data_cache_for_table
     except ImportError:
-        from services.repository import clear_all_data_caches  # type: ignore
-    clear_all_data_caches()
+        from services.repository import clear_data_cache_for_table  # type: ignore
+    clear_data_cache_for_table("job_expenses")
     return True, "Expense saved."
 
 
@@ -141,8 +141,8 @@ def delete_job_expense(row_id: str) -> tuple[bool, str]:
         if jid:
             refresh_job_actual_cost(jid)
     try:
-        from app.services.repository import clear_all_data_caches
+        from app.services.repository import clear_data_cache_for_table
     except ImportError:
-        from services.repository import clear_all_data_caches  # type: ignore
-    clear_all_data_caches()
+        from services.repository import clear_data_cache_for_table  # type: ignore
+    clear_data_cache_for_table("job_expenses")
     return True, "Expense removed."

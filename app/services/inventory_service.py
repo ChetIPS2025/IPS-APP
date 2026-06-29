@@ -26,7 +26,7 @@ from app.services.phase2_modules_service import (
     normalize_inventory,
     save_inventory_item,
 )
-from app.services.repository import ServiceResult, clear_all_data_caches, fetch_rows, insert_row, update_row
+from app.services.repository import ServiceResult, fetch_rows, insert_row, update_row
 
 try:
     from app.services.inventory_display_helpers import resolve_inventory_qr_value, resolve_inventory_sku
@@ -97,13 +97,12 @@ def clear_inventory_cache() -> None:
         from perf_debug import perf_span  # type: ignore
 
     with perf_span("inventory.clear_cache"):
-        clear_all_data_caches()
-        clear_inventory_image_url_cache()
         try:
-            from app.pages._core._data import clear_inventory_list_cache
+            from app.services.repository import clear_data_cache_for_table
         except ImportError:
-            from pages._core._data import clear_inventory_list_cache  # type: ignore
-        clear_inventory_list_cache()
+            from services.repository import clear_data_cache_for_table  # type: ignore
+        clear_data_cache_for_table("inventory_items")
+        clear_inventory_image_url_cache()
         try:
             from app.services.pricing_guide_images import clear_catalog_image_maps_cache
 

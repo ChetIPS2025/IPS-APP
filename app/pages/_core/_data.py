@@ -23,6 +23,16 @@ def clear_catalog_session_datasets() -> None:
     st.session_state.pop(_CATALOG_SESSION_KEY, None)
 
 
+def clear_catalog_session_key(name: str) -> None:
+    """Drop one mirrored catalog dataset from session state."""
+    key = str(name or "").strip()
+    if not key:
+        return
+    store = st.session_state.get(_CATALOG_SESSION_KEY)
+    if isinstance(store, dict) and key in store:
+        del store[key]
+
+
 try:
     from app.utils.dates import week_dates
 except ImportError:
@@ -685,6 +695,69 @@ def clear_tasks_list_cache() -> None:
 
 def clear_labor_rates_cache() -> None:
     _cached_labor_rates_rows.clear()
+
+
+def clear_jobs_catalog_cache() -> None:
+    clear_jobs_list_cache()
+    clear_catalog_session_key("jobs")
+
+
+def clear_estimates_catalog_cache() -> None:
+    clear_estimates_list_cache()
+    clear_catalog_session_key("estimates")
+    clear_jobs_catalog_cache()
+
+
+def clear_inventory_catalog_cache() -> None:
+    clear_inventory_list_cache()
+    clear_catalog_session_key("inventory")
+    try:
+        from app.services.pricing_guide_service import clear_pricing_guide_cache
+    except ImportError:
+        from services.pricing_guide_service import clear_pricing_guide_cache  # type: ignore
+    clear_pricing_guide_cache()
+
+
+def clear_assets_catalog_cache() -> None:
+    clear_assets_list_cache()
+    clear_catalog_session_key("assets")
+    try:
+        from app.services.pricing_guide_service import clear_pricing_guide_cache
+    except ImportError:
+        from services.pricing_guide_service import clear_pricing_guide_cache  # type: ignore
+    clear_pricing_guide_cache()
+
+
+def clear_customers_catalog_cache() -> None:
+    clear_customers_list_cache()
+    clear_catalog_session_key("customers")
+
+
+def clear_employees_catalog_cache() -> None:
+    clear_employees_list_cache()
+    clear_user_profiles_cache()
+    clear_catalog_session_key("employees")
+
+
+def clear_tasks_catalog_cache() -> None:
+    clear_tasks_list_cache()
+
+
+def clear_labor_rates_catalog_cache() -> None:
+    clear_labor_rates_cache()
+
+
+def clear_timekeeping_catalog_cache() -> None:
+    """Timekeeping writes roll up to job costing — refresh jobs only."""
+    clear_jobs_catalog_cache()
+
+
+def clear_pricing_guide_catalog_cache() -> None:
+    try:
+        from app.services.pricing_guide_service import clear_pricing_guide_cache
+    except ImportError:
+        from services.pricing_guide_service import clear_pricing_guide_cache  # type: ignore
+    clear_pricing_guide_cache()
 
 
 def clear_all_catalog_list_caches() -> None:

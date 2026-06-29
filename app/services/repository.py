@@ -77,7 +77,7 @@ def clear_all_data_caches() -> None:
         _clear_all_data_caches_impl()
 
 
-def _clear_all_data_caches_impl() -> None:
+def _clear_db_read_caches() -> None:
     try:
         from app.db import clear_streamlit_db_read_cache
 
@@ -100,6 +100,10 @@ def _clear_all_data_caches_impl() -> None:
             clear_session_table_cache()
         except Exception:
             pass
+
+
+def _clear_all_data_caches_impl() -> None:
+    _clear_db_read_caches()
     try:
         from app.pages._core._data import clear_all_catalog_list_caches
     except ImportError:
@@ -108,6 +112,82 @@ def _clear_all_data_caches_impl() -> None:
         except ImportError:
             clear_all_catalog_list_caches = None  # type: ignore
     if clear_all_catalog_list_caches:
+        try:
+            clear_all_catalog_list_caches()
+        except Exception:
+            pass
+
+
+def clear_data_cache_for_table(table: str) -> None:
+    """Invalidate caches affected by a single-table write (narrower than clear_all)."""
+    try:
+        from app.perf_debug import perf_span
+    except ImportError:
+        from perf_debug import perf_span  # type: ignore
+
+    name = str(table or "").strip().lower()
+    with perf_span(f"repo.clear_data_cache:{name or 'unknown'}"):
+        _clear_db_read_caches()
+        try:
+            from app.pages._core._data import (
+                clear_all_catalog_list_caches,
+                clear_assets_catalog_cache,
+                clear_customers_catalog_cache,
+                clear_employees_catalog_cache,
+                clear_estimates_catalog_cache,
+                clear_inventory_catalog_cache,
+                clear_jobs_catalog_cache,
+                clear_labor_rates_catalog_cache,
+                clear_pricing_guide_catalog_cache,
+                clear_tasks_catalog_cache,
+                clear_timekeeping_catalog_cache,
+            )
+        except ImportError:
+            from pages._core._data import (  # type: ignore
+                clear_all_catalog_list_caches,
+                clear_assets_catalog_cache,
+                clear_customers_catalog_cache,
+                clear_employees_catalog_cache,
+                clear_estimates_catalog_cache,
+                clear_inventory_catalog_cache,
+                clear_jobs_catalog_cache,
+                clear_labor_rates_catalog_cache,
+                clear_pricing_guide_catalog_cache,
+                clear_tasks_catalog_cache,
+                clear_timekeeping_catalog_cache,
+            )
+
+        _handlers: dict[str, object] = {
+            "jobs": clear_jobs_catalog_cache,
+            "estimates": clear_estimates_catalog_cache,
+            "estimate_line_items": clear_estimates_catalog_cache,
+            "estimate_labor": clear_estimates_catalog_cache,
+            "estimate_equipment": clear_estimates_catalog_cache,
+            "estimate_materials": clear_estimates_catalog_cache,
+            "estimate_travel": clear_estimates_catalog_cache,
+            "estimate_subcontractors": clear_estimates_catalog_cache,
+            "estimate_other_costs": clear_estimates_catalog_cache,
+            "inventory_items": clear_inventory_catalog_cache,
+            "assets": clear_assets_catalog_cache,
+            "customers": clear_customers_catalog_cache,
+            "employees": clear_employees_catalog_cache,
+            "users": clear_employees_catalog_cache,
+            "user_profiles": clear_employees_catalog_cache,
+            "employee_certifications": clear_employees_catalog_cache,
+            "todos": clear_tasks_catalog_cache,
+            "tasks": clear_tasks_catalog_cache,
+            "labor_rates": clear_labor_rates_catalog_cache,
+            "pricing_guide_items": clear_pricing_guide_catalog_cache,
+            "estimate_materials_catalog": clear_pricing_guide_catalog_cache,
+            "employee_timekeeping_days": clear_timekeeping_catalog_cache,
+            "employee_timekeeping_weeks": clear_timekeeping_catalog_cache,
+            "job_cost_transactions": clear_jobs_catalog_cache,
+            "job_expenses": clear_jobs_catalog_cache,
+        }
+        handler = _handlers.get(name)
+        if handler is not None and callable(handler):
+            handler()
+            return
         try:
             clear_all_catalog_list_caches()
         except Exception:
@@ -286,7 +366,7 @@ def _insert_with_optional_columns(
                 row = _db().insert_row_admin(table, filtered)
             else:
                 row = _db().insert_row(table, filtered)
-            clear_all_data_caches()
+            clear_data_cache_for_table(table)
             return ServiceResult(ok=True, data=row)
         except Exception as exc:
             last_exc = exc
@@ -334,7 +414,7 @@ def update_row(table: str, payload: dict[str, Any], match: dict[str, Any]) -> Se
         payload = filter_payload_to_table(table, payload)
         try:
             rows = _db().update_rows(table, payload, match)
-            clear_all_data_caches()
+            clear_data_cache_for_table(table)
             return ServiceResult(ok=True, data=rows[0] if rows else None)
         except Exception as exc:
             msg = _friendly_repo_error(exc, table=table, action="update")
@@ -347,7 +427,7 @@ def update_row_admin(table: str, payload: dict[str, Any], match: dict[str, Any])
     payload = filter_payload_to_table(table, payload)
     try:
         rows = _db().update_rows_admin(table, payload, match)
-        clear_all_data_caches()
+        clear_data_cache_for_table(table)
         return ServiceResult(ok=True, data=rows[0] if rows else None)
     except Exception as exc:
         msg = _friendly_repo_error(exc, table=table, action="update")
@@ -358,7 +438,7 @@ def update_row_admin(table: str, payload: dict[str, Any], match: dict[str, Any])
 def delete_row(table: str, match: dict[str, Any]) -> ServiceResult:
     try:
         rows = _db().delete_rows(table, match)
-        clear_all_data_caches()
+        clear_data_cache_for_table(table)
         return ServiceResult(ok=True, data=rows)
     except Exception as exc:
         msg = _friendly_repo_error(exc, table=table, action="delete from")

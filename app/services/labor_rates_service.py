@@ -8,7 +8,6 @@ from typing import Any
 try:
     from app.services.repository import (
         ServiceResult,
-        clear_all_data_caches,
         fetch_rows,
         insert_row,
         update_row,
@@ -16,7 +15,6 @@ try:
 except ImportError:
     from services.repository import (  # type: ignore
         ServiceResult,
-        clear_all_data_caches,
         fetch_rows,
         insert_row,
         update_row,
@@ -119,22 +117,13 @@ def save_labor_rate(
     }
     rid = _str(rate_id)
     if rid:
-        result = update_row(_TABLE, payload, {"id": rid})
-        if result.ok:
-            clear_all_data_caches()
-        return result
+        return update_row(_TABLE, payload, {"id": rid})
 
     existing = find_labor_rate_by_classification(name)
     if existing and existing.get("id"):
-        result = update_row(_TABLE, payload, {"id": existing["id"]})
-        if result.ok:
-            clear_all_data_caches()
-        return result
+        return update_row(_TABLE, payload, {"id": existing["id"]})
 
-    result = insert_row(_TABLE, payload)
-    if result.ok:
-        clear_all_data_caches()
-    return result
+    return insert_row(_TABLE, payload)
 
 
 def upsert_default_labor_rate(

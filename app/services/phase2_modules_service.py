@@ -12,7 +12,6 @@ _LOG = logging.getLogger(__name__)
 try:
     from app.services.repository import (
         ServiceResult,
-        clear_all_data_caches,
         delete_row,
         fetch_list,
         fetch_rows,
@@ -25,7 +24,6 @@ try:
 except ImportError:
     from services.repository import (  # type: ignore
         ServiceResult,
-        clear_all_data_caches,
         delete_row,
         fetch_list,
         fetch_rows,
@@ -1207,8 +1205,6 @@ def clear_timekeeping_day_rows(
         if not result.ok:
             return result
         removed += 1
-    if removed:
-        clear_all_data_caches()
     return ServiceResult(ok=True, data={"removed": removed})
 
 
@@ -1404,8 +1400,6 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
                 if isinstance(job_patch, dict):
                     payload.update(job_patch)
         result = update_row("jobs", payload, {"id": row_id})
-        if result.ok:
-            clear_all_data_caches()
         return result
     return insert_row("jobs", payload)
 
@@ -1575,7 +1569,6 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
     else:
         result = insert_row("estimates", payload)
     if result.ok:
-        clear_all_data_caches()
         saved_id = str(
             row_id or ((result.data or {}).get("id") if isinstance(result.data, dict) else "") or ""
         ).strip()
@@ -1933,8 +1926,6 @@ def save_certification(ui: dict[str, Any], *, row_id: str | None = None) -> Serv
         result = update_row(table, payload, {"id": row_id})
     else:
         result = insert_row(table, payload)
-    if result.ok:
-        clear_all_data_caches()
     return result
 
 
@@ -2026,8 +2017,6 @@ def delete_employee(row_id: str) -> ServiceResult:
 
 def delete_certification(row_id: str) -> ServiceResult:
     result = delete_row("employee_certifications", {"id": row_id})
-    if result.ok:
-        clear_all_data_caches()
     return result
 
 
@@ -2058,8 +2047,6 @@ def save_timekeeping_week(employee_id: str, week_start: date, ui_summary: dict[s
         result = update_row("employee_timekeeping_weeks", payload, {"id": existing["id"]})
     else:
         result = insert_row("employee_timekeeping_weeks", payload)
-    if result.ok:
-        clear_all_data_caches()
     return result
 
 
@@ -2082,8 +2069,6 @@ def submit_timekeeping_week(employee_id: str, week_start: date) -> ServiceResult
         "approved_at": None,
     }
     result = update_row("employee_timekeeping_weeks", payload, {"id": existing["id"]})
-    if result.ok:
-        clear_all_data_caches()
     return result
 
 
@@ -2105,8 +2090,6 @@ def approve_timekeeping_week(employee_id: str, week_start: date, *, approved_by:
         "approved_at": datetime.now(timezone.utc).isoformat(),
     }
     result = update_row("employee_timekeeping_weeks", payload, {"id": existing["id"]})
-    if result.ok:
-        clear_all_data_caches()
     return result
 
 
@@ -2137,8 +2120,6 @@ def reject_timekeeping_week(
         if str(day.get("status") or "") == "Pending" and day.get("id"):
             update_timekeeping_day_status(str(day["id"]), status="Rejected", approved_by=approver)
     result = update_row("employee_timekeeping_weeks", payload, {"id": existing["id"]})
-    if result.ok:
-        clear_all_data_caches()
     return result
 
 
@@ -2170,7 +2151,6 @@ def save_timekeeping_day(ui: dict[str, Any], *, row_id: str | None = None) -> Se
     else:
         result = insert_row("employee_timekeeping_days", payload)
     if result.ok:
-        clear_all_data_caches()
         row = result.data if isinstance(result.data, dict) else None
         if row:
             try:
@@ -2241,7 +2221,6 @@ def update_timekeeping_day_status(
         payload["approved_at"] = datetime.now(timezone.utc).isoformat()
     result = update_row("employee_timekeeping_days", payload, {"id": rid})
     if result.ok:
-        clear_all_data_caches()
         try:
             from app.db import fetch_by_match
         except ImportError:
