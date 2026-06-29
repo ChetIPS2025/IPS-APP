@@ -97,6 +97,7 @@ try:
         set_field_job_id,
         toggle_field_expanded,
     )
+    from app.ui.streamlit_perf import fragment
 except ImportError:
     from components.job_ips_forms import render_job_ips_forms_tab  # type: ignore
     from components.job_materials_ui import render_job_materials_tab  # type: ignore
@@ -186,6 +187,7 @@ except ImportError:
         set_field_job_id,
         toggle_field_expanded,
     )
+    from ui.streamlit_perf import fragment  # type: ignore
 
 _SEL = select_key("jobs")
 _TABLE_KEY = "jobs_list"
@@ -1036,6 +1038,23 @@ def _clear_jobs_detail_modal() -> None:
     st.session_state.pop(JOB_DOC_UPLOAD_MODE_KEY, None)
     st.session_state.pop(JOB_DOC_PENDING_DELETE_ID_KEY, None)
     st.session_state.pop(JOB_DOC_PENDING_DELETE_JOB_KEY, None)
+
+
+@fragment
+def _render_jobs_list_fragment(
+    filtered: list[dict],
+    *,
+    filter_options: dict[str, list[str]],
+    cost_cache: dict[str, dict[str, float | dict | bool]],
+    subjob_counts: dict[str, int],
+) -> list[str]:
+    """Jobs table — filter and row actions rerun locally."""
+    return _render_custom_jobs_table(
+        filtered,
+        filter_options=filter_options,
+        cost_cache=cost_cache,
+        subjob_counts=subjob_counts,
+    )
 
 
 def _render_custom_jobs_table(
@@ -2367,6 +2386,12 @@ def _render_job_overview_financials(job: dict, *, cost_summary: dict | None = No
         st.rerun()
 
 
+@fragment
+def _render_job_detail_tabs_fragment(job: dict, *, cost_summary: dict | None = None) -> None:
+    """Job detail modal tabs — local reruns for tab interactions."""
+    _render_job_detail_tabs(job, cost_summary=cost_summary)
+
+
 def _render_job_detail_tabs(job: dict, *, cost_summary: dict | None = None) -> None:
     jn = _safe_value(job.get("job_number"))
     jname = _safe_value(job.get("job_name"))
@@ -2788,7 +2813,7 @@ def render_job_detail_dialog(job: dict) -> None:
             if is_field_context():
                 _render_field_job_detail_tabs(job)
             else:
-                _render_job_detail_tabs(job, cost_summary=cost_summary if cost_summary else None)
+                _render_job_detail_tabs_fragment(job, cost_summary=cost_summary if cost_summary else None)
         with body_right:
             render_job_detail_activity_sidebar(job)
 
@@ -3036,7 +3061,7 @@ def _render_jobs_page() -> None:
                 break
     st.session_state[CACHE_KEY] = modal_cache
 
-    _render_custom_jobs_table(
+    _render_jobs_list_fragment(
         page_rows,
         filter_options=filter_options,
         cost_cache=None,

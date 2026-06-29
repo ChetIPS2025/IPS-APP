@@ -521,12 +521,12 @@ def _sync_child_records(inspection_id: str, data: dict[str, Any]) -> None:
     if not inspection_id:
         return
     try:
-        from app.db import delete_rows_admin, insert_row_admin
+        from app.services.repository import delete_row_admin, insert_row_admin
     except ImportError:
-        from db import delete_rows_admin, insert_row_admin  # type: ignore
+        from services.repository import delete_row_admin, insert_row_admin  # type: ignore
 
     try:
-        delete_rows_admin(TORQUE_TABLE, {"inspection_id": inspection_id})
+        delete_row_admin(TORQUE_TABLE, {"inspection_id": inspection_id})
         for row in normalize_torque_rows(
             _as_list(data.get("torque_rows")),
             model_key=str(data.get("coupling_model") or "1030G20"),
@@ -548,7 +548,7 @@ def _sync_child_records(inspection_id: str, data: dict[str, Any]) -> None:
                 },
             )
 
-        delete_rows_admin(PHOTOS_TABLE, {"inspection_id": inspection_id})
+        delete_row_admin(PHOTOS_TABLE, {"inspection_id": inspection_id})
         prof = current_profile() or {}
         uploader = str(prof.get("full_name") or prof.get("name") or prof.get("email") or "").strip()
         for att in _as_list(data.get("photo_attachments")):
@@ -568,7 +568,7 @@ def _sync_child_records(inspection_id: str, data: dict[str, Any]) -> None:
                 },
             )
 
-        delete_rows_admin(SIGNATURES_TABLE, {"inspection_id": inspection_id})
+        delete_row_admin(SIGNATURES_TABLE, {"inspection_id": inspection_id})
         meta = normalize_signatures_meta(data)
         for role in SIGNATURE_ROLES:
             entry = meta.get(role) or {}
@@ -642,18 +642,26 @@ def save_coupling_inspection(
 
     rid = str(inspection_id or data.get("id") or "").strip()
     try:
+        from app.services.repository import insert_row_admin, update_row_admin
+    except ImportError:
+        from services.repository import insert_row_admin, update_row_admin  # type: ignore
+
+    try:
         if rid:
-            rows = update_rows_admin(TABLE, payload, {"id": rid})
-            clear_data_cache_for_table(TABLE)
-            row = rows[0] if rows else None
+            result = update_row_admin(TABLE, payload, {"id": rid})
+            if not result.ok:
+                return ServiceResult(ok=False, error=result.error or "Could not save coupling inspection.")
+            row = result.data if isinstance(result.data, dict) else None
             if row and rid:
                 _sync_child_records(rid, {**data, **payload, "signatures_meta": sig_meta})
             return ServiceResult(ok=True, data=normalize_coupling_inspection(row) if row else None)
         payload["created_at"] = _utc_now_iso()
         if "created_by" not in payload or not payload.get("created_by"):
             payload["created_by"] = (current_profile() or {}).get("id")
-        row = insert_row_admin(TABLE, payload)
-        clear_data_cache_for_table(TABLE)
+        result = insert_row_admin(TABLE, payload)
+        if not result.ok:
+            return ServiceResult(ok=False, error=result.error or "Could not save coupling inspection.")
+        row = result.data if isinstance(result.data, dict) else None
         new_id = str(row.get("id") or "") if row else ""
         if new_id:
             _sync_child_records(new_id, {**data, **payload, "signatures_meta": sig_meta})

@@ -61,6 +61,7 @@ try:
         job_row_select_label,
         sort_jobs_by_number_then_name,
     )
+    from app.ui.streamlit_perf import fragment
 except ImportError:
     from auth import current_profile, current_role, is_authenticated  # type: ignore
     from branding import render_header  # type: ignore
@@ -79,6 +80,7 @@ except ImportError:
         job_row_select_label,
         sort_jobs_by_number_then_name,
     )
+    from ui.streamlit_perf import fragment  # type: ignore
 
 _INV = "inventory_items"
 _TXN = "inventory_transactions"
@@ -1929,6 +1931,65 @@ def _render_scan_success(item: dict[str, Any], payload: dict[str, Any]) -> None:
             st.rerun()
 
 
+@fragment
+def _render_inventory_scan_entry_fragment(
+    item: dict[str, Any],
+    *,
+    qoh: float,
+    unit: str,
+    job_labels: list[str],
+    job_map: dict[str, str],
+) -> None:
+    """Qty/job scan form — local reruns for +/- and submit."""
+    if "inv_scan_qty" not in st.session_state:
+        st.session_state["inv_scan_qty"] = 1
+
+    with st.form("inv_mobile_scan_form", clear_on_submit=False):
+        st.markdown('<span class="ips-inv-qr-form-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
+        st.markdown('<p class="ips-inv-qr-field-label">Qty</p>', unsafe_allow_html=True)
+        qty_minus_col, qty_col, qty_plus_col = st.columns([1, 2.4, 1], gap="small")
+        with qty_minus_col:
+            qty_dec = st.form_submit_button("−", use_container_width=True)
+        with qty_col:
+            qty = st.number_input(
+                "Qty",
+                min_value=1,
+                step=1,
+                format="%d",
+                key="inv_scan_qty",
+                label_visibility="collapsed",
+            )
+        with qty_plus_col:
+            qty_inc = st.form_submit_button("+", use_container_width=True)
+        st.markdown('<p class="ips-inv-qr-qty-hint">Whole numbers only.</p>', unsafe_allow_html=True)
+        st.markdown('<p class="ips-inv-qr-field-label ips-inv-qr-field-label-spaced">Where used</p>', unsafe_allow_html=True)
+        job_pick = st.selectbox(
+            "Where used",
+            job_labels,
+            key="inv_scan_job_pick",
+            label_visibility="collapsed",
+        )
+        submit = st.form_submit_button("Enter", type="primary", use_container_width=True)
+
+    if qty_dec:
+        _mobile_scan_qty_step(-1)
+        st.rerun()
+    if qty_inc:
+        _mobile_scan_qty_step(1)
+        st.rerun()
+    if not submit:
+        return
+
+    _submit_mobile_inventory_scan(
+        item=item,
+        qty=float(qty or 0),
+        job_pick=job_pick,
+        job_map=job_map,
+        qoh=qoh,
+        unit=unit,
+    )
+
+
 def render_inventory_scan_page() -> None:
     """Mobile QR scan workflow — Qty + Job + Enter only (field speed). No sidebar."""
     ensure_narrow_viewport_detected()
@@ -1985,50 +2046,10 @@ def render_inventory_scan_page() -> None:
     _render_mobile_item_summary(item, qoh=qoh)
 
     job_labels, job_map = _scan_mobile_job_options()
-    if "inv_scan_qty" not in st.session_state:
-        st.session_state["inv_scan_qty"] = 1
-
-    with st.form("inv_mobile_scan_form", clear_on_submit=False):
-        st.markdown('<span class="ips-inv-qr-form-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
-        st.markdown('<p class="ips-inv-qr-field-label">Qty</p>', unsafe_allow_html=True)
-        qty_minus_col, qty_col, qty_plus_col = st.columns([1, 2.4, 1], gap="small")
-        with qty_minus_col:
-            qty_dec = st.form_submit_button("−", use_container_width=True)
-        with qty_col:
-            qty = st.number_input(
-                "Qty",
-                min_value=1,
-                step=1,
-                format="%d",
-                key="inv_scan_qty",
-                label_visibility="collapsed",
-            )
-        with qty_plus_col:
-            qty_inc = st.form_submit_button("+", use_container_width=True)
-        st.markdown('<p class="ips-inv-qr-qty-hint">Whole numbers only.</p>', unsafe_allow_html=True)
-        st.markdown('<p class="ips-inv-qr-field-label ips-inv-qr-field-label-spaced">Where used</p>', unsafe_allow_html=True)
-        job_pick = st.selectbox(
-            "Where used",
-            job_labels,
-            key="inv_scan_job_pick",
-            label_visibility="collapsed",
-        )
-        submit = st.form_submit_button("Enter", type="primary", use_container_width=True)
-
-    if qty_dec:
-        _mobile_scan_qty_step(-1)
-        st.rerun()
-    if qty_inc:
-        _mobile_scan_qty_step(1)
-        st.rerun()
-    if not submit:
-        return
-
-    _submit_mobile_inventory_scan(
-        item=item,
-        qty=float(qty or 0),
-        job_pick=job_pick,
-        job_map=job_map,
+    _render_inventory_scan_entry_fragment(
+        item,
         qoh=qoh,
         unit=unit,
+        job_labels=job_labels,
+        job_map=job_map,
     )

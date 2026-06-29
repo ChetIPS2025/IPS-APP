@@ -448,6 +448,18 @@ def delete_row(table: str, match: dict[str, Any]) -> ServiceResult:
         return ServiceResult(ok=False, error=msg)
 
 
+def delete_row_admin(table: str, match: dict[str, Any]) -> ServiceResult:
+    """Server-side delete using service role."""
+    try:
+        rows = _db().delete_rows_admin(table, match)
+        clear_data_cache_for_table(table)
+        return ServiceResult(ok=True, data=rows)
+    except Exception as exc:
+        msg = _friendly_repo_error(exc, table=table, action="delete from")
+        _LOG.warning("delete_row_admin %s failed: %s", table, exc)
+        return ServiceResult(ok=False, error=msg)
+
+
 def user_facing_error(result: ServiceResult, *, demo_ok_message: str | None = None) -> str | None:
     """Message for st.error; None if ok."""
     if result.ok:

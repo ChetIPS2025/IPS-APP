@@ -192,18 +192,17 @@ def apply_pricing_stock_settings_to_inventory(pg_row: dict[str, Any]) -> Service
     if not inv:
         return ServiceResult(ok=True, data={"skipped": True})
     try:
-        from app.db import update_rows_admin
+        from app.services.repository import update_row_admin
     except ImportError:
-        from db import update_rows_admin  # type: ignore
+        from services.repository import update_row_admin  # type: ignore
     rp = float(pg_row.get("default_reorder_point") or 0)
-    try:
-        update_rows_admin(
-            "inventory_items",
-            {"reorder_point": rp, "updated_at": _now_iso()},
-            {"id": inv_id},
-        )
-    except Exception as exc:
-        return ServiceResult(ok=False, error=str(exc))
+    res = update_row_admin(
+        "inventory_items",
+        {"reorder_point": rp, "updated_at": _now_iso()},
+        {"id": inv_id},
+    )
+    if not res.ok:
+        return ServiceResult(ok=False, error=res.error or str(res.error))
     clear_inventory_cache()
     return ServiceResult(ok=True, data={"inventory_id": inv_id, "reorder_point": rp})
 
@@ -244,22 +243,21 @@ def save_pricing_stock_settings(
         rp = 0.0
 
     try:
-        from app.db import update_rows_admin
+        from app.services.repository import update_row_admin
     except ImportError:
-        from db import update_rows_admin  # type: ignore
+        from services.repository import update_row_admin  # type: ignore
 
-    try:
-        update_rows_admin(
-            "pricing_guide_items",
-            {
-                "stock_policy": policy,
-                "default_reorder_point": rp,
-                "updated_at": _now_iso(),
-            },
-            {"id": pid},
-        )
-    except Exception as exc:
-        return ServiceResult(ok=False, error=str(exc))
+    res = update_row_admin(
+        "pricing_guide_items",
+        {
+            "stock_policy": policy,
+            "default_reorder_point": rp,
+            "updated_at": _now_iso(),
+        },
+        {"id": pid},
+    )
+    if not res.ok:
+        return ServiceResult(ok=False, error=res.error or "Could not save stock policy.")
 
     clear_pricing_guide_cache()
 

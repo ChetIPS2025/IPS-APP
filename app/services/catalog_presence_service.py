@@ -58,14 +58,13 @@ def _filter_table_payload(table: str, payload: dict[str, Any]) -> dict[str, Any]
 
 def _admin_insert_row(table: str, payload: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
     try:
-        from app.db import insert_row_admin
+        from app.services.repository import insert_row_admin
     except ImportError:
-        from db import insert_row_admin  # type: ignore
-    try:
-        inserted = insert_row_admin(table, _filter_table_payload(table, payload))
-        return inserted, None
-    except Exception as exc:
-        return None, str(exc)
+        from services.repository import insert_row_admin  # type: ignore
+    res = insert_row_admin(table, _filter_table_payload(table, payload))
+    if res.ok and isinstance(res.data, dict):
+        return res.data, None
+    return None, str(res.error or "Insert failed")
 
 
 def _linked_inventory_id(row: dict[str, Any]) -> str:
@@ -126,7 +125,6 @@ def _recompute_item_class(
     pricing_item_id: str,
     inventory_id: str | None,
     asset_id: str | None,
-    update_rows_admin,
 ) -> None:
     inv_id = str(inventory_id or "").strip()
     ast_id = str(asset_id or "").strip()
@@ -138,7 +136,11 @@ def _recompute_item_class(
         item_class = "Asset"
     else:
         item_class = "Non-Inventory"
-    update_rows_admin(
+    try:
+        from app.services.repository import update_row_admin
+    except ImportError:
+        from services.repository import update_row_admin  # type: ignore
+    res = update_row_admin(
         "pricing_guide_items",
         {
             "item_class": item_class,
@@ -150,6 +152,8 @@ def _recompute_item_class(
         },
         {"id": pricing_item_id},
     )
+    if not res.ok:
+        raise RuntimeError(str(res.error or "Could not update pricing guide item class."))
 
 
 def _set_pricing_guide_visibility(row: dict[str, Any], *, visible: bool) -> ServiceResult:
@@ -157,18 +161,17 @@ def _set_pricing_guide_visibility(row: dict[str, Any], *, visible: bool) -> Serv
     if not pid:
         return ServiceResult(ok=False, error="Missing pricing item id.")
     try:
-        from app.db import update_rows_admin
+        from app.services.repository import update_row_admin
     except ImportError:
-        from db import update_rows_admin  # type: ignore
+        from services.repository import update_row_admin  # type: ignore
 
-    try:
-        update_rows_admin(
-            "pricing_guide_items",
-            {"is_active": bool(visible), "updated_at": _now_iso()},
-            {"id": pid},
-        )
-    except Exception as exc:
-        return ServiceResult(ok=False, error=str(exc))
+    res = update_row_admin(
+        "pricing_guide_items",
+        {"is_active": bool(visible), "updated_at": _now_iso()},
+        {"id": pid},
+    )
+    if not res.ok:
+        return ServiceResult(ok=False, error=res.error or "Could not update pricing guide visibility.")
 
     ast_id = _linked_asset_id(row)
     if ast_id:
@@ -263,11 +266,6 @@ def _remove_inventory(row: dict[str, Any]) -> ServiceResult:
         return ServiceResult(ok=True)
 
     pid = str(row.get("id") or "").strip()
-    try:
-        from app.db import update_rows_admin
-    except ImportError:
-        from db import update_rows_admin  # type: ignore
-
     ast_id = _linked_asset_id(row)
     ast_row = _load_asset_row(ast_id) if ast_id else None
     remaining_ast = str(ast_row.get("id") or "") if ast_row else ""
@@ -287,7 +285,6 @@ def _remove_inventory(row: dict[str, Any]) -> ServiceResult:
             pricing_item_id=pid,
             inventory_id=None,
             asset_id=remaining_ast or None,
-            update_rows_admin=update_rows_admin,
         )
     except Exception as exc:
         return ServiceResult(ok=False, error=str(exc))
@@ -384,11 +381,6 @@ def _remove_asset(row: dict[str, Any]) -> ServiceResult:
         return ServiceResult(ok=True)
 
     pid = str(row.get("id") or "").strip()
-    try:
-        from app.db import update_rows_admin
-    except ImportError:
-        from db import update_rows_admin  # type: ignore
-
     inv_id = _linked_inventory_id(row)
     inv_row = get_inventory_item(inv_id) if inv_id else None
     remaining_inv = str(inv_row.get("id") or "") if inv_row else ""
@@ -408,7 +400,6 @@ def _remove_asset(row: dict[str, Any]) -> ServiceResult:
             pricing_item_id=pid,
             inventory_id=remaining_inv or None,
             asset_id=None,
-            update_rows_admin=update_rows_admin,
         )
     except Exception as exc:
         return ServiceResult(ok=False, error=str(exc))

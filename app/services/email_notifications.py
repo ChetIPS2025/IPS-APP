@@ -89,13 +89,18 @@ def upsert_job_email_settings(
     if not jid:
         raise ValueError("job_id required")
     try:
-        from app.db import fetch_one, insert_row_admin, update_rows_admin
+        from app.db import fetch_by_match_admin
     except ImportError:
-        from db import fetch_one, insert_row_admin, update_rows_admin  # type: ignore
+        from db import fetch_by_match_admin  # type: ignore
+    try:
+        from app.services.repository import insert_row_admin, update_row_admin
+    except ImportError:
+        from services.repository import insert_row_admin, update_row_admin  # type: ignore
 
     existing = None
     try:
-        existing = fetch_one("job_email_settings", {"job_id": jid})
+        rows = fetch_by_match_admin("job_email_settings", {"job_id": jid}, limit=1)
+        existing = rows[0] if rows else None
     except Exception:
         existing = None
 
@@ -113,7 +118,7 @@ def upsert_job_email_settings(
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     if existing and existing.get("id"):
-        update_rows_admin("job_email_settings", payload, {"id": existing["id"]})
+        update_row_admin("job_email_settings", payload, {"id": existing["id"]})
     else:
         insert_row_admin("job_email_settings", payload)
 

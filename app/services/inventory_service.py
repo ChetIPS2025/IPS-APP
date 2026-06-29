@@ -179,27 +179,26 @@ def remove_inventory_keep_pricing_item(item_id: str) -> ServiceResult:
 
     pg_ids = _linked_pricing_item_ids(iid, inv)
     try:
-        from app.db import update_rows_admin
+        from app.services.repository import update_row_admin
     except ImportError:
-        from db import update_rows_admin  # type: ignore
+        from services.repository import update_row_admin  # type: ignore
 
     updated: list[str] = []
     now = datetime.now(timezone.utc).isoformat()
     for pid in sorted(pg_ids):
-        try:
-            update_rows_admin(
-                "pricing_guide_items",
-                {
-                    "inventory_item_id": None,
-                    "linked_inventory_id": None,
-                    "item_class": "Non-Inventory",
-                    "updated_at": now,
-                },
-                {"id": pid},
-            )
-            updated.append(pid)
-        except Exception as exc:
-            return ServiceResult(ok=False, error=f"Could not update pricing guide item: {exc}")
+        res = update_row_admin(
+            "pricing_guide_items",
+            {
+                "inventory_item_id": None,
+                "linked_inventory_id": None,
+                "item_class": "Non-Inventory",
+                "updated_at": now,
+            },
+            {"id": pid},
+        )
+        if not res.ok:
+            return ServiceResult(ok=False, error=res.error or f"Could not update pricing guide item.")
+        updated.append(pid)
 
     delete_result = delete_inventory_item(iid)
     if not delete_result.ok:

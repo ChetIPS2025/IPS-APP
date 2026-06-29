@@ -68,6 +68,7 @@ try:
         update_customer_location,
     )
     from app.styles import inject_customers_module_css
+    from app.ui.streamlit_perf import fragment
 except ImportError:
     from components.headers import render_page_brand_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
@@ -128,6 +129,7 @@ except ImportError:
         update_customer_location,
     )
     from styles import inject_customers_module_css  # type: ignore
+    from ui.streamlit_perf import fragment  # type: ignore
 
 _SEL = select_key("customers")
 _LOC_SEL = select_key("customer_locations")
@@ -297,6 +299,16 @@ def _on_customer_checkbox_change(customer_id: str, all_customer_ids: list[str]) 
     elif st.session_state.get(SELECTED_CUSTOMER_KEY) == customer_id:
         st.session_state[SELECTED_CUSTOMER_KEY] = None
         st.session_state[SHOW_CUSTOMER_MODAL_KEY] = False
+
+
+@fragment
+def _render_customers_list_fragment(
+    filtered: list[dict],
+    *,
+    filter_options: dict[str, list[str]],
+) -> list[str]:
+    """Customer list — filter and row actions rerun locally."""
+    return _render_custom_customers_table(filtered, filter_options=filter_options)
 
 
 def _render_custom_customers_table(
@@ -1863,6 +1875,12 @@ def _render_customer_detail_tabs(customer: dict) -> None:
         placeholder_html("Customer activity history will appear here when connected to Supabase.")
 
 
+@fragment
+def _render_customer_detail_tabs_fragment(customer: dict) -> None:
+    """Customer modal tabs — local reruns for contacts/locations edits."""
+    _render_customer_detail_tabs(customer)
+
+
 def render_customer_detail_dialog(customer: dict) -> None:
     rk = record_session_key(customer, "id", "customer_name")
     cname = safe_value(customer.get("customer_name") or customer.get("company_name"))
@@ -1893,7 +1911,7 @@ def render_customer_detail_dialog(customer: dict) -> None:
     if is_edit_mode(_MOD, rk):
         _render_customer_edit_form(customer)
     else:
-        _render_customer_detail_tabs(customer)
+        _render_customer_detail_tabs_fragment(customer)
 
 
 @st.dialog("Customer Details", width="large", on_dismiss=_clear_customers_detail_modal)
@@ -2586,7 +2604,7 @@ def render() -> None:
     page_rows, _, _, _ = paginate_rows(filtered, _CUSTOMERS_TABLE_KEY)
 
     build_modal_cache(filtered, cache_key=_CUSTOMERS_CACHE_KEY)
-    _render_custom_customers_table(page_rows, filter_options=filter_options)
+    _render_customers_list_fragment(page_rows, filter_options=filter_options)
     render_table_pagination_footer(len(filtered), _CUSTOMERS_TABLE_KEY)
 
     selected_customer_id = st.session_state.get(SELECTED_CUSTOMER_KEY)
