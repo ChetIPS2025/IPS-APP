@@ -109,7 +109,7 @@ def test_insert_row_admin_retries_after_pgrst204_unknown_column():
     ):
         with patch("app.services.repository._db") as mock_db:
             mock_db.return_value.insert_row_admin.side_effect = fake_insert
-            with patch("app.services.repository.clear_all_data_caches"):
+            with patch("app.services.repository.clear_data_cache_for_table"):
                 result = insert_row_admin("estimate_line_items", payload)
 
     assert result.ok is True

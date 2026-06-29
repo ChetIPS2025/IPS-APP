@@ -202,6 +202,11 @@ except ImportError:
         format_estimate_date,
     )
 
+try:
+    from app.ui.streamlit_perf import fragment
+except ImportError:
+    from ui.streamlit_perf import fragment  # type: ignore
+
 _SEL = select_key("estimates")
 _MOD = "estimates"
 _TABLE_KEY = "estimates_list"
@@ -1316,6 +1321,12 @@ def _render_estimate_edit_form(est: dict) -> None:
             st.error(msg or "Could not save estimate.")
 
 
+@fragment
+def _render_estimate_detail_tabs_fragment(est: dict) -> None:
+    """Estimate modal tabs — Cost Builder and scope edits rerun locally in the dialog."""
+    _render_estimate_detail_tabs(est)
+
+
 def _render_estimate_detail_tabs(est: dict) -> None:
     eid = str(est.get("id") or "")
     en = safe_value(est.get("estimate_number"))
@@ -1651,7 +1662,7 @@ def render_estimate_detail_dialog(est: dict) -> None:
         _render_estimate_edit_form(est)
     else:
         _render_estimate_actions_panel(est)
-        _render_estimate_detail_tabs(est)
+        _render_estimate_detail_tabs_fragment(est)
 
 
 @st.dialog("Estimate Details", width="large", on_dismiss=_clear_estimates_detail_modal)

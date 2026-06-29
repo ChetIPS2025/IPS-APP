@@ -123,6 +123,11 @@ except ImportError:
     from utils.field_context import get_field_job_id, is_field_context, is_field_mode, render_field_job_bar  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
 
+try:
+    from app.ui.streamlit_perf import fragment, ips_app_rerun
+except ImportError:
+    from ui.streamlit_perf import fragment, ips_app_rerun  # type: ignore
+
 _SEL = select_key("timekeeping")
 _MODULE = "timekeeping"
 _TABLE_KEY = "timekeeping_list"
@@ -158,6 +163,11 @@ _WEEKLY_TS_LIST_ROW_COLS = [
     _TS_LIST_BILLED,
     _TS_LIST_STATUS,
 ]
+
+
+def _timekeeping_app_rerun() -> None:
+    """Rerun the full app (dialogs and page shell live outside list fragments)."""
+    ips_app_rerun()
 
 
 def _render_timekeeping_list_spacer_cell() -> None:
@@ -3107,7 +3117,7 @@ def _render_inline_daily_entries(row: dict, week_start_d: date) -> None:
             st.session_state[SELECTED_TIMECARD_KEY] = timecard_id
             st.session_state[SHOW_TIMECARD_MODAL_KEY] = True
             st.session_state[_MODAL_KEY] = timecard_id
-            st.rerun()
+            _timekeeping_app_rerun()
 
 
 def _render_daily_entries_tab(emp: dict, week_start_d: date) -> None:
@@ -3183,6 +3193,12 @@ def _render_approval_tab(emp: dict, week_start_d: date) -> None:
         st.caption(f"Approved by {_current_user_name() if not approved_at else 'supervisor'}.")
 
 
+@fragment
+def _render_timekeeping_detail_tabs_fragment(emp: dict, week_start_d: date) -> None:
+    """Timecard modal tabs — local reruns for hour edits and allocation saves."""
+    _render_timekeeping_view_tabs(emp, week_start_d)
+
+
 def _render_timekeeping_view_tabs(emp: dict, week_start_d: date) -> None:
     st_total, ot_total, dt_total, total = _emp_totals(emp)
     status = _resolved_week_status(emp, week_start_d)
@@ -3247,7 +3263,7 @@ def render_timekeeping_detail_dialog(emp: dict, week_start_d: date) -> None:
             ("Total Hours", _fmt_table_hours(total)),
         ]
     )
-    _render_timekeeping_view_tabs(emp, week_start_d)
+    _render_timekeeping_detail_tabs_fragment(emp, week_start_d)
 
 
 @st.dialog("Timecard Details", width="large", on_dismiss=_clear_timecard_modal)
@@ -3265,6 +3281,21 @@ def _filter_timecards(
 ) -> list[dict]:
     rows = [_build_timecard_row(row, ws) for row in summaries]
     return apply_column_filters(rows, _TABLE_KEY, _TK_COLUMN_FILTER_SPECS)
+
+
+@fragment
+def _render_timekeeping_list_fragment(
+    page_rows: list[dict],
+    *,
+    filter_options: dict[str, list[str]],
+    week_start_d: date,
+) -> list[str]:
+    """Weekly timecard list — inline hour edits rerun here instead of the full page."""
+    return _render_custom_timekeeping_table(
+        page_rows,
+        filter_options=filter_options,
+        week_start_d=week_start_d,
+    )
 
 
 def _render_custom_timekeeping_table(
@@ -3529,7 +3560,7 @@ def render() -> None:
         unsafe_allow_html=True,
     )
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
-    _render_custom_timekeeping_table(page_rows, filter_options=filter_options, week_start_d=ws)
+    _render_timekeeping_list_fragment(page_rows, filter_options=filter_options, week_start_d=ws)
     render_table_pagination_footer(len(filtered), _TABLE_KEY)
 
     if st.session_state.get(SELECTED_TIMECARD_KEY) and st.session_state.get(SHOW_TIMECARD_MODAL_KEY):
