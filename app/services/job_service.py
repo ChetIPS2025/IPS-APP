@@ -162,7 +162,6 @@ def dashboard_job_metrics(jobs: list[dict[str, Any]]) -> dict[str, int]:
         "on_hold_jobs": 0,
         "complete_jobs": 0,
         "cancelled_jobs": 0,
-        # Legacy keys kept at zero for older dashboard widgets.
         "jobs_awarded": 0,
         "pending_jobs": 0,
         "draft_jobs": 0,
@@ -172,6 +171,17 @@ def dashboard_job_metrics(jobs: list[dict[str, Any]]) -> dict[str, int]:
         if not isinstance(job, dict):
             continue
         if bool(job.get("is_deleted")):
+            continue
+        raw = str(job.get("status") or "").strip().lower().replace("_", " ")
+        if raw in {"awarded", "won"}:
+            out["jobs_awarded"] += 1
+            continue
+        if raw in {"draft", "pending", "planning", "estimate pending", "scheduled"}:
+            out["pending_jobs"] += 1
+            if raw == "draft":
+                out["draft_jobs"] += 1
+            if raw == "estimate pending":
+                out["estimate_pending_jobs"] += 1
             continue
         bucket = _DASHBOARD_JOB_METRIC_BUCKETS.get(normalize_job_status_for_filter(job.get("status")))
         if bucket:

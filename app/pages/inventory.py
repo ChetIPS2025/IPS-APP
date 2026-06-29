@@ -1042,7 +1042,7 @@ def render() -> None:
             "Recent inventory and tool QR scans — who scanned, what opened, and what action was recorded."
         )
         render_qr_scan_history_table(
-            load_recent_qr_scans(limit=25),
+            load_recent_qr_scans(limit=25)[0],
             empty_message="No QR scans recorded yet. Scans appear when materials or tools are used via QR.",
         )
 

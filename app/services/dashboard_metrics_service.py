@@ -77,6 +77,22 @@ def _period_delta_pct(current: float, previous: float) -> tuple[str, str]:
     return f"{sign}{pct:.1f}% vs prior period", direction
 
 
+def job_status_overview(jobs: list[dict[str, Any]]) -> dict[str, int]:
+    """Job counts by normalized status for the dashboard donut chart."""
+    try:
+        from app.services.job_service import normalize_job_status_for_filter
+    except ImportError:
+        from services.job_service import normalize_job_status_for_filter  # type: ignore
+
+    counts: dict[str, int] = {}
+    for job in jobs:
+        if not isinstance(job, dict) or bool(job.get("is_deleted")):
+            continue
+        label = normalize_job_status_for_filter(job.get("status"))
+        counts[label] = counts.get(label, 0) + 1
+    return counts
+
+
 def compute_dashboard_kpis(
     estimates: list[dict[str, Any]],
     jobs: list[dict[str, Any]],

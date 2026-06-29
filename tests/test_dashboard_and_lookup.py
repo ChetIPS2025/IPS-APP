@@ -6,6 +6,7 @@ from datetime import date, timedelta
 
 from app.services.dashboard_metrics_service import (
     compute_dashboard_kpis,
+    job_status_overview,
     open_quotes_aging_bars,
     sales_by_category,
     upcoming_deadlines,
@@ -70,6 +71,20 @@ def test_upcoming_deadlines_includes_expiration():
     )
     assert len(items) == 1
     assert "Q26001" in items[0]["title"]
+
+
+def test_job_status_overview_counts_normalized_statuses():
+    counts = job_status_overview(
+        [
+            {"status": "Active", "is_deleted": False},
+            {"status": "On Hold", "is_deleted": False},
+            {"status": "Completed", "is_deleted": False},
+            {"status": "Active", "is_deleted": True},
+        ]
+    )
+    assert counts.get("Active") == 1
+    assert counts.get("On Hold") == 1
+    assert counts.get("Completed") == 1
 
 
 def test_sync_lookup_deactivates_removed_values(monkeypatch):

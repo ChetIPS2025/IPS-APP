@@ -203,7 +203,9 @@ def load_dashboard_kpis(
         period_start=period_start,
         period_end=period_end,
     )
-    if kpis.get("has_live_data"):
+    is_live = bool(kpis.get("has_live_data"))
+    kpis["is_live"] = is_live
+    if is_live:
         return kpis
     return {
         **kpis,
@@ -218,10 +220,11 @@ def load_dashboard_kpis(
         "on_hold_jobs": kpis.get("on_hold_jobs") or 0,
         "estimate_pending_jobs": kpis.get("estimate_pending_jobs") or 1,
         "complete_jobs": kpis.get("complete_jobs") or 1,
-        "sales_caption": "Demo data — connect Supabase for live KPIs",
-        "quotes_caption": "Demo data",
-        "estimates_caption": "Demo data",
-        "inventory_caption": "Demo data",
+        "sales_caption": "Sample data — connect Supabase for live KPIs",
+        "quotes_caption": "Sample data",
+        "estimates_caption": "Sample data",
+        "inventory_caption": "Sample data",
+        "is_live": False,
     }
 
 
@@ -229,7 +232,7 @@ def dashboard_sales_series(
     *,
     period_start: date,
     period_end: date,
-) -> tuple[list[str], dict[str, list[float]]]:
+) -> tuple[list[str], dict[str, list[float]], bool]:
     try:
         from app.services.dashboard_metrics_service import sales_overview_series
     except ImportError:
@@ -242,15 +245,16 @@ def dashboard_sales_series(
         period_end=period_end,
     )
     if labels and series:
-        return labels, series
-    return demo_sales_series()
+        return labels, series, True
+    demo_labels, demo_series = demo_sales_series()
+    return demo_labels, demo_series, False
 
 
 def dashboard_sales_categories(
     *,
     period_start: date,
     period_end: date,
-) -> dict[str, float]:
+) -> tuple[dict[str, float], bool]:
     try:
         from app.services.dashboard_metrics_service import sales_by_category
     except ImportError:
@@ -262,11 +266,11 @@ def dashboard_sales_categories(
         period_end=period_end,
     )
     if cats:
-        return cats
-    return demo_sales_categories()
+        return cats, True
+    return demo_sales_categories(), False
 
 
-def dashboard_quote_aging_bars() -> list[tuple[str, float, str]]:
+def dashboard_quote_aging_bars() -> tuple[list[tuple[str, float, str]], bool]:
     try:
         from app.services.dashboard_metrics_service import open_quotes_aging_bars
     except ImportError:
@@ -274,16 +278,16 @@ def dashboard_quote_aging_bars() -> list[tuple[str, float, str]]:
 
     bars = open_quotes_aging_bars(load_estimates())
     if bars:
-        return bars
+        return bars, True
     return [
         ("0–30 days", 82000, "#22c55e"),
         ("31–60 days", 28000, "#f59e0b"),
         ("61–90 days", 12000, "#f97316"),
         ("90+ days", 5430, "#ef4444"),
-    ]
+    ], False
 
 
-def dashboard_upcoming_deadlines() -> list[dict[str, str]]:
+def dashboard_upcoming_deadlines() -> tuple[list[dict[str, str]], bool]:
     try:
         from app.services.dashboard_metrics_service import upcoming_deadlines
     except ImportError:
@@ -291,8 +295,24 @@ def dashboard_upcoming_deadlines() -> list[dict[str, str]]:
 
     items = upcoming_deadlines(load_estimates(), load_jobs())
     if items:
-        return items
-    return demo_deadlines()
+        return items, True
+    return demo_deadlines(), False
+
+
+def dashboard_job_status_overview() -> tuple[dict[str, int], bool]:
+    try:
+        from app.services.dashboard_metrics_service import job_status_overview
+    except ImportError:
+        from services.dashboard_metrics_service import job_status_overview  # type: ignore
+
+    counts = job_status_overview(load_jobs())
+    if counts:
+        return counts, True
+    return _demo_job_status_counts(), False
+
+
+def _demo_job_status_counts() -> dict[str, int]:
+    return {"Not Started": 4, "In Progress": 9, "On Hold": 2, "Completed": 3}
 
 
 def demo_sales_series() -> tuple[list[str], dict[str, list[float]]]:
@@ -308,19 +328,8 @@ def demo_sales_categories() -> dict[str, float]:
 
 
 def demo_job_status() -> dict[str, int]:
-    try:
-        from app.services.jobs_service import normalize_job_status
-    except ImportError:
-        from services.jobs_service import normalize_job_status  # type: ignore
-    jobs = load_jobs()
-    counts: dict[str, int] = {}
-    for j in jobs:
-        if bool(j.get("is_deleted")):
-            continue
-        st_label = normalize_job_status(j.get("status"))
-        counts[st_label] = counts.get(st_label, 0) + 1
-    if not counts:
-        return {"Not Started": 4, "In Progress": 9, "On Hold": 2, "Completed": 3}
+    """Backward-compatible alias — prefer ``dashboard_job_status_overview()``."""
+    counts, _ = dashboard_job_status_overview()
     return counts
 
 
@@ -349,15 +358,15 @@ def demo_item_activities() -> list[dict[str, str]]:
     ]
 
 
-def load_recent_item_activity(*, limit: int = 10) -> list[dict[str, str]]:
+def load_recent_item_activity(*, limit: int = 10) -> tuple[list[dict[str, str]], bool]:
     try:
         from app.services.dashboard_item_activity_service import recent_item_activity_feed
     except ImportError:
         from services.dashboard_item_activity_service import recent_item_activity_feed  # type: ignore
     items = recent_item_activity_feed(limit=limit)
     if items:
-        return items
-    return demo_item_activities()[:limit]
+        return items, True
+    return demo_item_activities()[:limit], False
 
 
 def demo_qr_scans() -> list[dict[str, str]]:
@@ -475,15 +484,15 @@ def demo_qr_scans() -> list[dict[str, str]]:
     ]
 
 
-def load_recent_qr_scans(*, limit: int = 25, inventory_item_id: str | None = None) -> list[dict[str, str]]:
+def load_recent_qr_scans(*, limit: int = 25, inventory_item_id: str | None = None) -> tuple[list[dict[str, str]], bool]:
     try:
         from app.services.qr_scan_log_service import recent_qr_scans
     except ImportError:
         from services.qr_scan_log_service import recent_qr_scans  # type: ignore
     rows = recent_qr_scans(limit=limit, inventory_item_id=inventory_item_id)
     if rows:
-        return rows
-    return demo_qr_scans()[:limit]
+        return rows, True
+    return demo_qr_scans()[:limit], False
 
 
 def demo_deadlines() -> list[dict[str, str]]:
