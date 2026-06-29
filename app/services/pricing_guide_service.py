@@ -611,10 +611,10 @@ def save_pricing_item(
     changed_by: str = "",
 ) -> tuple[bool, str]:
     try:
-        from app.db import insert_row_admin, update_rows_admin
+        from app.db import fetch_by_match_admin, insert_row_admin, update_rows_admin
         from app.pages._core._crud import is_demo_id
     except ImportError:
-        from db import insert_row_admin, update_rows_admin  # type: ignore
+        from db import fetch_by_match_admin, insert_row_admin, update_rows_admin  # type: ignore
         from pages._core._crud import is_demo_id  # type: ignore
 
     cost = float(data.get("default_cost") or data.get("purchase_price") or 0)
@@ -711,17 +711,14 @@ def save_pricing_item(
 
     try:
         if saved_id and not is_demo_id(saved_id):
-            try:
-                from app.db import fetch_table_admin as _fta
-            except ImportError:
-                from db import fetch_table_admin as _fta  # type: ignore
-            existing = [
-                r
-                for r in list(_fta("pricing_guide_items", limit=10000) or [])
-                if isinstance(r, dict) and str(r.get("id")) == saved_id
-            ]
-            if existing:
-                old_cost = float(existing[0].get("default_cost") or 0)
+            existing_rows = fetch_by_match_admin(
+                "pricing_guide_items",
+                {"id": saved_id},
+                columns="default_cost",
+                limit=1,
+            )
+            if existing_rows:
+                old_cost = float(existing_rows[0].get("default_cost") or 0)
             update_rows_admin("pricing_guide_items", payload, {"id": saved_id})
             _record_price_history(
                 pricing_item_id=saved_id,
