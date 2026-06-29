@@ -64,7 +64,9 @@ try:
         class_pill_html,
         clear_pricing_guide_cache,
         fetch_price_history,
+        fetch_pricing_guide_catalog,
         normalize_pricing_row,
+        pricing_guide_fetch_status,
         save_pricing_item,
         search_pricing_rows,
         pricing_guide_summary,
@@ -147,7 +149,9 @@ except ImportError:
         class_pill_html,
         clear_pricing_guide_cache,
         fetch_price_history,
+        fetch_pricing_guide_catalog,
         normalize_pricing_row,
+        pricing_guide_fetch_status,
         save_pricing_item,
         search_pricing_rows,
         pricing_guide_summary,
@@ -239,7 +243,20 @@ def _fitting_detail_fields_html(row: dict[str, Any]) -> str:
 
 
 def _load_rows() -> list[dict[str, Any]]:
+    if not st.session_state.get("_pg_catalog_status_checked"):
+        fetch_pricing_guide_catalog(include_inactive=True)
+        st.session_state["_pg_catalog_status_checked"] = True
     return cached_pricing_guide_rows(include_inactive=True)
+
+
+def _render_catalog_status_banner() -> None:
+    status = pricing_guide_fetch_status()
+    if not status or not status.warning:
+        return
+    if status.fetch_failed:
+        st.error(status.warning)
+    else:
+        st.warning(status.warning)
 
 
 def _vendor_options() -> list[tuple[str, str]]:
@@ -1100,6 +1117,7 @@ def render() -> None:
         render_labor_rates_panel(key_prefix="pg_labor", show_header=False)
         return
 
+    _render_catalog_status_banner()
     rows = _load_rows()
     filter_options = build_filter_options(rows, _COLUMN_FILTER_SPECS)
 

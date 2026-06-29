@@ -5,12 +5,64 @@ from __future__ import annotations
 import html
 import logging
 import re
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 import streamlit as st
 
 _LOG = logging.getLogger(__name__)
+
+PricingGuideSource = Literal["pricing_guide_items", "estimate_materials", "empty"]
+
+
+@dataclass(frozen=True)
+class PricingGuideFetchResult:
+    rows: list[dict[str, Any]]
+    source: PricingGuideSource
+    warning: str | None = None
+    fetch_failed: bool = False
+
+
+_last_pricing_guide_fetch: PricingGuideFetchResult | None = None
+
+
+def pricing_guide_fetch_status() -> PricingGuideFetchResult | None:
+    """Metadata from the most recent catalog fetch (for UI banners)."""
+    return _last_pricing_guide_fetch
+
+
+def _allow_legacy_pricing_fallback() -> bool:
+    try:
+        from app.config import settings
+    except ImportError:
+        from config import settings  # type: ignore
+    return not settings.is_production
+
+
+def _legacy_estimate_material_rows(
+    *,
+    fetch_table: Callable[..., list[dict[str, Any]]],
+    fetch_table_admin: Callable[..., list[dict[str, Any]]] | None,
+    include_inactive: bool,
+) -> list[dict[str, Any]]:
+    fetcher = fetch_table_admin or fetch_table
+    legacy: list[dict[str, Any]] = []
+    try:
+        legacy = list(fetcher("estimate_materials", limit=10000, order_by="item_key") or [])
+    except Exception:
+        try:
+            legacy = list(fetch_table("estimate_materials", limit=10000, order_by="item_key") or [])
+        except Exception:
+            legacy = []
+    out = [
+        normalize_pricing_row({**r, "_source": "estimate_materials"})
+        for r in legacy
+        if isinstance(r, dict) and str(r.get("item_key") or "").strip()
+    ]
+    if not include_inactive:
+        out = [r for r in out if r.get("is_active") is not False]
+    return out
 
 PRICING_ITEM_TYPES: tuple[str, ...] = (
     "Inventory",
@@ -366,12 +418,14 @@ def pricing_guide_row_visible(row: dict[str, Any], asset_flags: dict[str, bool])
     return asset_flags.get(ast_id, True)
 
 
-def fetch_pricing_guide_rows(
+def fetch_pricing_guide_catalog(
     *,
     include_inactive: bool = True,
     fetch_table: Callable[..., list[dict[str, Any]]] | None = None,
     fetch_table_admin: Callable[..., list[dict[str, Any]]] | None = None,
-) -> list[dict[str, Any]]:
+) -> PricingGuideFetchResult:
+    global _last_pricing_guide_fetch
+
     if fetch_table is None or fetch_table_admin is None:
         try:
             from app.db import fetch_table as _ft, fetch_table_admin as _fta
@@ -383,10 +437,12 @@ def fetch_pricing_guide_rows(
     fetcher = fetch_table_admin or fetch_table
     vendors, inv_labels, asset_labels, inv_costs, asset_flags, asset_costs = _load_lookup_maps()
     rows: list[dict[str, Any]] = []
+    fetch_error: str | None = None
     try:
         rows = list(fetcher("pricing_guide_items", limit=10000, order_by="description") or [])
     except Exception as exc:
-        _LOG.debug("pricing_guide_items fetch failed, falling back to estimate_materials: %s", exc)
+        fetch_error = str(exc)
+        _LOG.warning("pricing_guide_items fetch failed: %s", exc)
         rows = []
 
     if rows:
@@ -405,32 +461,67 @@ def fetch_pricing_guide_rows(
         out = [r for r in out if pricing_guide_row_visible(r, asset_flags)]
         if not include_inactive:
             out = [r for r in out if r.get("is_active") is not False]
-        return out
+        result = PricingGuideFetchResult(out, "pricing_guide_items")
+        _last_pricing_guide_fetch = result
+        return result
 
-    legacy: list[dict[str, Any]] = []
-    try:
-        legacy = list(fetcher("estimate_materials", limit=10000, order_by="item_key") or [])
-    except Exception:
-        try:
-            legacy = list(fetch_table("estimate_materials", limit=10000, order_by="item_key") or [])
-        except Exception:
-            legacy = []
-    out = [
-        normalize_pricing_row(r)
-        for r in legacy
-        if isinstance(r, dict) and str(r.get("item_key") or "").strip()
-    ]
-    if not include_inactive:
-        out = [r for r in out if r.get("is_active") is not False]
-    return out
+    if not _allow_legacy_pricing_fallback():
+        if fetch_error:
+            warning = (
+                "Pricing Guide could not load `pricing_guide_items` from Supabase. "
+                "Run migration `082_pricing_guide_items.sql` and import catalog data. "
+                f"Legacy `estimate_materials` fallback is disabled in production. ({fetch_error})"
+            )
+            result = PricingGuideFetchResult([], "empty", warning=warning, fetch_failed=True)
+        else:
+            result = PricingGuideFetchResult([], "pricing_guide_items")
+        _last_pricing_guide_fetch = result
+        return result
+
+    legacy_out = _legacy_estimate_material_rows(
+        fetch_table=fetch_table,
+        fetch_table_admin=fetch_table_admin,
+        include_inactive=include_inactive,
+    )
+    warning = None
+    if fetch_error:
+        warning = (
+            f"`pricing_guide_items` unavailable ({fetch_error}). "
+            "Showing legacy `estimate_materials` catalog (development only)."
+        )
+    elif not legacy_out:
+        warning = "No rows in `pricing_guide_items` or `estimate_materials`."
+    else:
+        warning = (
+            "`pricing_guide_items` is empty — showing legacy `estimate_materials` catalog "
+            "(development only)."
+        )
+    result = PricingGuideFetchResult(legacy_out, "estimate_materials", warning=warning)
+    _last_pricing_guide_fetch = result
+    return result
+
+
+def fetch_pricing_guide_rows(
+    *,
+    include_inactive: bool = True,
+    fetch_table: Callable[..., list[dict[str, Any]]] | None = None,
+    fetch_table_admin: Callable[..., list[dict[str, Any]]] | None = None,
+) -> list[dict[str, Any]]:
+    return fetch_pricing_guide_catalog(
+        include_inactive=include_inactive,
+        fetch_table=fetch_table,
+        fetch_table_admin=fetch_table_admin,
+    ).rows
 
 
 @st.cache_data(ttl=300, show_spinner=False)
 def cached_pricing_guide_rows(*, include_inactive: bool = True) -> list[dict[str, Any]]:
-    return fetch_pricing_guide_rows(include_inactive=include_inactive)
+    return fetch_pricing_guide_catalog(include_inactive=include_inactive).rows
 
 
 def clear_pricing_guide_cache() -> None:
+    global _last_pricing_guide_fetch
+    _last_pricing_guide_fetch = None
     cached_pricing_guide_rows.clear()
     _cached_lookup_maps.clear()
     try:

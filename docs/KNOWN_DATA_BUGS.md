@@ -22,6 +22,7 @@ Each item has an **ID** for tracking in [`FIX_ORDER.md`](FIX_ORDER.md) and [`DAT
 | SP-005 | Estimate Materials: CSV export, Edit Estimate, Add from Inventory, Add Custom Item wired. |
 | SV-001, SV-006, OR-001 | Estimates view selectbox live; customer open counts use `status_maps`; Estimate Materials in office sidebar. |
 | SV-003, SV-004 | Central `status_maps.py`; task labels/DB writes preserve In Progress/Blocked; asset normalizer unified. |
+| SP-002, SP-003, NP-003 | Pricing Guide fail-loud in prod; lookups use DB when configured; settings persist to `company_settings`. |
 | Field loop | Scans, labor rollup, per-job email settings feed job costing (see commits on `main` May–Jun 2026). |
 
 ---
@@ -44,7 +45,7 @@ Each item has an **ID** for tracking in [`FIX_ORDER.md`](FIX_ORDER.md) and [`DAT
 |----|--------|-----------|-------|------------------------|
 | NP-001 | fixed | Dashboard | ~~Unlabeled demo/live mix~~ Live when Supabase has data; **Sample data** badges on panels without rows. | `dashboard.py` |
 | NP-002 | fixed | Reports | ~~Entire module demo~~ Live-backed with labeled sample fallback. | `reports.py` |
-| NP-003 | open | Admin / Settings | “Save settings” writes session only; caption references future `company_settings` table. | `admin.py` |
+| NP-003 | fixed | Admin / Settings | ~~Session-only save~~ Application settings persist to `company_settings` (run `122_company_settings_app_prefs.sql` for new columns). | `admin.py`, `company_settings_service.py` |
 | NP-004 | open | Tasks | `demo-*` task IDs persist to session overrides only; never linked to `todos`. | `tasks.py`, `_LOCAL_OVERRIDES_KEY` |
 | NP-005 | open | Multiple | `is_demo_id()` rows skip Supabase persist on Estimates, Jobs, Assets, etc. UI can look live but is not in DB. | `_crud.py`, module pages |
 
@@ -67,9 +68,9 @@ Each item has an **ID** for tracking in [`FIX_ORDER.md`](FIX_ORDER.md) and [`DAT
 | ID | Status | Area | Issue | Primary code / tables |
 |----|--------|------|-------|------------------------|
 | SP-001 | fixed | Inventory scan | Primary shop/job consumption paths use `record_inventory_transaction()`. Audit any remaining direct qty updates in scan edge paths. | `inventory_scan.py`, `inventory_service.py` |
-| SP-002 | open | Pricing Guide | If `pricing_guide_items` fetch fails, catalog falls back to `estimate_materials` silently in prod. | `pricing_guide_service.py` |
-| SP-003 | open | Lookups vs constants | Admin persists to `ips_lookup_*`; pages fall back to `utils/constants` when lookups missing. | `admin.py`, `lookup_service` |
-| SP-004 | open | Documents | `documents_hub` vs `employee_documents` overlap; no single link model documented for users. | `documents.py`, `employee_documents.py` |
+| SP-002 | fixed | Pricing Guide | ~~Silent `estimate_materials` fallback~~ Production uses `pricing_guide_items` only; dev may show legacy with banner. | `pricing_guide_service.py`, `pricing_guide.py` |
+| SP-003 | fixed | Lookups vs constants | ~~Runtime constants fallback~~ When Supabase is configured, dropdowns use `ips_lookup_*` only; admin **Seed from defaults** for empty tables. | `lookup_service.py`, `admin.py` |
+| SP-004 | fixed | Documents | Link model documented: Documents hub vs Employee Documents scope. | `CURRENT_APP_FLOW.md` |
 | SP-005 | fixed | Estimate Materials | Export, Edit Estimate, Add from Inventory, Add Custom Item wired to persist/navigation. | `estimate_materials.py` |
 
 ---
@@ -139,10 +140,10 @@ Each item has an **ID** for tracking in [`FIX_ORDER.md`](FIX_ORDER.md) and [`DAT
 | High | Tasks | NP-004, SV-002 |
 | High | Job Costing | DL-004 |
 | Medium | Estimates / Materials | — |
-| Medium | Pricing Guide | SP-002 |
+| Medium | Pricing Guide | — |
 | Medium | Customers | — |
 | Medium | Assets | SV-004, CD-001–CD-003 |
-| Medium | Admin / Settings | NP-003, SP-003 |
+| Medium | Admin / Settings | — |
 | Medium | Coupling Inspection | XP-003 (docs), SS-005 |
 | Low | Session / nav polish | SS-001, SS-003, SS-006 |
 

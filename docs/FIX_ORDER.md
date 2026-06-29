@@ -4,7 +4,7 @@
 **Tracker:** Bug IDs defined in [`KNOWN_DATA_BUGS.md`](KNOWN_DATA_BUGS.md).  
 **Strategy:** [`DATA_FLOW_REPAIR_PLAN.md`](DATA_FLOW_REPAIR_PLAN.md).
 
-**Progress (Jun 2026):** Phases 1–2 largely complete (persistence, handoffs, Dashboard/Reports live labels). See **Recently resolved** in [`KNOWN_DATA_BUGS.md`](KNOWN_DATA_BUGS.md). Next focus: status maps (Phase 3), session/cache (Phase 4), settings/catalog SSOT (Phase 5).
+**Progress (Jun 2026):** Phases 1–2 and Phase 5 (catalog/settings SSOT) largely complete. Phase 3 status maps shipped. Next focus: session/cache (Phase 4), job costing chain (Phase 6).
 
 **Rules for all phases:**
 - No layout, CSS, or UI component refactors unless required to wire data (e.g. a button that must call an existing service).

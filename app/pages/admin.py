@@ -26,6 +26,7 @@ try:
         show_modal_if_pending,
     )
     from app.components.tabs import render_tabs
+    from app.pages._core._crud import apply_persist_feedback
     from app.pages._core._session import nav_slug, select_key
     from app.utils.constants import LOOKUP_TABLES
 except ImportError:
@@ -87,11 +88,19 @@ def _load_lookup_entries_from_service(table_name: str) -> tuple[list[dict], str]
         return load_lookup_entries_for_label(table_name)
     except Exception:
         try:
-            from app.services.lookup_service import constants_fallback_for_label
+            from app.services.lookup_service import (
+                constants_fallback_for_label,
+                supabase_is_configured,
+            )
         except ImportError:
-            from services.lookup_service import constants_fallback_for_label  # type: ignore
-        vals = constants_fallback_for_label(table_name)
-        return [{"id": f"local-{i}", "value": v, "from_db": False} for i, v in enumerate(vals)], "constants"
+            from services.lookup_service import (  # type: ignore
+                constants_fallback_for_label,
+                supabase_is_configured,
+            )
+        if not supabase_is_configured():
+            vals = constants_fallback_for_label(table_name)
+            return [{"id": f"local-{i}", "value": v, "from_db": False} for i, v in enumerate(vals)], "constants"
+        return [], "empty"
 
 
 def _get_lookup_entries(table_name: str) -> list[dict]:
@@ -109,6 +118,8 @@ def _lookup_source_label(table_name: str) -> str:
         return "Loaded from Supabase"
     if source == "constants":
         return "Using app constants — save to create DB records"
+    if source == "empty":
+        return "No Supabase values — seed from defaults or add manually"
     return "No values configured"
 
 
@@ -254,6 +265,18 @@ def _render_lookup_editor() -> None:
     st.caption(_lookup_source_label(table))
     st.caption("Click a row to view or edit. Changes persist after **Save lookup table**.")
 
+    source = str(st.session_state.get(_lookup_source_key(table)) or "unknown")
+    if source == "empty":
+        if st.button("Seed from app defaults", key=f"{key}_seed"):
+            try:
+                from app.services.lookup_service import seed_lookup_from_constants
+            except ImportError:
+                from services.lookup_service import seed_lookup_from_constants  # type: ignore
+            ok, msg = seed_lookup_from_constants(table)
+            if apply_persist_feedback(ok, msg):
+                _clear_lookup_session(table)
+                st.rerun()
+
     rows = _lookup_rows(table, entries)
     build_modal_cache(rows, cache_key=_CACHE_KEY)
     render_clickable_table(
@@ -294,8 +317,35 @@ def _render_lookup_editor() -> None:
     st.markdown(f"</{ot}>", unsafe_allow_html=True)
 
 
+def _hydrate_app_settings_widgets(key_prefix: str) -> None:
+    flag = f"{key_prefix}_hydrated"
+    if st.session_state.get(flag):
+        return
+    try:
+        from app.services.company_settings_service import load_app_settings
+    except ImportError:
+        from services.company_settings_service import load_app_settings  # type: ignore
+    row = load_app_settings()
+    st.session_state[f"{key_prefix}_landing"] = str(row.get("default_landing_page") or "Dashboard")
+    st.session_state[f"{key_prefix}_date_fmt"] = str(row.get("date_format") or "MM/DD/YYYY")
+    st.session_state[f"{key_prefix}_tz"] = str(row.get("timezone") or "America/Chicago")
+    st.session_state[f"{key_prefix}_email"] = bool(row.get("email_notifications_enabled", True))
+    st.session_state[flag] = True
+
+
 def _render_app_settings(*, key_prefix: str) -> None:
+    _hydrate_app_settings_widgets(key_prefix)
     st.markdown("**Application Settings**")
+    if not st.session_state.get(f"{key_prefix}_from_db_notified"):
+        try:
+            from app.services.company_settings_service import load_app_settings
+        except ImportError:
+            from services.company_settings_service import load_app_settings  # type: ignore
+        if load_app_settings().get("from_db"):
+            st.caption("Loaded from **company_settings** in Supabase.")
+        else:
+            st.caption("Using defaults — save to persist to **company_settings**.")
+        st.session_state[f"{key_prefix}_from_db_notified"] = True
     c1, c2 = st.columns(2)
     with c1:
         st.selectbox(
@@ -322,7 +372,17 @@ def _render_app_settings(*, key_prefix: str) -> None:
         disabled=True,
     )
     if st.button("Save settings", key=f"{key_prefix}_save", type="primary"):
-        st.success("Settings saved (session preferences — company_settings table in a later phase).")
+        try:
+            from app.services.company_settings_service import save_app_settings
+        except ImportError:
+            from services.company_settings_service import save_app_settings  # type: ignore
+        ok, msg = save_app_settings(
+            default_landing_page=str(st.session_state.get(f"{key_prefix}_landing") or "Dashboard"),
+            date_format=str(st.session_state.get(f"{key_prefix}_date_fmt") or "MM/DD/YYYY"),
+            timezone_name=str(st.session_state.get(f"{key_prefix}_tz") or "America/Chicago"),
+            email_notifications_enabled=bool(st.session_state.get(f"{key_prefix}_email", True)),
+        )
+        apply_persist_feedback(ok, msg)
     st.markdown("---")
     try:
         from app.components.install_share import render_install_share_settings

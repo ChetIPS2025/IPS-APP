@@ -656,7 +656,11 @@ Field modules add: `render_field_job_bar`, `ips_field_job_id`, and embed the sam
 
 **Known dependencies:** `documents.py`, HR permission filter.
 
-**Current confusing points:** Overlaps with **Employee Documents** module purpose.
+**Link model (when to use which module):**
+- **Documents hub** (`documents`) — operational files linked to jobs, estimates, assets, inventory, company updates, or certifications via `linked_module` + `linked_ref`. Use for project/customer deliverables and cross-module attachments.
+- **Employee Documents** (`employee_documents`) — HR/compliance files tied to a specific employee record (licenses, medical, training). Stored in `employee-documents` bucket; not shown in the hub unless also uploaded there separately.
+
+**Current confusing points:** Both modules can store PDFs; only Employee Documents is employee-scoped. Prefer the hub for job/estimate/asset links; use Employee Documents for workforce compliance.
 
 ---
 

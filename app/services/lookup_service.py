@@ -1,4 +1,4 @@
-"""Lookup values for dropdowns (Supabase ips_lookup_* with constants fallback)."""
+"""Lookup values for dropdowns (Supabase ips_lookup_*; constants only when offline)."""
 
 from __future__ import annotations
 
@@ -61,6 +61,20 @@ def _constants_fallback(slug: str) -> list[str]:
     if tup:
         return [str(x) for x in tup]
     return []
+
+
+def supabase_is_configured() -> bool:
+    """True when public Supabase URL/key are present (runtime DB expected)."""
+    try:
+        from app.config import validate_supabase_public_config
+    except ImportError:
+        from config import validate_supabase_public_config  # type: ignore
+    return validate_supabase_public_config() is None
+
+
+def _allow_constants_runtime_fallback() -> bool:
+    """Constants seed dev/offline dropdowns; not a silent prod substitute for ips_lookup_*."""
+    return not supabase_is_configured()
 
 
 def slug_for_label(label: str) -> str:
@@ -140,12 +154,13 @@ def load_lookup_entries(slug: str) -> tuple[list[dict[str, Any]], str]:
         if entries:
             return entries, "database"
 
-    const_vals = _constants_fallback(slug)
-    if const_vals:
-        return [
-            {"id": f"local-{i}", "value": val, "from_db": False}
-            for i, val in enumerate(const_vals)
-        ], "constants"
+    if _allow_constants_runtime_fallback():
+        const_vals = _constants_fallback(slug)
+        if const_vals:
+            return [
+                {"id": f"local-{i}", "value": val, "from_db": False}
+                for i, val in enumerate(const_vals)
+            ], "constants"
     return [], "empty"
 
 
@@ -175,7 +190,18 @@ def load_lookup_for_label(label: str) -> list[str]:
         values = []
     if values:
         return values
-    return constants_fallback_for_label(label)
+    if _allow_constants_runtime_fallback():
+        return constants_fallback_for_label(label)
+    return []
+
+
+def seed_lookup_from_constants(label: str) -> tuple[bool, str]:
+    """Push app.constants defaults into ips_lookup_* (admin seed action)."""
+    vals = constants_fallback_for_label(label)
+    if not vals:
+        return False, f"No built-in defaults for {label}."
+    entries = [{"id": _new_local_id(), "value": val, "from_db": False} for val in vals]
+    return sync_lookup_for_label(label, entries)
 
 
 def load_lookup_entries_for_label(label: str) -> tuple[list[dict[str, Any]], str]:
