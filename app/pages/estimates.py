@@ -248,6 +248,7 @@ _REVISE_CANCEL_CONFIRM_PREFIX = "est_revise_cancel_confirm_"
 SELECTED_ESTIMATE_KEY = "selected_estimate_id"
 SHOW_ESTIMATE_MODAL_KEY = "show_estimate_detail_modal"
 _ALL_ESTIMATE_IDS_KEY = "_ips_estimates_visible_ids"
+_COST_BUILDER_OPTS_CACHE_KEY = "_ips_cost_builder_select_opts"
 
 
 def _as_date(value: object) -> date | None:
@@ -487,6 +488,7 @@ def _on_estimate_cost_builder_saved(estimate_id: str) -> None:
     except ImportError:
         from services.phase2_modules_service import clear_all_data_caches  # type: ignore
     clear_all_data_caches()
+    _clear_cost_builder_options_cache()
 
 
 def _inventory_options() -> list[tuple[str, dict]]:
@@ -520,6 +522,35 @@ def _vendor_options() -> list[str]:
         if v and v != "—":
             vendors.add(v)
     return sorted(vendors)
+
+
+def _clear_cost_builder_options_cache() -> None:
+    st.session_state.pop(_COST_BUILDER_OPTS_CACHE_KEY, None)
+
+
+def _cost_builder_option_lists() -> tuple[
+    list[tuple[str, dict]],
+    list[tuple[str, dict]],
+    list[tuple[str, dict]],
+    list[str],
+]:
+    """Load pricing/inventory/asset/vendor picklists once per session (Cost Builder only)."""
+    cached = st.session_state.get(_COST_BUILDER_OPTS_CACHE_KEY)
+    if isinstance(cached, dict):
+        return (
+            list(cached.get("pg") or []),
+            list(cached.get("inv") or []),
+            list(cached.get("asset") or []),
+            list(cached.get("vendor") or []),
+        )
+    opts = {
+        "pg": _pricing_guide_options(),
+        "inv": _inventory_options(),
+        "asset": _asset_options(),
+        "vendor": _vendor_options(),
+    }
+    st.session_state[_COST_BUILDER_OPTS_CACHE_KEY] = opts
+    return opts["pg"], opts["inv"], opts["asset"], opts["vendor"]
 
 
 def _job_select_options(customer_name: str) -> list[tuple[str, str]]:
@@ -1295,10 +1326,6 @@ def _render_estimate_detail_tabs(est: dict) -> None:
     en = safe_value(est.get("estimate_number"))
     status = safe_value(est.get("status"))
     customer = safe_value(est.get("customer"))
-    inv_opts = _inventory_options()
-    pg_opts = _pricing_guide_options()
-    asset_opts = _asset_options()
-    vendor_opts = _vendor_options()
 
     if st.session_state.get(_build_mode_key(est)):
         st.info("Build mode — add lines and review totals in Cost Builder.")
@@ -1372,6 +1399,7 @@ def _render_estimate_detail_tabs(est: dict) -> None:
             fresh = get_estimate(eid)
             if fresh:
                 est = fresh
+            pg_opts, inv_opts, asset_opts, vendor_opts = _cost_builder_option_lists()
             render_cost_builder_tab(
                 est,
                 pricing_guide_options=pg_opts,
