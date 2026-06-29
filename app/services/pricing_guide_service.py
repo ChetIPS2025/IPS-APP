@@ -245,7 +245,14 @@ def _asset_cost_from_row(row: dict[str, Any]) -> float | None:
     return _cost_from_row(row, ("daily_rate", "hourly_rate", "rental_daily_rate", "purchase_cost", "current_value"))
 
 
-def _load_lookup_maps() -> tuple[dict[str, str], dict[str, str], dict[str, str], dict[str, float], dict[str, bool], dict[str, float]]:
+def _fetch_lookup_maps_from_db() -> tuple[
+    dict[str, str],
+    dict[str, str],
+    dict[str, str],
+    dict[str, float],
+    dict[str, bool],
+    dict[str, float],
+]:
     vendor_names: dict[str, str] = {}
     inventory_labels: dict[str, str] = {}
     asset_labels: dict[str, str] = {}
@@ -325,6 +332,30 @@ def _load_lookup_maps() -> tuple[dict[str, str], dict[str, str], dict[str, str],
     return vendor_names, inventory_labels, asset_labels, inventory_costs, asset_flags, asset_costs
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def _cached_lookup_maps() -> tuple[
+    dict[str, str],
+    dict[str, str],
+    dict[str, str],
+    dict[str, float],
+    dict[str, bool],
+    dict[str, float],
+]:
+    """Vendor, inventory, and asset lookup maps (cached separately from PG rows)."""
+    return _fetch_lookup_maps_from_db()
+
+
+def _load_lookup_maps() -> tuple[
+    dict[str, str],
+    dict[str, str],
+    dict[str, str],
+    dict[str, float],
+    dict[str, bool],
+    dict[str, float],
+]:
+    return _cached_lookup_maps()
+
+
 def pricing_guide_row_visible(row: dict[str, Any], asset_flags: dict[str, bool]) -> bool:
     """Hide Asset-class PG rows when the linked asset is fleet-only."""
     if str(row.get("item_class") or "") != "Asset":
@@ -401,6 +432,7 @@ def cached_pricing_guide_rows(*, include_inactive: bool = True) -> list[dict[str
 
 def clear_pricing_guide_cache() -> None:
     cached_pricing_guide_rows.clear()
+    _cached_lookup_maps.clear()
     try:
         from app.services.item_images import clear_item_image_url_cache
         from app.services.pricing_guide_images import clear_pricing_guide_image_cache
