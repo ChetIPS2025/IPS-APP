@@ -12378,6 +12378,53 @@ body.ips-auth-login [data-testid="stVerticalBlockBorderWrapper"].st-key-ips_logi
 .ips-deadline-badge.warn {{ background: #ffedd5; color: #c2410c; }}
 .ips-deadline-badge.ok {{ background: #dcfce7; color: #166534; }}
 
+.st-key-dashboard_management_reminders {{
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  padding: 1.1rem 1.25rem 1.15rem;
+  margin: 0 0 1.15rem;
+}}
+.st-key-dashboard_management_reminders [data-testid="stHorizontalBlock"]:first-of-type {{
+  margin-bottom: 0.65rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid #f1f5f9;
+}}
+.ips-dash-mr-title-bar {{
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: {TEXT};
+  letter-spacing: -0.01em;
+}}
+.ips-dash-mr-subtitle {{
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: {TEXT_MUTED};
+  line-height: 1.4;
+}}
+.ips-dash-mr-empty {{
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  color: {TEXT_MUTED};
+}}
+.ips-dash-mr-item-title {{
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 650;
+  color: {TEXT};
+  line-height: 1.35;
+}}
+.ips-dash-mr-item-meta {{
+  margin: 0.12rem 0 0;
+  font-size: 0.72rem;
+  color: {TEXT_MUTED};
+}}
+.ips-dash-mr-item-text {{
+  min-width: 0;
+}}
+
 .ips-quick-actions-card {{
   background: #ffffff;
   border: 1px solid #e2e8f0;

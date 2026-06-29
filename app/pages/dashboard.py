@@ -12,6 +12,7 @@ try:
     from app.components.cards import render_kpi_card
     from app.components.charts import render_donut_chart, render_horizontal_bars, render_line_chart
     from app.components.company_updates_feed import render_dashboard_company_updates_section
+    from app.components.dashboard_management_reminders import render_dashboard_management_reminders_section
     from app.components.feeds import render_activity_feed
     from app.components.qr_scan_history_ui import inject_qr_scan_history_css, qr_scan_history_table_html
     from app.components.headers import render_dashboard_quick_actions, render_page_brand_header
@@ -35,6 +36,7 @@ except ImportError:
     from components.cards import render_kpi_card  # type: ignore
     from components.charts import render_donut_chart, render_horizontal_bars, render_line_chart  # type: ignore
     from components.company_updates_feed import render_dashboard_company_updates_section  # type: ignore
+    from components.dashboard_management_reminders import render_dashboard_management_reminders_section  # type: ignore
     from components.feeds import render_activity_feed  # type: ignore
     from components.qr_scan_history_ui import inject_qr_scan_history_css, qr_scan_history_table_html  # type: ignore
     from components.headers import render_dashboard_quick_actions, render_page_brand_header  # type: ignore
@@ -114,6 +116,8 @@ def render() -> None:
     )
 
     render_dashboard_company_updates_section(load_recent_company_updates(limit=8))
+
+    render_dashboard_management_reminders_section(limit=8)
 
     kpis = load_dashboard_kpis(period_start=start, period_end=end)
     kpis_live = bool(kpis.get("is_live"))
