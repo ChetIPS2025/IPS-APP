@@ -13,6 +13,7 @@ try:
     from app.services.catalog_stock_policy_service import (
         STOCK_POLICIES,
         STOCK_POLICY_LABELS,
+        linked_inventory_quantity,
         normalize_stock_policy,
         save_pricing_stock_settings,
         stock_policy_label,
@@ -23,6 +24,7 @@ except ImportError:
     from services.catalog_stock_policy_service import (  # type: ignore
         STOCK_POLICIES,
         STOCK_POLICY_LABELS,
+        linked_inventory_quantity,
         normalize_stock_policy,
         save_pricing_stock_settings,
         stock_policy_label,
@@ -57,6 +59,7 @@ def render_catalog_stock_policy_panel(
 
     current_policy = normalize_stock_policy(row.get("stock_policy"))
     current_rp = float(row.get("default_reorder_point") or 0)
+    current_qty = linked_inventory_quantity(row)
     labels = _policy_options()
     default_label = STOCK_POLICY_LABELS[current_policy]
 
@@ -87,12 +90,34 @@ def render_catalog_stock_policy_panel(
             disabled=not can_manage or policy == "none",
             help="When on-hand quantity is at or below this level, mandatory items appear in Needs reorder.",
         )
+        qty_on_hand = 0.0
+        if policy != "none":
+            qty_on_hand = float(
+                st.number_input(
+                    "Quantity on hand",
+                    min_value=0.0,
+                    value=current_qty,
+                    step=1.0,
+                    key=_draft_key(pid, "qty"),
+                    disabled=not can_manage,
+                    help=(
+                        "For optional extras, enter what you have left from jobs — "
+                        "inventory is created automatically when quantity is greater than zero."
+                    ),
+                )
+            )
 
         if not can_manage:
             st.caption(f"Current policy: {stock_policy_label(current_policy)}")
+            if current_policy != "none":
+                st.caption(f"Quantity on hand: {current_qty:g}")
             return
 
-        unchanged = policy == current_policy and float(reorder) == current_rp
+        unchanged = (
+            policy == current_policy
+            and float(reorder) == current_rp
+            and (policy == "none" or float(qty_on_hand) == float(current_qty))
+        )
         if success_solid_button(
             "Save Stock Policy",
             f"pg_stock_save_{pid}",
@@ -103,6 +128,7 @@ def render_catalog_stock_policy_panel(
                 row,
                 stock_policy=policy,
                 default_reorder_point=float(reorder),
+                quantity_on_hand=float(qty_on_hand) if policy != "none" else None,
                 ensure_inventory=True,
             )
             if result.ok:
@@ -110,4 +136,5 @@ def render_catalog_stock_policy_panel(
                 if on_change:
                     on_change()
                 st.rerun()
-            st.error(result.error or "Could not save stock policy.")
+            else:
+                st.error(result.error or "Could not save stock policy.")

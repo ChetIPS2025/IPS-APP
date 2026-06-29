@@ -36,6 +36,7 @@ __all__ = [
     "enrich_inventory_rows",
     "inventory_needs_reorder",
     "inventory_status_fields_for_qty",
+    "linked_inventory_quantity",
     "normalize_stock_policy",
     "passes_inventory_view_filter",
     "pricing_guide_lookup_maps",
@@ -224,11 +225,134 @@ def sync_linked_inventory_reorder(pricing_item_id: str) -> ServiceResult:
     return apply_pricing_stock_settings_to_inventory(row)
 
 
+def _linked_inventory_quantity(pg_row: dict[str, Any]) -> float:
+    """Current on-hand qty for the pricing item's linked inventory row, if any."""
+    inv_id = _linked_inventory_id(pg_row)
+    if not inv_id:
+        return 0.0
+    inv = get_inventory_item(inv_id)
+    return _inventory_qty(inv) if inv else 0.0
+
+
+def linked_inventory_quantity(pg_row: dict[str, Any]) -> float:
+    """Public alias for reading linked inventory on-hand quantity."""
+    return _linked_inventory_quantity(pg_row)
+
+
+def _ensure_inventory_link_for_policy(
+    row: dict[str, Any],
+    *,
+    policy: str,
+    quantity_on_hand: float | None,
+) -> tuple[dict[str, Any], list[str], ServiceResult | None]:
+    """Create linked inventory when mandatory, or optional with qty > 0."""
+    fresh = row
+    messages: list[str] = []
+    if policy == "none" or _linked_inventory_id(fresh):
+        return fresh, messages, None
+
+    qty = float(quantity_on_hand or 0) if quantity_on_hand is not None else 0.0
+    should_create = policy == "mandatory" or (policy == "optional" and qty > 0)
+    if not should_create:
+        return fresh, messages, None
+
+    try:
+        from app.services.catalog_presence_service import apply_catalog_presence, resolve_catalog_presence
+    except ImportError:
+        from services.catalog_presence_service import apply_catalog_presence, resolve_catalog_presence  # type: ignore
+
+    presence = resolve_catalog_presence(fresh)
+    result = apply_catalog_presence(
+        fresh,
+        pricing_guide=bool(presence.get("pricing_guide")),
+        inventory=True,
+        assets=bool(presence.get("assets")),
+    )
+    if not result.ok:
+        return fresh, messages, result
+
+    try:
+        from app.services.pricing_guide_service import cached_pricing_guide_rows
+    except ImportError:
+        from services.pricing_guide_service import cached_pricing_guide_rows  # type: ignore
+
+    pid = str(fresh.get("id") or "").strip()
+    fresh = next(
+        (r for r in cached_pricing_guide_rows(include_inactive=True) if str(r.get("id") or "") == pid),
+        fresh,
+    )
+    label = "mandatory" if policy == "mandatory" else "optional extras"
+    messages.append(f"Inventory record created for {label} item.")
+    return fresh, messages, None
+
+
+def _apply_quantity_on_hand_to_inventory(
+    pg_row: dict[str, Any],
+    quantity_on_hand: float,
+) -> tuple[list[str], ServiceResult | None]:
+    """Set linked inventory quantity; records an adjustment transaction when qty changes."""
+    inv_id = _linked_inventory_id(pg_row)
+    if not inv_id:
+        return [], None
+
+    inv = get_inventory_item(inv_id)
+    if not inv:
+        return [], ServiceResult(ok=False, error="Linked inventory item not found.")
+
+    new_qty = max(float(quantity_on_hand or 0), 0.0)
+    prev_qty = _inventory_qty(inv)
+    if abs(new_qty - prev_qty) < 1e-9:
+        return [], None
+
+    delta = round(new_qty - prev_qty, 4)
+    if abs(delta) < 1e-9:
+        return [], None
+
+    try:
+        from app.services.inventory_service import record_inventory_transaction
+    except ImportError:
+        from services.inventory_service import record_inventory_transaction  # type: ignore
+
+    txn = record_inventory_transaction(
+        {
+            "inventory_id": inv_id,
+            "transaction_type": "adjustment",
+            "quantity": abs(delta),
+            "signed_quantity": delta,
+            "notes": "Quantity updated from Pricing Guide stock policy",
+            "source": "pricing_guide",
+        }
+    )
+    if not txn.ok:
+        try:
+            from app.services.repository import update_row_admin
+        except ImportError:
+            from services.repository import update_row_admin  # type: ignore
+        res = update_row_admin(
+            "inventory_items",
+            {
+                "quantity_on_hand": new_qty,
+                "qty_on_hand": new_qty,
+                "updated_at": _now_iso(),
+                **inventory_status_fields_for_qty(inv, new_qty),
+            },
+            {"id": inv_id},
+        )
+        if not res.ok:
+            return [], ServiceResult(ok=False, error=txn.error or res.error or "Could not update quantity.")
+        clear_inventory_cache()
+    else:
+        clear_inventory_cache()
+
+    return [f"Quantity on hand set to {new_qty:g}."], None
+
+
 def save_pricing_stock_settings(
     pg_row: dict[str, Any],
     *,
     stock_policy: str,
     default_reorder_point: float,
+    quantity_on_hand: float | None = None,
     ensure_inventory: bool = True,
 ) -> ServiceResult:
     """Persist stock policy on pricing guide and sync linked inventory."""
@@ -272,25 +396,22 @@ def save_pricing_stock_settings(
 
     messages: list[str] = ["Stock policy saved."]
 
-    if policy == "mandatory" and ensure_inventory and not _linked_inventory_id(fresh):
+    qty_value: float | None = None
+    if policy in {"mandatory", "optional"} and quantity_on_hand is not None:
         try:
-            from app.services.catalog_presence_service import apply_catalog_presence, resolve_catalog_presence
-        except ImportError:
-            from services.catalog_presence_service import apply_catalog_presence, resolve_catalog_presence  # type: ignore
-        presence = resolve_catalog_presence(fresh)
-        result = apply_catalog_presence(
+            qty_value = max(float(quantity_on_hand), 0.0)
+        except (TypeError, ValueError):
+            qty_value = 0.0
+
+    if ensure_inventory and policy in {"mandatory", "optional"}:
+        fresh, ensure_msgs, ensure_err = _ensure_inventory_link_for_policy(
             fresh,
-            pricing_guide=bool(presence.get("pricing_guide")),
-            inventory=True,
-            assets=bool(presence.get("assets")),
+            policy=policy,
+            quantity_on_hand=qty_value,
         )
-        if not result.ok:
-            return result
-        messages.append("Inventory record created for mandatory item.")
-        fresh = next(
-            (r for r in cached_pricing_guide_rows(include_inactive=True) if str(r.get("id") or "") == pid),
-            fresh,
-        )
+        if ensure_err is not None:
+            return ensure_err
+        messages.extend(ensure_msgs)
 
     if policy in {"mandatory", "optional"} and _linked_inventory_id(fresh):
         sync_result = apply_pricing_stock_settings_to_inventory({**fresh, "default_reorder_point": rp})
@@ -298,5 +419,11 @@ def save_pricing_stock_settings(
             return sync_result
         if policy == "mandatory" and rp > 0:
             messages.append(f"Reorder point set to {rp:g} on linked inventory.")
+
+        if qty_value is not None:
+            qty_msgs, qty_err = _apply_quantity_on_hand_to_inventory(fresh, qty_value)
+            if qty_err is not None:
+                return qty_err
+            messages.extend(qty_msgs)
 
     return ServiceResult(ok=True, data={"message": " ".join(messages)})
