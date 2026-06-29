@@ -20,13 +20,13 @@ Each business area is a **module/page** inside that shell — Jobs, Estimates, *
 
 ### Pricing Guide vs Inventory vs Estimate Materials
 
-| Concept | Purpose |
-|---------|---------|
-| **Pricing Guide** | Master list of default material, labor, equipment, travel, and other costs used when building estimates |
-| **Inventory** | Physical stock on hand — QR tracking, check-in/check-out, job issue transactions |
-| **Estimate Materials** | Material lines selected on a specific estimate (Cost Builder / estimate detail) |
+| Concept | Purpose | Primary table(s) |
+|---------|---------|------------------|
+| **Pricing Guide** | Master catalog of default costs (material, labor, equipment, travel, etc.) | `pricing_guide_items` (legacy merge from `estimate_materials` if migration missing) |
+| **Inventory** | Physical stock on hand — QR tracking, check-in/check-out, job issue transactions | `inventory_items` |
+| **Estimate Materials** | Material **lines on a specific estimate** (cost builder) | `estimate_line_items` |
 
-The Pricing Guide reads and writes the `estimate_materials` catalog table (and legacy `materials_catalog` merge where present). Inventory remains a separate module and table.
+The Pricing Guide can set optional/mandatory stock policy and quantity on hand inline; linked rows sync to `inventory_items`. Inventory remains a separate module for shop/field scans and transactions.
 
 Helper launchers (`run_streamlit.ps1`, `run_streamlit.bat`, `run_app.py`) all start the same `app/main.py`. See [LAUNCHERS.md](LAUNCHERS.md).
 
@@ -35,8 +35,9 @@ Helper launchers (`run_streamlit.ps1`, `run_streamlit.bat`, `run_app.py`) all st
 - Fixed left sidebar with logo and user profile
 - Consistent SaaS dashboard UI (cards, filters, selectable tables, detail panels)
 - Role-based access (Admin, Supervisor, Project Manager, Employee, Viewer)
-- Supabase-backed data with demo fallbacks when tables are missing
+- Supabase-backed data with **Live data** / **Sample data** badges on Dashboard and Reports when tables are empty or unreachable
 - Field Supervisor Mode for tablet-friendly job lookup and time entry
+- Pipeline view for quotes → jobs workflow
 - Centralized CSS in `app/styles.py` (injected on every page)
 
 ## Folder structure
@@ -125,17 +126,24 @@ See [SUPABASE_SCHEMA_NOTES.md](SUPABASE_SCHEMA_NOTES.md) for table/column mappin
 | Area | Tables |
 |------|--------|
 | Jobs | `jobs` |
-| Estimates | `estimates`, `estimate_line_items`, `estimate_materials` (catalog + lines) |
-| Inventory | `inventory_items` |
+| Estimates | `estimates`, `estimate_line_items` |
+| Pricing Guide | `pricing_guide_items` |
+| Inventory | `inventory_items`, `inventory_transactions` |
 | Assets | `assets` |
 | Time | `employee_timekeeping_weeks`, `time_entries` |
-| People | `employees`, `profiles`, `employee_certifications` |
+| People | `employees`, `profiles`, `employee_certifications`, `employee_documents` |
 | Docs | `documents_hub` |
 | Updates | `company_updates` |
 | Tasks | `todos` |
+| Lookups | `ips_lookup_tables`, `ips_lookup_values` |
+
+**Storage buckets** (create in Supabase when using uploads): `certification-documents`, `employee-documents`, plus buckets used by job photos and inventory images (see service modules).
 
 ## Documentation
 
+- [docs/KNOWN_DATA_BUGS.md](docs/KNOWN_DATA_BUGS.md) — data-flow bug tracker (open / fixed)
+- [docs/FIX_ORDER.md](docs/FIX_ORDER.md) — recommended repair sequence
+- [docs/CURRENT_APP_FLOW.md](docs/CURRENT_APP_FLOW.md) — as-built module behavior
 - [TESTING_CHECKLIST.md](TESTING_CHECKLIST.md)
 - [DEPLOYMENT_NOTES.md](DEPLOYMENT_NOTES.md)
 - [app/pages/LEGACY_PAGES.md](app/pages/LEGACY_PAGES.md)
