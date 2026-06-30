@@ -61,12 +61,18 @@ def render() -> None:
     admin = _admin_read()
     prof = current_profile() or {}
     uid = str(prof.get("id") or "").strip() or None
+    session_key = uid or "anonymous"
     today = date.today()
 
     jobs = sort_jobs_by_number_then_name(
         list(fetch_jobs_with_order_fallback(limit=3000, use_admin=admin) or [])
     )
-    time_entries = fetch_table_for_session("time_entries", admin=admin, limit=8000)
+    time_entries = fetch_table_for_session(
+        "time_entries",
+        session_key=session_key,
+        use_admin=admin,
+        limit=8000,
+    )
     te_today = [
         te
         for te in (time_entries or [])
@@ -74,7 +80,15 @@ def render() -> None:
     ]
     estimates = {
         str(e.get("id") or ""): e
-        for e in (fetch_table_for_session("estimates", admin=admin, limit=3000) or [])
+        for e in (
+            fetch_table_for_session(
+                "estimates",
+                session_key=session_key,
+                use_admin=admin,
+                limit=3000,
+            )
+            or []
+        )
         if isinstance(e, dict) and e.get("id")
     }
 

@@ -70,7 +70,12 @@ def render_crew_time_for_job(
     status = str((batch or {}).get("status") or "draft").lower()
     st.caption(f"Batch status: **{status}**")
 
-    employees = fetch_table_for_session("employees", admin=admin, limit=5000)
+    employees = fetch_table_for_session(
+        "employees",
+        session_key=str(uid or "anonymous"),
+        use_admin=admin,
+        limit=5000,
+    )
     emp_opts = {
         str(e.get("id") or ""): str(e.get("name") or e.get("email") or "Employee")
         for e in (employees or [])
