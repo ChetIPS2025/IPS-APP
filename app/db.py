@@ -1320,6 +1320,12 @@ def find_auth_user_by_email_admin(email: str) -> dict[str, Any] | None:
     if not em:
         return None
     try:
+        http_row = _find_auth_user_by_email_http(em)
+        if http_row:
+            return http_row if isinstance(http_row, dict) else _auth_row_to_dict(http_row)
+    except Exception as exc:
+        _LOG.warning("HTTP auth email lookup failed for %s: %r", em, exc)
+    try:
         for page in range(1, 51):
             batch = list_auth_users_admin(page=page, per_page=200)
             if not batch:
@@ -1332,12 +1338,6 @@ def find_auth_user_by_email_admin(email: str) -> dict[str, Any] | None:
                 break
     except Exception as exc:
         _LOG.warning("find_auth_user_by_email_admin failed for %s: %r", em, exc)
-    try:
-        http_row = _find_auth_user_by_email_http(em)
-        if http_row:
-            return http_row if isinstance(http_row, dict) else _auth_row_to_dict(http_row)
-    except Exception as exc:
-        _LOG.warning("HTTP auth email lookup failed for %s: %r", em, exc)
     return None
 
 
@@ -1375,42 +1375,94 @@ def _auth_user_id_from_profile_email(email: str) -> str:
     return ""
 
 
-def _find_auth_user_by_email_http(email: str) -> dict[str, Any] | None:
-    """Raw GoTrue admin list fallback when the Python SDK response shape differs."""
+def _http_list_auth_users_admin(
+    *,
+    page: int = 1,
+    per_page: int = 200,
+    email_filter: str = "",
+) -> list[dict[str, Any]]:
+    """Raw GoTrue admin list; optional ``filter`` searches auth.users by email."""
     import urllib.error
     import urllib.parse
     import urllib.request
 
-    em = str(email or "").strip().lower()
-    if not em:
-        return None
     key, _ = _admin_api_key_and_source()
     url_base = str(getattr(settings, "supabase_url", "") or "").strip().rstrip("/")
     if not url_base or not key:
-        return None
+        return []
     headers = {"Authorization": f"Bearer {key}", "apikey": key, "Accept": "application/json"}
-    for page in range(1, 51):
-        qs = urllib.parse.urlencode({"page": page, "per_page": 200})
-        req = urllib.request.Request(f"{url_base}/auth/v1/admin/users?{qs}", headers=headers)
-        try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                payload = json.loads(resp.read().decode("utf-8"))
-        except urllib.error.HTTPError as exc:
-            _LOG.warning("HTTP auth user list failed for %s page %s: %r", em, page, exc)
-            break
-        except Exception as exc:
-            _LOG.warning("HTTP auth user list failed for %s page %s: %r", em, page, exc)
-            break
-        users = payload.get("users") if isinstance(payload, dict) else payload
-        if not isinstance(users, list) or not users:
-            break
-        for user in users:
-            row = user if isinstance(user, dict) else _auth_row_to_dict(user)
+    params: dict[str, str | int] = {"page": page, "per_page": per_page}
+    filt = str(email_filter or "").strip()
+    if len(filt) >= 3:
+        params["filter"] = filt
+    qs = urllib.parse.urlencode(params)
+    req = urllib.request.Request(f"{url_base}/auth/v1/admin/users?{qs}", headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        _LOG.warning("HTTP auth user list failed (filter=%r page=%s): %r", filt or None, page, exc)
+        return []
+    except Exception as exc:
+        _LOG.warning("HTTP auth user list failed (filter=%r page=%s): %r", filt or None, page, exc)
+        return []
+    users = payload.get("users") if isinstance(payload, dict) else payload
+    if not isinstance(users, list) or not users:
+        return []
+    out: list[dict[str, Any]] = []
+    for user in users:
+        row = user if isinstance(user, dict) else _auth_row_to_dict(user)
+        row["email"] = _auth_user_row_email(row) or row.get("email")
+        out.append(row)
+    return out
+
+
+def _find_auth_user_by_email_http(email: str) -> dict[str, Any] | None:
+    """Raw GoTrue admin list fallback when the Python SDK response shape differs."""
+    em = str(email or "").strip().lower()
+    if not em:
+        return None
+    if len(em) >= 3:
+        for row in _http_list_auth_users_admin(page=1, per_page=50, email_filter=em):
             if _auth_user_row_email(row) == em:
                 return row
-        if len(users) < 200:
+    for page in range(1, 51):
+        batch = _http_list_auth_users_admin(page=page, per_page=200)
+        if not batch:
+            break
+        for row in batch:
+            if _auth_user_row_email(row) == em:
+                return row
+        if len(batch) < 200:
             break
     return None
+
+
+def _recover_auth_id_after_create_conflict(email: str, profile_id: str = "") -> str:
+    """
+    Last-resort auth.users.id lookup after create_user reports a duplicate.
+
+    Uses GoTrue email filter first because paginated list_users often misses rows.
+    """
+    em = str(email or "").strip().lower()
+    if not em:
+        return ""
+    auth_id = _find_auth_user_id_by_email(em)
+    if auth_id:
+        return auth_id
+    http_row = _find_auth_user_by_email_http(em)
+    if http_row:
+        aid = str(http_row.get("id") or "").strip()
+        if aid:
+            return aid
+    pid = str(profile_id or "").strip()
+    if pid:
+        linked = _resolve_auth_id_from_profile_id(pid, em)
+        if linked:
+            return linked
+        if get_auth_user_by_id_admin(pid):
+            return pid
+    return ""
 
 
 def resolve_auth_user_id(
@@ -1662,11 +1714,17 @@ def set_login_password_admin(
         auth_id = _find_auth_user_id_by_email(em)
     if not auth_id:
         auth_id = _resolve_auth_id_from_profile_id(str(profile_id or "").strip(), em)
+    if not auth_id:
+        auth_id = _recover_auth_id_after_create_conflict(em, str(profile_id or "").strip())
 
     stale_profile_id = str(profile_id or "").strip()
     if not auth_id and stale_profile_id and not get_auth_user_by_id_admin(stale_profile_id):
         _delete_profile_by_id_admin(stale_profile_id)
-        auth_id = _find_auth_user_id_by_email(em) or _resolve_auth_id_from_profile_id(stale_profile_id, em)
+        auth_id = (
+            _find_auth_user_id_by_email(em)
+            or _resolve_auth_id_from_profile_id(stale_profile_id, em)
+            or _recover_auth_id_after_create_conflict(em, stale_profile_id)
+        )
 
     if auth_id:
         linked = get_auth_user_by_id_admin(auth_id) or {}
@@ -1724,9 +1782,9 @@ def set_login_password_admin(
         if not _auth_create_user_conflict(exc):
             raise
         _remove_orphan_profiles_for_email(em)
-        auth_id = (
-            _find_auth_user_id_by_email(em)
-            or _resolve_auth_id_from_profile_id(str(profile_id or "").strip(), em)
+        auth_id = _recover_auth_id_after_create_conflict(
+            em,
+            str(profile_id or "").strip(),
         )
         if not auth_id:
             raise RuntimeError(

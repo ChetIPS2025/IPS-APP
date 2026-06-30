@@ -167,7 +167,7 @@ def test_set_login_password_admin_recovers_from_database_error(monkeypatch):
     )
     assert out == auth_id
     assert password_calls == [auth_id]
-    assert profile_resolve_calls["n"] == 2
+    assert profile_resolve_calls["n"] >= 2
 
 
 def test_set_login_password_admin_links_via_profile_id_before_create(monkeypatch):
@@ -238,6 +238,88 @@ def test_find_auth_user_by_email_http_fallback(monkeypatch):
     row = find_auth_user_by_email_admin("user@industrialplantsolution.com")
     assert row is not None
     assert row["id"] == "auth-http"
+
+
+def test_find_auth_user_by_email_http_uses_filter_first(monkeypatch):
+    from app.db import _find_auth_user_by_email_http
+
+    calls: list[dict] = []
+
+    def fake_http_list(**kwargs):
+        calls.append(kwargs)
+        if kwargs.get("email_filter"):
+            return [{"id": "auth-filter", "email": "user@industrialplantsolution.com", "identities": []}]
+        return []
+
+    monkeypatch.setattr("app.db._http_list_auth_users_admin", fake_http_list)
+
+    row = _find_auth_user_by_email_http("user@industrialplantsolution.com")
+    assert row is not None
+    assert row["id"] == "auth-filter"
+    assert any(c.get("email_filter") == "user@industrialplantsolution.com" for c in calls)
+
+
+def test_recover_auth_id_after_create_conflict_uses_http_filter(monkeypatch):
+    from app.db import _recover_auth_id_after_create_conflict
+
+    monkeypatch.setattr("app.db._find_auth_user_id_by_email", lambda em: "")
+    monkeypatch.setattr(
+        "app.db._find_auth_user_by_email_http",
+        lambda em: {"id": "auth-recovered", "email": em, "identities": []},
+    )
+
+    assert (
+        _recover_auth_id_after_create_conflict(
+            "chance.burgess@industrialplantsolution.com",
+            "1d04e3f2-c3de-4783-935b-bd4550acf307",
+        )
+        == "auth-recovered"
+    )
+
+
+def test_set_login_password_admin_recovers_via_http_filter_on_create_conflict(monkeypatch):
+    from app.db import set_login_password_admin
+
+    auth_id = "auth-recovered-99"
+    email = "chance.burgess@industrialplantsolution.com"
+    profile_id = "1d04e3f2-c3de-4783-935b-bd4550acf307"
+    password_calls: list[str] = []
+    recover_calls: list[tuple[str, str]] = []
+
+    def fake_recover(em: str, pid: str = "") -> str:
+        recover_calls.append((em, pid))
+        return auth_id if len(recover_calls) >= 3 else ""
+
+    monkeypatch.setattr("app.db.resolve_auth_user_id", lambda **k: "")
+    monkeypatch.setattr("app.db._find_auth_user_id_by_email", lambda em: "")
+    monkeypatch.setattr("app.db._resolve_auth_id_from_profile_id", lambda pid, em: "")
+    monkeypatch.setattr("app.db._recover_auth_id_after_create_conflict", fake_recover)
+    monkeypatch.setattr("app.db.get_auth_user_by_id_admin", lambda uid: None)
+    monkeypatch.setattr("app.db._delete_profile_by_id_admin", lambda pid: None)
+    monkeypatch.setattr("app.db._remove_orphan_profiles_for_email", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "app.db.create_auth_user",
+        lambda **k: (_ for _ in ()).throw(
+            RuntimeError(
+                f"auth.admin.create_user failed for {email!r}: AuthApiError('User already registered')"
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        "app.db.set_auth_user_password_admin",
+        lambda **k: password_calls.append(k["auth_user_id"]),
+    )
+    monkeypatch.setattr("app.db._upsert_profile_for_auth", lambda **k: None)
+    monkeypatch.setattr("app.db._link_employee_auth_ids", lambda **k: None)
+
+    out = set_login_password_admin(
+        email=email,
+        password="secret1",
+        profile_id=profile_id,
+        employee_id="emp-1",
+    )
+    assert out == auth_id
+    assert password_calls == [auth_id]
 
 
 def test_resolve_employee_auth_login_marks_unlinked(monkeypatch):
