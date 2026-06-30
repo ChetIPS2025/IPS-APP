@@ -1159,13 +1159,103 @@ def _admin_user_attributes(**fields: Any) -> Any:
     return AdminUserAttributes(**{k: v for k, v in fields.items() if v is not None})
 
 
+def _auth_user_row_email(auth_row: dict[str, Any] | None) -> str:
+    """Best-effort email from auth.users row (top-level, identities, metadata)."""
+    if not auth_row:
+        return ""
+    em = str(auth_row.get("email") or "").strip().lower()
+    if em:
+        return em
+    for ident in auth_row.get("identities") or []:
+        if isinstance(ident, dict):
+            idata = ident.get("identity_data") or {}
+            candidate = str(idata.get("email") or ident.get("email") or "").strip().lower()
+        else:
+            idata = getattr(ident, "identity_data", None) or {}
+            candidate = str(
+                getattr(ident, "email", None)
+                or (idata.get("email") if isinstance(idata, dict) else "")
+                or ""
+            ).strip().lower()
+        if candidate:
+            return candidate
+    meta = auth_row.get("user_metadata") or {}
+    if isinstance(meta, dict):
+        return str(meta.get("email") or "").strip().lower()
+    return ""
+
+
 def _auth_user_email_matches(auth_row: dict[str, Any] | None, email: str) -> bool:
     em = str(email or "").strip().lower()
     if not em:
         return True
     if not auth_row:
         return False
-    return str(auth_row.get("email") or "").strip().lower() == em
+    return _auth_user_row_email(auth_row) == em
+
+
+def _auth_row_to_dict(user: Any) -> dict[str, Any]:
+    if isinstance(user, dict):
+        return user
+    identities = getattr(user, "identities", None)
+    id_list: list[Any] = []
+    if identities:
+        for ident in identities:
+            if isinstance(ident, dict):
+                id_list.append(ident)
+            else:
+                id_list.append(
+                    {
+                        "email": getattr(ident, "email", None),
+                        "identity_data": getattr(ident, "identity_data", None) or {},
+                    }
+                )
+    return {
+        "id": getattr(user, "id", None),
+        "email": getattr(user, "email", None),
+        "phone": getattr(user, "phone", None),
+        "created_at": getattr(user, "created_at", None),
+        "identities": id_list,
+        "user_metadata": getattr(user, "user_metadata", None) or {},
+    }
+
+
+def _auth_create_user_conflict(exc: Exception) -> bool:
+    """True when create_user failed because the login already exists."""
+    msg = f"{type(exc).__name__} {exc}".lower()
+    return any(
+        token in msg
+        for token in (
+            "already exists",
+            "duplicate",
+            "registered",
+            "database error creating",
+            "database error saving new user",
+        )
+    )
+
+
+def _resolve_auth_id_from_profile_id(profile_id: str, email: str) -> str:
+    """
+    Accept profiles.id as auth.users.id when the profile email matches and auth row exists.
+
+    Covers drift where auth.users.email is empty but the profile row has the work email.
+    """
+    pid = str(profile_id or "").strip()
+    em = str(email or "").strip().lower()
+    if not pid or not em:
+        return ""
+    try:
+        rows = fetch_by_match_admin("profiles", {"id": pid}, columns="id,email", limit=1)  # type: ignore[name-defined]
+    except Exception:
+        rows = []
+    if not rows:
+        return ""
+    if str(rows[0].get("email") or "").strip().lower() != em:
+        return ""
+    if get_auth_user_by_id_admin(pid):
+        return pid
+    return ""
 
 
 def _auth_admin_user_message(exc: Exception, *, action: str) -> str:
@@ -1204,10 +1294,9 @@ def get_auth_user_by_id_admin(user_id: str) -> dict[str, Any] | None:
             if isinstance(user, dict):
                 return user
             if user is not None:
-                return {
-                    "id": getattr(user, "id", None),
-                    "email": getattr(user, "email", None),
-                }
+                return _auth_row_to_dict(user)
+            if res is not None and hasattr(res, "id") and not hasattr(res, "user"):
+                return _auth_row_to_dict(res)
         except Exception as exc:
             if _exception_indicates_user_not_found(exc):
                 return None
@@ -1235,8 +1324,9 @@ def find_auth_user_by_email_admin(email: str) -> dict[str, Any] | None:
             if not batch:
                 break
             for row in batch:
-                if str(row.get("email") or "").strip().lower() == em:
-                    return row
+                row_email = _auth_user_row_email(row if isinstance(row, dict) else _auth_row_to_dict(row))
+                if row_email == em:
+                    return row if isinstance(row, dict) else _auth_row_to_dict(row)
             if len(batch) < 200:
                 break
     except Exception as exc:
@@ -1316,6 +1406,9 @@ def resolve_auth_user_id(
             _LOG.warning("resolve_auth_user_id email lookup failed for %s: %r", em, exc)
     legacy_profile = str(profile_id or "").strip()
     if legacy_profile:
+        linked = _resolve_auth_id_from_profile_id(legacy_profile, em)
+        if linked:
+            return linked
         auth_row = get_auth_user_by_id_admin(legacy_profile)
         if auth_row and _auth_user_email_matches(auth_row, em):
             return legacy_profile
@@ -1517,10 +1610,18 @@ def set_login_password_admin(
     )
     if not auth_id:
         auth_id = _find_auth_user_id_by_email(em)
+    if not auth_id:
+        auth_id = _resolve_auth_id_from_profile_id(str(profile_id or "").strip(), em)
 
     if auth_id:
         linked = get_auth_user_by_id_admin(auth_id) or {}
-        if not _auth_user_email_matches(linked, em):
+        profile_linked = _resolve_auth_id_from_profile_id(auth_id, em) == auth_id
+        if not linked and not profile_linked:
+            raise RuntimeError(
+                "No app login account exists for this user. "
+                "Use Create login to set up access, or contact an administrator."
+            )
+        if not profile_linked and not _auth_user_email_matches(linked, em):
             raise RuntimeError(
                 "No app login account exists for this user. "
                 "Use Create login to set up access, or contact an administrator."
@@ -1559,11 +1660,13 @@ def set_login_password_admin(
         )
         return str(created.get("id") or "")
     except Exception as exc:
-        lower = str(exc).lower()
-        if "already exists" not in lower and "duplicate" not in lower and "registered" not in lower:
+        if not _auth_create_user_conflict(exc):
             raise
         _remove_orphan_profiles_for_email(em)
-        auth_id = _find_auth_user_id_by_email(em)
+        auth_id = (
+            _find_auth_user_id_by_email(em)
+            or _resolve_auth_id_from_profile_id(str(profile_id or "").strip(), em)
+        )
         if not auth_id:
             raise RuntimeError(
                 "A login already exists for this email, but it could not be linked. "
@@ -1914,16 +2017,11 @@ def list_auth_users_admin(*, page: int = 1, per_page: int = 200) -> list[dict[st
     out: list[dict[str, Any]] = []
     for u in users or []:
         if isinstance(u, dict):
-            out.append(u)
+            out.append({**u, "email": _auth_user_row_email(u) or u.get("email")})
         else:
-            out.append(
-                {
-                    "id": getattr(u, "id", None),
-                    "email": getattr(u, "email", None),
-                    "phone": getattr(u, "phone", None),
-                    "created_at": getattr(u, "created_at", None),
-                }
-            )
+            row = _auth_row_to_dict(u)
+            row["email"] = _auth_user_row_email(row) or row.get("email")
+            out.append(row)
     return out
 
 

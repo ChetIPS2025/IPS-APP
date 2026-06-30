@@ -96,6 +96,118 @@ def test_create_auth_user_removes_orphan_profile_before_create(monkeypatch):
     assert deleted == ["orphan-profile"]
 
 
+def test_resolve_auth_id_from_profile_id_when_auth_email_missing(monkeypatch):
+    from app.db import _resolve_auth_id_from_profile_id
+
+    pid = "1d04e3f2-c3de-4783-935b-bd4550acf307"
+    email = "chance.burgess@industrialplantsolution.com"
+
+    monkeypatch.setattr(
+        "app.db.fetch_by_match_admin",
+        lambda table, match, **kwargs: [{"id": pid, "email": email}],
+    )
+    monkeypatch.setattr(
+        "app.db.get_auth_user_by_id_admin",
+        lambda uid: {"id": uid, "email": None, "identities": []},
+    )
+
+    assert _resolve_auth_id_from_profile_id(pid, email) == pid
+
+
+def test_auth_user_row_email_reads_identity(monkeypatch):
+    from app.db import _auth_user_row_email
+
+    row = {
+        "email": None,
+        "identities": [{"identity_data": {"email": "user@industrialplantsolution.com"}}],
+    }
+    assert _auth_user_row_email(row) == "user@industrialplantsolution.com"
+
+
+def test_set_login_password_admin_recovers_from_database_error(monkeypatch):
+    from app.db import set_login_password_admin
+
+    auth_id = "1d04e3f2-c3de-4783-935b-bd4550acf307"
+    email = "chance.burgess@industrialplantsolution.com"
+    password_calls: list[str] = []
+    profile_resolve_calls = {"n": 0}
+
+    def fake_resolve_pid(pid: str, em: str) -> str:
+        profile_resolve_calls["n"] += 1
+        return auth_id if profile_resolve_calls["n"] > 1 else ""
+
+    monkeypatch.setattr("app.db.resolve_auth_user_id", lambda **k: "")
+    monkeypatch.setattr("app.db._find_auth_user_id_by_email", lambda em: "")
+    monkeypatch.setattr("app.db._resolve_auth_id_from_profile_id", fake_resolve_pid)
+    monkeypatch.setattr("app.db._remove_orphan_profiles_for_email", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "app.db.create_auth_user",
+        lambda **k: (_ for _ in ()).throw(
+            RuntimeError(
+                f"auth.admin.create_user failed for {email!r}: AuthApiError('Database error creating new user')"
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        "app.db.get_auth_user_by_id_admin",
+        lambda uid: {"id": uid, "email": email},
+    )
+    monkeypatch.setattr(
+        "app.db.set_auth_user_password_admin",
+        lambda **k: password_calls.append(k["auth_user_id"]),
+    )
+    monkeypatch.setattr("app.db._upsert_profile_for_auth", lambda **k: None)
+    monkeypatch.setattr("app.db._link_employee_auth_ids", lambda **k: None)
+
+    out = set_login_password_admin(
+        email=email,
+        password="secret1",
+        profile_id=auth_id,
+        employee_id="emp-1",
+    )
+    assert out == auth_id
+    assert password_calls == [auth_id]
+    assert profile_resolve_calls["n"] == 2
+
+
+def test_set_login_password_admin_links_via_profile_id_before_create(monkeypatch):
+    from app.db import set_login_password_admin
+
+    auth_id = "1d04e3f2-c3de-4783-935b-bd4550acf307"
+    email = "chance.burgess@industrialplantsolution.com"
+    created: list[str] = []
+
+    monkeypatch.setattr("app.db.resolve_auth_user_id", lambda **k: "")
+    monkeypatch.setattr("app.db._find_auth_user_id_by_email", lambda em: "")
+    monkeypatch.setattr(
+        "app.db._resolve_auth_id_from_profile_id",
+        lambda pid, em: auth_id if pid == auth_id else "",
+    )
+    monkeypatch.setattr(
+        "app.db.get_auth_user_by_id_admin",
+        lambda uid: {"id": uid, "email": None, "identities": []},
+    )
+    monkeypatch.setattr(
+        "app.db.set_auth_user_password_admin",
+        lambda **k: created.append("pw"),
+    )
+    monkeypatch.setattr("app.db._upsert_profile_for_auth", lambda **k: None)
+    monkeypatch.setattr("app.db._link_employee_auth_ids", lambda **k: None)
+    monkeypatch.setattr(
+        "app.db.create_auth_user",
+        lambda **k: created.append("create") or {"id": "should-not-run"},
+    )
+
+    out = set_login_password_admin(
+        email=email,
+        password="secret1",
+        profile_id=auth_id,
+        employee_id="emp-1",
+    )
+    assert out == auth_id
+    assert created == ["pw"]
+
+
 def test_resolve_employee_auth_login_marks_unlinked(monkeypatch):
     from app.services.users_service import resolve_employee_auth_login
 
