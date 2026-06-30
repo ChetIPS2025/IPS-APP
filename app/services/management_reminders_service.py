@@ -168,11 +168,6 @@ def create_management_reminder(
         except ImportError:
             from services.tasks_service import clear_tasks_cache  # type: ignore
         clear_tasks_cache()
-        try:
-            from app.pages._core._data import clear_tasks_list_cache
-        except ImportError:
-            from pages._core._data import clear_tasks_list_cache  # type: ignore
-        clear_tasks_list_cache()
     return ok, msg if not ok else "Reminder saved."
 
 
@@ -199,9 +194,4 @@ def complete_management_reminder(task_id: str) -> tuple[bool, str]:
     if err:
         return False, err
     clear_tasks_cache()
-    try:
-        from app.pages._core._data import clear_tasks_list_cache
-    except ImportError:
-        from pages._core._data import clear_tasks_list_cache  # type: ignore
-    clear_tasks_list_cache()
     return True, "Reminder completed."

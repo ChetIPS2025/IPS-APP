@@ -66,6 +66,26 @@ def test_can_create_for_pm_not_viewer():
     assert can_create_management_reminder("viewer") is False
 
 
+def test_clear_tasks_catalog_cache_drops_session_mirror(monkeypatch):
+    import streamlit as st
+
+    from app.pages._core._data import (
+        _CATALOG_SESSION_KEY,
+        clear_tasks_catalog_cache,
+    )
+
+    monkeypatch.setattr(
+        "app.pages._core._data.clear_tasks_list_cache",
+        lambda: None,
+    )
+    st.session_state[_CATALOG_SESSION_KEY] = {"tasks": [{"id": "stale", "title": "Old"}]}
+
+    clear_tasks_catalog_cache()
+
+    store = st.session_state.get(_CATALOG_SESSION_KEY, {})
+    assert "tasks" not in store
+
+
 def test_is_open_reminder():
     assert is_open_reminder({"status": "Open"}) is True
     assert is_open_reminder({"status": "Complete"}) is False

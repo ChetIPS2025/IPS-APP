@@ -830,6 +830,7 @@ def clear_employees_catalog_cache() -> None:
 
 def clear_tasks_catalog_cache() -> None:
     clear_tasks_list_cache()
+    clear_catalog_session_key("tasks")
 
 
 def clear_labor_rates_catalog_cache() -> None:
