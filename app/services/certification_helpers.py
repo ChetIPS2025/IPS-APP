@@ -115,6 +115,48 @@ def cert_document_pill_html(attached: bool) -> str:
     return '<span class="ips-cert-doc-empty">—</span>'
 
 
+def resolve_logged_in_employee_id(profile: dict[str, Any] | None = None) -> str:
+    """Workforce id for the signed-in user (profile link, then email match)."""
+    prof = profile if isinstance(profile, dict) else {}
+    eid = str(prof.get("employee_id") or "").strip()
+    if eid:
+        return eid
+    email = str(prof.get("email") or "").strip().lower()
+    if not email:
+        return ""
+    try:
+        from app.pages._core._data import load_employees
+    except ImportError:
+        from pages._core._data import load_employees  # type: ignore
+    for emp in load_employees():
+        if str(emp.get("email") or "").strip().lower() == email:
+            return str(emp.get("id") or "").strip()
+    return ""
+
+
+def can_manage_employee_certifications(role: str) -> bool:
+    """Admin/supervisor/PM may view and edit all employee certifications."""
+    try:
+        from app.utils.permissions import can_view_field_certifications
+    except ImportError:
+        from utils.permissions import can_view_field_certifications  # type: ignore
+    return can_view_field_certifications(role)
+
+
+def certification_visible_to_user(
+    cert: dict[str, Any],
+    *,
+    role: str,
+    viewer_employee_id: str = "",
+) -> bool:
+    """True when the signed-in user may see this certification row."""
+    if can_manage_employee_certifications(role):
+        return True
+    cert_emp = str(cert.get("employee_id") or "").strip()
+    viewer_emp = str(viewer_employee_id or "").strip()
+    return bool(cert_emp and viewer_emp and cert_emp == viewer_emp)
+
+
 def can_view_certification_attachment(
     role: str,
     cert: dict[str, Any],

@@ -44,10 +44,13 @@ try:
     )
     from app.services.certification_helpers import (
         CERT_STATUS_VALUES,
+        can_manage_employee_certifications,
         can_view_certification_attachment,
         cert_status_pill_html,
+        certification_visible_to_user,
         coerce_date,
         days_until_expiration,
+        resolve_logged_in_employee_id,
     )
     from app.services.certification_attachments_service import cert_has_attachment
     from app.services.employees_service import (
@@ -95,10 +98,13 @@ except ImportError:
     )
     from services.certification_helpers import (  # type: ignore
         CERT_STATUS_VALUES,
+        can_manage_employee_certifications,
         can_view_certification_attachment,
         cert_status_pill_html,
+        certification_visible_to_user,
         coerce_date,
         days_until_expiration,
+        resolve_logged_in_employee_id,
     )
     from services.certification_attachments_service import cert_has_attachment  # type: ignore
     from services.employees_service import (  # type: ignore
@@ -251,7 +257,11 @@ def _current_profile() -> dict:
 
 
 def _current_employee_id() -> str:
-    return str(_current_profile().get("employee_id") or "").strip()
+    return resolve_logged_in_employee_id(_current_profile())
+
+
+def _can_manage_certifications() -> bool:
+    return can_manage_employee_certifications(_current_role())
 
 
 def _current_user_id() -> str | None:
@@ -710,11 +720,12 @@ def render_certification_detail_dialog(
         subtitle=str(cert.get("cert_number") or ""),
         status=str(cert.get("status") or ""),
     )
-    render_modal_edit_button(
-        module=_MODULE,
-        record_key=rk,
-        key_prefix=f"cert_modal_{rk}",
-    )
+    if _can_manage_certifications():
+        render_modal_edit_button(
+            module=_MODULE,
+            record_key=rk,
+            key_prefix=f"cert_modal_{rk}",
+        )
     render_modal_meta_grid(
         [
             ("Issuer", cert.get("issuer")),
@@ -849,28 +860,51 @@ def render() -> None:
 
     inject_certifications_module_css()
 
-    employee_names, emp_opts = _employee_options()
-    filter_names = ["All Employees", *employee_names]
-    active_id = str(st.session_state.get(ACTIVE_EMPLOYEE_KEY) or "")
-    default_filter = next(
-        (n for n, eid in emp_opts.items() if eid == active_id),
-        "All Employees",
-    )
-    if default_filter not in filter_names:
-        default_filter = "All Employees"
+    manage_all = _can_manage_certifications()
+    viewer_eid = _current_employee_id()
 
-    def _cert_add() -> None:
-        if st.button("+ Add Certification", key="cert_add", type="primary", use_container_width=True):
-            st.session_state["ips_cert_form_open"] = True
+    if not manage_all and not viewer_eid:
+        render_page_brand_header(
+            "My Certifications",
+            "Your credentials, expirations, and compliance status.",
+        )
+        st.warning(
+            "Your login is not linked to an employee record yet. "
+            "Contact an administrator to view your certifications."
+        )
+        return
 
-    render_page_brand_header(
-        "Employee Certifications",
-        "Track credentials, expirations, and compliance.",
-        actions=[_cert_add],
-    )
+    if manage_all:
+        employee_names, emp_opts = _employee_options()
+        filter_names = ["All Employees", *employee_names]
+        active_id = str(st.session_state.get(ACTIVE_EMPLOYEE_KEY) or "")
+        default_filter = next(
+            (n for n, eid in emp_opts.items() if eid == active_id),
+            "All Employees",
+        )
+        if default_filter not in filter_names:
+            default_filter = "All Employees"
 
-    all_certs = load_all_certifications()
-    expired_n, expiring_n = certification_alerts(all_certs)
+        def _cert_add() -> None:
+            if st.button("+ Add Certification", key="cert_add", type="primary", use_container_width=True):
+                st.session_state["ips_cert_form_open"] = True
+
+        render_page_brand_header(
+            "Employee Certifications",
+            "Track credentials, expirations, and compliance.",
+            actions=[_cert_add],
+        )
+        scope_certs = load_all_certifications()
+    else:
+        employee_names, emp_opts = [], {}
+        st.session_state[ACTIVE_EMPLOYEE_KEY] = viewer_eid
+        render_page_brand_header(
+            "My Certifications",
+            "Your credentials, expirations, and compliance status.",
+        )
+        scope_certs = load_certifications(viewer_eid)
+
+    expired_n, expiring_n = certification_alerts(scope_certs)
     if expired_n or expiring_n:
         parts = []
         if expired_n:
@@ -883,46 +917,76 @@ def render() -> None:
         )
 
     def _filters() -> None:
-        c1, c2, c3 = st.columns([1.2, 5, 0.6])
-        with c1:
-            idx = filter_names.index(default_filter) if default_filter in filter_names else 0
-            picked = st.selectbox(
-                "Employee",
-                filter_names,
-                index=idx,
-                key="cert_emp_filter",
-                label_visibility="collapsed",
-            )
-            if picked == "All Employees":
-                st.session_state[ACTIVE_EMPLOYEE_KEY] = ""
-            else:
-                st.session_state[ACTIVE_EMPLOYEE_KEY] = emp_opts.get(picked, "")
-        with c2:
-            st.text_input(
-                "Search",
-                placeholder="Search type or number...",
-                key="cert_search",
-                label_visibility="collapsed",
-            )
-        with c3:
-            if st.button("Clear", key="cert_clear", use_container_width=True):
-                eid_now = str(st.session_state.get(ACTIVE_EMPLOYEE_KEY) or "")
-                filter_fields = _FILTER_FIELDS_EMP if eid_now else _FILTER_FIELDS_ALL
-                clear_table_filters(
-                    _TABLE_KEY,
-                    filter_fields,
-                    extra_keys=["cert_search", "cert_emp_filter", ACTIVE_EMPLOYEE_KEY],
+        if manage_all:
+            c1, c2, c3 = st.columns([1.2, 5, 0.6])
+            with c1:
+                idx = filter_names.index(default_filter) if default_filter in filter_names else 0
+                picked = st.selectbox(
+                    "Employee",
+                    filter_names,
+                    index=idx,
+                    key="cert_emp_filter",
+                    label_visibility="collapsed",
                 )
-                st.session_state["cert_emp_filter"] = "All Employees"
-                st.session_state[ACTIVE_EMPLOYEE_KEY] = ""
-                _clear_certification_selection(st.session_state.get(_ALL_CERT_IDS_KEY))
-                st.rerun()
+                if picked == "All Employees":
+                    st.session_state[ACTIVE_EMPLOYEE_KEY] = ""
+                else:
+                    st.session_state[ACTIVE_EMPLOYEE_KEY] = emp_opts.get(picked, "")
+            with c2:
+                st.text_input(
+                    "Search",
+                    placeholder="Search type or number...",
+                    key="cert_search",
+                    label_visibility="collapsed",
+                )
+            with c3:
+                if st.button("Clear", key="cert_clear", use_container_width=True):
+                    eid_now = str(st.session_state.get(ACTIVE_EMPLOYEE_KEY) or "")
+                    filter_fields = _FILTER_FIELDS_EMP if eid_now else _FILTER_FIELDS_ALL
+                    clear_table_filters(
+                        _TABLE_KEY,
+                        filter_fields,
+                        extra_keys=["cert_search", "cert_emp_filter", ACTIVE_EMPLOYEE_KEY],
+                    )
+                    st.session_state["cert_emp_filter"] = "All Employees"
+                    st.session_state[ACTIVE_EMPLOYEE_KEY] = ""
+                    _clear_certification_selection(st.session_state.get(_ALL_CERT_IDS_KEY))
+                    st.rerun()
+        else:
+            c1, c2 = st.columns([5.6, 0.6])
+            with c1:
+                st.text_input(
+                    "Search",
+                    placeholder="Search type or number...",
+                    key="cert_search",
+                    label_visibility="collapsed",
+                )
+            with c2:
+                if st.button("Clear", key="cert_clear", use_container_width=True):
+                    clear_table_filters(
+                        _TABLE_KEY,
+                        _FILTER_FIELDS_EMP,
+                        extra_keys=["cert_search"],
+                    )
+                    _clear_certification_selection(st.session_state.get(_ALL_CERT_IDS_KEY))
+                    st.rerun()
 
     layout_filter_bar(_filters)
 
     eid = str(st.session_state.get(ACTIVE_EMPLOYEE_KEY) or "")
-    hide_employee = bool(eid)
-    scope = load_certifications(eid) if eid else all_certs
+    hide_employee = bool(eid) or not manage_all
+    if manage_all:
+        scope = load_certifications(eid) if eid else scope_certs
+    else:
+        scope = [
+            c
+            for c in scope_certs
+            if certification_visible_to_user(
+                c,
+                role=_current_role(),
+                viewer_employee_id=viewer_eid,
+            )
+        ]
     filter_specs = _COLUMN_FILTER_SPECS_EMP if hide_employee else _COLUMN_FILTER_SPECS_ALL
     filter_options = build_filter_options(scope, filter_specs)
     filtered = _filter_certs(
@@ -933,7 +997,7 @@ def render() -> None:
 
     st.caption(f"{len(filtered)} certification(s)")
 
-    if st.session_state.get("ips_cert_form_open"):
+    if manage_all and st.session_state.get("ips_cert_form_open"):
         _show_add_certification_dialog(eid)
 
     all_cert_ids = render_certifications_table_block(

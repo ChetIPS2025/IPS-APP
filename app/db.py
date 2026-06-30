@@ -1052,8 +1052,9 @@ def create_auth_user(
         pid = str(row.get("id") or "").strip()
         if not pid:
             continue
+        profile_em = str(row.get("email") or "").strip().lower()
         auth_row = get_auth_user_by_id_admin(pid)
-        if auth_row and _auth_user_email_matches(auth_row, em_norm):
+        if auth_row and (_auth_user_email_matches(auth_row, em_norm) or profile_em == em_norm):
             raise RuntimeError("A login already exists for this email.")
         if not auth_row:
             _delete_profile_by_id_admin(pid)
@@ -1331,7 +1332,12 @@ def find_auth_user_by_email_admin(email: str) -> dict[str, Any] | None:
                 break
     except Exception as exc:
         _LOG.warning("find_auth_user_by_email_admin failed for %s: %r", em, exc)
-        return None
+    try:
+        http_row = _find_auth_user_by_email_http(em)
+        if http_row:
+            return http_row if isinstance(http_row, dict) else _auth_row_to_dict(http_row)
+    except Exception as exc:
+        _LOG.warning("HTTP auth email lookup failed for %s: %r", em, exc)
     return None
 
 
@@ -1353,17 +1359,58 @@ def _auth_user_id_from_profile_email(email: str) -> str:
     if not em:
         return ""
     try:
-        rows = fetch_by_match_admin("profiles", {"email": em}, columns="id,email", limit=3)  # type: ignore[name-defined]
+        rows = fetch_by_match_admin("profiles", {"email": em}, columns="id,email", limit=10)  # type: ignore[name-defined]
     except Exception:
         rows = []
     for row in rows or []:
         pid = str(row.get("id") or "").strip()
         if not pid:
             continue
+        profile_em = str(row.get("email") or "").strip().lower()
         auth_row = get_auth_user_by_id_admin(pid)
-        if auth_row and _auth_user_email_matches(auth_row, em):
+        if not auth_row:
+            continue
+        if _auth_user_email_matches(auth_row, em) or profile_em == em:
             return pid
     return ""
+
+
+def _find_auth_user_by_email_http(email: str) -> dict[str, Any] | None:
+    """Raw GoTrue admin list fallback when the Python SDK response shape differs."""
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    em = str(email or "").strip().lower()
+    if not em:
+        return None
+    key, _ = _admin_api_key_and_source()
+    url_base = str(getattr(settings, "supabase_url", "") or "").strip().rstrip("/")
+    if not url_base or not key:
+        return None
+    headers = {"Authorization": f"Bearer {key}", "apikey": key, "Accept": "application/json"}
+    for page in range(1, 51):
+        qs = urllib.parse.urlencode({"page": page, "per_page": 200})
+        req = urllib.request.Request(f"{url_base}/auth/v1/admin/users?{qs}", headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            _LOG.warning("HTTP auth user list failed for %s page %s: %r", em, page, exc)
+            break
+        except Exception as exc:
+            _LOG.warning("HTTP auth user list failed for %s page %s: %r", em, page, exc)
+            break
+        users = payload.get("users") if isinstance(payload, dict) else payload
+        if not isinstance(users, list) or not users:
+            break
+        for user in users:
+            row = user if isinstance(user, dict) else _auth_row_to_dict(user)
+            if _auth_user_row_email(row) == em:
+                return row
+        if len(users) < 200:
+            break
+    return None
 
 
 def resolve_auth_user_id(
@@ -1434,15 +1481,18 @@ def _find_auth_user_id_by_email(email: str) -> str:
         found = find_auth_user_by_email_admin(em)
         if found:
             aid = str(found.get("id") or "").strip()
-            if aid and _auth_user_email_matches(found, em):
-                auth_row = get_auth_user_by_id_admin(aid)
-                if auth_row and _auth_user_email_matches(auth_row, em):
-                    return aid
+            if aid:
                 if _auth_user_email_matches(found, em):
+                    return aid
+                auth_row = get_auth_user_by_id_admin(aid)
+                if auth_row:
                     return aid
     except Exception as exc:
         _LOG.warning("Auth email lookup failed for %s: %r", em, exc)
-    return _auth_user_id_from_profile_email(em)
+    profile_auth_id = _auth_user_id_from_profile_email(em)
+    if profile_auth_id:
+        return profile_auth_id
+    return ""
 
 
 def _remove_orphan_profiles_for_email(
@@ -1613,15 +1663,26 @@ def set_login_password_admin(
     if not auth_id:
         auth_id = _resolve_auth_id_from_profile_id(str(profile_id or "").strip(), em)
 
+    stale_profile_id = str(profile_id or "").strip()
+    if not auth_id and stale_profile_id and not get_auth_user_by_id_admin(stale_profile_id):
+        _delete_profile_by_id_admin(stale_profile_id)
+        auth_id = _find_auth_user_id_by_email(em) or _resolve_auth_id_from_profile_id(stale_profile_id, em)
+
     if auth_id:
         linked = get_auth_user_by_id_admin(auth_id) or {}
         profile_linked = _resolve_auth_id_from_profile_id(auth_id, em) == auth_id
+        email_ok = _auth_user_email_matches(linked, em)
         if not linked and not profile_linked:
             raise RuntimeError(
                 "No app login account exists for this user. "
                 "Use Create login to set up access, or contact an administrator."
             )
-        if not profile_linked and not _auth_user_email_matches(linked, em):
+        if not profile_linked and not email_ok and not get_auth_user_by_id_admin(auth_id):
+            raise RuntimeError(
+                "No app login account exists for this user. "
+                "Use Create login to set up access, or contact an administrator."
+            )
+        if not profile_linked and not email_ok:
             raise RuntimeError(
                 "No app login account exists for this user. "
                 "Use Create login to set up access, or contact an administrator."

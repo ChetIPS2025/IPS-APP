@@ -208,6 +208,38 @@ def test_set_login_password_admin_links_via_profile_id_before_create(monkeypatch
     assert created == ["pw"]
 
 
+def test_auth_user_id_from_profile_email_when_auth_email_missing(monkeypatch):
+    from app.db import _auth_user_id_from_profile_email
+
+    pid = "1d04e3f2-c3de-4783-935b-bd4550acf307"
+    email = "chance.burgess@industrialplantsolution.com"
+
+    monkeypatch.setattr(
+        "app.db.fetch_by_match_admin",
+        lambda table, match, **kwargs: [{"id": pid, "email": email}],
+    )
+    monkeypatch.setattr(
+        "app.db.get_auth_user_by_id_admin",
+        lambda uid: {"id": uid, "email": None, "identities": []},
+    )
+
+    assert _auth_user_id_from_profile_email(email) == pid
+
+
+def test_find_auth_user_by_email_http_fallback(monkeypatch):
+    from app.db import find_auth_user_by_email_admin
+
+    monkeypatch.setattr("app.db.list_auth_users_admin", lambda **k: [])
+    monkeypatch.setattr(
+        "app.db._find_auth_user_by_email_http",
+        lambda em: {"id": "auth-http", "email": em, "identities": []},
+    )
+
+    row = find_auth_user_by_email_admin("user@industrialplantsolution.com")
+    assert row is not None
+    assert row["id"] == "auth-http"
+
+
 def test_resolve_employee_auth_login_marks_unlinked(monkeypatch):
     from app.services.users_service import resolve_employee_auth_login
 
