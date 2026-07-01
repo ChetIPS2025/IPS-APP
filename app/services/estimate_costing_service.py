@@ -521,17 +521,13 @@ def calculate_estimate_totals(
     *,
     tax_rate: float | None = None,
     demo_materials: list[dict[str, Any]] | None = None,
+    bundle: dict[str, Any] | None = None,
 ) -> dict[str, float]:
-    bundle = get_estimate_bundle(estimate_id, demo_materials=demo_materials)
+    bundle = bundle or get_estimate_bundle(estimate_id, demo_materials=demo_materials)
     rate = tax_rate
     if rate is None:
-        rows, _ = fetch_rows("estimates", limit=1)
-        for row in rows:
-            if _str(row.get("id")) == _str(estimate_id):
-                rate = _num(row.get("tax_rate"))
-                break
-        if rate is None:
-            rate = 0.0
+        row = fetch_by_id("estimates", _str(estimate_id))
+        rate = _num(row.get("tax_rate")) if row else 0.0
     return calc_totals(
         bundle["materials"],
         bundle["labor"],
@@ -582,11 +578,15 @@ def _estimate_totals_persist_payload(totals: dict[str, float]) -> dict[str, Any]
     }
 
 
-def recalculate_and_save_estimate_totals(estimate_id: str) -> ServiceResult:
+def recalculate_and_save_estimate_totals(
+    estimate_id: str,
+    *,
+    tax_rate: float | None = None,
+) -> ServiceResult:
     eid = _str(estimate_id)
     if not eid:
         return ServiceResult(ok=False, error="Estimate id is required.")
-    totals = calculate_estimate_totals(eid)
+    totals = calculate_estimate_totals(eid, tax_rate=tax_rate)
     payload = _estimate_totals_persist_payload(totals)
     result = update_row("estimates", payload, {"id": eid})
     if result.ok:
@@ -809,7 +809,7 @@ def add_estimate_labor_batch(estimate_id: str, lines: list[dict[str, Any]]) -> S
     return ServiceResult(ok=True, data={"saved": inserted})
 
 
-def update_estimate_labor(line_id: str, data: dict[str, Any]) -> ServiceResult:
+def _labor_update_payload(data: dict[str, Any]) -> dict[str, Any]:
     calc = calc_labor_line(
         data.get("st_hours"),
         data.get("ot_hours"),
@@ -820,7 +820,7 @@ def update_estimate_labor(line_id: str, data: dict[str, Any]) -> ServiceResult:
         data.get("markup_percent"),
     )
     role = _str(data.get("role_name") or data.get("labor_type"))
-    payload = {
+    return {
         "labor_type": _str(data.get("labor_type") or role or "Other"),
         "role_name": role,
         "employee_id": data.get("employee_id") or None,
@@ -840,13 +840,75 @@ def update_estimate_labor(line_id: str, data: dict[str, Any]) -> ServiceResult:
         "price_total": calc["price_total"],
         "notes": _str(data.get("notes")),
     }
+
+
+def update_estimate_labor(line_id: str, data: dict[str, Any], *, recalc: bool = True) -> ServiceResult:
+    payload = _labor_update_payload(data)
     result = update_row(_LABOR_LINES_TABLE, payload, {"id": _str(line_id)})
     if not result.ok and result.error and _is_missing_table_error(Exception(result.error)):
         return ServiceResult(ok=False, error=_LABOR_LINES_MISSING_MSG)
     eid = _str(data.get("estimate_id"))
-    if result.ok and eid:
-        recalculate_and_save_estimate_totals(eid)
+    if result.ok and recalc and eid:
+        recalc_result = recalculate_and_save_estimate_totals(eid)
+        if not recalc_result.ok:
+            return recalc_result
+        return ServiceResult(ok=True, data=recalc_result.data)
     return result
+
+
+def update_estimate_labor_batch(
+    estimate_id: str,
+    updates: list[dict[str, Any]],
+    *,
+    recalc: bool = True,
+) -> ServiceResult:
+    """Update multiple labor lines, recalculating estimate totals once at the end."""
+    eid = _str(estimate_id)
+    if not eid:
+        return ServiceResult(ok=False, error="Estimate id is required.")
+    if not updates:
+        return ServiceResult(ok=False, error="No labor lines to update.")
+    saved = 0
+    last_err = ""
+    for item in updates:
+        line_id = _str(item.get("line_id") or item.get("id"))
+        if not line_id:
+            last_err = "Labor line id is required."
+            break
+        payload = _labor_update_payload(item)
+        result = update_row(_LABOR_LINES_TABLE, payload, {"id": line_id})
+        if not result.ok:
+            if result.error and _is_missing_table_error(Exception(result.error)):
+                return ServiceResult(ok=False, error=_LABOR_LINES_MISSING_MSG)
+            last_err = str(result.error or "Save failed.")
+            break
+        saved += 1
+    if saved and recalc:
+        recalc_result = recalculate_and_save_estimate_totals(eid)
+        if not recalc_result.ok:
+            if saved < len(updates):
+                return ServiceResult(
+                    ok=False,
+                    error=f"Saved {saved} of {len(updates)} labor lines, but totals refresh failed. {recalc_result.error}",
+                    data={"saved": saved},
+                )
+            return recalc_result
+        if saved < len(updates):
+            return ServiceResult(
+                ok=False,
+                error=f"Saved {saved} of {len(updates)} labor lines. {last_err}",
+                data={"saved": saved, **(recalc_result.data or {})},
+            )
+        return ServiceResult(ok=True, data={"saved": saved, **(recalc_result.data or {})})
+    if saved < len(updates):
+        if saved:
+            return ServiceResult(
+                ok=False,
+                error=f"Saved {saved} of {len(updates)} labor lines. {last_err}",
+                data={"saved": saved},
+            )
+        return ServiceResult(ok=False, error=last_err or "Could not save labor lines.")
+    return ServiceResult(ok=True, data={"saved": saved})
 
 
 def delete_estimate_labor(line_id: str, *, estimate_id: str = "") -> ServiceResult:

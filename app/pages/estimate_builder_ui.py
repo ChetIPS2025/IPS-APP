@@ -36,14 +36,17 @@ try:
         delete_estimate_subcontractor,
         delete_estimate_travel,
         get_estimate_bundle,
+        get_estimate_labor,
         recalculate_and_save_estimate_totals,
         resolve_global_markup_pct,
         resolve_category_markup_defaults,
         save_category_markup_settings,
         save_global_markup_settings,
         update_estimate_labor,
+        update_estimate_labor_batch,
     )
     from app.services.labor_rates_service import save_default_rates_from_lines
+    from app.ui.streamlit_perf import fragment, ips_app_rerun
     from app.utils.estimate_calculations import TRAVEL_TYPES, calc_travel_line, calc_travel_total
     from app.services.proposal_pdf_service import build_customer_quote_bundle
     from app.services.pricing_guide_service import create_pricing_item_from_estimate_line
@@ -86,14 +89,17 @@ except ImportError:
         delete_estimate_subcontractor,
         delete_estimate_travel,
         get_estimate_bundle,
+        get_estimate_labor,
         recalculate_and_save_estimate_totals,
         resolve_global_markup_pct,
         resolve_category_markup_defaults,
         save_category_markup_settings,
         save_global_markup_settings,
         update_estimate_labor,
+        update_estimate_labor_batch,
     )
     from services.labor_rates_service import save_default_rates_from_lines  # type: ignore
+    from ui.streamlit_perf import fragment, ips_app_rerun  # type: ignore
     from utils.estimate_calculations import TRAVEL_TYPES, calc_travel_line, calc_travel_total, margin_warning_class  # type: ignore
     from services.estimate_builder_helpers import (  # type: ignore
         equipment_line_totals,
@@ -107,6 +113,34 @@ except ImportError:
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
     from services.proposal_pdf_service import build_customer_quote_bundle  # type: ignore
     from services.pricing_guide_service import create_pricing_item_from_estimate_line  # type: ignore
+
+
+def _estimate_tax_rate(est: dict[str, Any]) -> float:
+    return float(est.get("tax_rate") or 0)
+
+
+def _cost_builder_totals_cache_key(eid: str) -> str:
+    return f"ecb_totals_{eid}"
+
+
+def _read_cost_builder_totals(eid: str, est: dict[str, Any]) -> dict[str, float]:
+    cached = st.session_state.get(_cost_builder_totals_cache_key(eid))
+    if isinstance(cached, dict) and cached:
+        return cached
+    return calculate_estimate_totals(eid, tax_rate=_estimate_tax_rate(est))
+
+
+def _cache_cost_builder_totals(eid: str, totals: dict[str, Any]) -> None:
+    if totals:
+        st.session_state[_cost_builder_totals_cache_key(eid)] = dict(totals)
+
+
+def _recalc_and_cache_cost_builder_totals(eid: str, est: dict[str, Any]) -> tuple[bool, str | None]:
+    result = recalculate_and_save_estimate_totals(eid, tax_rate=_estimate_tax_rate(est))
+    if getattr(result, "ok", False):
+        _cache_cost_builder_totals(eid, getattr(result, "data", None) or {})
+        return True, ""
+    return False, str(getattr(result, "error", None) or "Could not update totals.")
 
 
 def _service_ok(result) -> tuple[bool, str]:
@@ -606,14 +640,14 @@ def render_cost_builder_tab(
         st.info("Save this estimate to Supabase before building costs.")
         return
 
-    totals = calculate_estimate_totals(eid)
+    totals = _read_cost_builder_totals(eid, est)
     stored_price = float(est.get("customer_price") or est.get("total") or 0)
     calc_price = float(totals.get("customer_price") or 0)
     if calc_price > 0 and abs(stored_price - calc_price) > 0.01:
-        ok, _ = _service_ok(recalculate_and_save_estimate_totals(eid))
+        ok, _ = _recalc_and_cache_cost_builder_totals(eid, est)
         if ok and on_saved:
             on_saved()
-        totals = calculate_estimate_totals(eid)
+        totals = _read_cost_builder_totals(eid, est)
     render_cost_summary_cards(est, totals)
 
     st.caption(
@@ -637,7 +671,7 @@ def render_cost_builder_tab(
     recalc_col, _ = st.columns([1, 3], gap="small")
     with recalc_col:
         if st.button("Recalculate Totals", key=f"ecb_recalc_{eid}", type="primary", use_container_width=True):
-            ok, err = _service_ok(recalculate_and_save_estimate_totals(eid))
+            ok, err = _recalc_and_cache_cost_builder_totals(eid, est)
             if ok:
                 st.success("Totals updated.")
                 if on_saved:
@@ -1947,7 +1981,7 @@ def _render_cost_builder_line_sections(est: dict[str, Any]) -> None:
     )
 
     st.markdown("#### Labor")
-    _render_labor_lines(eid, bundle["labor"], key_prefix="ecb_lab")
+    _render_labor_lines_fragment(eid, est, key_prefix="ecb_lab")
 
     st.markdown("#### Equipment")
     _render_deletable_lines(
@@ -2163,19 +2197,92 @@ def _labor_inline_hours_changed(key_prefix: str, row: dict[str, Any]) -> bool:
     return abs(cur_st - saved_st) > 0.001 or abs(cur_ot - saved_ot) > 0.001
 
 
+def _sync_labor_row_hours_saved(key_prefix: str, row: dict[str, Any], *, st_hours: float, ot_hours: float) -> None:
+    rid = str(row.get("id") or "")
+    st_key, ot_key = _labor_inline_hour_keys(key_prefix, rid)
+    sync_key = f"{key_prefix}_hrs_sync_{rid}"
+    st.session_state[st_key] = float(st_hours)
+    st.session_state[ot_key] = float(ot_hours)
+    st.session_state[sync_key] = f"{float(st_hours):.3f}|{float(ot_hours):.3f}"
+
+
+def _apply_labor_hours_save_result(eid: str, result) -> tuple[bool, str | None]:
+    ok, err = _service_ok(result)
+    if ok:
+        totals = getattr(result, "data", None) or {}
+        if totals:
+            _cache_cost_builder_totals(eid, totals)
+    return ok, err
+
+
+def _finish_labor_hours_save(
+    eid: str,
+    rows: list[dict[str, Any]],
+    *,
+    key_prefix: str,
+    result,
+) -> tuple[bool, str | None]:
+    ok, err = _apply_labor_hours_save_result(eid, result)
+    if ok:
+        for row in rows:
+            rid = str(row.get("id") or "")
+            st_key, ot_key = _labor_inline_hour_keys(key_prefix, rid)
+            _sync_labor_row_hours_saved(
+                key_prefix,
+                row,
+                st_hours=float(st.session_state.get(st_key, row.get("st_hours") or 0)),
+                ot_hours=float(st.session_state.get(ot_key, row.get("ot_hours") or 0)),
+            )
+        ips_app_rerun()
+    return ok, err
+
+
 def _save_labor_line_hours(
     eid: str,
     row: dict[str, Any],
     *,
+    key_prefix: str,
     st_hours: float,
     ot_hours: float,
 ) -> tuple[bool, str | None]:
     rid = str(row.get("id") or "")
-    return _service_ok(
-        update_estimate_labor(
+    return _finish_labor_hours_save(
+        eid,
+        [row],
+        key_prefix=key_prefix,
+        result=update_estimate_labor(
             rid,
             _labor_line_update_payload(eid, row, st_hours=st_hours, ot_hours=ot_hours),
+        ),
+    )
+
+
+def _save_labor_lines_hours_batch(
+    eid: str,
+    rows: list[dict[str, Any]],
+    *,
+    key_prefix: str,
+) -> tuple[bool, str | None]:
+    updates: list[dict[str, Any]] = []
+    for row in rows:
+        rid = str(row.get("id") or "")
+        st_key, ot_key = _labor_inline_hour_keys(key_prefix, rid)
+        updates.append(
+            {
+                "line_id": rid,
+                **_labor_line_update_payload(
+                    eid,
+                    row,
+                    st_hours=float(st.session_state.get(st_key, row.get("st_hours") or 0)),
+                    ot_hours=float(st.session_state.get(ot_key, row.get("ot_hours") or 0)),
+                ),
+            }
         )
+    return _finish_labor_hours_save(
+        eid,
+        rows,
+        key_prefix=key_prefix,
+        result=update_estimate_labor_batch(eid, updates),
     )
 
 
@@ -2275,22 +2382,9 @@ def _render_labor_lines(
             key=f"{key_prefix}_save_all_hrs_{eid}",
             type="primary",
         ):
-            errors: list[str] = []
-            for row in pending:
-                rid = str(row.get("id") or "")
-                st_key, ot_key = _labor_inline_hour_keys(key_prefix, rid)
-                ok, err = _save_labor_line_hours(
-                    eid,
-                    row,
-                    st_hours=float(st.session_state.get(st_key, row.get("st_hours") or 0)),
-                    ot_hours=float(st.session_state.get(ot_key, row.get("ot_hours") or 0)),
-                )
-                if not ok and err:
-                    errors.append(str(err))
-            if errors:
-                st.error(errors[0])
-            else:
-                st.rerun()
+            ok, err = _save_labor_lines_hours_batch(eid, pending, key_prefix=key_prefix)
+            if err and not ok:
+                st.error(err)
 
     st.caption("Edit ST/OT hours directly in each row. Use ✎ to change rates or markup.")
     col_widths = [2.3, 0.7, 0.7, 1.15, 0.85, 0.85, 1.05]
@@ -2362,12 +2456,12 @@ def _render_labor_lines(
                     ok, err = _save_labor_line_hours(
                         eid,
                         row,
+                        key_prefix=key_prefix,
                         st_hours=float(st_hours),
                         ot_hours=float(ot_hours),
                     )
-                    if ok:
-                        st.rerun()
-                    st.error(err)
+                    if err and not ok:
+                        st.error(err)
             with act2:
                 if st.button("✎", key=f"{key_prefix}_edit_{rid}", help="Edit rates / markup"):
                     st.session_state[f"{key_prefix}_edit_id"] = rid
@@ -2378,6 +2472,18 @@ def _render_labor_lines(
                     if ok:
                         st.rerun()
                     st.error(err)
+
+
+@fragment
+def _render_labor_lines_fragment(
+    eid: str,
+    est: dict[str, Any],
+    *,
+    key_prefix: str,
+) -> None:
+    """Labor lines rerun locally so hour saves do not rebuild the whole Cost Builder."""
+    labor, _ = get_estimate_labor(eid)
+    _render_labor_lines(eid, labor, key_prefix=key_prefix)
 
 
 def render_materials_tab(
@@ -2423,8 +2529,7 @@ def render_materials_tab(
 
 def render_labor_tab(est: dict[str, Any]) -> None:
     eid = str(est.get("id") or "")
-    bundle = get_estimate_bundle(eid)
-    _render_labor_lines(eid, bundle["labor"], key_prefix="lab_tab")
+    _render_labor_lines_fragment(eid, est, key_prefix="lab_tab")
     if st.button("+ Add Labor", key=f"lab_tab_add_{eid}"):
         _open_batch_add_form(
             form_state_key=f"lab_tab_form_{eid}",
