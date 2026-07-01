@@ -2132,6 +2132,53 @@ def _render_deletable_lines(
                 st.error(err)
 
 
+def _labor_line_update_payload(eid: str, row: dict[str, Any], **overrides: Any) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "estimate_id": eid,
+        "labor_type": row.get("labor_type") or row.get("role_name"),
+        "role_name": row.get("role_name"),
+        "description": row.get("description") or row.get("role_name"),
+        "st_hours": float(row.get("st_hours") or 0),
+        "ot_hours": float(row.get("ot_hours") or 0),
+        "st_rate": float(row.get("st_rate") or 0),
+        "ot_rate": float(row.get("ot_rate") or 0),
+        "markup_percent": float(row.get("markup_percent") or 0),
+        "notes": row.get("notes") or "",
+    }
+    payload.update(overrides)
+    return payload
+
+
+def _labor_inline_hour_keys(key_prefix: str, rid: str) -> tuple[str, str]:
+    return f"{key_prefix}_sth_{rid}", f"{key_prefix}_oth_{rid}"
+
+
+def _labor_inline_hours_changed(key_prefix: str, row: dict[str, Any]) -> bool:
+    rid = str(row.get("id") or "")
+    st_key, ot_key = _labor_inline_hour_keys(key_prefix, rid)
+    saved_st = float(row.get("st_hours") or 0)
+    saved_ot = float(row.get("ot_hours") or 0)
+    cur_st = float(st.session_state.get(st_key, saved_st))
+    cur_ot = float(st.session_state.get(ot_key, saved_ot))
+    return abs(cur_st - saved_st) > 0.001 or abs(cur_ot - saved_ot) > 0.001
+
+
+def _save_labor_line_hours(
+    eid: str,
+    row: dict[str, Any],
+    *,
+    st_hours: float,
+    ot_hours: float,
+) -> tuple[bool, str | None]:
+    rid = str(row.get("id") or "")
+    return _service_ok(
+        update_estimate_labor(
+            rid,
+            _labor_line_update_payload(eid, row, st_hours=st_hours, ot_hours=ot_hours),
+        )
+    )
+
+
 def _render_labor_edit_form(
     eid: str,
     row: dict[str, Any],
@@ -2189,18 +2236,15 @@ def _render_labor_edit_form(
             ok, err = _service_ok(
                 update_estimate_labor(
                     rid,
-                    {
-                        "estimate_id": eid,
-                        "labor_type": row.get("labor_type") or row.get("role_name"),
-                        "role_name": row.get("role_name"),
-                        "description": row.get("description") or row.get("role_name"),
-                        "st_hours": st_hours,
-                        "ot_hours": ot_hours,
-                        "st_rate": st_rate,
-                        "ot_rate": ot_rate,
-                        "markup_percent": markup,
-                        "notes": row.get("notes") or "",
-                    },
+                    _labor_line_update_payload(
+                        eid,
+                        row,
+                        st_hours=st_hours,
+                        ot_hours=ot_hours,
+                        st_rate=st_rate,
+                        ot_rate=ot_rate,
+                        markup_percent=markup,
+                    ),
                 )
             )
             if ok:
@@ -2222,31 +2266,113 @@ def _render_labor_lines(
     if not rows:
         st.caption("No lines yet.")
         return
+
     edit_id = str(st.session_state.get(f"{key_prefix}_edit_id") or "")
-    headers = ["Role", "ST/OT Hrs", "ST/OT Rate", "Cost", "Price"]
+    pending = [r for r in rows if edit_id != str(r.get("id") or "") and _labor_inline_hours_changed(key_prefix, r)]
+    if pending:
+        if st.button(
+            f"Save all hour changes ({len(pending)})",
+            key=f"{key_prefix}_save_all_hrs_{eid}",
+            type="primary",
+        ):
+            errors: list[str] = []
+            for row in pending:
+                rid = str(row.get("id") or "")
+                st_key, ot_key = _labor_inline_hour_keys(key_prefix, rid)
+                ok, err = _save_labor_line_hours(
+                    eid,
+                    row,
+                    st_hours=float(st.session_state.get(st_key, row.get("st_hours") or 0)),
+                    ot_hours=float(st.session_state.get(ot_key, row.get("ot_hours") or 0)),
+                )
+                if not ok and err:
+                    errors.append(str(err))
+            if errors:
+                st.error(errors[0])
+            else:
+                st.rerun()
+
+    st.caption("Edit ST/OT hours directly in each row. Use ✎ to change rates or markup.")
+    col_widths = [2.3, 0.7, 0.7, 1.15, 0.85, 0.85, 1.05]
+    header = st.columns(col_widths, gap="small")
+    for idx, label in enumerate(["Role", "ST Hrs", "OT Hrs", "ST/OT Rate", "Cost", "Price", ""]):
+        with header[idx]:
+            st.markdown(f"**{label}**")
+
     for row in rows:
         rid = str(row.get("id") or "")
         if edit_id == rid:
-            st.markdown(f"**Edit — {html.escape(str(row.get('role_name') or 'Labor'))}**")
+            st.markdown(f"**Edit rates — {html.escape(str(row.get('role_name') or 'Labor'))}**")
             _render_labor_edit_form(eid, row, key_prefix=key_prefix)
             continue
-        cells = [
-            html.escape(str(row.get("role_name") or "—")),
-            html.escape(f"{row.get('st_hours', 0)}/{row.get('ot_hours', 0)}"),
-            html.escape(_labor_line_rate_text(row)),
-            html.escape(fmt_currency(row.get("cost_total"))),
-            html.escape(fmt_currency(row.get("price_total"))),
-        ]
-        c0, c_act = st.columns([8, 1.2], gap="small")
-        with c0:
-            _line_table(headers, [cells])
-        with c_act:
-            b1, b2 = st.columns(2, gap="small")
-            with b1:
-                if st.button("✎", key=f"{key_prefix}_edit_{rid}", help="Edit line"):
+
+        role_name = str(row.get("role_name") or "—")
+        st_rate = float(row.get("st_rate") or 0)
+        ot_rate = float(row.get("ot_rate") or 0)
+        markup = float(row.get("markup_percent") or 0)
+        st_key, ot_key = _labor_inline_hour_keys(key_prefix, rid)
+        saved_st = float(row.get("st_hours") or 0)
+        saved_ot = float(row.get("ot_hours") or 0)
+        sync_key = f"{key_prefix}_hrs_sync_{rid}"
+        snapshot = f"{saved_st:.3f}|{saved_ot:.3f}"
+        if st.session_state.get(sync_key) != snapshot:
+            st.session_state[st_key] = saved_st
+            st.session_state[ot_key] = saved_ot
+            st.session_state[sync_key] = snapshot
+
+        cols = st.columns(col_widths, gap="small")
+        with cols[0]:
+            st.markdown(role_name)
+        with cols[1]:
+            st_hours = st.number_input(
+                "ST Hrs",
+                min_value=0.0,
+                step=0.5,
+                format="%.1f",
+                key=st_key,
+                label_visibility="collapsed",
+            )
+        with cols[2]:
+            ot_hours = st.number_input(
+                "OT Hrs",
+                min_value=0.0,
+                step=0.5,
+                format="%.1f",
+                key=ot_key,
+                label_visibility="collapsed",
+            )
+        preview = labor_line_totals(st_hours, ot_hours, st_rate, ot_rate, markup)
+        with cols[3]:
+            st.caption(_labor_line_rate_text(row))
+        with cols[4]:
+            st.caption(fmt_currency(preview.get("cost_total")))
+        with cols[5]:
+            st.caption(fmt_currency(preview.get("price_total")))
+        with cols[6]:
+            act1, act2, act3 = st.columns(3, gap="small")
+            changed = _labor_inline_hours_changed(key_prefix, row)
+            with act1:
+                if st.button(
+                    "Save",
+                    key=f"{key_prefix}_save_hrs_{rid}",
+                    type="primary" if changed else "secondary",
+                    disabled=not changed,
+                    use_container_width=True,
+                ):
+                    ok, err = _save_labor_line_hours(
+                        eid,
+                        row,
+                        st_hours=float(st_hours),
+                        ot_hours=float(ot_hours),
+                    )
+                    if ok:
+                        st.rerun()
+                    st.error(err)
+            with act2:
+                if st.button("✎", key=f"{key_prefix}_edit_{rid}", help="Edit rates / markup"):
                     st.session_state[f"{key_prefix}_edit_id"] = rid
                     st.rerun()
-            with b2:
+            with act3:
                 if st.button("✕", key=f"{key_prefix}_del_{rid}", help="Delete line"):
                     ok, err = _service_ok(delete_estimate_labor(rid, estimate_id=eid))
                     if ok:
