@@ -1153,7 +1153,7 @@ def inject_dashboard_active_jobs_table_css() -> None:
   border: 1px solid #e2e8f0 !important;
   border-radius: 11px !important;
   padding: 0.75rem !important;
-  margin-top: 24px !important;
+  margin-top: 20px !important;
   margin-bottom: 20px !important;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06) !important;
   width: 100% !important;

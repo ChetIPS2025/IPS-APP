@@ -339,20 +339,20 @@ def render_dashboard_company_updates_section(
     display_rows = list(rows)[: max(1, int(limit))]
 
     with st.container(key="dashboard_company_updates"):
-        hdr_l, hdr_mid, hdr_r1, hdr_r2 = st.columns([2.2, 1.2, 1, 1], gap="small", vertical_alignment="center")
+        hdr_l, hdr_r = st.columns([2, 1], gap="small", vertical_alignment="center")
         with hdr_l:
             st.markdown(
                 f'<p class="ips-ops-news-title">Recent Company News</p>',
                 unsafe_allow_html=True,
             )
-        with hdr_mid:
-            st.markdown('<span aria-hidden="true"></span>', unsafe_allow_html=True)
-        with hdr_r1:
-            if st.button("+ Post Update", key="ips_dash_cu_new", type="primary", use_container_width=True):
-                _go_company_updates_page(open_new=True)
-        with hdr_r2:
-            if st.button("View All", key="ips_dash_cu_all", use_container_width=True):
-                _go_company_updates_page()
+        with hdr_r:
+            btn_post, btn_all = st.columns(2, gap="small")
+            with btn_post:
+                if st.button("+ Post Update", key="ips_dash_cu_new", type="primary", use_container_width=True):
+                    _go_company_updates_page(open_new=True)
+            with btn_all:
+                if st.button("View All", key="ips_dash_cu_all", use_container_width=True):
+                    _go_company_updates_page()
 
         if not display_rows:
             st.markdown(
@@ -374,8 +374,12 @@ def render_dashboard_company_updates_section(
                     f"</{ot}>",
                     unsafe_allow_html=True,
                 )
-                btn_l, btn_r = st.columns(2, gap="small")
-                with btn_l:
+                st.markdown(
+                    '<span class="ips-ops-news-footer-marker" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+                _, btn_open, btn_read = st.columns([5, 1, 1], gap="small")
+                with btn_open:
                     if uid and st.button(
                         "Open",
                         key=f"ips_dash_cu_open_{uid}",
@@ -384,7 +388,7 @@ def render_dashboard_company_updates_section(
                     ):
                         _mark_dashboard_update_read(uid)
                         _open_company_update(uid)
-                with btn_r:
+                with btn_read:
                     if uid and _is_update_unread(row):
                         if st.button(
                             "Mark read",

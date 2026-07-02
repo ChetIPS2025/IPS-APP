@@ -13705,7 +13705,7 @@ def inject_ops_dashboard_css() -> None:
     """Compact operations dashboard layout — KPI row, news, quick actions, activity grid."""
     st.markdown(
         """
-<style id="ips-ops-dashboard-v10">
+<style id="ips-ops-dashboard-v11">
 /* ── App shell: flex main beside sidebar (desktop only) ── */
 .stApp:has(.ips-ops-dashboard-marker) [data-testid="stAppViewContainer"] {
   width: 100% !important;
@@ -13727,14 +13727,16 @@ def inject_ops_dashboard_css() -> None:
     flex-direction: row !important;
   }
   .stApp:has(.ips-ops-dashboard-marker) section[data-testid="stSidebar"] {
-    flex: 0 0 248px !important;
-    width: 248px !important;
-    min-width: 248px !important;
-    max-width: 248px !important;
+    flex: 0 0 240px !important;
+    width: 240px !important;
+    min-width: 240px !important;
+    max-width: 240px !important;
   }
   .stApp:has(.ips-ops-dashboard-marker) section[data-testid="stMain"] {
     flex: 1 1 auto !important;
+    min-width: 0 !important;
     width: auto !important;
+    max-width: 100% !important;
   }
 }
 @media (max-width: 899px) {
@@ -13778,7 +13780,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stEle
   overflow: visible !important;
 }
 .st-key-dashboard_ops_shell [data-testid="stVerticalBlock"] {
-  gap: 0 !important;
+  gap: 20px !important;
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
@@ -13795,13 +13797,30 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stEle
   overflow: visible !important;
 }
 .st-key-dashboard_active_jobs_table {
-  margin-top: 24px !important;
+  margin-top: 20px !important;
 }
-
-/* ── Header ── */
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stHorizontalBlock"]:has(.ips-page-title-block):has(.ips-page-actions-marker) {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 16px !important;
+  width: 100% !important;
+  flex-wrap: wrap !important;
+}
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stHorizontalBlock"]:has(.ips-page-actions-marker) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 0.5rem !important;
+  flex-wrap: wrap !important;
+}
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-header {
   margin-bottom: 12px !important;
   padding-bottom: 0 !important;
+  width: 100% !important;
+}
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stHorizontalBlock"]:has(.ips-page-title-block) {
+  align-items: center !important;
 }
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-title {
   font-size: 2.125rem !important;
@@ -13840,44 +13859,53 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   line-height: 1.35;
 }
 
-/* ── KPI rows: 3 cards per row ── */
+/* ── KPI row: single responsive grid ── */
+.st-key-dashboard_ops_kpis {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}
 .st-key-dashboard_ops_kpis [data-testid="stVerticalBlock"] {
-  gap: 16px !important;
+  gap: 0 !important;
   width: 100% !important;
 }
 .st-key-dashboard_ops_kpis [data-testid="stHorizontalBlock"] {
-  display: flex !important;
-  flex-wrap: nowrap !important;
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)) !important;
   gap: 16px !important;
   width: 100% !important;
   max-width: 100% !important;
   align-items: stretch !important;
 }
 .st-key-dashboard_ops_kpis [data-testid="column"] {
-  flex: 1 1 0 !important;
-  min-width: 0 !important;
+  flex: unset !important;
   width: auto !important;
+  min-width: 0 !important;
   max-width: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: visible !important;
 }
 .ips-ops-kpi-card {
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 11px;
   padding: 0.65rem 0.75rem;
-  min-height: 84px;
-  height: auto;
+  min-height: 88px;
+  height: 100%;
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 0.55rem;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
-  transition: transform 0.12s ease, box-shadow 0.15s ease, border-color 0.12s ease;
+  transition: box-shadow 0.15s ease, border-color 0.12s ease;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  flex: 1 1 auto;
 }
 .ips-ops-kpi-card:hover {
-  transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(37, 99, 235, 0.14);
   border-color: #bfdbfe;
 }
@@ -13914,9 +13942,9 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   color: #64748b;
   margin: 0.1rem 0 0;
   line-height: 1.2;
-  white-space: normal !important;
-  word-break: normal !important;
-  overflow-wrap: break-word !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 .st-key-dashboard_ops_kpis [data-testid="column"]:nth-child(5) .ips-ops-kpi-value,
 .st-key-dashboard_ops_kpis [data-testid="column"]:nth-child(6) .ips-ops-kpi-value {
@@ -13924,6 +13952,11 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
 }
 .st-key-dashboard_ops_kpis [data-testid="column"]:nth-child(4) .ips-ops-kpi-value {
   color: #ea580c;
+}
+@media (min-width: 1200px) {
+  .st-key-dashboard_ops_kpis [data-testid="stHorizontalBlock"] {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  }
 }
 
 /* ── Second row: 70 / 30 grid ── */
@@ -13934,7 +13967,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
 }
 .st-key-dashboard_ops_row2 [data-testid="stElementContainer"]:has(.ips-ops-row2-grid-marker) + [data-testid="stElementContainer"] [data-testid="stHorizontalBlock"] {
   display: grid !important;
-  grid-template-columns: minmax(0, 7fr) minmax(0, 3fr) !important;
+  grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr) !important;
   gap: 16px !important;
   width: 100% !important;
   max-width: 100% !important;
@@ -13945,6 +13978,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   width: 100% !important;
   max-width: 100% !important;
   overflow: visible !important;
+  display: block !important;
 }
 
 /* ── Company news ── */
@@ -13964,36 +13998,29 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   box-sizing: border-box !important;
 }
 .st-key-dashboard_company_updates [data-testid="stVerticalBlock"] {
-  gap: 0.65rem !important;
+  gap: 0.5rem !important;
   width: 100% !important;
   overflow: visible !important;
 }
 .st-key-dashboard_company_updates [data-testid="stHorizontalBlock"]:first-of-type {
-  margin-bottom: 0.35rem !important;
+  margin-bottom: 0.25rem !important;
   padding-bottom: 0 !important;
   border-bottom: none !important;
   display: flex !important;
-  flex-wrap: wrap !important;
-  gap: 0.35rem !important;
+  flex-wrap: nowrap !important;
+  gap: 0.5rem !important;
   align-items: center !important;
 }
 .st-key-dashboard_company_updates [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"] {
   min-width: 0 !important;
-  flex: 1 1 auto !important;
-}
-.ips-ops-news-title {
-  margin: 0;
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: #0f172a;
 }
 .st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) {
   display: flex !important;
   flex-direction: column !important;
-  gap: 0.5rem !important;
+  gap: 0.35rem !important;
   border: 1px solid #e8edf4 !important;
   border-radius: 10px !important;
-  padding: 0.65rem 0.75rem !important;
+  padding: 0.55rem 0.65rem !important;
   margin-bottom: 0 !important;
   background: #fafbfd !important;
   height: auto !important;
@@ -14001,6 +14028,41 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
+}
+.ips-ops-news-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+.st-key-dashboard_company_updates [data-testid="stElementContainer"]:has(.ips-ops-news-footer-marker) + [data-testid="stElementContainer"] [data-testid="stHorizontalBlock"] {
+  display: flex !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  gap: 10px !important;
+  margin-top: 0.25rem !important;
+  padding-top: 0.4rem !important;
+  border-top: 1px solid #eef2f7 !important;
+  width: 100% !important;
+}
+.st-key-dashboard_company_updates [data-testid="stElementContainer"]:has(.ips-ops-news-footer-marker) + [data-testid="stElementContainer"] [data-testid="column"] {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+}
+.st-key-dashboard_company_updates [data-testid="stElementContainer"]:has(.ips-ops-news-footer-marker) + [data-testid="stElementContainer"] [data-testid="column"]:first-child {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+}
+.st-key-dashboard_company_updates [data-testid="stElementContainer"]:has(.ips-ops-news-footer-marker) + [data-testid="stElementContainer"] .stButton > button {
+  min-height: 30px !important;
+  height: 30px !important;
+  padding: 0 0.75rem !important;
+  font-size: 0.72rem !important;
+  width: auto !important;
+  min-width: 64px !important;
+  white-space: nowrap !important;
 }
 .ips-ct-feed-card-wrap-compact {
   margin: 0 !important;
@@ -14064,6 +14126,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   line-height: 1.25 !important;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .ips-ct-body-compact {
   margin: 0.1rem 0 0 !important;
@@ -14074,23 +14137,6 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-.st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) [data-testid="stHorizontalBlock"]:last-of-type {
-  display: flex !important;
-  justify-content: space-between !important;
-  align-items: center !important;
-  gap: 0.5rem !important;
-  margin-top: 0.35rem !important;
-  padding-top: 0.45rem !important;
-  border-top: 1px solid #eef2f7 !important;
-  width: 100% !important;
-}
-.st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) .stButton > button {
-  min-height: 30px !important;
-  height: 30px !important;
-  padding: 0 0.65rem !important;
-  font-size: 0.72rem !important;
-  width: 100% !important;
 }
 
 /* ── Quick actions: 2-col grid ── */
@@ -14118,10 +14164,14 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   gap: 12px !important;
   width: 100% !important;
+  align-items: stretch !important;
 }
 .st-key-dashboard_ops_quick_actions [data-testid="column"] {
   min-width: 0 !important;
   width: 100% !important;
+  overflow: visible !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 .ips-ops-qa-title {
   margin: 0 0 0.15rem;
@@ -14131,10 +14181,11 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
 }
 .st-key-dashboard_ops_quick_actions .stButton {
   width: 100% !important;
+  flex: 1 1 auto !important;
 }
 .st-key-dashboard_ops_quick_actions .stButton > button {
-  min-height: 52px !important;
-  height: auto !important;
+  min-height: 48px !important;
+  height: 100% !important;
   width: 100% !important;
   padding: 0.4rem 0.5rem !important;
   background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%) !important;
@@ -14144,11 +14195,10 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   font-weight: 700 !important;
   font-size: 0.75rem !important;
   box-shadow: 0 2px 6px rgba(37, 99, 235, 0.28) !important;
-  transition: background 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease !important;
+  transition: background 0.15s ease, box-shadow 0.15s ease !important;
 }
 .st-key-dashboard_ops_quick_actions .stButton > button:hover {
   background: linear-gradient(180deg, #1d4ed8 0%, #1e3a8a 100%) !important;
-  transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.32) !important;
 }
 .st-key-dashboard_ops_quick_actions .stButton > button p {
@@ -14179,6 +14229,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  align-items: stretch;
 }
 .ips-ops-widget {
   background: #ffffff;
@@ -14186,14 +14237,14 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   border-radius: 11px;
   padding: 0.65rem 0.75rem;
   min-height: 170px;
-  height: auto;
+  height: 100%;
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
   display: flex;
   flex-direction: column;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  overflow: auto;
+  overflow: hidden;
 }
 .ips-ops-widget-head {
   display: flex;
@@ -14265,11 +14316,6 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stExp
 }
 
 /* ── Responsive breakpoints ── */
-@media (max-width: 1400px) {
-  .ips-ops-activity-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
 @media (max-width: 992px) {
   .st-key-dashboard_ops_row2 [data-testid="stElementContainer"]:has(.ips-ops-row2-grid-marker) + [data-testid="stElementContainer"] [data-testid="stHorizontalBlock"] {
     grid-template-columns: 1fr !important;
@@ -14287,23 +14333,15 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stExp
     font-size: 1.5rem !important;
   }
   .st-key-dashboard_ops_kpis [data-testid="stHorizontalBlock"] {
-    flex-wrap: wrap !important;
-  }
-  .st-key-dashboard_ops_kpis [data-testid="column"] {
-    flex: 1 1 calc(50% - 8px) !important;
-    min-width: calc(50% - 8px) !important;
+    grid-template-columns: repeat(2, minmax(150px, 1fr)) !important;
   }
   .ips-ops-activity-grid {
     grid-template-columns: 1fr;
   }
-  .st-key-dashboard_ops_quick_actions [data-testid="stHorizontalBlock"] {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
 }
 @media (max-width: 480px) {
-  .st-key-dashboard_ops_kpis [data-testid="column"] {
-    flex: 1 1 100% !important;
-    min-width: 100% !important;
+  .st-key-dashboard_ops_kpis [data-testid="stHorizontalBlock"] {
+    grid-template-columns: 1fr !important;
   }
   .st-key-dashboard_ops_quick_actions [data-testid="stHorizontalBlock"] {
     grid-template-columns: 1fr !important;

@@ -395,22 +395,17 @@ def render() -> None:
                 ("Open Invoices", fmt_currency(kpis.get("open_invoices", 0)), "🧾", "#dbeafe"),
                 ("Revenue This Month", fmt_currency(kpis.get("total_sales", 0)), "💵", "#fef3c7"),
             ]
-            for row_start in range(0, len(kpi_items), 3):
-                cols = st.columns(3, gap="small")
-                for j, col in enumerate(cols):
-                    idx = row_start + j
-                    if idx >= len(kpi_items):
-                        break
-                    label, value, icon, bg = kpi_items[idx]
-                    with col:
-                        render_ops_kpi_card(label, value, icon, bg)
+            kpi_cols = st.columns(6, gap="small")
+            for col, (label, value, icon, bg) in zip(kpi_cols, kpi_items):
+                with col:
+                    render_ops_kpi_card(label, value, icon, bg)
 
         with st.container(key="dashboard_ops_row2"):
             st.markdown(
                 '<span class="ips-ops-row2-grid-marker" aria-hidden="true"></span>',
                 unsafe_allow_html=True,
             )
-            news_col, qa_col = st.columns([7, 3], gap="medium")
+            news_col, qa_col = st.columns([2, 1], gap="medium")
             with news_col:
                 render_dashboard_company_updates_section(
                     load_recent_company_updates(limit=5),
