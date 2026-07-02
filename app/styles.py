@@ -1087,23 +1087,24 @@ def inject_jobs_module_css() -> None:
   border-bottom: 1px solid #e8edf4;
   margin: 0 !important;
 }}
-.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
-  background: #eef2f7;
-  min-height: 32px !important;
-  max-height: 34px !important;
-  height: auto !important;
-  padding: 3px 8px !important;
-  position: sticky;
-  top: 0;
-  z-index: 12;
-  box-shadow: 0 1px 0 #dbe3ef;
-}}
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) {{
   background: #ffffff !important;
   cursor: pointer;
   min-height: 48px !important;
   max-height: 52px !important;
-  padding: 2px 8px !important;
+  height: 50px !important;
+  padding: 0 10px 0 8px !important;
+}}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
+  background: #eef2f7;
+  min-height: 40px !important;
+  max-height: 44px !important;
+  height: 42px !important;
+  padding: 0 10px 0 8px !important;
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  box-shadow: 0 1px 0 #dbe3ef;
 }}
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-row-even) {{
   background: #f8fafc !important;
@@ -1313,8 +1314,14 @@ def inject_jobs_module_css() -> None:
 .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) {{
   overflow: visible !important;
   display: flex !important;
+  flex-direction: column !important;
   align-items: center !important;
-  justify-content: flex-end !important;
+  justify-content: center !important;
+  flex: 0 0 110px !important;
+  min-width: 110px !important;
+  width: 110px !important;
+  max-width: 110px !important;
+  padding-right: 8px !important;
 }}
 .st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-actions-cell)
 [data-testid="column"]:has(.job-row-actions-menu) {{
@@ -1337,12 +1344,12 @@ def inject_jobs_module_css() -> None:
   flex-wrap: nowrap !important;
   align-items: center !important;
   justify-content: center !important;
-  min-height: 28px !important;
-  height: 28px !important;
-  min-width: 84px !important;
+  min-height: 34px !important;
+  height: 34px !important;
+  min-width: 88px !important;
   width: auto !important;
   max-width: none !important;
-  padding: 0 0.55rem !important;
+  padding: 0 12px !important;
   border-radius: 8px !important;
   background: {PRIMARY} !important;
   border: 1px solid {PRIMARY} !important;
@@ -1354,6 +1361,7 @@ def inject_jobs_module_css() -> None:
   white-space: nowrap !important;
   word-break: keep-all !important;
   overflow-wrap: normal !important;
+  overflow: visible !important;
 }}
 .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"] > div,
 .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) [data-testid="column"]:has(.job-row-actions-menu) button[data-testid="stBaseButton-popover"] > div,
