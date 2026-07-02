@@ -854,6 +854,31 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .job-actions-button {
   overflow-wrap: normal !important;
   min-width: fit-content !important;
 }
+/* Job # + Project / Description — bold blue links */
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-num) .ips-jobs-table-link button,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-desc) .ips-jobs-table-link button,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-num) .ips-jobs-table-link button p,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-desc) .ips-jobs-table-link button p,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-num) .ips-jobs-table-link button span,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-desc) .ips-jobs-table-link button span,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-num) .ips-jobs-number-text,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-num) button[kind="tertiary"],
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-desc) button[kind="tertiary"],
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-num) button[data-testid="stBaseButton-tertiary"],
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-desc) button[data-testid="stBaseButton-tertiary"] {
+  color: #2563eb !important;
+  font-weight: 700 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-num) .ips-jobs-table-link button:hover,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-desc) .ips-jobs-table-link button:hover,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-num) .ips-jobs-table-link button:focus,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-desc) .ips-jobs-table-link button:focus {
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
+}
 </style>
         """,
         unsafe_allow_html=True,
@@ -1147,7 +1172,7 @@ def inject_dashboard_active_jobs_table_css() -> None:
     """Scope jobs list table styling to the dashboard Active Jobs panel."""
     st.markdown(
         """
-<style id="ips-dashboard-active-jobs-table-v4">
+<style id="ips-dashboard-active-jobs-table-v5">
 .st-key-dashboard_active_jobs_table {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
@@ -1370,7 +1395,7 @@ def inject_dashboard_active_jobs_table_css() -> None:
   z-index: 5 !important;
   background: #eef2f7 !important;
 }
-.st-key-dashboard_active_jobs_table .ips-jobs-cell,
+.st-key-dashboard_active_jobs_table .ips-jobs-cell:not(.ips-jobs-table-link):not(.ips-jobs-title-link):not(.job-project-link),
 .st-key-dashboard_active_jobs_table .ips-jobs-money {
   font-size: 0.8125rem !important;
   line-height: 1.25 !important;
@@ -1474,6 +1499,31 @@ def inject_dashboard_active_jobs_table_css() -> None:
   .st-key-dashboard_active_jobs_table [data-testid="column"]:has(.ips-jobs-col-subjobs) {
     display: none !important;
   }
+}
+/* Job # + Project / Description — bold blue links */
+.st-key-dashboard_active_jobs_table [data-testid="column"]:has(.ips-jobs-col-num) .ips-jobs-table-link button,
+.st-key-dashboard_active_jobs_table [data-testid="column"]:has(.ips-jobs-col-desc) .ips-jobs-table-link button,
+.st-key-dashboard_active_jobs_table [data-testid="column"]:has(.ips-jobs-col-num) .ips-jobs-table-link button p,
+.st-key-dashboard_active_jobs_table [data-testid="column"]:has(.ips-jobs-col-desc) .ips-jobs-table-link button p,
+.st-key-dashboard_active_jobs_table [data-testid="column"]:has(.ips-jobs-col-num) .ips-jobs-table-link button span,
+.st-key-dashboard_active_jobs_table [data-testid="column"]:has(.ips-jobs-col-desc) .ips-jobs-table-link button span,
+.st-key-dashboard_active_jobs_table [data-testid="column"]:has(.ips-jobs-col-num) .ips-jobs-number-text,
+.st-key-dashboard_active_jobs_table [data-testid="column"]:has(.ips-jobs-col-num) button[kind="tertiary"],
+.st-key-dashboard_active_jobs_table [data-testid="column"]:has(.ips-jobs-col-desc) button[kind="tertiary"],
+.st-key-dashboard_active_jobs_table [data-testid="column"]:has(.ips-jobs-col-num) button[data-testid="stBaseButton-tertiary"],
+.st-key-dashboard_active_jobs_table [data-testid="column"]:has(.ips-jobs-col-desc) button[data-testid="stBaseButton-tertiary"] {
+  color: #2563eb !important;
+  font-weight: 700 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.st-key-dashboard_active_jobs_table [data-testid="column"]:has(.ips-jobs-col-num) .ips-jobs-table-link button:hover,
+.st-key-dashboard_active_jobs_table [data-testid="column"]:has(.ips-jobs-col-desc) .ips-jobs-table-link button:hover,
+.st-key-dashboard_active_jobs_table [data-testid="column"]:has(.ips-jobs-col-num) .ips-jobs-table-link button:focus,
+.st-key-dashboard_active_jobs_table [data-testid="column"]:has(.ips-jobs-col-desc) .ips-jobs-table-link button:focus {
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
 }
 </style>
         """,

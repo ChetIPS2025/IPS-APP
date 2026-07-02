@@ -1174,10 +1174,10 @@ def inject_jobs_module_css() -> None:
   color: #64748b !important;
   font-weight: 700 !important;
 }}
-.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) [data-testid="stMarkdown"] p,
-.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) .ips-jobs-cell,
-.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) .job-cell,
-.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) .jobs-table-cell {{
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"]:not(:has(.ips-jobs-col-num)):not(:has(.ips-jobs-col-desc)) [data-testid="stMarkdown"] p,
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"]:not(:has(.ips-jobs-col-num)):not(:has(.ips-jobs-col-desc)) .ips-jobs-cell,
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"]:not(:has(.ips-jobs-col-num)):not(:has(.ips-jobs-col-desc)) .job-cell,
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"]:not(:has(.ips-jobs-col-num)):not(:has(.ips-jobs-col-desc)) .jobs-table-cell {{
   font-weight: 700 !important;
   color: #0f172a !important;
   font-size: 0.875rem !important;
