@@ -378,7 +378,7 @@ def render_dashboard_company_updates_section(
                     '<span class="ips-ops-news-footer-marker" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
-                _, btn_open, btn_read = st.columns([5, 1, 1], gap="small")
+                btn_open, btn_read = st.columns(2, gap="small")
                 with btn_open:
                     if uid and st.button(
                         "Open",

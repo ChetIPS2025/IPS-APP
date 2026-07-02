@@ -9,7 +9,7 @@ import streamlit as st
 
 try:
     from app.auth import current_profile, current_role
-    from app.components.cards import render_ops_kpi_card
+    from app.components.cards import render_ops_kpi_row
     from app.components.charts import render_donut_chart, render_horizontal_bars, render_line_chart
     from app.components.dashboard_active_jobs_table import render_dashboard_active_jobs_table
     from app.components.company_updates_feed import render_dashboard_company_updates_section
@@ -41,7 +41,7 @@ try:
     from app.utils.formatting import fmt_currency, fmt_date
 except ImportError:
     from auth import current_profile, current_role  # type: ignore
-    from components.cards import render_ops_kpi_card  # type: ignore
+    from components.cards import render_ops_kpi_row  # type: ignore
     from components.charts import render_donut_chart, render_horizontal_bars, render_line_chart  # type: ignore
     from components.dashboard_active_jobs_table import render_dashboard_active_jobs_table  # type: ignore
     from components.company_updates_feed import render_dashboard_company_updates_section  # type: ignore
@@ -395,10 +395,7 @@ def render() -> None:
                 ("Open Invoices", fmt_currency(kpis.get("open_invoices", 0)), "🧾", "#dbeafe"),
                 ("Revenue This Month", fmt_currency(kpis.get("total_sales", 0)), "💵", "#fef3c7"),
             ]
-            kpi_cols = st.columns(6, gap="small")
-            for col, (label, value, icon, bg) in zip(kpi_cols, kpi_items):
-                with col:
-                    render_ops_kpi_card(label, value, icon, bg)
+            render_ops_kpi_row(kpi_items)
 
         with st.container(key="dashboard_ops_row2"):
             st.markdown(

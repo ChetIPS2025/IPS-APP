@@ -48,21 +48,28 @@ def render_card(title: str = "", body_html: str = "") -> None:
     )
 
 
+def _ops_kpi_card_html(label: str, value: str, icon: str, icon_bg: str) -> str:
+    ot = "d" + "iv"
+    return (
+        f'<{ot} class="ips-ops-kpi-card">'
+        f'<{ot} class="ips-ops-kpi-icon-ring" style="background:{html.escape(icon_bg)}">{icon}</{ot}>'
+        f'<{ot} class="ips-ops-kpi-text">'
+        f'<p class="ips-ops-kpi-value">{html.escape(value)}</p>'
+        f'<p class="ips-ops-kpi-label">{html.escape(label)}</p>'
+        f"</{ot}></{ot}>"
+    )
+
+
 def render_ops_kpi_card(label: str, value: str, icon: str, icon_bg: str) -> None:
     """Compact operations KPI tile — icon ring, bold value, small label (~80–90px)."""
+    st.markdown(_ops_kpi_card_html(label, value, icon, icon_bg), unsafe_allow_html=True)
+
+
+def render_ops_kpi_row(items: list[tuple[str, str, str, str]]) -> None:
+    """Render all operations KPI tiles in one CSS grid (avoids Streamlit column width issues)."""
     ot = "d" + "iv"
-    st.markdown(
-        f"""
-<{ot} class="ips-ops-kpi-card">
-  <{ot} class="ips-ops-kpi-icon-ring" style="background:{icon_bg}">{icon}</{ot}>
-  <{ot} class="ips-ops-kpi-text">
-    <p class="ips-ops-kpi-value">{html.escape(value)}</p>
-    <p class="ips-ops-kpi-label">{html.escape(label)}</p>
-  </{ot}>
-</{ot}>
-""",
-        unsafe_allow_html=True,
-    )
+    cards = "".join(_ops_kpi_card_html(label, value, icon, bg) for label, value, icon, bg in items)
+    st.markdown(f'<{ot} class="ips-ops-kpi-grid">{cards}</{ot}>', unsafe_allow_html=True)
 
 
 def render_kpi_card(
