@@ -11,6 +11,7 @@ try:
     from app.auth import current_profile, current_role
     from app.components.cards import render_ops_kpi_card
     from app.components.charts import render_donut_chart, render_horizontal_bars, render_line_chart
+    from app.components.dashboard_active_jobs_table import render_dashboard_active_jobs_table
     from app.components.company_updates_feed import render_dashboard_company_updates_section
     from app.components.dashboard_management_reminders import render_dashboard_management_reminders_section
     from app.components.feeds import render_activity_feed
@@ -20,7 +21,6 @@ try:
         render_ops_quick_action_tiles,
         render_page_brand_header,
     )
-    from app.components.tables import data_table_html
     from app.pages._core._data import (
         dashboard_job_status_overview,
         dashboard_quote_aging_bars,
@@ -43,6 +43,7 @@ except ImportError:
     from auth import current_profile, current_role  # type: ignore
     from components.cards import render_ops_kpi_card  # type: ignore
     from components.charts import render_donut_chart, render_horizontal_bars, render_line_chart  # type: ignore
+    from components.dashboard_active_jobs_table import render_dashboard_active_jobs_table  # type: ignore
     from components.company_updates_feed import render_dashboard_company_updates_section  # type: ignore
     from components.dashboard_management_reminders import render_dashboard_management_reminders_section  # type: ignore
     from components.feeds import render_activity_feed  # type: ignore
@@ -52,7 +53,6 @@ except ImportError:
         render_ops_quick_action_tiles,
         render_page_brand_header,
     )
-    from components.tables import data_table_html  # type: ignore
     from pages._core._data import (  # type: ignore
         dashboard_job_status_overview,
         dashboard_quote_aging_bars,
@@ -347,6 +347,8 @@ def render() -> None:
 
     _render_todays_activity()
 
+    render_dashboard_active_jobs_table(load_awarded_jobs(), limit=10)
+
     render_dashboard_management_reminders_section(limit=4)
 
     with st.expander("Analytics & Reports", expanded=False):
@@ -424,47 +426,16 @@ def render() -> None:
             st.markdown(f"</{ot}>", unsafe_allow_html=True)
         st.markdown(f"</{ot}>", unsafe_allow_html=True)
 
-    with st.expander("QR Scans & Active Jobs", expanded=False):
+    with st.expander("Recent QR Scans", expanded=False):
         inject_qr_scan_history_css()
-        qr_col, jobs_col = st.columns(2, gap="small")
         qr_scans, qr_live = load_recent_qr_scans(limit=8)
-
-        def _dash_awarded_job_cell(field: str, row: dict) -> str:
-            if field == "job_number":
-                return f'<span class="ips-dash-job-number">{html.escape(str(row.get("job_number") or ""))}</span>'
-            if field == "awarded_date":
-                return html.escape(fmt_date(row.get("awarded_date")) if row.get("awarded_date") else "—")
-            return html.escape(str(row.get(field) or "—"))
-
-        awarded_jobs = load_awarded_jobs()
-        with qr_col:
-            st.markdown(
-                f'<{ot} class="ips-panel-card ips-panel-card-compact">'
-                f'{_panel_title("Recent QR Scans", is_live=qr_live)}'
-                f'{qr_scan_history_table_html(qr_scans, compact=True)}'
-                f"</{ot}>",
-                unsafe_allow_html=True,
-            )
-        with jobs_col:
-            st.markdown(
-                f'<{ot} class="ips-panel-card ips-panel-card-compact">'
-                f'{_panel_title("Active Jobs", is_live=bool(awarded_jobs))}'
-                f'{data_table_html(
-                    awarded_jobs,
-                    [
-                        ("job_number", "Job #"),
-                        ("job_name", "Project / Description"),
-                        ("customer", "Customer"),
-                        ("awarded_date", "Start Date"),
-                    ],
-                    col_fr=["0.55fr", "1.35fr", "0.95fr", "0.75fr"],
-                    cell_renderer=_dash_awarded_job_cell,
-                    table_class="ips-data-table-wrap ips-data-table-stable ips-dash-list-table",
-                    empty_message="No active jobs.",
-                )}'
-                f"</{ot}>",
-                unsafe_allow_html=True,
-            )
+        st.markdown(
+            f'<{ot} class="ips-panel-card ips-panel-card-compact">'
+            f'{_panel_title("Recent QR Scans", is_live=qr_live)}'
+            f'{qr_scan_history_table_html(qr_scans, compact=True)}'
+            f"</{ot}>",
+            unsafe_allow_html=True,
+        )
 
     with st.expander("Additional Quick Actions", expanded=False):
         render_dashboard_quick_actions(
