@@ -153,6 +153,7 @@ def render_dashboard_management_reminders_section(*, limit: int = 8) -> None:
                     if rid and st.button(
                         "Done",
                         key=f"ips_dash_mr_done_{rid}",
+                        type="primary",
                         disabled=is_demo_id(rid),
                         use_container_width=True,
                     ):
