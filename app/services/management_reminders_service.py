@@ -12,10 +12,12 @@ except ImportError:
     from services.task_display_helpers import normalize_task_status  # type: ignore
     from services.tasks_service import _resolve_task_job_id  # type: ignore
 
-_MANAGEMENT_ROLES = frozenset({"admin", "project manager", "supervisor"})
+_MANAGEMENT_VIEW_ALL_ROLES = frozenset({"admin", "project manager", "supervisor"})
+_OFFICE_REMINDER_CREATE_ROLES = frozenset({"admin", "project manager", "supervisor", "employee"})
 
 __all__ = [
     "can_create_management_reminder",
+    "can_create_office_reminder",
     "complete_management_reminder",
     "create_management_reminder",
     "due_date_badge",
@@ -69,7 +71,7 @@ def visible_to_user(row: dict[str, Any], *, profile: dict[str, Any], role: str) 
     if not is_office_reminder(row) or not is_open_reminder(row):
         return False
     role_key = str(role or "viewer").strip().lower()
-    if role_key in _MANAGEMENT_ROLES:
+    if role_key in _MANAGEMENT_VIEW_ALL_ROLES:
         return True
     return _matches_profile(row, profile)
 
@@ -127,8 +129,13 @@ def due_date_badge(due_raw: object) -> tuple[str, str]:
     return due.strftime("%b %d"), "ok"
 
 
+def can_create_office_reminder(role: str) -> bool:
+    return str(role or "").strip().lower() in _OFFICE_REMINDER_CREATE_ROLES
+
+
 def can_create_management_reminder(role: str) -> bool:
-    return str(role or "").strip().lower() in _MANAGEMENT_ROLES
+    """Backward-compatible alias for dashboard create permission."""
+    return can_create_office_reminder(role)
 
 
 def create_management_reminder(

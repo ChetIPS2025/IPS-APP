@@ -61,8 +61,9 @@ def test_due_date_badge_overdue():
     assert level == "danger"
 
 
-def test_can_create_for_pm_not_viewer():
+def test_can_create_for_pm_and_employee_not_viewer():
     assert can_create_management_reminder("project manager") is True
+    assert can_create_management_reminder("employee") is True
     assert can_create_management_reminder("viewer") is False
 
 

@@ -1,4 +1,4 @@
-"""Dashboard panel for office management reminders (job-less todos)."""
+"""Dashboard panel for shared office to-do reminders (job-less todos)."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ try:
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._data import load_tasks, task_assignee_options
     from app.services.management_reminders_service import (
-        can_create_management_reminder,
+        can_create_office_reminder,
         complete_management_reminder,
         create_management_reminder,
         due_date_badge,
@@ -25,7 +25,7 @@ except ImportError:
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._data import load_tasks, task_assignee_options  # type: ignore
     from services.management_reminders_service import (  # type: ignore
-        can_create_management_reminder,
+        can_create_office_reminder,
         complete_management_reminder,
         create_management_reminder,
         due_date_badge,
@@ -45,7 +45,7 @@ def _default_assignee(profile: dict[str, Any], options: list[str]) -> str:
 
 
 def render_dashboard_management_reminders_section(*, limit: int = 8) -> None:
-    """Open office reminders for managers; assignee-scoped for other roles."""
+    """Shared office to-dos: managers see all open items; others see assigned work."""
     profile = current_profile() or {}
     role = current_role()
     reminders = filter_dashboard_reminders(
@@ -54,7 +54,7 @@ def render_dashboard_management_reminders_section(*, limit: int = 8) -> None:
         role=role,
         limit=limit,
     )
-    can_create = can_create_management_reminder(role)
+    can_create = can_create_office_reminder(role)
     assignee_options = [o for o in task_assignee_options() if o]
     if can_create and assignee_options and "ips_dash_mr_assignee" not in st.session_state:
         st.session_state["ips_dash_mr_assignee"] = _default_assignee(profile, assignee_options)
@@ -74,8 +74,8 @@ def render_dashboard_management_reminders_section(*, limit: int = 8) -> None:
         with hdr_l:
             st.markdown(
                 f'<{ot} class="ips-dash-mr-head">'
-                f'<p class="ips-dash-mr-title-bar">Management Reminders</p>'
-                f'<p class="ips-dash-mr-subtitle">Simple office follow-ups — not job subjobs</p>'
+                f'<p class="ips-dash-mr-title-bar">Office To-Do List</p>'
+                f'<p class="ips-dash-mr-subtitle">Shared follow-ups and office tasks — not job subjobs</p>'
                 f"</{ot}>",
                 unsafe_allow_html=True,
             )
@@ -83,7 +83,7 @@ def render_dashboard_management_reminders_section(*, limit: int = 8) -> None:
             b_add, b_all = st.columns(2, gap="small")
             with b_add:
                 if can_create and st.button(
-                    "+ Add Reminder",
+                    "+ Add To-Do",
                     key="ips_dash_mr_toggle_form",
                     type="primary",
                     use_container_width=True,
@@ -96,14 +96,14 @@ def render_dashboard_management_reminders_section(*, limit: int = 8) -> None:
 
         if can_create and st.session_state.get("ips_dash_mr_form"):
             with st.form("ips_dash_mr_new_form", clear_on_submit=True):
-                st.text_input("Reminder", placeholder="Follow up on vendor quote…", key="ips_dash_mr_title")
+                st.text_input("To-do", placeholder="Follow up on vendor quote…", key="ips_dash_mr_title")
                 c1, c2 = st.columns(2)
                 with c1:
                     st.checkbox("Due date", key="ips_dash_mr_has_due")
                     st.date_input("Due", value=date.today(), key="ips_dash_mr_due")
                 with c2:
                     st.selectbox("Assign to", assignee_options, key="ips_dash_mr_assignee")
-                if st.form_submit_button("Save reminder", type="primary"):
+                if st.form_submit_button("Save to-do", type="primary"):
                     due: date | None = None
                     if st.session_state.get("ips_dash_mr_has_due"):
                         due_val = st.session_state.get("ips_dash_mr_due")
@@ -120,7 +120,7 @@ def render_dashboard_management_reminders_section(*, limit: int = 8) -> None:
 
         if not reminders:
             st.markdown(
-                '<p class="ips-dash-mr-empty">No open management reminders.</p>',
+                '<p class="ips-dash-mr-empty">No open office to-dos.</p>',
                 unsafe_allow_html=True,
             )
         else:
