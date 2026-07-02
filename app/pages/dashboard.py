@@ -387,17 +387,23 @@ def render() -> None:
             )
 
         with st.container(key="dashboard_ops_kpis"):
-            k1, k2, k3, k4, k5, k6 = st.columns(6, gap="small")
-            for col, label, value, icon, bg in [
-                (k1, "Active Jobs", str(kpis.get("active_jobs", 0)), "💼", "#ffedd5"),
-                (k2, "Estimates Pending", str(kpis.get("open_estimates", 0)), "📋", "#f3e8ff"),
-                (k3, "Employees Working Today", str(employees_today), "👷", "#dcfce7"),
-                (k4, "Open Tasks", str(_count_open_tasks()), "✅", "#e0f2fe"),
-                (k5, "Open Invoices", fmt_currency(kpis.get("open_invoices", 0)), "🧾", "#dbeafe"),
-                (k6, "Revenue This Month", fmt_currency(kpis.get("total_sales", 0)), "💵", "#fef3c7"),
-            ]:
-                with col:
-                    render_ops_kpi_card(label, value, icon, bg)
+            kpi_items = [
+                ("Active Jobs", str(kpis.get("active_jobs", 0)), "💼", "#ffedd5"),
+                ("Estimates Pending", str(kpis.get("open_estimates", 0)), "📋", "#f3e8ff"),
+                ("Employees Working Today", str(employees_today), "👷", "#dcfce7"),
+                ("Open Tasks", str(_count_open_tasks()), "✅", "#e0f2fe"),
+                ("Open Invoices", fmt_currency(kpis.get("open_invoices", 0)), "🧾", "#dbeafe"),
+                ("Revenue This Month", fmt_currency(kpis.get("total_sales", 0)), "💵", "#fef3c7"),
+            ]
+            for row_start in range(0, len(kpi_items), 3):
+                cols = st.columns(3, gap="small")
+                for j, col in enumerate(cols):
+                    idx = row_start + j
+                    if idx >= len(kpi_items):
+                        break
+                    label, value, icon, bg = kpi_items[idx]
+                    with col:
+                        render_ops_kpi_card(label, value, icon, bg)
 
         with st.container(key="dashboard_ops_row2"):
             st.markdown(

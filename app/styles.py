@@ -13697,30 +13697,43 @@ def inject_ops_dashboard_css() -> None:
     """Compact operations dashboard layout — KPI row, news, quick actions, activity grid."""
     st.markdown(
         """
-<style id="ips-ops-dashboard-v9">
-/* ── App shell: flex main beside sidebar ── */
+<style id="ips-ops-dashboard-v10">
+/* ── App shell: flex main beside sidebar (desktop only) ── */
 .stApp:has(.ips-ops-dashboard-marker) [data-testid="stAppViewContainer"] {
-  display: flex !important;
-  flex-direction: row !important;
   width: 100% !important;
   max-width: 100% !important;
-  overflow-x: visible !important;
+  overflow-x: clip !important;
   box-sizing: border-box !important;
-}
-.stApp:has(.ips-ops-dashboard-marker) section[data-testid="stSidebar"] {
-  flex: 0 0 260px !important;
-  width: 260px !important;
-  min-width: 260px !important;
-  max-width: 260px !important;
 }
 .stApp:has(.ips-ops-dashboard-marker) section[data-testid="stMain"] {
-  flex: 1 1 auto !important;
-  min-width: 0 !important;
-  width: auto !important;
+  width: 100% !important;
   max-width: 100% !important;
-  overflow-x: visible !important;
+  min-width: 0 !important;
+  overflow-x: clip !important;
   box-sizing: border-box !important;
   background: #f1f5f9 !important;
+}
+@media (min-width: 900px) {
+  .stApp:has(.ips-ops-dashboard-marker) [data-testid="stAppViewContainer"] {
+    display: flex !important;
+    flex-direction: row !important;
+  }
+  .stApp:has(.ips-ops-dashboard-marker) section[data-testid="stSidebar"] {
+    flex: 0 0 248px !important;
+    width: 248px !important;
+    min-width: 248px !important;
+    max-width: 248px !important;
+  }
+  .stApp:has(.ips-ops-dashboard-marker) section[data-testid="stMain"] {
+    flex: 1 1 auto !important;
+    width: auto !important;
+  }
+}
+@media (max-width: 899px) {
+  .stApp:has(.ips-ops-dashboard-marker) section[data-testid="stMain"] {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+  }
 }
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .block-container {
   width: 100% !important;
@@ -13819,18 +13832,24 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   line-height: 1.35;
 }
 
-/* ── KPI row: CSS Grid ── */
+/* ── KPI rows: 3 cards per row ── */
+.st-key-dashboard_ops_kpis [data-testid="stVerticalBlock"] {
+  gap: 16px !important;
+  width: 100% !important;
+}
 .st-key-dashboard_ops_kpis [data-testid="stHorizontalBlock"] {
-  display: grid !important;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important;
+  display: flex !important;
+  flex-wrap: nowrap !important;
   gap: 16px !important;
   width: 100% !important;
   max-width: 100% !important;
+  align-items: stretch !important;
 }
 .st-key-dashboard_ops_kpis [data-testid="column"] {
-  width: 100% !important;
+  flex: 1 1 0 !important;
   min-width: 0 !important;
-  max-width: 100% !important;
+  width: auto !important;
+  max-width: none !important;
 }
 .ips-ops-kpi-card {
   background: #ffffff;
@@ -13887,6 +13906,9 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   color: #64748b;
   margin: 0.1rem 0 0;
   line-height: 1.2;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
 }
 .st-key-dashboard_ops_kpis [data-testid="column"]:nth-child(5) .ips-ops-kpi-value,
 .st-key-dashboard_ops_kpis [data-testid="column"]:nth-child(6) .ips-ops-kpi-value {
@@ -13942,6 +13964,14 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   margin-bottom: 0.35rem !important;
   padding-bottom: 0 !important;
   border-bottom: none !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 0.35rem !important;
+  align-items: center !important;
+}
+.st-key-dashboard_company_updates [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"] {
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
 }
 .ips-ops-news-title {
   margin: 0;
@@ -14070,20 +14100,22 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   box-sizing: border-box !important;
 }
 .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"] {
-  display: grid !important;
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  display: flex !important;
+  flex-direction: column !important;
   gap: 12px !important;
   width: 100% !important;
 }
 .st-key-dashboard_ops_quick_actions [data-testid="stHorizontalBlock"] {
-  display: contents !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+  width: 100% !important;
 }
 .st-key-dashboard_ops_quick_actions [data-testid="column"] {
   min-width: 0 !important;
   width: 100% !important;
 }
 .ips-ops-qa-title {
-  grid-column: 1 / -1;
   margin: 0 0 0.15rem;
   font-size: 1.25rem;
   font-weight: 800;
@@ -14243,18 +14275,29 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stExp
     padding-left: 12px !important;
     padding-right: 12px !important;
   }
+  section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-title {
+    font-size: 1.5rem !important;
+  }
   .st-key-dashboard_ops_kpis [data-testid="stHorizontalBlock"] {
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+    flex-wrap: wrap !important;
+  }
+  .st-key-dashboard_ops_kpis [data-testid="column"] {
+    flex: 1 1 calc(50% - 8px) !important;
+    min-width: calc(50% - 8px) !important;
   }
   .ips-ops-activity-grid {
     grid-template-columns: 1fr;
   }
+  .st-key-dashboard_ops_quick_actions [data-testid="stHorizontalBlock"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
 }
 @media (max-width: 480px) {
-  .st-key-dashboard_ops_kpis [data-testid="stHorizontalBlock"] {
-    grid-template-columns: 1fr !important;
+  .st-key-dashboard_ops_kpis [data-testid="column"] {
+    flex: 1 1 100% !important;
+    min-width: 100% !important;
   }
-  .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"] {
+  .st-key-dashboard_ops_quick_actions [data-testid="stHorizontalBlock"] {
     grid-template-columns: 1fr !important;
   }
 }
