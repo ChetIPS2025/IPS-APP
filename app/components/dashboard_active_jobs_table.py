@@ -137,17 +137,20 @@ def _render_job_link(
     job: dict[str, Any],
     extra_class: str = "",
     truncate: bool = False,
+    use_container_width: bool | None = None,
 ) -> None:
     link_class = extra_class
     if truncate:
         link_class = f"{link_class} ips-jobs-cell-truncate".strip()
-    st.markdown(f'<div class="ips-jobs-table-link {link_class}">', unsafe_allow_html=True)
+    title_attr = f' title="{html.escape(label, quote=True)}"' if label else ""
+    btn_width = use_container_width if use_container_width is not None else (not truncate)
+    st.markdown(f'<div class="ips-jobs-table-link {link_class}"{title_attr}>', unsafe_allow_html=True)
     if st.button(
         label,
         key=key,
         type="tertiary",
         help="Open job details",
-        use_container_width=not truncate,
+        use_container_width=btn_width,
     ):
         _open_job_nav(str(job.get("id") or ""), job)
     st.markdown("</div>", unsafe_allow_html=True)
@@ -254,6 +257,7 @@ def render_dashboard_active_jobs_table(
                     key=f"dash_job_num_{jid}",
                     job=job,
                     extra_class="ips-jobs-number-link job-number-link",
+                    use_container_width=False,
                 )
 
             with cols[1]:

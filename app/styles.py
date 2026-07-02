@@ -1255,6 +1255,20 @@ def inject_jobs_module_css() -> None:
 .st-key-jobs_table_wrap .ips-jobs-number-link button,
 .st-key-jobs_table_wrap .job-number-link button {{
   white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  width: auto !important;
+  max-width: none !important;
+}}
+.st-key-jobs_table_wrap .ips-jobs-number-link [data-testid="stButton"],
+.st-key-jobs_table_wrap .job-number-link [data-testid="stButton"] {{
+  width: auto !important;
+  max-width: none !important;
+}}
+.st-key-jobs_table_wrap .ips-jobs-number-link button p,
+.st-key-jobs_table_wrap .job-number-link button p {{
+  overflow: visible !important;
+  text-overflow: clip !important;
 }}
 .st-key-jobs_table_wrap .ips-jobs-title-link button,
 .st-key-jobs_table_wrap .job-project-link button {{
