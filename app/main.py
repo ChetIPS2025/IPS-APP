@@ -308,6 +308,12 @@ def main() -> None:
     inject_sidebar_mobile_auto_collapse_once()
     log_auth_state("app_authenticated")
 
+    try:
+        from app.components.sidebar_shell import capture_nav_slug_from_query, inject_sidebar_shell
+    except ImportError:
+        from components.sidebar_shell import capture_nav_slug_from_query, inject_sidebar_shell  # type: ignore
+    capture_nav_slug_from_query()
+
     if must_reset_password():
         _render_password_reset()
         if must_reset_password():
@@ -355,6 +361,7 @@ def main() -> None:
     st.session_state[SESSION_NAV_KEY] = slug
 
     render_sidebar(slug)
+    inject_sidebar_shell()
 
     try:
         render_module(slug)

@@ -11591,6 +11591,12 @@ section[data-testid="stSidebar"] .block-container {{
   min-width: 0;
   flex: 1 1 auto;
 }}
+.ips-main-header-menu {{
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  margin-right: 0.65rem;
+}}
 .ips-main-header-logo {{
   height: 40px;
   width: auto;
@@ -13104,8 +13110,12 @@ section[data-testid="stMain"] [data-testid="stExpander"] summary {{
 section[data-testid="stSidebar"] {{
   min-width: 15.5rem !important;
   max-width: 15.5rem !important;
+  width: 15.5rem !important;
+  z-index: 99995 !important;
+  overflow: visible !important;
 }}
 section[data-testid="stSidebar"] > div {{
+  min-width: 15.5rem !important;
   display: flex;
   flex-direction: column;
   min-height: 100vh;

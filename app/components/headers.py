@@ -9,23 +9,34 @@ import streamlit as st
 
 try:
     from app.branding import wording_logo_html
+    from app.components.sidebar_shell import inject_sidebar_menu_wire
 except ImportError:
     from branding import wording_logo_html  # type: ignore
+    from components.sidebar_shell import inject_sidebar_menu_wire  # type: ignore
 
 _ActionFn = Callable[[], None]
 
 
-def render_main_brand_bar(*, brand_actions: list[_ActionFn] | None = None) -> None:
+def render_main_brand_bar(*, brand_actions: list[_ActionFn] | None = None, show_menu: bool = True) -> None:
     """Light-gray IPS wording logo bar — call once per page (via phase2 shell)."""
     ot, ct = "d" + "iv", "/" + "d" + "iv"
     logo = wording_logo_html(height=40)
+    menu_html = (
+        '<button type="button" class="ips-header-menu-btn" aria-label="Open navigation menu">'
+        "☰ Menu</button>"
+        if show_menu
+        else ""
+    )
     st.markdown(
         f'<{ot} class="ips-main-header">'
+        f'<{ot} class="ips-main-header-menu">{menu_html}</{ct}>'
         f'<{ot} class="ips-main-header-brand">{logo}</{ct}>'
         f'<{ot} class="ips-main-header-actions-slot"></{ct}>'
         f"</{ct}>",
         unsafe_allow_html=True,
     )
+    if show_menu:
+        inject_sidebar_menu_wire()
     if brand_actions:
         ba_cols = st.columns([5, 1], gap="small")
         with ba_cols[1]:

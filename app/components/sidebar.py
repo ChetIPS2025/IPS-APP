@@ -49,6 +49,11 @@ def render_sidebar(active_slug: str) -> None:
         if field_mode
         else filter_nav_for_role(NAV_PAGES, role)
     )
+    try:
+        from app.components.sidebar_shell import store_sidebar_nav_fallback
+    except ImportError:
+        from components.sidebar_shell import store_sidebar_nav_fallback  # type: ignore
+    store_sidebar_nav_fallback(nav_items)
     _ESTIMATING_SLUGS = frozenset({"estimates", "pricing_guide"})
     _SCAN_SLUGS = frozenset({"scan_inventory", "scan_asset"})
 

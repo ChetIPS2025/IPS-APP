@@ -202,6 +202,7 @@ FIELD_NAV_PAGES: list[tuple[str, str]] = [
     ("scan_asset", "Scan Asset"),
     ("tasks", "Today's Tasks"),
     ("timekeeping", "Log Time"),
+    ("company_updates", "Company Updates"),
     ("assets", "Assets"),
     ("inventory", "Inventory"),
     ("employee_certifications", "Certifications"),

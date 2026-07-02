@@ -222,36 +222,8 @@ section[data-testid="stSidebar"],
   }
 }
 
-/* Phones: overlay sidebar, wider tap targets, full-width form rows */
+/* Phones: overlay sidebar handled by sidebar_shell.py (<=899px). */
 @media (max-width: 768px) {
-  .stSidebar,
-  [data-testid="stSidebar"],
-  section[data-testid="stSidebar"] {
-    position: fixed !important;
-    left: 0 !important;
-    top: 0 !important;
-    height: 100dvh !important;
-    max-height: 100dvh !important;
-    z-index: 100002 !important;
-    width: 260px !important;
-    min-width: 260px !important;
-    max-width: min(260px, 92vw) !important;
-    transition: transform 0.2s ease-out !important;
-    background: #ffffff !important;
-    background-color: #ffffff !important;
-    border-right: 1px solid #E5EAF2 !important;
-    color: #111827 !important;
-    box-shadow: 4px 0 24px rgba(15, 23, 42, 0.18) !important;
-  }
-  [data-testid="stSidebar"][aria-expanded="false"],
-  section[data-testid="stSidebar"][aria-expanded="false"] {
-    transform: translateX(-100%) !important;
-  }
-  [data-testid="stSidebar"][aria-expanded="true"],
-  section[data-testid="stSidebar"][aria-expanded="true"] {
-    transform: translateX(0) !important;
-  }
-
   section[data-testid="stMain"] .block-container,
   [data-testid="stMain"] .block-container {
     padding-left: max(1rem, env(safe-area-inset-left)) !important;
@@ -332,7 +304,7 @@ def inject_sidebar_mobile_auto_collapse_once() -> None:
     }
   }
   function run() {
-    if (vpW() > 768) return;
+    if (vpW() >= 900) return;
     if (sessionStorage.getItem("ips_mobile_sidebar_init") === "1") return;
     var d = rootDoc();
     var side = d.querySelector('[data-testid="stSidebar"]');
