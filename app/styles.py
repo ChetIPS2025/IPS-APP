@@ -2283,8 +2283,11 @@ def inject_estimates_module_css() -> None:
 .ips-estimates-cell {{
   color: {TEXT};
   font-size: 0.8125rem;
-  line-height: 1.25;
+  line-height: 1.2;
   min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }}
 .ips-estimates-number {{
   font-size: 14px;
@@ -2297,8 +2300,10 @@ def inject_estimates_module_css() -> None:
   font-size: 14px;
   font-weight: 700;
   color: #0f172a;
-  line-height: 1.25;
-  word-break: break-word;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }}
 .ips-estimates-muted {{
   font-size: 13px;
@@ -3365,6 +3370,11 @@ section[data-testid="stMain"] [class*="_table_wrap"] [data-testid="stHorizontalB
   min-height: 40px !important;
   height: auto !important;
   align-items: center !important;
+}
+.st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {
+  min-height: 42px !important;
+  max-height: 44px !important;
+  height: 42px !important;
 }
 .ips-filter-dot {
   width: 6px;
