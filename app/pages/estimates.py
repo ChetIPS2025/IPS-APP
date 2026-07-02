@@ -54,9 +54,13 @@ try:
     from app.components.estimate_actions import render_estimate_action_buttons
     from app.components.estimates_page_layout import (
         close_estimates_filter_bar_shell,
+        estimate_col_marker,
         inject_estimates_page_layout_css,
         render_estimates_filter_bar_shell,
+        render_estimates_pagination_footer,
+        render_estimates_summary_badge_bar,
         render_estimates_summary_cards,
+        render_estimates_table_pagination_header,
     )
     from app.components.headers import render_page_brand_header
     from app.components.layout import render_filter_bar as layout_filter_bar
@@ -66,12 +70,7 @@ try:
         clear_table_filters,
         render_table_header_cell,
     )
-    from app.components.table_pagination import (
-        paginate_rows,
-        render_table_pagination_footer,
-        render_table_pagination_header,
-        reset_table_page,
-    )
+    from app.components.table_pagination import paginate_rows, reset_table_page
     from app.pages._core._crud import is_demo_id
     from app.pages._core._session import select_key
     from app.services.estimates_service import (
@@ -149,11 +148,16 @@ except ImportError:
         persist_estimate,
     )
     from components.estimate_actions import render_estimate_action_buttons  # type: ignore
+    from components.table_pagination import paginate_rows, reset_table_page  # type: ignore
     from components.estimates_page_layout import (  # type: ignore
         close_estimates_filter_bar_shell,
+        estimate_col_marker,
         inject_estimates_page_layout_css,
         render_estimates_filter_bar_shell,
+        render_estimates_pagination_footer,
+        render_estimates_summary_badge_bar,
         render_estimates_summary_cards,
+        render_estimates_table_pagination_header,
     )
     from components.headers import render_page_brand_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
@@ -162,12 +166,6 @@ except ImportError:
         build_filter_options,
         clear_table_filters,
         render_table_header_cell,
-    )
-    from components.table_pagination import (  # type: ignore
-        paginate_rows,
-        render_table_pagination_footer,
-        render_table_pagination_header,
-        reset_table_page,
     )
     from pages._core._crud import is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
@@ -231,6 +229,7 @@ _ESTIMATE_TABS = [
     "Activity",
 ]
 _ESTIMATE_COLS = [0.35, 1.05, 2.2, 1.55, 1.05, 1.05, 1.15, 0.95, 1.15]
+_ESTIMATE_COL_MARKERS = ("sel", "num", "desc", "customer", "job", "status", "date", "total", "actions")
 _ESTIMATE_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
     ("ESTIMATE #", None),
@@ -752,8 +751,9 @@ def _render_custom_estimates_table(
         st.markdown('<div class="ips-estimates-table-wrap">', unsafe_allow_html=True)
 
         header_cols = st.columns(_ESTIMATE_COLS, gap="small", vertical_alignment="center")
-        for col, (label, field) in zip(header_cols, _ESTIMATE_HEADER_SPECS):
+        for col, (label, field), marker in zip(header_cols, _ESTIMATE_HEADER_SPECS, _ESTIMATE_COL_MARKERS):
             with col:
+                st.markdown(estimate_col_marker(marker), unsafe_allow_html=True)
                 if field:
                     render_table_header_cell(
                         label,
@@ -768,7 +768,7 @@ def _render_custom_estimates_table(
                         base_class="ips-estimates-header-row ips-estimates-cell",
                     )
 
-        for est in filtered:
+        for row_idx, est in enumerate(filtered):
             eid = str(est.get("id") or "").strip()
             if not eid:
                 continue
@@ -780,10 +780,17 @@ def _render_custom_estimates_table(
             est_date = fmt_date(est.get("estimate_date"))
             job_no = _estimate_job(est)
             total = _estimate_customer_price(est)
+            row_parity = "even" if row_idx % 2 else "odd"
 
             cols = st.columns(_ESTIMATE_COLS, gap="small", vertical_alignment="center")
 
             with cols[0]:
+                st.markdown(
+                    f'<span class="ips-estimates-table-row ips-estimates-row-{row_parity}" '
+                    f'data-row-id="{html.escape(eid, quote=True)}" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+                st.markdown(estimate_col_marker("sel"), unsafe_allow_html=True)
                 st.checkbox(
                     "",
                     key=_estimate_select_key(eid),
@@ -793,45 +800,53 @@ def _render_custom_estimates_table(
                 )
 
             with cols[1]:
+                st.markdown(estimate_col_marker("num"), unsafe_allow_html=True)
                 st.markdown(
                     f'<div class="ips-estimates-number">{html.escape(est_no)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[2]:
+                st.markdown(estimate_col_marker("desc"), unsafe_allow_html=True)
                 st.markdown(
                     f'<div class="ips-estimates-title">{html.escape(project)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[3]:
+                st.markdown(estimate_col_marker("customer"), unsafe_allow_html=True)
                 st.markdown(
                     f'<div class="ips-estimates-cell">{html.escape(customer)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[4]:
+                st.markdown(estimate_col_marker("job"), unsafe_allow_html=True)
                 st.markdown(
                     f'<div class="ips-estimates-cell ips-estimates-muted">{html.escape(job_no)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[5]:
+                st.markdown(estimate_col_marker("status"), unsafe_allow_html=True)
                 st.markdown(_estimate_status_pill_html(status), unsafe_allow_html=True)
 
             with cols[6]:
+                st.markdown(estimate_col_marker("date"), unsafe_allow_html=True)
                 st.markdown(
                     f'<div class="ips-estimates-cell ips-estimates-muted">{html.escape(est_date)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[7]:
+                st.markdown(estimate_col_marker("total"), unsafe_allow_html=True)
                 st.markdown(
                     f'<div class="ips-estimates-cell ips-estimates-number">{html.escape(total)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[8]:
+                st.markdown(estimate_col_marker("actions"), unsafe_allow_html=True)
                 if _can_show_approve_job(est):
                     if st.button(
                         "Approve Job",
@@ -1833,7 +1848,10 @@ def render() -> None:
         return
     inject_estimates_module_css()
     inject_estimates_page_layout_css()
-    st.markdown('<div class="ips-estimates-page"></div>', unsafe_allow_html=True)
+    st.markdown(
+        '<span class="ips-estimates-page ips-page-shell-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
     rows = load_estimates()
     filter_options = build_filter_options(rows, _ESTIMATE_COLUMN_FILTER_SPECS)
 
@@ -1850,13 +1868,14 @@ def render() -> None:
         "Estimates",
         "Create, review, price, and send customer proposals.",
         actions=[_est_export, _est_new],
+        actions_column_ratio=(1.85, 1.15),
     )
 
     if st.session_state.get(_NEW_ESTIMATE_DIALOG_KEY):
         _show_new_estimate_dialog()
 
     def _filters() -> None:
-        c1, c2, c3 = st.columns([3.2, 2.2, 0.6])
+        c1, c2, c3 = st.columns([6.5, 2.5, 1], gap="small")
         with c1:
             st.text_input(
                 "Search",
@@ -1904,6 +1923,14 @@ def render() -> None:
         total_customer_value=float(summary["total_customer_value"]),
         has_value_data=bool(summary.get("has_any_value")),
     )
+    render_estimates_summary_badge_bar(
+        total=int(summary["total"]),
+        active=int(summary["active"]),
+        draft=int(summary["draft"]),
+        sent=int(summary["sent"]),
+        total_customer_value=float(summary["total_customer_value"]),
+        has_value_data=bool(summary.get("has_any_value")),
+    )
 
     rows_by_id = {str(r.get("id") or ""): r for r in rows if str(r.get("id") or "").strip()}
     _render_approve_confirmation_panel(rows_by_id)
@@ -1920,10 +1947,10 @@ def render() -> None:
     build_modal_cache(filtered, cache_key=_ESTIMATES_CACHE_KEY)
     refreshed = _sync_stale_estimate_rollups(filtered, max_sync=5)
     filtered = _apply_estimate_row_refreshes(filtered, refreshed)
-    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="estimate")
+    render_estimates_table_pagination_header(len(filtered), _TABLE_KEY)
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
     _render_custom_estimates_table(page_rows, filter_options=filter_options)
-    render_table_pagination_footer(len(filtered), _TABLE_KEY)
+    render_estimates_pagination_footer(len(filtered), _TABLE_KEY)
 
     selected_estimate_id = st.session_state.get(SELECTED_ESTIMATE_KEY)
     if selected_estimate_id and st.session_state.get(SHOW_ESTIMATE_MODAL_KEY):

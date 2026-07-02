@@ -2243,24 +2243,24 @@ def inject_estimates_module_css() -> None:
     """Estimates list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-estimates-module-v2">
+<style id="ips-estimates-module-v3">
 .ips-estimates-table-wrap {{
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  overflow: hidden;
-  margin-bottom: 0.5rem;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  overflow: visible;
+  margin-bottom: 0;
 }}
 .ips-estimates-header-row {{
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
-  padding: 8px 10px;
-  font-size: 12px;
-  font-weight: 800;
-  color: #475569;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  min-height: 38px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  min-height: 0;
   display: flex;
   align-items: center;
   white-space: nowrap;
@@ -2269,16 +2269,16 @@ def inject_estimates_module_css() -> None:
   line-height: 1.2;
 }}
 .ips-estimates-row {{
-  background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
-  padding: 6px 10px;
-  min-height: 52px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  min-height: 0;
 }}
 .ips-estimates-row:hover {{
-  background: #eef5ff;
+  background: transparent;
 }}
 .ips-estimates-row-selected {{
-  background: #eaf2ff !important;
+  background: transparent !important;
 }}
 .ips-estimates-cell {{
   color: {TEXT};
@@ -2371,26 +2371,6 @@ def inject_estimates_module_css() -> None:
 .st-key-estimates_table_wrap [data-testid="stVerticalBlock"] {{
   gap: 0 !important;
 }}
-.st-key-estimates_table_wrap [data-testid="stHorizontalBlock"] {{
-  gap: 0.35rem !important;
-  align-items: center !important;
-  border-bottom: 1px solid #e2e8f0;
-  padding: 6px 10px !important;
-  margin: 0 !important;
-  min-height: 52px;
-}}
-.st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
-  background: #f8fafc;
-  min-height: 44px;
-  height: auto !important;
-  padding: 8px 10px !important;
-}}
-.st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
-  background: #eef5ff;
-}}
-.st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
-  background: #eaf2ff !important;
-}}
 .st-key-estimates_table_wrap [data-testid="stElementContainer"] {{
   margin-bottom: 0 !important;
   padding-bottom: 0 !important;
@@ -2401,14 +2381,6 @@ def inject_estimates_module_css() -> None:
 .st-key-estimates_table_wrap [data-testid="stCheckbox"] label {{
   min-height: 24px !important;
   margin: 0 !important;
-}}
-.st-key-estimates_table_wrap .stButton > button {{
-  height: 32px !important;
-  min-height: 32px !important;
-  padding: 0 12px !important;
-  border-radius: 9px !important;
-  font-size: 14px !important;
-  width: auto !important;
 }}
 .ips-est-summary-card {{
   background: #ffffff;
