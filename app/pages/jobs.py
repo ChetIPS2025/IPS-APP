@@ -19,8 +19,10 @@ try:
         render_jobs_filter_bar_shell,
         render_jobs_pagination_footer,
         render_jobs_row_click_bridge,
+        render_jobs_summary_badge_bar,
         render_jobs_summary_cards,
         render_jobs_table_pagination_header,
+        jobs_visible_table_layout,
     )
     from app.components.job_ips_forms import render_job_ips_forms_tab
     from app.components.job_materials_ui import render_job_materials_tab
@@ -136,8 +138,10 @@ except ImportError:
         render_jobs_filter_bar_shell,
         render_jobs_pagination_footer,
         render_jobs_row_click_bridge,
+        render_jobs_summary_badge_bar,
         render_jobs_summary_cards,
         render_jobs_table_pagination_header,
+        jobs_visible_table_layout,
     )
     from components.job_actions import render_job_action_buttons  # type: ignore
     from components.weekly_timesheet_builder import render_weekly_timesheet_builder  # type: ignore
@@ -1100,11 +1104,17 @@ def _render_custom_jobs_table(
     all_job_ids = [str(j.get("id") or "").strip() for j in filtered if str(j.get("id") or "").strip()]
     st.session_state[_ALL_JOB_IDS_KEY] = all_job_ids
 
+    visible_markers, visible_headers, visible_weights = jobs_visible_table_layout(
+        filtered,
+        lambda job: _job_list_cost_fields(job, cost_cache=cost_cache),
+    )
+    col_map = {marker: idx for idx, marker in enumerate(visible_markers)}
+
     with st.container(key="jobs_table_wrap"):
         st.markdown('<div class="ips-jobs-table-wrap jobs-table">', unsafe_allow_html=True)
 
-        header_cols = st.columns(_JOB_COLS, gap="small", vertical_alignment="center")
-        for col, (label, field), marker in zip(header_cols, _JOB_HEADER_SPECS, _JOB_COL_MARKERS):
+        header_cols = st.columns(visible_weights, gap="small", vertical_alignment="center")
+        for col, (label, field), marker in zip(header_cols, visible_headers, visible_markers):
             with col:
                 st.markdown(_jobs_col_marker(marker), unsafe_allow_html=True)
                 if field:
@@ -1144,9 +1154,9 @@ def _render_custom_jobs_table(
             expanded = field_mode and field_expanded_id(FIELD_EXPANDED_JOB_KEY) == jid
 
             row_parity = "even" if row_idx % 2 else "odd"
-            cols = st.columns(_JOB_COLS, gap="small", vertical_alignment="center")
+            cols = st.columns(visible_weights, gap="small", vertical_alignment="center")
 
-            with cols[0]:
+            with cols[col_map["num"]]:
                 st.markdown(
                     f'<span class="ips-jobs-row-marker ips-jobs-table-row job-row jobs-table-row ips-jobs-row-{row_parity}" '
                     f'data-row-id="{html.escape(jid, quote=True)}" aria-hidden="true"></span>',
@@ -1171,7 +1181,7 @@ def _render_custom_jobs_table(
                     help_text=f"Open job {job_no}" if job_no and job_no != "—" else "Open job details",
                 )
 
-            with cols[1]:
+            with cols[col_map["desc"]]:
                 st.markdown(_jobs_col_marker("desc"), unsafe_allow_html=True)
                 title_label = project if project and project != "—" else "View job"
                 _render_job_list_link_button(
@@ -1183,7 +1193,7 @@ def _render_custom_jobs_table(
                     truncate=True,
                 )
 
-            with cols[2]:
+            with cols[col_map["customer"]]:
                 st.markdown(_jobs_col_marker("customer"), unsafe_allow_html=True)
                 customer_title = html.escape(customer, quote=True)
                 st.markdown(
@@ -1192,7 +1202,7 @@ def _render_custom_jobs_table(
                     unsafe_allow_html=True,
                 )
 
-            with cols[3]:
+            with cols[col_map["status"]]:
                 st.markdown(_jobs_col_marker("status"), unsafe_allow_html=True)
                 st.markdown(
                     '<span class="job-status-cell ips-jobs-status-cell" aria-hidden="true"></span>',
@@ -1214,7 +1224,7 @@ def _render_custom_jobs_table(
                     profit_cls = " ips-jobs-money-positive"
                 elif profit_val < 0:
                     profit_cls = " ips-jobs-money-negative"
-            with cols[4]:
+            with cols[col_map["contract"]]:
                 st.markdown(_jobs_col_marker("contract"), unsafe_allow_html=True)
                 contract_cls = _money_cell_class(contract_val, available=has_contract)
                 st.markdown(
@@ -1222,47 +1232,51 @@ def _render_custom_jobs_table(
                     f"{html.escape(_money_cell(contract_val, available=has_contract))}</div>",
                     unsafe_allow_html=True,
                 )
-            with cols[5]:
-                st.markdown(_jobs_col_marker("estimated"), unsafe_allow_html=True)
-                estimated_cls = _money_cell_class(estimated_val, available=has_estimated)
-                st.markdown(
-                    f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money{estimated_cls}">'
-                    f"{html.escape(_money_cell(estimated_val, available=has_estimated))}</div>",
-                    unsafe_allow_html=True,
-                )
-            with cols[6]:
-                st.markdown(_jobs_col_marker("actual"), unsafe_allow_html=True)
-                actual_cls = _money_cell_class(actual_val, available=has_actual)
-                st.markdown(
-                    f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money ips-jobs-money-actual{actual_cls}">'
-                    f"{html.escape(_money_cell(actual_val, available=has_actual))}</div>",
-                    unsafe_allow_html=True,
-                )
-            with cols[7]:
-                st.markdown(_jobs_col_marker("profit"), unsafe_allow_html=True)
-                profit_display_cls = _money_cell_class(profit_val, available=has_profit_data)
-                st.markdown(
-                    f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money{profit_cls}{profit_display_cls}">'
-                    f"{html.escape(_money_cell(profit_val, available=has_profit_data))}</div>",
-                    unsafe_allow_html=True,
-                )
-            with cols[8]:
-                st.markdown(_jobs_col_marker("margin"), unsafe_allow_html=True)
-                margin_display = _pct_cell(margin_val) if has_contract else "—"
-                margin_cls = profit_cls if has_contract else " ips-jobs-money-empty"
-                st.markdown(
-                    f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money{margin_cls}">'
-                    f"{html.escape(margin_display)}</div>",
-                    unsafe_allow_html=True,
-                )
-            with cols[9]:
+            if "estimated" in col_map:
+                with cols[col_map["estimated"]]:
+                    st.markdown(_jobs_col_marker("estimated"), unsafe_allow_html=True)
+                    estimated_cls = _money_cell_class(estimated_val, available=has_estimated)
+                    st.markdown(
+                        f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money{estimated_cls}">'
+                        f"{html.escape(_money_cell(estimated_val, available=has_estimated))}</div>",
+                        unsafe_allow_html=True,
+                    )
+            if "actual" in col_map:
+                with cols[col_map["actual"]]:
+                    st.markdown(_jobs_col_marker("actual"), unsafe_allow_html=True)
+                    actual_cls = _money_cell_class(actual_val, available=has_actual)
+                    st.markdown(
+                        f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money ips-jobs-money-actual{actual_cls}">'
+                        f"{html.escape(_money_cell(actual_val, available=has_actual))}</div>",
+                        unsafe_allow_html=True,
+                    )
+            if "profit" in col_map:
+                with cols[col_map["profit"]]:
+                    st.markdown(_jobs_col_marker("profit"), unsafe_allow_html=True)
+                    profit_display_cls = _money_cell_class(profit_val, available=has_profit_data)
+                    st.markdown(
+                        f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money{profit_cls}{profit_display_cls}">'
+                        f"{html.escape(_money_cell(profit_val, available=has_profit_data))}</div>",
+                        unsafe_allow_html=True,
+                    )
+            if "margin" in col_map:
+                with cols[col_map["margin"]]:
+                    st.markdown(_jobs_col_marker("margin"), unsafe_allow_html=True)
+                    margin_display = _pct_cell(margin_val) if has_contract else "—"
+                    margin_cls = profit_cls if has_contract else " ips-jobs-money-empty"
+                    st.markdown(
+                        f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money{margin_cls}">'
+                        f"{html.escape(margin_display)}</div>",
+                        unsafe_allow_html=True,
+                    )
+            with cols[col_map["subjobs"]]:
                 st.markdown(_jobs_col_marker("subjobs"), unsafe_allow_html=True)
                 st.markdown(
                     f'<div class="ips-jobs-cell job-cell jobs-table-cell ips-jobs-col-subjobs">'
                     f"{open_subjobs:,}</div>",
                     unsafe_allow_html=True,
                 )
-            with cols[10]:
+            with cols[col_map["actions"]]:
                 st.markdown(_jobs_col_marker("actions"), unsafe_allow_html=True)
                 st.markdown(
                     '<span class="ips-jobs-actions-cell ips-jobs-actions-toolbar job-actions-cell" aria-hidden="true"></span>',
@@ -3021,7 +3035,7 @@ def _render_jobs_page() -> None:
     filter_options = build_filter_options(all_jobs, _JOB_COLUMN_FILTER_SPECS)
 
     def _jobs_export() -> None:
-        st.button("Export", key="jobs_export", use_container_width=True)
+        st.button("Export", key="jobs_export", type="secondary", use_container_width=True)
 
     def _jobs_new() -> None:
         if st.button("+ New Job", key="jobs_new", type="primary", use_container_width=True):
@@ -3032,6 +3046,7 @@ def _render_jobs_page() -> None:
         "Jobs",
         "Track and manage all company jobs, assignments, and costing.",
         actions=[_jobs_export, _jobs_new],
+        actions_column_ratio=(1.85, 1.15),
     )
 
     if is_field_mode():
@@ -3121,7 +3136,7 @@ def _render_jobs_page() -> None:
                     st.error(msg or "Could not save job.")
 
     def _filters() -> None:
-        c1, c2, c3 = st.columns([3.2, 2.2, 0.6])
+        c1, c2, c3 = st.columns([6.5, 2.5, 1], gap="small")
         with c1:
             st.text_input(
                 "Search",
@@ -3172,6 +3187,14 @@ def _render_jobs_page() -> None:
         total_actual=float(summary["total_actual"]),
         has_contract_data=bool(summary.get("has_any_contract")),
         has_actual_data=bool(summary.get("has_any_actual")),
+    )
+    render_jobs_summary_badge_bar(
+        total=int(summary["total"]),
+        active=int(summary["active"]),
+        on_hold=int(summary["on_hold"]),
+        open_subjobs=int(summary["open_subjobs"]),
+        total_contract=float(summary["total_contract"]),
+        has_contract_data=bool(summary.get("has_any_contract")),
     )
     render_jobs_table_pagination_header(len(filtered), _TABLE_KEY)
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)

@@ -24,6 +24,34 @@ except ImportError:
     )
 
 _PAGE_SIZE_OPTIONS = (50, 75, 100, 150)
+_HIDE_IF_EMPTY_COLUMNS = frozenset({"estimated", "actual", "profit", "margin"})
+_JOB_COL_WEIGHTS = [0.55, 2.35, 1.15, 0.68, 0.72, 0.72, 0.72, 0.72, 0.58, 0.42, 0.62]
+_JOB_COL_MARKERS: tuple[str, ...] = (
+    "num",
+    "desc",
+    "customer",
+    "status",
+    "contract",
+    "estimated",
+    "actual",
+    "profit",
+    "margin",
+    "subjobs",
+    "actions",
+)
+_JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
+    ("JOB #", None),
+    ("PROJECT / DESCRIPTION", None),
+    ("CUSTOMER", "customer"),
+    ("STATUS", "status"),
+    ("CONTRACT VALUE", None),
+    ("ESTIMATED COST", None),
+    ("ACTUAL COST", None),
+    ("GROSS PROFIT", None),
+    ("MARGIN %", None),
+    ("OPEN TASKS / SUBJOBS", None),
+    ("ACTIONS", None),
+]
 
 
 def _money(value: float) -> str:
@@ -41,26 +69,61 @@ def _summary_money(value: float, *, has_data: bool) -> str:
 def inject_jobs_page_layout_css() -> None:
     st.markdown(
         """
-<style id="ips-jobs-page-layout-v6">
+<style id="ips-jobs-page-layout-v7">
 section[data-testid="stMain"]:has(.ips-jobs-page) {
   background: #ffffff !important;
 }
 section[data-testid="stMain"]:has(.ips-jobs-page) .block-container {
   background: #ffffff !important;
 }
+section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="stVerticalBlock"] {
+  gap: 0.35rem !important;
+}
+section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="stElementContainer"] {
+  margin-bottom: 0.15rem !important;
+}
+section[data-testid="stMain"]:has(.ips-jobs-page) .ips-page-header {
+  margin-bottom: 0.15rem !important;
+  padding-bottom: 0 !important;
+}
+section[data-testid="stMain"]:has(.ips-jobs-page) .ips-page-title {
+  font-size: 1.35rem !important;
+  margin: 0 !important;
+  line-height: 1.15 !important;
+}
+section[data-testid="stMain"]:has(.ips-jobs-page) .ips-page-subtitle {
+  font-size: 0.78rem !important;
+  margin: 0.12rem 0 0 !important;
+  line-height: 1.3 !important;
+}
+section[data-testid="stMain"]:has(.ips-jobs-page) .ips-page-actions-marker + [data-testid="stHorizontalBlock"] {
+  gap: 0.4rem !important;
+  justify-content: flex-end !important;
+}
 .ips-jobs-filter-bar-wrap {
   background: #ffffff;
   border: 1px solid #dbe3ef;
   border-radius: 10px;
-  padding: 0.65rem 0.75rem;
-  margin-bottom: 0.85rem;
+  padding: 0.38rem 0.5rem;
+  margin-bottom: 0.35rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.ips-jobs-filter-bar-wrap [data-testid="stHorizontalBlock"] {
+  align-items: center !important;
+  gap: 0.45rem !important;
 }
 section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap [data-testid="stTextInput"] input,
 section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap [data-testid="stSelectbox"] > div > div {
   background: #ffffff !important;
   border: 1px solid #dbe3ef !important;
   border-radius: 8px !important;
-  min-height: 38px !important;
+  min-height: 34px !important;
+  font-size: 0.8125rem !important;
+}
+section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap .stButton > button {
+  min-height: 34px !important;
+  height: 34px !important;
+  font-size: 0.8125rem !important;
 }
 .ips-jobs-table-wrap.jobs-table {
   background: #ffffff;
@@ -69,12 +132,14 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap [dat
   overflow: hidden;
 }
 .st-key-jobs_table_wrap {
-  max-height: min(calc(100vh - 220px), 940px);
+  max-height: min(calc(100vh - 200px), 980px);
+  min-height: 520px;
   overflow: auto;
   position: relative;
   border: 1px solid #dbe3ef;
   border-radius: 10px;
   background: #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
 }
 .st-key-jobs_table_wrap .ips-jobs-col-marker {
   display: block !important;
@@ -93,8 +158,8 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap [dat
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) {
   display: flex !important;
   align-items: center !important;
-  min-height: 48px !important;
-  max-height: 52px !important;
+  min-height: 46px !important;
+  max-height: 50px !important;
   padding: 2px 8px !important;
   background: #ffffff !important;
   border-bottom: 1px solid #e8edf4 !important;
@@ -181,9 +246,9 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap [dat
   justify-content: flex-end !important;
 }
 .st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-actions) {
-  flex: 0 0 92px !important;
-  max-width: 96px !important;
-  min-width: 88px !important;
+  flex: 0 0 78px !important;
+  max-width: 82px !important;
+  min-width: 72px !important;
   justify-content: flex-end !important;
 }
 .ips-jobs-cell-truncate,
@@ -247,34 +312,47 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap [dat
 }
 .ips-jobs-summary-cards {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.65rem;
-  margin: 0 0 1rem 0;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin: 0 0 0.35rem 0;
 }
-@media (max-width: 1400px) {
+@media (max-width: 1500px) {
   .ips-jobs-summary-cards {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (max-width: 900px) {
+  .ips-jobs-summary-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 .ips-jobs-stat-card {
   background: #ffffff;
   border: 1px solid #dbe3ef;
   border-radius: 10px;
-  padding: 0.75rem 0.9rem;
-  min-height: 68px;
+  padding: 0.45rem 0.55rem 0.5rem;
+  min-height: 52px;
   border-left-width: 4px;
   border-left-style: solid;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+.ips-jobs-stat-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.1);
+  border-color: #bfd3f2;
 }
 .ips-jobs-stat-label {
-  font-size: 0.68rem;
+  font-size: 0.6rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: #64748b;
-  margin: 0 0 0.3rem 0;
+  margin: 0 0 0.15rem 0;
+  line-height: 1.2;
 }
 .ips-jobs-stat-value {
-  font-size: 1.25rem;
+  font-size: 1.05rem;
   font-weight: 800;
   color: #0f172a;
   line-height: 1.1;
@@ -285,6 +363,12 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap [dat
 .ips-jobs-stat-total .ips-jobs-stat-value { color: #1e3a8a; }
 .ips-jobs-stat-active { border-left-color: #2563eb; }
 .ips-jobs-stat-active .ips-jobs-stat-value { color: #2563eb; }
+.ips-jobs-stat-on-hold { border-left-color: #d97706; }
+.ips-jobs-stat-on-hold .ips-jobs-stat-value { color: #d97706; }
+.ips-jobs-stat-completed { border-left-color: #15803d; }
+.ips-jobs-stat-completed .ips-jobs-stat-value { color: #15803d; }
+.ips-jobs-stat-cancelled { border-left-color: #64748b; }
+.ips-jobs-stat-cancelled .ips-jobs-stat-value { color: #64748b; }
 .ips-jobs-stat-awarded { border-left-color: #15803d; }
 .ips-jobs-stat-awarded .ips-jobs-stat-value { color: #15803d; }
 .ips-jobs-stat-pending { border-left-color: #d97706; }
@@ -297,11 +381,47 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap [dat
 .ips-jobs-stat-contract .ips-jobs-stat-value { color: #15803d; }
 .ips-jobs-stat-actual { border-left-color: #2563eb; }
 .ips-jobs-stat-actual .ips-jobs-stat-value { color: #2563eb; }
+.ips-jobs-summary-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  margin: 0 0 0.35rem 0;
+  padding: 0.35rem 0.45rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+.ips-jobs-summary-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #475569;
+  padding: 0.15rem 0.45rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+.ips-jobs-summary-chip strong {
+  font-weight: 800;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+.ips-jobs-summary-chip.ips-jobs-chip-accent strong {
+  color: #2563eb;
+}
+.ips-jobs-summary-chip.ips-jobs-chip-money strong {
+  color: #15803d;
+}
 section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="column"]:has(.ips-jobs-page-size-marker) > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] {
   align-items: center !important;
   justify-content: flex-end !important;
   gap: 0.35rem !important;
-  margin-bottom: 0.65rem !important;
+  margin-bottom: 0.25rem !important;
 }
 .ips-jobs-show-label {
   font-size: 0.8125rem;
@@ -581,11 +701,11 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-
   justify-content: flex-end !important;
 }
 section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"] {
-  min-width: 84px !important;
-  min-height: 28px !important;
-  height: 28px !important;
-  padding: 0 0.55rem !important;
-  font-size: 0.8125rem !important;
+  min-width: 72px !important;
+  min-height: 26px !important;
+  height: 26px !important;
+  padding: 0 0.45rem !important;
+  font-size: 0.75rem !important;
 }
 .ips-jobs-pagination-footer {
   margin-top: 0.85rem;
@@ -626,6 +746,38 @@ def close_jobs_filter_bar_shell() -> None:
     st.markdown("</div>", unsafe_allow_html=True)
 
 
+def jobs_column_has_data(
+    filtered: list[dict],
+    cost_fields_fn,
+    marker: str,
+) -> bool:
+    for job in filtered:
+        costs = cost_fields_fn(job)
+        if marker == "estimated" and bool(costs.get("has_estimated")):
+            return True
+        if marker == "actual" and bool(costs.get("has_actual")):
+            return True
+        if marker in {"profit", "margin"} and bool(costs.get("has_contract")):
+            return True
+    return False
+
+
+def jobs_visible_table_layout(
+    filtered: list[dict],
+    cost_fields_fn,
+) -> tuple[tuple[str, ...], list[tuple[str, str | None]], list[float]]:
+    markers: list[str] = []
+    headers: list[tuple[str, str | None]] = []
+    weights: list[float] = []
+    for idx, marker in enumerate(_JOB_COL_MARKERS):
+        if marker in _HIDE_IF_EMPTY_COLUMNS and not jobs_column_has_data(filtered, cost_fields_fn, marker):
+            continue
+        markers.append(marker)
+        headers.append(_JOB_HEADER_SPECS[idx])
+        weights.append(_JOB_COL_WEIGHTS[idx])
+    return tuple(markers), headers, weights
+
+
 def render_jobs_summary_cards(
     *,
     total: int,
@@ -641,13 +793,13 @@ def render_jobs_summary_cards(
 ) -> None:
     cards = [
         ("Total Jobs", f"{total:,}", "ips-jobs-stat-total"),
-        ("Active Jobs", f"{active:,}", "ips-jobs-stat-active"),
+        ("Active", f"{active:,}", "ips-jobs-stat-active"),
         ("On Hold", f"{on_hold:,}", "ips-jobs-stat-on-hold"),
         ("Completed", f"{completed:,}", "ips-jobs-stat-completed"),
         ("Cancelled", f"{cancelled:,}", "ips-jobs-stat-cancelled"),
         ("Open Subjobs", f"{open_subjobs:,}", "ips-jobs-stat-subjobs"),
-        ("Total Contract Value", _summary_money(total_contract, has_data=has_contract_data), "ips-jobs-stat-contract"),
-        ("Total Actual Cost", _summary_money(total_actual, has_data=has_actual_data), "ips-jobs-stat-actual"),
+        ("Contract Value", _summary_money(total_contract, has_data=has_contract_data), "ips-jobs-stat-contract"),
+        ("Actual Cost", _summary_money(total_actual, has_data=has_actual_data), "ips-jobs-stat-actual"),
     ]
     parts = ['<div class="ips-jobs-summary-cards">']
     for label, value, cls in cards:
@@ -657,6 +809,33 @@ def render_jobs_summary_cards(
             f'<p class="ips-jobs-stat-value">{html.escape(value)}</p>'
             f"</div>"
         )
+    parts.append("</div>")
+    st.markdown("".join(parts), unsafe_allow_html=True)
+
+
+def render_jobs_summary_badge_bar(
+    *,
+    total: int,
+    active: int,
+    on_hold: int,
+    open_subjobs: int,
+    total_contract: float,
+    has_contract_data: bool = False,
+) -> None:
+    contract_label = _summary_money(total_contract, has_data=has_contract_data)
+    chips = [
+        ("ips-jobs-summary-chip", f"<strong>{total:,}</strong> Jobs"),
+        ("ips-jobs-summary-chip ips-jobs-chip-accent", f"<strong>{active:,}</strong> Active"),
+        ("ips-jobs-summary-chip", f"<strong>{on_hold:,}</strong> Hold"),
+        ("ips-jobs-summary-chip", f"<strong>{open_subjobs:,}</strong> Subjobs"),
+    ]
+    if has_contract_data and contract_label != "—":
+        chips.append(
+            ("ips-jobs-summary-chip ips-jobs-chip-money", f"<strong>{html.escape(contract_label)}</strong> Contract Value")
+        )
+    parts = ['<div class="ips-jobs-summary-bar">']
+    for cls, inner in chips:
+        parts.append(f'<span class="{cls}">{inner}</span>')
     parts.append("</div>")
     st.markdown("".join(parts), unsafe_allow_html=True)
 

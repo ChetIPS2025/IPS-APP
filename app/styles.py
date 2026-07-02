@@ -953,13 +953,13 @@ def inject_jobs_module_css() -> None:
 }}
 .ips-jobs-cell {{
   color: #0f172a;
-  font-size: 0.8125rem;
+  font-size: 0.78rem;
   font-weight: 600;
   line-height: 1.2;
   min-width: 0;
 }}
 .ips-jobs-number {{
-  font-size: 0.8125rem;
+  font-size: 0.78rem;
   font-weight: 700;
   color: #2563eb;
   line-height: 1.2;
