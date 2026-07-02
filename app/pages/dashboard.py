@@ -312,20 +312,21 @@ def _recent_estimate_lines(limit: int = 4) -> list[str]:
 
 def _render_todays_activity() -> None:
     ot = "d" + "iv"
-    st.markdown('<p class="ips-ops-section-title">Today\'s Activity</p>', unsafe_allow_html=True)
-    panels = [
-        ("📅", "Today's Jobs", _jobs_scheduled_today(), "No jobs scheduled today"),
-        ("👷", "Employees Clocked In", _employees_clocked_in_lines(), "No time logged this week"),
-        ("💼", "Recent Job Updates", _recent_job_update_lines(), "No recent job activity"),
-        ("⏱", "Recent Time Entries", _recent_time_entry_lines(), "No time entries"),
-        ("📎", "Recent Documents", _recent_document_lines(), "No recent documents"),
-        ("📋", "Recent Estimates", _recent_estimate_lines(), "No recent estimates"),
-    ]
-    cards = "".join(
-        _activity_widget_html(icon, title, lines, empty=empty)
-        for icon, title, lines, empty in panels
-    )
-    st.markdown(f'<{ot} class="ips-ops-activity-grid">{cards}</{ot}>', unsafe_allow_html=True)
+    with st.container(key="dashboard_ops_activity"):
+        st.markdown('<p class="ips-ops-section-title">Today\'s Activity</p>', unsafe_allow_html=True)
+        panels = [
+            ("📅", "Today's Jobs", _jobs_scheduled_today(), "No jobs scheduled today"),
+            ("👷", "Employees Clocked In", _employees_clocked_in_lines(), "No time logged this week"),
+            ("💼", "Recent Job Updates", _recent_job_update_lines(), "No recent job activity"),
+            ("⏱", "Recent Time Entries", _recent_time_entry_lines(), "No time entries"),
+            ("📎", "Recent Documents", _recent_document_lines(), "No recent documents"),
+            ("📋", "Recent Estimates", _recent_estimate_lines(), "No recent estimates"),
+        ]
+        cards = "".join(
+            _activity_widget_html(icon, title, lines, empty=empty)
+            for icon, title, lines, empty in panels
+        )
+        st.markdown(f'<{ot} class="ips-ops-activity-grid">{cards}</{ot}>', unsafe_allow_html=True)
 
 
 def render() -> None:
@@ -369,56 +370,62 @@ def render() -> None:
         actions_column_ratio=(1.5, 2.5),
     )
 
-    kpis = load_dashboard_kpis(period_start=start, period_end=end)
-    employees_today = _employees_working_today()
-    active_jobs_count = int(kpis.get("active_jobs", 0))
-    st.markdown(
-        _ops_welcome_html(employees=employees_today, active_jobs=active_jobs_count),
-        unsafe_allow_html=True,
-    )
-
-    kpis_live = bool(kpis.get("is_live"))
-    if not kpis_live:
+    with st.container(key="dashboard_ops_shell"):
+        kpis = load_dashboard_kpis(period_start=start, period_end=end)
+        employees_today = _employees_working_today()
+        active_jobs_count = int(kpis.get("active_jobs", 0))
         st.markdown(
-            '<p class="ips-alert-banner">Sample KPI data — connect Supabase for live metrics.</p>',
+            _ops_welcome_html(employees=employees_today, active_jobs=active_jobs_count),
             unsafe_allow_html=True,
         )
 
-    with st.container(key="dashboard_ops_kpis"):
-        k1, k2, k3, k4, k5, k6 = st.columns(6, gap="small")
-        for col, label, value, icon, bg in [
-            (k1, "Active Jobs", str(kpis.get("active_jobs", 0)), "💼", "#ffedd5"),
-            (k2, "Estimates Pending", str(kpis.get("open_estimates", 0)), "📋", "#f3e8ff"),
-            (k3, "Employees Working Today", str(employees_today), "👷", "#dcfce7"),
-            (k4, "Open Tasks", str(_count_open_tasks()), "✅", "#e0f2fe"),
-            (k5, "Open Invoices", fmt_currency(kpis.get("open_invoices", 0)), "🧾", "#dbeafe"),
-            (k6, "Revenue This Month", fmt_currency(kpis.get("total_sales", 0)), "💵", "#fef3c7"),
-        ]:
-            with col:
-                render_ops_kpi_card(label, value, icon, bg)
+        kpis_live = bool(kpis.get("is_live"))
+        if not kpis_live:
+            st.markdown(
+                '<p class="ips-alert-banner">Sample KPI data — connect Supabase for live metrics.</p>',
+                unsafe_allow_html=True,
+            )
 
-    news_col, qa_col = st.columns([7, 3], gap="small")
-    with news_col:
-        render_dashboard_company_updates_section(
-            load_recent_company_updates(limit=5),
-            limit=5,
-        )
-    with qa_col:
-        render_ops_quick_action_tiles(
-            [
-                ("💼", "+ Job", "jobs"),
-                ("📋", "+ Estimate", "estimates"),
-                ("👥", "+ Customer", "customers"),
-                ("📊", "Daily Report", "field_daily_reports"),
-                ("⏱", "Time Entry", "timekeeping"),
-                ("📦", "Inventory", "inventory"),
-            ],
-            key_prefix="ips_ops_qa",
-        )
+        with st.container(key="dashboard_ops_kpis"):
+            k1, k2, k3, k4, k5, k6 = st.columns(6, gap="small")
+            for col, label, value, icon, bg in [
+                (k1, "Active Jobs", str(kpis.get("active_jobs", 0)), "💼", "#ffedd5"),
+                (k2, "Estimates Pending", str(kpis.get("open_estimates", 0)), "📋", "#f3e8ff"),
+                (k3, "Employees Working Today", str(employees_today), "👷", "#dcfce7"),
+                (k4, "Open Tasks", str(_count_open_tasks()), "✅", "#e0f2fe"),
+                (k5, "Open Invoices", fmt_currency(kpis.get("open_invoices", 0)), "🧾", "#dbeafe"),
+                (k6, "Revenue This Month", fmt_currency(kpis.get("total_sales", 0)), "💵", "#fef3c7"),
+            ]:
+                with col:
+                    render_ops_kpi_card(label, value, icon, bg)
 
-    _render_todays_activity()
+        with st.container(key="dashboard_ops_row2"):
+            st.markdown(
+                '<span class="ips-ops-row2-grid-marker" aria-hidden="true"></span>',
+                unsafe_allow_html=True,
+            )
+            news_col, qa_col = st.columns([7, 3], gap="medium")
+            with news_col:
+                render_dashboard_company_updates_section(
+                    load_recent_company_updates(limit=5),
+                    limit=5,
+                )
+            with qa_col:
+                render_ops_quick_action_tiles(
+                    [
+                        ("💼", "+ Job", "jobs"),
+                        ("📋", "+ Estimate", "estimates"),
+                        ("👥", "+ Customer", "customers"),
+                        ("📊", "Daily Report", "field_daily_reports"),
+                        ("⏱", "Time Entry", "timekeeping"),
+                        ("📦", "Inventory", "inventory"),
+                    ],
+                    key_prefix="ips_ops_qa",
+                )
 
-    render_dashboard_active_jobs_table(load_awarded_jobs(), limit=12)
+        _render_todays_activity()
+
+        render_dashboard_active_jobs_table(load_awarded_jobs(), limit=12)
 
     with st.expander("Office To-Do & More", expanded=False):
         render_dashboard_management_reminders_section(limit=4)

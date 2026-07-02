@@ -1057,14 +1057,21 @@ def inject_dashboard_active_jobs_table_css() -> None:
     """Scope jobs list table styling to the dashboard Active Jobs panel."""
     st.markdown(
         """
-<style id="ips-dashboard-active-jobs-table-v2">
+<style id="ips-dashboard-active-jobs-table-v3">
 .st-key-dashboard_active_jobs_table {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
   border-radius: 11px !important;
-  padding: 0.35rem 0.4rem 0.4rem !important;
-  margin-bottom: 0.2rem !important;
+  padding: 0.75rem !important;
+  margin-top: 24px !important;
+  margin-bottom: 20px !important;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06) !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+  box-sizing: border-box !important;
+  position: relative !important;
 }
 .ips-ops-jobs-table-title {
   margin: 0 !important;
@@ -1072,18 +1079,22 @@ def inject_dashboard_active_jobs_table_css() -> None:
   font-weight: 800 !important;
 }
 .st-key-dashboard_active_jobs_table .ips-dash-jobs-table {
+  width: 100% !important;
+  max-width: 100% !important;
   max-height: min(420px, 48vh);
   overflow: auto;
   border: 1px solid #dbe3ef;
   border-radius: 10px;
   background: #ffffff;
+  box-sizing: border-box;
 }
 .st-key-dashboard_active_jobs_table .ips-jobs-col-marker {
   display: block !important;
   width: 0 !important;
   height: 0 !important;
   overflow: hidden !important;
-  position: absolute !important;
+  margin: 0 !important;
+  padding: 0 !important;
   pointer-events: none !important;
 }
 .st-key-dashboard_active_jobs_table [data-testid="stHorizontalBlock"] {

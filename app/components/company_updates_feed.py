@@ -323,6 +323,11 @@ def _go_company_updates_page(*, open_new: bool = False) -> None:
     st.rerun()
 
 
+def _dashboard_item_key(uid: str, idx: int) -> str:
+    safe = "".join(ch if ch.isalnum() else "_" for ch in str(uid or ""))[:40] or f"row_{idx}"
+    return f"dashboard_cu_item_{safe}"
+
+
 def render_dashboard_company_updates_section(
     rows: list[dict[str, Any]],
     *,
@@ -356,34 +361,38 @@ def render_dashboard_company_updates_section(
             )
             return
 
-        for row in display_rows:
+        for idx, row in enumerate(display_rows):
             uid = str(row.get("id") or "").strip()
-            card_col, act_col = st.columns([4.2, 1.3], gap="small", vertical_alignment="center")
-            with card_col:
+            with st.container(key=_dashboard_item_key(uid, idx)):
+                st.markdown(
+                    '<span class="ips-ops-news-item-marker" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
                 st.markdown(
                     f'<{ot} class="ips-ct-feed-card-wrap ips-ct-feed-card-wrap-compact">'
                     f"{connecteam_feed_card_compact_html(row)}"
                     f"</{ot}>",
                     unsafe_allow_html=True,
                 )
-            with act_col:
-                st.markdown('<span class="ips-ct-dash-actions-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
-                if uid and st.button(
-                    "Open",
-                    key=f"ips_dash_cu_open_{uid}",
-                    type="primary",
-                    use_container_width=True,
-                ):
-                    _mark_dashboard_update_read(uid)
-                    _open_company_update(uid)
-                if uid and _is_update_unread(row):
-                    if st.button(
-                        "Mark read",
-                        key=f"ips_dash_cu_read_{uid}",
+                btn_l, btn_r = st.columns(2, gap="small")
+                with btn_l:
+                    if uid and st.button(
+                        "Open",
+                        key=f"ips_dash_cu_open_{uid}",
+                        type="primary",
                         use_container_width=True,
                     ):
                         _mark_dashboard_update_read(uid)
-                        st.rerun()
+                        _open_company_update(uid)
+                with btn_r:
+                    if uid and _is_update_unread(row):
+                        if st.button(
+                            "Mark read",
+                            key=f"ips_dash_cu_read_{uid}",
+                            use_container_width=True,
+                        ):
+                            _mark_dashboard_update_read(uid)
+                            st.rerun()
 
 
 def company_updates_feed_html(

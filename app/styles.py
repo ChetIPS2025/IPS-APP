@@ -13697,22 +13697,89 @@ def inject_ops_dashboard_css() -> None:
     """Compact operations dashboard layout — KPI row, news, quick actions, activity grid."""
     st.markdown(
         """
-<style id="ips-ops-dashboard-v8">
-section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) {
+<style id="ips-ops-dashboard-v9">
+/* ── App shell: flex main beside sidebar ── */
+.stApp:has(.ips-ops-dashboard-marker) [data-testid="stAppViewContainer"] {
+  display: flex !important;
+  flex-direction: row !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: visible !important;
+  box-sizing: border-box !important;
+}
+.stApp:has(.ips-ops-dashboard-marker) section[data-testid="stSidebar"] {
+  flex: 0 0 260px !important;
+  width: 260px !important;
+  min-width: 260px !important;
+  max-width: 260px !important;
+}
+.stApp:has(.ips-ops-dashboard-marker) section[data-testid="stMain"] {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  width: auto !important;
+  max-width: 100% !important;
+  overflow-x: visible !important;
+  box-sizing: border-box !important;
   background: #f1f5f9 !important;
 }
-section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stVerticalBlock"] {
-  gap: 0.2rem !important;
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .block-container {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  box-sizing: border-box !important;
 }
-section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"] {
-  margin-bottom: 0.08rem !important;
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stVerticalBlock"] {
+  gap: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
 }
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stVerticalBlock"] > div {
   padding-left: 20px !important;
   padding-right: 20px !important;
+  box-sizing: border-box !important;
 }
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"] {
+  margin-bottom: 0 !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+
+/* ── Dashboard shell ── */
+.st-key-dashboard_ops_shell {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+}
+.st-key-dashboard_ops_shell [data-testid="stVerticalBlock"] {
+  gap: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+.st-key-dashboard_ops_kpis,
+.st-key-dashboard_ops_row2,
+.st-key-dashboard_ops_activity,
+.st-key-dashboard_active_jobs_table {
+  margin-bottom: 20px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+.st-key-dashboard_active_jobs_table {
+  margin-top: 24px !important;
+}
+
+/* ── Header ── */
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-header {
-  margin-bottom: 0.08rem !important;
+  margin-bottom: 12px !important;
   padding-bottom: 0 !important;
 }
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-title {
@@ -13735,8 +13802,8 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   letter-spacing: 0.04em;
 }
 .ips-ops-welcome {
-  margin: 0 0 0.2rem;
-  padding: 0.15rem 0 0.2rem;
+  margin: 0 0 20px;
+  padding: 0;
 }
 .ips-ops-welcome-greet {
   margin: 0;
@@ -13752,43 +13819,35 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   line-height: 1.35;
 }
 
-.st-key-dashboard_ops_kpis {
-  margin: 0.12rem 0 0.2rem !important;
-}
+/* ── KPI row: CSS Grid ── */
 .st-key-dashboard_ops_kpis [data-testid="stHorizontalBlock"] {
-  gap: 0.35rem !important;
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important;
+  gap: 16px !important;
+  width: 100% !important;
+  max-width: 100% !important;
 }
 .st-key-dashboard_ops_kpis [data-testid="column"] {
+  width: 100% !important;
   min-width: 0 !important;
-}
-@media (max-width: 1200px) {
-  .st-key-dashboard_ops_kpis [data-testid="stHorizontalBlock"] {
-    flex-wrap: wrap !important;
-  }
-  .st-key-dashboard_ops_kpis [data-testid="column"] {
-    flex: 1 1 calc(33.333% - 0.35rem) !important;
-    min-width: calc(33.333% - 0.35rem) !important;
-  }
-}
-@media (max-width: 768px) {
-  .st-key-dashboard_ops_kpis [data-testid="column"] {
-    flex: 1 1 calc(50% - 0.35rem) !important;
-    min-width: calc(50% - 0.35rem) !important;
-  }
+  max-width: 100% !important;
 }
 .ips-ops-kpi-card {
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 11px;
-  padding: 0.4rem 0.45rem;
+  padding: 0.65rem 0.75rem;
   min-height: 84px;
-  max-height: 90px;
+  height: auto;
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.55rem;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
   transition: transform 0.12s ease, box-shadow 0.15s ease, border-color 0.12s ease;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .ips-ops-kpi-card:hover {
   transform: translateY(-2px);
@@ -13805,6 +13864,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   justify-content: center;
   font-size: 0.95rem;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+  flex-shrink: 0;
 }
 .ips-ops-kpi-text {
   flex: 1 1 auto;
@@ -13828,7 +13888,6 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   margin: 0.1rem 0 0;
   line-height: 1.2;
 }
-.ips-ops-kpi-card:nth-child(6) .ips-ops-kpi-value,
 .st-key-dashboard_ops_kpis [data-testid="column"]:nth-child(5) .ips-ops-kpi-value,
 .st-key-dashboard_ops_kpis [data-testid="column"]:nth-child(6) .ips-ops-kpi-value {
   color: #15803d;
@@ -13837,16 +13896,50 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   color: #ea580c;
 }
 
+/* ── Second row: 70 / 30 grid ── */
+.st-key-dashboard_ops_row2 {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+.st-key-dashboard_ops_row2 [data-testid="stElementContainer"]:has(.ips-ops-row2-grid-marker) + [data-testid="stElementContainer"] [data-testid="stHorizontalBlock"] {
+  display: grid !important;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 3fr) !important;
+  gap: 16px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  align-items: start !important;
+}
+.st-key-dashboard_ops_row2 [data-testid="column"] {
+  min-width: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+}
+
+/* ── Company news ── */
 .st-key-dashboard_company_updates {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
   border-radius: 11px !important;
-  padding: 0.4rem 0.45rem 0.35rem !important;
-  margin-bottom: 0.2rem !important;
+  padding: 0.75rem !important;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05) !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  height: auto !important;
+  overflow: visible !important;
+  display: flex !important;
+  flex-direction: column !important;
+  box-sizing: border-box !important;
+}
+.st-key-dashboard_company_updates [data-testid="stVerticalBlock"] {
+  gap: 0.65rem !important;
+  width: 100% !important;
+  overflow: visible !important;
 }
 .st-key-dashboard_company_updates [data-testid="stHorizontalBlock"]:first-of-type {
-  margin-bottom: 0.2rem !important;
+  margin-bottom: 0.35rem !important;
   padding-bottom: 0 !important;
   border-bottom: none !important;
 }
@@ -13856,33 +13949,48 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   font-weight: 800;
   color: #0f172a;
 }
+.st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.5rem !important;
+  border: 1px solid #e8edf4 !important;
+  border-radius: 10px !important;
+  padding: 0.65rem 0.75rem !important;
+  margin-bottom: 0 !important;
+  background: #fafbfd !important;
+  height: auto !important;
+  overflow: visible !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
 .ips-ct-feed-card-wrap-compact {
   margin: 0 !important;
+  width: 100% !important;
 }
 .ips-ct-feed-card-compact,
 .ips-ct-feed-card-ultra {
-  padding: 0.35rem 0.45rem !important;
-  border-radius: 10px !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
   min-height: 0 !important;
-  max-height: 92px !important;
-  overflow: hidden;
-  border: 1px solid #e8edf4 !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  border: none !important;
   box-shadow: none !important;
-}
-.st-key-dashboard_company_updates [data-testid="stHorizontalBlock"]:has(.ips-ct-feed-card-wrap-compact) {
-  max-height: 120px;
-  overflow: hidden;
-  margin-bottom: 0.15rem !important;
-  align-items: center !important;
+  background: transparent !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 .ips-ct-avatar-sm {
   width: 1.5rem !important;
   height: 1.5rem !important;
   font-size: 0.58rem !important;
+  flex-shrink: 0;
 }
 .ips-ct-compact-top {
   display: flex;
-  gap: 0.35rem;
+  gap: 0.45rem;
   align-items: flex-start;
 }
 .ips-ct-compact-body {
@@ -13892,7 +14000,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
 .ips-ct-compact-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.2rem 0.35rem;
+  gap: 0.25rem 0.45rem;
   align-items: center;
   font-size: 0.68rem;
 }
@@ -13912,55 +14020,83 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   padding: 0.04rem 0.35rem;
 }
 .ips-ct-title-compact {
-  margin: 0.1rem 0 0 !important;
+  margin: 0.15rem 0 0 !important;
   font-size: 0.8125rem !important;
   font-weight: 800 !important;
-  line-height: 1.2 !important;
-  white-space: nowrap;
+  line-height: 1.25 !important;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .ips-ct-body-compact {
-  margin: 0.08rem 0 0 !important;
+  margin: 0.1rem 0 0 !important;
   font-size: 0.75rem !important;
-  line-height: 1.3 !important;
+  line-height: 1.35 !important;
   color: #475569 !important;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.st-key-dashboard_company_updates [data-testid="column"]:has(.ips-ct-dash-actions-marker) [data-testid="stVerticalBlock"] {
-  gap: 0.2rem !important;
+.st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) [data-testid="stHorizontalBlock"]:last-of-type {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  margin-top: 0.35rem !important;
+  padding-top: 0.45rem !important;
+  border-top: 1px solid #eef2f7 !important;
+  width: 100% !important;
 }
-.st-key-dashboard_company_updates .stButton > button {
-  min-height: 26px !important;
-  height: 26px !important;
-  padding: 0 0.4rem !important;
-  font-size: 0.68rem !important;
+.st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) .stButton > button {
+  min-height: 30px !important;
+  height: 30px !important;
+  padding: 0 0.65rem !important;
+  font-size: 0.72rem !important;
+  width: 100% !important;
 }
 
+/* ── Quick actions: 2-col grid ── */
 .st-key-dashboard_ops_quick_actions {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
   border-radius: 11px !important;
-  padding: 0.4rem 0.45rem 0.4rem !important;
-  margin-bottom: 0.2rem !important;
+  padding: 0.75rem !important;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05) !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  height: auto !important;
+  overflow: visible !important;
+  box-sizing: border-box !important;
 }
 .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"] {
-  gap: 0.3rem !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+  width: 100% !important;
+}
+.st-key-dashboard_ops_quick_actions [data-testid="stHorizontalBlock"] {
+  display: contents !important;
+}
+.st-key-dashboard_ops_quick_actions [data-testid="column"] {
+  min-width: 0 !important;
+  width: 100% !important;
 }
 .ips-ops-qa-title {
-  margin: 0 0 0.25rem;
+  grid-column: 1 / -1;
+  margin: 0 0 0.15rem;
   font-size: 1.25rem;
   font-weight: 800;
   color: #0f172a;
 }
+.st-key-dashboard_ops_quick_actions .stButton {
+  width: 100% !important;
+}
 .st-key-dashboard_ops_quick_actions .stButton > button {
   min-height: 52px !important;
   height: auto !important;
-  padding: 0.35rem 0.4rem !important;
+  width: 100% !important;
+  padding: 0.4rem 0.5rem !important;
   background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%) !important;
   border: 1px solid #1e40af !important;
   border-radius: 10px !important;
@@ -13983,8 +14119,15 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   text-align: center !important;
 }
 
+/* ── Today's activity grid ── */
+.st-key-dashboard_ops_activity {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}
 .ips-ops-section-title {
-  margin: 0.2rem 0 0.15rem;
+  margin: 0 0 12px;
   font-size: 1.25rem;
   font-weight: 800;
   color: #0f172a;
@@ -13992,31 +14135,31 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
 .ips-ops-activity-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.35rem;
-  margin-bottom: 0.2rem;
-}
-@media (max-width: 1100px) {
-  .ips-ops-activity-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (max-width: 640px) {
-  .ips-ops-activity-grid { grid-template-columns: 1fr; }
+  gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .ips-ops-widget {
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 11px;
-  padding: 0.4rem 0.45rem;
-  min-height: 108px;
-  max-height: 128px;
+  padding: 0.65rem 0.75rem;
+  min-height: 170px;
+  height: auto;
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
   display: flex;
   flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: auto;
 }
 .ips-ops-widget-head {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  margin-bottom: 0.2rem;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
   flex-shrink: 0;
 }
 .ips-ops-widget-icon {
@@ -14044,13 +14187,13 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   padding: 0;
   overflow-y: auto;
   flex: 1 1 auto;
-  max-height: 88px;
+  min-height: 0;
 }
 .ips-ops-widget-item {
   font-size: 0.8125rem;
   color: #334155;
   line-height: 1.35;
-  padding: 0.06rem 0;
+  padding: 0.08rem 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -14060,47 +14203,59 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   color: #94a3b8;
   font-style: italic;
 }
-.ips-ops-activity-card,
-.ips-ops-activity-title,
-.ips-ops-activity-list,
-.ips-ops-activity-item,
-.ips-ops-activity-empty {
-  /* legacy aliases */
-}
 
+/* ── Expanders ── */
 .st-key-dashboard_management_reminders {
-  padding: 0.45rem 0.6rem !important;
-  margin-bottom: 0.35rem !important;
+  padding: 0.75rem !important;
+  margin-bottom: 20px !important;
 }
-.st-key-dashboard_management_reminders .ips-dash-mr-title-bar {
-  font-size: 0.88rem !important;
-}
-.st-key-dashboard_management_reminders .ips-dash-mr-subtitle {
-  font-size: 0.72rem !important;
-  margin-top: 0.1rem !important;
-}
-
 .ips-ops-expander .ips-panel-card {
   min-height: 0 !important;
-  padding: 0.45rem 0.55rem !important;
+  padding: 0.55rem 0.65rem !important;
   margin-bottom: 0.35rem !important;
 }
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stExpander"] {
-  margin-bottom: 0.25rem !important;
+  margin-bottom: 20px !important;
+  max-width: 100% !important;
 }
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stExpander"] summary {
   font-size: 0.82rem !important;
   font-weight: 700 !important;
   padding: 0.35rem 0 !important;
 }
-@media (max-width: 960px) {
-  section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stHorizontalBlock"]:has(.st-key-dashboard_company_updates),
-  section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stHorizontalBlock"]:has(.st-key-dashboard_ops_quick_actions) {
-    flex-direction: column !important;
+
+/* ── Responsive breakpoints ── */
+@media (max-width: 1400px) {
+  .ips-ops-activity-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  .st-key-dashboard_ops_kpis [data-testid="column"] {
-    flex: 1 1 calc(50% - 0.45rem) !important;
-    min-width: calc(50% - 0.45rem) !important;
+}
+@media (max-width: 992px) {
+  .st-key-dashboard_ops_row2 [data-testid="stElementContainer"]:has(.ips-ops-row2-grid-marker) + [data-testid="stElementContainer"] [data-testid="stHorizontalBlock"] {
+    grid-template-columns: 1fr !important;
+  }
+  .ips-ops-activity-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 768px) {
+  section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stVerticalBlock"] > div {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+  .st-key-dashboard_ops_kpis [data-testid="stHorizontalBlock"] {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+  }
+  .ips-ops-activity-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 480px) {
+  .st-key-dashboard_ops_kpis [data-testid="stHorizontalBlock"] {
+    grid-template-columns: 1fr !important;
+  }
+  .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"] {
+    grid-template-columns: 1fr !important;
   }
 }
 </style>
