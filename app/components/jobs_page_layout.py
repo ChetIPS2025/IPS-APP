@@ -190,8 +190,6 @@ section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="column"]:has(.ip
 .ips-jobs-row-marker,
 .job-row,
 .jobs-table-row,
-.job-checkbox-cell,
-.ips-jobs-checkbox-cell,
 .job-status-cell,
 .ips-jobs-status-cell {
   display: block !important;
@@ -316,12 +314,6 @@ section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="column"]:has(.ip
 }
 section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell),
 section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-actions-cell) {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-testid="column"]:has(.job-checkbox-cell),
-section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"]:has([data-testid="stCheckbox"]) {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;

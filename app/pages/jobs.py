@@ -304,9 +304,8 @@ JOB_DOC_PENDING_DELETE_JOB_KEY = "job_detail_doc_pending_delete_job_id"
 JOB_DAILY_UPDATE_ADD_MODE_KEY = "job_detail_daily_update_add_job_id"
 _DAILY_UPDATE_STATUS_OPTS = ["Draft", "Open", "Submitted", "Closed"]
 _JOB_DOC_UPLOAD_TYPES = ["pdf", "doc", "docx", "xls", "xlsx", "csv", "png", "jpg", "jpeg"]
-_JOB_COLS = [0.3, 0.85, 1.85, 1.2, 0.95, 0.95, 0.95, 0.95, 0.85, 0.75, 0.85, 1.0]
+_JOB_COLS = [0.85, 1.85, 1.2, 0.95, 0.95, 0.95, 0.95, 0.85, 0.75, 0.85, 1.0]
 _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
-    ("", None),
     ("JOB #", None),
     ("PROJECT / DESCRIPTION", None),
     ("CUSTOMER", "customer"),
@@ -1026,42 +1025,15 @@ def _filter_jobs(
     return apply_column_filters(out, _TABLE_KEY, _JOB_COLUMN_FILTER_SPECS)
 
 
-def _job_select_key(job_id: str) -> str:
-    return f"job_select_{job_id}"
-
-
-def _clear_job_selection(job_ids: list[str] | None = None) -> None:
+def _clear_job_selection() -> None:
     st.session_state[SELECTED_JOB_KEY] = None
     st.session_state[SHOW_MODAL_KEY] = False
-    ids = list(job_ids or [])
-    for jid in ids:
-        st.session_state[_job_select_key(jid)] = False
-    for key in list(st.session_state.keys()):
-        if isinstance(key, str) and key.startswith("job_select_"):
-            st.session_state[key] = False
     st.session_state.pop(_SEL, None)
     st.session_state.pop(_JOBS_MODAL_KEY, None)
 
 
-def _on_job_checkbox_change(job_id: str, all_job_ids: list[str]) -> None:
-    key = _job_select_key(job_id)
-    if st.session_state.get(key):
-        for jid in all_job_ids:
-            if jid != job_id:
-                st.session_state[_job_select_key(jid)] = False
-        st.session_state[SELECTED_JOB_KEY] = job_id
-        st.session_state[SHOW_MODAL_KEY] = True
-        cache = st.session_state.get(CACHE_KEY) or {}
-        job = cache.get(job_id) if isinstance(cache, dict) else None
-        _open_jobs_detail_modal(job_id, job)
-    elif st.session_state.get(SELECTED_JOB_KEY) == job_id:
-        st.session_state[SELECTED_JOB_KEY] = None
-        st.session_state[SHOW_MODAL_KEY] = False
-
-
 def _clear_jobs_detail_modal() -> None:
-    job_ids = st.session_state.get(_ALL_JOB_IDS_KEY) or []
-    _clear_job_selection([str(jid) for jid in job_ids])
+    _clear_job_selection()
     clear_job_subjob_selection()
     for key in list(st.session_state.keys()):
         if isinstance(key, str) and key.startswith("job_edit_mode_"):
@@ -1161,20 +1133,6 @@ def _render_custom_jobs_table(
                         toggle_field_expanded(FIELD_EXPANDED_JOB_KEY, jid)
                         set_field_job_id(jid)
                         st.rerun()
-                else:
-                    st.markdown(
-                        '<span class="job-checkbox-cell ips-jobs-checkbox-cell" aria-hidden="true"></span>',
-                        unsafe_allow_html=True,
-                    )
-                    st.checkbox(
-                        "",
-                        key=_job_select_key(jid),
-                        label_visibility="collapsed",
-                        on_change=_on_job_checkbox_change,
-                        args=(jid, all_job_ids),
-                    )
-
-            with cols[1]:
                 num_label = job_no if job_no and job_no != "—" else "View job"
                 _render_job_list_link_button(
                     num_label,
@@ -1183,7 +1141,7 @@ def _render_custom_jobs_table(
                     extra_class="ips-jobs-number-link job-number-link",
                 )
 
-            with cols[2]:
+            with cols[1]:
                 title_label = project if project and project != "—" else "View job"
                 _render_job_list_link_button(
                     title_label,
@@ -1192,13 +1150,13 @@ def _render_custom_jobs_table(
                     extra_class="ips-jobs-title-link job-project-link ips-jobs-cell job-cell jobs-table-cell",
                 )
 
-            with cols[3]:
+            with cols[2]:
                 st.markdown(
                     f'<div class="ips-jobs-cell job-cell jobs-table-cell">{html.escape(customer)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[4]:
+            with cols[3]:
                 st.markdown(
                     '<span class="job-status-cell ips-jobs-status-cell" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
@@ -1219,43 +1177,43 @@ def _render_custom_jobs_table(
                     profit_cls = " ips-jobs-money-positive"
                 elif profit_val < 0:
                     profit_cls = " ips-jobs-money-negative"
-            with cols[5]:
+            with cols[4]:
                 contract_cls = _money_cell_class(contract_val, available=has_contract)
                 st.markdown(
                     f'<div class="ips-jobs-money ips-jobs-cell{contract_cls}">{html.escape(_money_cell(contract_val, available=has_contract))}</div>',
                     unsafe_allow_html=True,
                 )
-            with cols[6]:
+            with cols[5]:
                 estimated_cls = _money_cell_class(estimated_val, available=has_estimated)
                 st.markdown(
                     f'<div class="ips-jobs-money ips-jobs-cell{estimated_cls}">{html.escape(_money_cell(estimated_val, available=has_estimated))}</div>',
                     unsafe_allow_html=True,
                 )
-            with cols[7]:
+            with cols[6]:
                 actual_cls = _money_cell_class(actual_val, available=has_actual)
                 st.markdown(
                     f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-money-actual{actual_cls}">{html.escape(_money_cell(actual_val, available=has_actual))}</div>',
                     unsafe_allow_html=True,
                 )
-            with cols[8]:
+            with cols[7]:
                 profit_display_cls = _money_cell_class(profit_val, available=has_profit_data)
                 st.markdown(
                     f'<div class="ips-jobs-money ips-jobs-cell{profit_cls}{profit_display_cls}">{html.escape(_money_cell(profit_val, available=has_profit_data))}</div>',
                     unsafe_allow_html=True,
                 )
-            with cols[9]:
+            with cols[8]:
                 margin_display = _pct_cell(margin_val) if has_contract else "—"
                 margin_cls = profit_cls if has_contract else " ips-jobs-money-empty"
                 st.markdown(
                     f'<div class="ips-jobs-money ips-jobs-cell{margin_cls}">{html.escape(margin_display)}</div>',
                     unsafe_allow_html=True,
                 )
-            with cols[10]:
+            with cols[9]:
                 st.markdown(
                     f'<div class="ips-jobs-cell job-cell jobs-table-cell">{open_subjobs:,}</div>',
                     unsafe_allow_html=True,
                 )
-            with cols[11]:
+            with cols[10]:
                 st.markdown(
                     '<span class="ips-jobs-actions-cell ips-jobs-actions-toolbar job-actions-cell" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
@@ -3137,7 +3095,7 @@ def _render_jobs_page() -> None:
                 )
                 st.session_state["jobs_view"] = _JOBS_DEFAULT_VIEW
                 reset_table_page(_TABLE_KEY)
-                _clear_job_selection(st.session_state.get(_ALL_JOB_IDS_KEY))
+                _clear_job_selection()
                 clear_field_expanded(FIELD_EXPANDED_JOB_KEY)
                 st.rerun()
 
