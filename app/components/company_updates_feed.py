@@ -1,16 +1,14 @@
 """
 Company Updates feed for Dashboard and other summary surfaces.
 
-Company Updates = human announcements everyone should see (safety meetings,
-policy changes, schedule changes, shop notices, new procedures, urgent alerts).
-
-Keep separate from Recent Activity, which is automated system events
-(inventory moves, tool check-in/out, scans).
+Connecteam-style news feed: author header, card per update, read badges,
+and quick actions — separate from automated Recent Activity.
 """
 
 from __future__ import annotations
 
 import html
+from datetime import date
 from typing import Any
 
 import streamlit as st
@@ -20,33 +18,42 @@ try:
 except ImportError:
     from utils.formatting import fmt_date  # type: ignore
 
-_CATEGORY_ICONS: dict[str, str] = {
-    "HR Updates": "👥",
-    "HR Update": "👥",
-    "Safety Alerts": "⚠️",
-    "Safety Alert": "⚠️",
-    "Events": "📅",
-    "Event": "📅",
-    "Announcements": "📢",
-    "Announcement": "📢",
-    "Project Updates": "🏗️",
-    "Project Update": "🏗️",
-    "General": "📋",
+_CATEGORY_DISPLAY: dict[str, str] = {
+    "General": "Announcements",
+    "Policy": "Announcements",
+    "Safety": "Safety Alerts",
+    "Urgent": "Safety Alerts",
+    "Schedule": "Events",
+    "HR / Payroll": "HR Updates",
+    "Equipment": "Project Updates",
+    "Training": "Project Updates",
 }
 
 
-def _category_icon(category: str) -> str:
-    return _CATEGORY_ICONS.get(str(category or "").strip(), "📋")
+def _display_category(raw: str) -> str:
+    c = str(raw or "").strip()
+    return _CATEGORY_DISPLAY.get(c, c or "Announcements")
 
 
-def _snippet(body: str, *, max_len: int = 110) -> str:
+def _display_department(display_cat: str) -> str:
+    return {
+        "HR Updates": "HR Department",
+        "Safety Alerts": "Safety Department",
+        "Events": "Events Team",
+        "Announcements": "Corporate Communications",
+        "Project Updates": "Operations",
+    }.get(display_cat, "IPS Communications")
+
+_DASHBOARD_READ_KEY = "ips_dash_cu_read_ids"
+
+
+def _snippet(body: str, *, max_len: int = 160) -> str:
     text = " ".join(str(body or "").split())
     if len(text) <= max_len:
         return text
     return text[: max_len - 1].rstrip() + "…"
 
 
-# Human announcement categories shown on the Dashboard (not project/system logs).
 DASHBOARD_ANNOUNCEMENT_CATEGORIES: frozenset[str] = frozenset(
     {
         "Announcement",
@@ -75,6 +82,17 @@ def _normalize_dashboard_category(raw: object) -> str:
     if "project" in text:
         return "Project Update"
     return "General"
+
+
+def _raw_category_for_display(normalized: str) -> str:
+    return {
+        "Announcement": "General",
+        "Safety Alert": "Safety",
+        "Event": "Schedule",
+        "HR Update": "HR / Payroll",
+        "Project Update": "Equipment",
+        "General": "General",
+    }.get(normalized, "General")
 
 
 def dashboard_update_visible(row: dict[str, Any]) -> bool:
@@ -112,89 +130,146 @@ def _author_label(row: dict[str, Any]) -> str:
     return "IPS Team"
 
 
-def _display_category(category: object) -> str:
-    cat = _normalize_dashboard_category(category)
-    short = {
-        "Safety Alert": "Safety",
-        "HR Update": "HR",
-        "Announcement": "Announcement",
-        "Event": "Event",
-        "General": "General",
-        "Project Update": "Project",
-    }
-    return short.get(cat, cat)
+def _author_initials(name: str) -> str:
+    parts = [p for p in str(name or "").replace(".", " ").split() if p]
+    if not parts:
+        return "IP"
+    if len(parts) == 1:
+        return parts[0][:2].upper()
+    return (parts[0][:1] + parts[-1][:1]).upper()
 
 
-def _posted_meta(row: dict[str, Any]) -> str:
+def _relative_posted_label(row: dict[str, Any]) -> str:
+    raw = str(row.get("date") or row.get("created_at") or "")[:10]
+    if not raw:
+        return "Recently"
+    try:
+        posted = date.fromisoformat(raw)
+    except ValueError:
+        return fmt_date(raw)
+    delta = (date.today() - posted).days
+    if delta == 0:
+        return "Today"
+    if delta == 1:
+        return "Yesterday"
+    if delta < 7:
+        return f"{delta} days ago"
+    return fmt_date(raw)
+
+
+def _dashboard_read_ids() -> set[str]:
+    raw = st.session_state.get(_DASHBOARD_READ_KEY)
+    if isinstance(raw, set):
+        return raw
+    if isinstance(raw, list):
+        return set(str(x) for x in raw)
+    return set()
+
+
+def _mark_dashboard_update_read(update_id: str) -> None:
+    uid = str(update_id or "").strip()
+    if not uid:
+        return
+    seen = _dashboard_read_ids()
+    seen.add(uid)
+    st.session_state[_DASHBOARD_READ_KEY] = seen
+
+
+def _is_update_unread(row: dict[str, Any]) -> bool:
+    uid = str(row.get("id") or "").strip()
+    if uid and uid in _dashboard_read_ids():
+        return False
+    if row.get("is_new") is False:
+        return False
+    return True
+
+
+def connecteam_feed_card_html(row: dict[str, Any]) -> str:
+    """Single Connecteam-style announcement card."""
+    ot = "d" + "iv"
+    normalized = _normalize_dashboard_category(row.get("category"))
+    display_cat = _display_category(_raw_category_for_display(normalized))
+    department = _display_department(display_cat)
     author = _author_label(row)
-    date_label = fmt_date(row.get("date") or row.get("created_at"))
-    category = _display_category(row.get("category"))
-    return f"Posted by {author} · {date_label} · {category}"
+    initials = html.escape(_author_initials(author))
+    title = html.escape(str(row.get("title") or "Untitled"))
+    body = html.escape(_snippet(str(row.get("body") or ""), max_len=220))
+    posted = html.escape(_relative_posted_label(row))
+    author_esc = html.escape(author)
+    is_pinned = bool(row.get("pinned"))
+    is_unread = _is_update_unread(row)
+    urgent = normalized == "Safety Alert" or str(row.get("priority") or "").lower() == "urgent"
+
+    card_cls = " ips-ct-feed-card-unread" if is_unread else " ips-ct-feed-card-read"
+    if is_pinned:
+        card_cls += " ips-ct-feed-card-pinned"
+    if urgent:
+        card_cls += " ips-ct-feed-card-urgent"
+
+    bg, fg, border = {
+        "Announcements": ("#dbeafe", "#1d4ed8", "#bfdbfe"),
+        "Safety Alerts": ("#fee2e2", "#b91c1c", "#fecaca"),
+        "Events": ("#dcfce7", "#15803d", "#bbf7d0"),
+        "HR Updates": ("#f3e8ff", "#6d28d9", "#e9d5ff"),
+    }.get(display_cat, ("#f1f5f9", "#475569", "#e2e8f0"))
+
+    status_html = (
+        f'<span class="ips-ct-status ips-ct-status-new"><span class="dot"></span>New</span>'
+        if is_unread
+        else '<span class="ips-ct-status ips-ct-status-read">✓ Read</span>'
+    )
+    pin_html = (
+        f'<span class="ips-ct-pin">📌 Pinned</span>' if is_pinned else ""
+    )
+
+    return (
+        f'<{ot} class="ips-ct-feed-card{card_cls}">'
+        f'<{ot} class="ips-ct-feed-head">'
+        f'<{ot} class="ips-ct-avatar" aria-hidden="true">{initials}</{ot}>'
+        f'<{ot} class="ips-ct-head-text">'
+        f'<span class="ips-ct-author">{author_esc}</span>'
+        f'<span class="ips-ct-meta">{posted} · {html.escape(department)}</span>'
+        f"</{ot}>"
+        f"{status_html}"
+        f"</{ot}>"
+        f'<h3 class="ips-ct-title">{title}</h3>'
+        f'<p class="ips-ct-body">{body}</p>'
+        f'<{ot} class="ips-ct-foot">'
+        f'<span class="ips-ct-cat-pill" style="background:{bg};color:{fg};border:1px solid {border};">'
+        f"{html.escape(display_cat)}</span>"
+        f"{pin_html}"
+        f"</{ot}>"
+        f"</{ot}>"
+    )
 
 
-def _split_featured_and_recent(
-    rows: list[dict[str, Any]],
-) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
-    if not rows:
-        return None, []
-    featured = rows[0]
-    recent = rows[1:6]
-    return featured, recent
-
-
-def dashboard_company_updates_hero_html(
+def dashboard_company_updates_feed_html(
     rows: list[dict[str, Any]],
     *,
     empty_message: str = "No company announcements right now.",
 ) -> str:
-    """Full-width featured update + recent list for the Dashboard hero section."""
-    featured, recent = _split_featured_and_recent(rows)
-    ot = "d" + "iv"
-    if featured is None:
+    if not rows:
         return f'<p class="ips-dash-cu-empty">{html.escape(empty_message)}</p>'
-
-    icon = html.escape(_category_icon(str(featured.get("category") or "")))
-    title = html.escape(str(featured.get("title") or "Untitled"))
-    body = html.escape(_snippet(str(featured.get("body") or ""), max_len=220))
-    meta = html.escape(_posted_meta(featured))
-    pinned = (
-        f'<span class="ips-dash-cu-featured-badge">{html.escape("Important")}</span>'
-        if featured.get("pinned")
-        else ""
+    ot = "d" + "iv"
+    cards = "".join(
+        f'<{ot} class="ips-ct-feed-card-wrap">{connecteam_feed_card_html(row)}</{ot}>'
+        for row in rows
     )
+    return f'<{ot} class="ips-ct-feed-stack">{cards}</{ot}>'
 
-    recent_html = ""
-    if recent:
-        items = "".join(
-            f'<li class="ips-dash-cu-recent-item">'
-            f'<span class="ips-dash-cu-recent-bullet" aria-hidden="true">•</span>'
-            f'<span class="ips-dash-cu-recent-name">{html.escape(str(row.get("title") or "Untitled"))}</span>'
-            f"</li>"
-            for row in recent
-        )
-        recent_html = (
-            f'<{ot} class="ips-dash-cu-recent">'
-            f'<p class="ips-dash-cu-recent-heading">Recent Updates</p>'
-            f'<ul class="ips-dash-cu-recent-list">{items}</ul>'
-            f"</{ot}>"
-        )
 
-    return (
-        f'<{ot} class="ips-dash-cu-body">'
-        f'<{ot} class="ips-dash-cu-featured">'
-        f'<{ot} class="ips-dash-cu-featured-icon">{icon}</{ot}>'
-        f'<{ot} class="ips-dash-cu-featured-content">'
-        f'<{ot} class="ips-dash-cu-featured-head">'
-        f'<h2 class="ips-dash-cu-featured-title">{title}</h2>'
-        f"{pinned}"
-        f"</{ot}>"
-        f'<p class="ips-dash-cu-featured-body">{body}</p>'
-        f'<p class="ips-dash-cu-featured-meta">{meta}</p>'
-        f"</{ot}>"
-        f"</{ot}>"
-        f"{recent_html}"
-        f"</{ot}>"
-    )
+def _open_company_update(update_id: str) -> None:
+    uid = str(update_id or "").strip()
+    if not uid:
+        return
+    try:
+        from app.navigation import set_nav_slug
+    except ImportError:
+        from navigation import set_nav_slug  # type: ignore
+    st.session_state["selected_update_id"] = uid
+    st.session_state["show_update_detail_modal"] = True
+    set_nav_slug("company_updates")
+    st.rerun()
 
 
 def render_dashboard_company_updates_section(
@@ -202,7 +277,7 @@ def render_dashboard_company_updates_section(
     *,
     empty_message: str = "No company announcements right now.",
 ) -> None:
-    """Primary Dashboard communication panel — featured update, recent list, and actions."""
+    """Connecteam-style news feed on the Dashboard."""
     ot = "d" + "iv"
 
     def _go_company_updates(*, open_new: bool = False) -> None:
@@ -215,14 +290,21 @@ def render_dashboard_company_updates_section(
         set_nav_slug("company_updates")
         st.rerun()
 
+    unread_count = sum(1 for row in rows if _is_update_unread(row))
+
     with st.container(key="dashboard_company_updates"):
         hdr_l, hdr_r = st.columns([2.35, 1.65], gap="small", vertical_alignment="center")
         with hdr_l:
+            badge = (
+                f'<span class="ips-ct-unread-badge">{unread_count} new</span>'
+                if unread_count
+                else ""
+            )
             st.markdown(
                 f'<{ot} class="ips-dash-cu-hero-head">'
-                f'<p class="ips-dash-cu-hero-title">Company Updates</p>'
+                f'<p class="ips-dash-cu-hero-title">Company News</p>'
                 f'<p class="ips-dash-cu-hero-subtitle">'
-                f"Human announcements — safety, policy, schedule, and shop notices"
+                f"Announcements, safety alerts, and events from your team{badge}"
                 f"</p>"
                 f"</{ot}>",
                 unsafe_allow_html=True,
@@ -231,7 +313,7 @@ def render_dashboard_company_updates_section(
             b_new, b_all = st.columns(2, gap="small")
             with b_new:
                 if st.button(
-                    "+ New Update",
+                    "+ Post Update",
                     key="ips_dash_cu_new",
                     type="primary",
                     use_container_width=True,
@@ -241,10 +323,43 @@ def render_dashboard_company_updates_section(
                 if st.button("View All", key="ips_dash_cu_all", use_container_width=True):
                     _go_company_updates()
 
-        st.markdown(
-            dashboard_company_updates_hero_html(rows, empty_message=empty_message),
-            unsafe_allow_html=True,
-        )
+        if not rows:
+            st.markdown(
+                f'<p class="ips-dash-cu-empty">{html.escape(empty_message)}</p>',
+                unsafe_allow_html=True,
+            )
+            return
+
+        for row in rows:
+            uid = str(row.get("id") or "").strip()
+            st.markdown(
+                f'<{ot} class="ips-ct-feed-card-wrap">{connecteam_feed_card_html(row)}</{ot}>',
+                unsafe_allow_html=True,
+            )
+            act1, act2, act3 = st.columns([1.1, 1.1, 2], gap="small")
+            with act1:
+                if uid and st.button(
+                    "Open",
+                    key=f"ips_dash_cu_open_{uid}",
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    _mark_dashboard_update_read(uid)
+                    _open_company_update(uid)
+            with act2:
+                if uid and _is_update_unread(row):
+                    if st.button(
+                        "Mark read",
+                        key=f"ips_dash_cu_read_{uid}",
+                        use_container_width=True,
+                    ):
+                        _mark_dashboard_update_read(uid)
+                        st.rerun()
+            with act3:
+                st.markdown(
+                    '<span class="ips-ct-feed-hint">Tap Open to read the full update</span>',
+                    unsafe_allow_html=True,
+                )
 
 
 def company_updates_feed_html(
@@ -252,36 +367,5 @@ def company_updates_feed_html(
     *,
     empty_message: str = "No company announcements right now.",
 ) -> str:
-    """Return HTML list of recent company updates for a compact dashboard panel."""
-    if not rows:
-        return f'<p class="ips-panel-empty">{html.escape(empty_message)}</p>'
-
-    ot = "d" + "iv"
-    parts: list[str] = [f'<{ot} class="ips-dash-updates-feed">']
-    for row in rows:
-        title = html.escape(str(row.get("title") or "Untitled"))
-        category = html.escape(str(row.get("category") or "General"))
-        date_label = html.escape(str(row.get("date") or "")[:10] or "—")
-        icon = html.escape(_category_icon(str(row.get("category") or "")))
-        body = html.escape(_snippet(str(row.get("body") or "")))
-        pinned = (
-            f'<span class="ips-dash-update-pinned">{html.escape("Pinned")}</span>'
-            if row.get("pinned")
-            else ""
-        )
-        parts.append(
-            f'<{ot} class="ips-dash-update-item">'
-            f'<{ot} class="ips-dash-update-icon">{icon}</{ot}>'
-            f"<{ot}>"
-            f'<{ot} class="ips-dash-update-head">'
-            f'<span class="ips-dash-update-title">{title}</span>'
-            f"{pinned}"
-            f'<span class="ips-dash-update-date">{date_label}</span>'
-            f"</{ot}>"
-            f'<{ot} class="ips-dash-update-meta">{category}</{ot}>'
-            f'<p class="ips-dash-update-body">{body}</p>'
-            f"</{ot}>"
-            f"</{ot}>"
-        )
-    parts.append(f"</{ot}>")
-    return "".join(parts)
+    """Compact HTML feed (legacy callers)."""
+    return dashboard_company_updates_feed_html(rows, empty_message=empty_message)

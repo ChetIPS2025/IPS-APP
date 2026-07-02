@@ -12365,6 +12365,145 @@ body.ips-auth-login [data-testid="stVerticalBlockBorderWrapper"].st-key-ips_logi
   font-size: 0.85rem;
   color: {TEXT_MUTED};
 }}
+.ips-ct-unread-badge {{
+  display: inline-block;
+  margin-left: 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #1d4ed8;
+  background: #dbeafe;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  vertical-align: middle;
+}}
+.ips-ct-feed-stack {{
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}}
+.st-key-dashboard_company_updates .ips-ct-feed-card-wrap {{
+  margin: 0.15rem 0 0.35rem;
+}}
+.ips-ct-feed-card {{
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 0.95rem 1rem 0.85rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}}
+.ips-ct-feed-card-unread {{
+  border-color: #bfdbfe;
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 42%);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+}}
+.ips-ct-feed-card-read {{
+  opacity: 0.96;
+}}
+.ips-ct-feed-card-pinned {{
+  border-left: 3px solid #2563eb;
+}}
+.ips-ct-feed-card-urgent {{
+  border-left: 3px solid #dc2626;
+  background: linear-gradient(180deg, #fff5f5 0%, #ffffff 48%);
+}}
+.ips-ct-feed-head {{
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.55rem;
+}}
+.ips-ct-avatar {{
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}}
+.ips-ct-head-text {{
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+}}
+.ips-ct-author {{
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: {TEXT};
+}}
+.ips-ct-meta {{
+  font-size: 0.72rem;
+  color: {TEXT_MUTED};
+}}
+.ips-ct-status {{
+  font-size: 0.68rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}}
+.ips-ct-status-new {{
+  color: #1d4ed8;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}}
+.ips-ct-status-new .dot {{
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: #2563eb;
+}}
+.ips-ct-status-read {{
+  color: #64748b;
+}}
+.ips-ct-title {{
+  margin: 0 0 0.35rem;
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: {TEXT};
+  line-height: 1.3;
+}}
+.ips-ct-body {{
+  margin: 0;
+  font-size: 0.82rem;
+  color: #475569;
+  line-height: 1.45;
+}}
+.ips-ct-foot {{
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid #f1f5f9;
+}}
+.ips-ct-cat-pill {{
+  font-size: 0.65rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0.12rem 0.5rem;
+}}
+.ips-ct-pin {{
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #64748b;
+}}
+.ips-ct-feed-hint {{
+  font-size: 0.72rem;
+  color: {TEXT_MUTED};
+  line-height: 2.2;
+}}
+.st-key-dashboard_company_updates [data-testid="stHorizontalBlock"]:not(:first-of-type) {{
+  margin-top: -0.15rem;
+  margin-bottom: 0.75rem;
+}}
 @media (max-width: 768px) {{
   .st-key-dashboard_company_updates {{
     padding: 0.95rem 0.9rem 1rem;
