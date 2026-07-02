@@ -1233,9 +1233,70 @@ def inject_jobs_module_css() -> None:
   font-size: 13px !important;
   width: auto !important;
 }}
-.st-key-jobs_table_wrap .job-number-link .stButton,
-.st-key-jobs_table_wrap .ips-jobs-number-link .stButton {{
-  display: none !important;
+.st-key-jobs_table_wrap .ips-jobs-table-link [data-testid="stButton"],
+.st-key-jobs_table_wrap .ips-jobs-table-link .stButton {{
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}}
+.st-key-jobs_table_wrap .ips-jobs-table-link button,
+.st-key-jobs_table_wrap .job-number-link button,
+.st-key-jobs_table_wrap .ips-jobs-number-link button,
+.st-key-jobs_table_wrap .ips-jobs-title-link button,
+.st-key-jobs_table_wrap .job-project-link button {{
+  background: transparent !important;
+  background-color: transparent !important;
+  color: {PRIMARY} !important;
+  font-weight: 700 !important;
+  font-size: 0.875rem !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  width: auto !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  text-align: left !important;
+  justify-content: flex-start !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  cursor: pointer !important;
+  transition: color 0.15s ease !important;
+}}
+.st-key-jobs_table_wrap .ips-jobs-number-link button,
+.st-key-jobs_table_wrap .job-number-link button {{
+  white-space: nowrap !important;
+}}
+.st-key-jobs_table_wrap .ips-jobs-title-link button,
+.st-key-jobs_table_wrap .job-project-link button {{
+  white-space: normal !important;
+  line-height: 1.3 !important;
+  word-break: normal !important;
+  overflow-wrap: anywhere !important;
+}}
+.st-key-jobs_table_wrap .ips-jobs-table-link button:hover,
+.st-key-jobs_table_wrap .ips-jobs-table-link button:focus,
+.st-key-jobs_table_wrap .job-number-link button:hover,
+.st-key-jobs_table_wrap .job-number-link button:focus,
+.st-key-jobs_table_wrap .ips-jobs-title-link button:hover,
+.st-key-jobs_table_wrap .ips-jobs-title-link button:focus {{
+  background: transparent !important;
+  background-color: transparent !important;
+  color: {PRIMARY_HOVER} !important;
+  text-decoration: underline !important;
+  border: none !important;
+  box-shadow: none !important;
+}}
+.st-key-jobs_table_wrap .ips-jobs-table-link button > div,
+.st-key-jobs_table_wrap .ips-jobs-table-link button p,
+.st-key-jobs_table_wrap .ips-jobs-table-link button span {{
+  color: inherit !important;
+  font-weight: inherit !important;
+  text-align: left !important;
 }}
 .ips-jobs-number-text {{
   font-weight: 700 !important;

@@ -937,6 +937,36 @@ def _open_job_edit_from_list(job: dict) -> None:
     _set_job_edit_mode(job)
 
 
+def _open_job_from_list(job: dict) -> None:
+    jid = str(job.get("id") or "").strip()
+    if not jid:
+        return
+    _open_jobs_detail_modal(jid, job)
+    st.rerun()
+
+
+def _render_job_list_link_button(
+    label: str,
+    *,
+    key: str,
+    job: dict,
+    extra_class: str = "",
+) -> None:
+    st.markdown(
+        f'<div class="ips-jobs-table-link {extra_class}">',
+        unsafe_allow_html=True,
+    )
+    if st.button(
+        label,
+        key=key,
+        type="tertiary",
+        help="Open job details",
+        use_container_width=True,
+    ):
+        _open_job_from_list(job)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
 def _on_job_status_updated(job_id: str, new_status: str) -> None:
     _patch_job_cache_status(job_id, new_status)
 
@@ -1146,20 +1176,20 @@ def _render_custom_jobs_table(
 
             with cols[1]:
                 num_label = job_no if job_no and job_no != "—" else "View job"
-                st.markdown(
-                    f'<div class="ips-jobs-number-link job-number-link">'
-                    f'<span class="ips-jobs-number-text" title="{html.escape(num_label, quote=True)}">'
-                    f"{html.escape(num_label)}</span></div>",
-                    unsafe_allow_html=True,
+                _render_job_list_link_button(
+                    num_label,
+                    key=f"job_open_num_{jid}",
+                    job=job,
+                    extra_class="ips-jobs-number-link job-number-link",
                 )
 
             with cols[2]:
-                st.markdown(
-                    f'<div class="ips-jobs-title-link job-project-link ips-jobs-cell job-cell jobs-table-cell">'
-                    f'<span class="ips-jobs-title ips-jobs-title-text job-project-text" '
-                    f'title="{html.escape(project, quote=True)}">'
-                    f"{html.escape(project)}</span></div>",
-                    unsafe_allow_html=True,
+                title_label = project if project and project != "—" else "View job"
+                _render_job_list_link_button(
+                    title_label,
+                    key=f"job_open_title_{jid}",
+                    job=job,
+                    extra_class="ips-jobs-title-link job-project-link ips-jobs-cell job-cell jobs-table-cell",
                 )
 
             with cols[3]:

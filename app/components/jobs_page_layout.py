@@ -231,9 +231,46 @@ section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="column"]:has(.ip
   color: #1d4ed8 !important;
   text-decoration: underline;
 }
-section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap .job-number-link button,
-section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap .ips-jobs-number-link button {
-  display: none !important;
+.st-key-jobs_table_wrap .ips-jobs-table-link [data-testid="stButton"],
+.st-key-jobs_table_wrap .ips-jobs-table-link .stButton {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+.st-key-jobs_table_wrap .ips-jobs-table-link button,
+.st-key-jobs_table_wrap .job-number-link button,
+.st-key-jobs_table_wrap .ips-jobs-number-link button,
+.st-key-jobs_table_wrap .ips-jobs-title-link button,
+.st-key-jobs_table_wrap .job-project-link button {
+  background: transparent !important;
+  color: #2563eb !important;
+  font-weight: 700 !important;
+  font-size: 0.875rem !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  width: auto !important;
+  max-width: 100% !important;
+}
+.st-key-jobs_table_wrap .ips-jobs-number-link button,
+.st-key-jobs_table_wrap .job-number-link button {
+  white-space: nowrap !important;
+}
+.st-key-jobs_table_wrap .ips-jobs-title-link button,
+.st-key-jobs_table_wrap .job-project-link button {
+  white-space: normal !important;
+  line-height: 1.3 !important;
+  overflow-wrap: anywhere !important;
+}
+.st-key-jobs_table_wrap .ips-jobs-table-link button:hover,
+.st-key-jobs_table_wrap .ips-jobs-table-link button:focus {
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
+  background: transparent !important;
 }
 .ips-jobs-title-link,
 .job-project-link {
