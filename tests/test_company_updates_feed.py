@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.components.company_updates_feed import (
+    connecteam_feed_card_compact_html,
     connecteam_feed_card_html,
     dashboard_company_updates_feed_html,
     dashboard_update_visible,
@@ -46,6 +47,24 @@ def test_connecteam_feed_card_html_includes_author_and_status():
     assert "Safety Reminder" in html
     assert "ips-ct-status-new" in html
     assert "JS" in html
+
+
+def test_connecteam_feed_card_compact_html():
+    html_out = connecteam_feed_card_compact_html(
+        {
+            "id": "x1",
+            "title": "Team Meeting",
+            "body": "All hands at 3pm in the shop bay.",
+            "category": "General",
+            "date": "2026-05-29",
+            "created_by_name": "Chet Breaux",
+            "pinned": True,
+        }
+    )
+    assert "ips-ct-feed-card-compact" in html_out
+    assert "Team Meeting" in html_out
+    assert "CB" in html_out
+    assert "ips-ct-pin-inline" in html_out
 
 
 def test_dashboard_company_updates_feed_html_empty():

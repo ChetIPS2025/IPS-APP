@@ -195,6 +195,35 @@ def render_person_profile_header(
     )
 
 
+def render_ops_quick_action_tiles(
+    actions: list[tuple[str, str, str]],
+    *,
+    key_prefix: str = "ips_ops_qa",
+    title: str = "Quick Actions",
+) -> None:
+    """Vertical stack of primary blue action tiles for the operations dashboard."""
+    with st.container(key="dashboard_ops_quick_actions"):
+        st.markdown(
+            f'<p class="ips-ops-qa-title">{html.escape(title)}</p>',
+            unsafe_allow_html=True,
+        )
+        for idx, (icon, label, slug) in enumerate(actions):
+            btn_label = f"{icon}  {label}"
+            if st.button(
+                btn_label,
+                key=f"{key_prefix}_{idx}",
+                type="primary",
+                use_container_width=True,
+            ):
+                if slug:
+                    try:
+                        from app.navigation import set_nav_slug
+                    except ImportError:
+                        from navigation import set_nav_slug  # type: ignore
+                    set_nav_slug(slug)
+                    st.rerun()
+
+
 def render_dashboard_quick_actions(
     actions: list[tuple[str, str, str]],
     *,

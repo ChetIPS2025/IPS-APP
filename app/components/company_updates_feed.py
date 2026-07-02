@@ -184,6 +184,55 @@ def _is_update_unread(row: dict[str, Any]) -> bool:
     return True
 
 
+def connecteam_feed_card_compact_html(row: dict[str, Any]) -> str:
+    """Compact dashboard announcement card (~120–150px)."""
+    ot = "d" + "iv"
+    normalized = _normalize_dashboard_category(row.get("category"))
+    display_cat = _display_category(_raw_category_for_display(normalized))
+    author = _author_label(row)
+    initials = html.escape(_author_initials(author))
+    title = html.escape(str(row.get("title") or "Untitled"))
+    body = html.escape(_snippet(str(row.get("body") or ""), max_len=120))
+    posted = html.escape(_relative_posted_label(row))
+    author_esc = html.escape(author)
+    is_pinned = bool(row.get("pinned"))
+    is_unread = _is_update_unread(row)
+
+    card_cls = " ips-ct-feed-card-unread" if is_unread else " ips-ct-feed-card-read"
+    if is_pinned:
+        card_cls += " ips-ct-feed-card-pinned"
+
+    bg, fg, border = {
+        "Announcements": ("#dbeafe", "#1d4ed8", "#bfdbfe"),
+        "Safety Alerts": ("#fee2e2", "#b91c1c", "#fecaca"),
+        "Events": ("#dcfce7", "#15803d", "#bbf7d0"),
+        "HR Updates": ("#f3e8ff", "#6d28d9", "#e9d5ff"),
+    }.get(display_cat, ("#f1f5f9", "#475569", "#e2e8f0"))
+
+    pin_html = '<span class="ips-ct-pin ips-ct-pin-inline">📌</span>' if is_pinned else ""
+
+    return (
+        f'<{ot} class="ips-ct-feed-card ips-ct-feed-card-compact{card_cls}">'
+        f'<{ot} class="ips-ct-compact-top">'
+        f'<{ot} class="ips-ct-avatar ips-ct-avatar-sm" aria-hidden="true">{initials}</{ot}>'
+        f'<{ot} class="ips-ct-compact-body">'
+        f'<{ot} class="ips-ct-compact-meta">'
+        f'<span class="ips-ct-author">{author_esc}</span>'
+        f'<span class="ips-ct-meta">{posted}</span>'
+        f"</{ot}>"
+        f'<h4 class="ips-ct-title ips-ct-title-compact">{title}</h4>'
+        f'<p class="ips-ct-body ips-ct-body-compact">{body}</p>'
+        f'<{ot} class="ips-ct-compact-foot">'
+        f'<span class="ips-ct-cat-pill ips-ct-cat-pill-sm" style="background:{bg};color:{fg};border:1px solid {border};">'
+        f"{html.escape(display_cat)}</span>"
+        f"{pin_html}"
+        f"</{ot}>"
+        f"</{ot}>"
+        f"</{ot}>"
+        f"</{ot}>"
+    )
+
+
 def connecteam_feed_card_html(row: dict[str, Any]) -> str:
     """Single Connecteam-style announcement card."""
     ot = "d" + "iv"
@@ -272,71 +321,59 @@ def _open_company_update(update_id: str) -> None:
     st.rerun()
 
 
+def _go_company_updates_page(*, open_new: bool = False) -> None:
+    try:
+        from app.navigation import set_nav_slug
+    except ImportError:
+        from navigation import set_nav_slug  # type: ignore
+    if open_new:
+        st.session_state["ips_cu_form"] = True
+    set_nav_slug("company_updates")
+    st.rerun()
+
+
 def render_dashboard_company_updates_section(
     rows: list[dict[str, Any]],
     *,
     empty_message: str = "No company announcements right now.",
+    limit: int = 5,
 ) -> None:
-    """Connecteam-style news feed on the Dashboard."""
+    """Compact company news feed on the operations dashboard."""
     ot = "d" + "iv"
-
-    def _go_company_updates(*, open_new: bool = False) -> None:
-        try:
-            from app.navigation import set_nav_slug
-        except ImportError:
-            from navigation import set_nav_slug  # type: ignore
-        if open_new:
-            st.session_state["ips_cu_form"] = True
-        set_nav_slug("company_updates")
-        st.rerun()
-
-    unread_count = sum(1 for row in rows if _is_update_unread(row))
+    display_rows = list(rows)[: max(1, int(limit))]
 
     with st.container(key="dashboard_company_updates"):
-        hdr_l, hdr_r = st.columns([2.35, 1.65], gap="small", vertical_alignment="center")
+        hdr_l, hdr_mid, hdr_r1, hdr_r2 = st.columns([2.2, 1.2, 1, 1], gap="small", vertical_alignment="center")
         with hdr_l:
-            badge = (
-                f'<span class="ips-ct-unread-badge">{unread_count} new</span>'
-                if unread_count
-                else ""
-            )
             st.markdown(
-                f'<{ot} class="ips-dash-cu-hero-head">'
-                f'<p class="ips-dash-cu-hero-title">Company News</p>'
-                f'<p class="ips-dash-cu-hero-subtitle">'
-                f"Announcements, safety alerts, and events from your team{badge}"
-                f"</p>"
-                f"</{ot}>",
+                f'<p class="ips-ops-news-title">Recent Company News</p>',
                 unsafe_allow_html=True,
             )
-        with hdr_r:
-            b_new, b_all = st.columns(2, gap="small")
-            with b_new:
-                if st.button(
-                    "+ Post Update",
-                    key="ips_dash_cu_new",
-                    type="primary",
-                    use_container_width=True,
-                ):
-                    _go_company_updates(open_new=True)
-            with b_all:
-                if st.button("View All", key="ips_dash_cu_all", use_container_width=True):
-                    _go_company_updates()
+        with hdr_mid:
+            st.markdown('<span aria-hidden="true"></span>', unsafe_allow_html=True)
+        with hdr_r1:
+            if st.button("+ Post Update", key="ips_dash_cu_new", type="primary", use_container_width=True):
+                _go_company_updates_page(open_new=True)
+        with hdr_r2:
+            if st.button("View All", key="ips_dash_cu_all", use_container_width=True):
+                _go_company_updates_page()
 
-        if not rows:
+        if not display_rows:
             st.markdown(
                 f'<p class="ips-dash-cu-empty">{html.escape(empty_message)}</p>',
                 unsafe_allow_html=True,
             )
             return
 
-        for row in rows:
+        for row in display_rows:
             uid = str(row.get("id") or "").strip()
             st.markdown(
-                f'<{ot} class="ips-ct-feed-card-wrap">{connecteam_feed_card_html(row)}</{ot}>',
+                f'<{ot} class="ips-ct-feed-card-wrap ips-ct-feed-card-wrap-compact">'
+                f"{connecteam_feed_card_compact_html(row)}"
+                f"</{ot}>",
                 unsafe_allow_html=True,
             )
-            act1, act2, act3 = st.columns([1.1, 1.1, 2], gap="small")
+            act1, act2 = st.columns(2, gap="small")
             with act1:
                 if uid and st.button(
                     "Open",
@@ -355,11 +392,6 @@ def render_dashboard_company_updates_section(
                     ):
                         _mark_dashboard_update_read(uid)
                         st.rerun()
-            with act3:
-                st.markdown(
-                    '<span class="ips-ct-feed-hint">Tap Open to read the full update</span>',
-                    unsafe_allow_html=True,
-                )
 
 
 def company_updates_feed_html(
