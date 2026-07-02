@@ -913,7 +913,7 @@ def inject_jobs_module_css() -> None:
     """Jobs list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-jobs-module-v22">
+<style id="ips-jobs-module-v23">
 .ips-jobs-table-wrap,
 .ips-jobs-table-wrap.jobs-table {{
   background: #ffffff;
@@ -926,11 +926,11 @@ def inject_jobs_module_css() -> None:
   background: #f8fafc;
   border-bottom: 1px solid #e2e8f0;
   padding: 5px 10px;
-  font-size: 12px;
+  font-size: 0.8125rem;
   font-weight: 800;
-  color: #475569;
+  color: #334155;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   min-height: 34px;
   display: flex;
   align-items: center;
@@ -952,13 +952,14 @@ def inject_jobs_module_css() -> None:
   background: #eaf2ff !important;
 }}
 .ips-jobs-cell {{
-  color: {TEXT};
-  font-size: 0.8125rem;
-  line-height: 1.25;
+  color: #0f172a;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.3;
   min-width: 0;
 }}
 .ips-jobs-number {{
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 800;
   color: #2563eb;
   line-height: 1.25;
@@ -966,7 +967,7 @@ def inject_jobs_module_css() -> None:
 }}
 .ips-jobs-title {{
   font-size: 0.875rem;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1.3;
   word-break: normal;
   overflow-wrap: anywhere;
@@ -983,7 +984,7 @@ def inject_jobs_module_css() -> None:
 }}
 .ips-jobs-title-text,
 .job-project-text {{
-  font-weight: 700 !important;
+  font-weight: 800 !important;
   color: {PRIMARY} !important;
   font-size: 0.875rem;
   line-height: 1.3;
@@ -1023,7 +1024,7 @@ def inject_jobs_module_css() -> None:
   min-height: 22px;
   padding: 0 10px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 0.75rem;
   font-weight: 800;
   white-space: nowrap;
   line-height: 1;
@@ -1173,6 +1174,23 @@ def inject_jobs_module_css() -> None:
   display: flex !important;
   align-items: center !important;
   min-height: 0 !important;
+  font-size: 0.875rem !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  font-variant-numeric: tabular-nums;
+}}
+.ips-jobs-money-empty {{
+  color: #64748b !important;
+  font-weight: 700 !important;
+}}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) [data-testid="stMarkdown"] p,
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) .ips-jobs-cell,
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) .job-cell,
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) .jobs-table-cell {{
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  font-size: 0.875rem !important;
+  line-height: 1.3 !important;
 }}
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"]:has(.ips-job-status-pill),
 .st-key-jobs_table_wrap [data-testid="column"]:has(.job-status-cell) {{
@@ -1224,7 +1242,7 @@ def inject_jobs_module_css() -> None:
   background: transparent !important;
   background-color: transparent !important;
   color: {PRIMARY} !important;
-  font-weight: 700 !important;
+  font-weight: 800 !important;
   font-size: 0.875rem !important;
   border: none !important;
   border-radius: 0 !important;
@@ -1276,7 +1294,7 @@ def inject_jobs_module_css() -> None:
   text-align: left !important;
 }}
 .ips-jobs-number-text {{
-  font-weight: 700 !important;
+  font-weight: 800 !important;
   color: {PRIMARY} !important;
   font-size: 0.875rem;
   line-height: 1.25;
@@ -1326,8 +1344,8 @@ def inject_jobs_module_css() -> None:
   border: 1px solid {PRIMARY} !important;
   box-shadow: 0 1px 2px rgba(37, 99, 235, 0.24) !important;
   color: #ffffff !important;
-  font-size: 0.8125rem !important;
-  font-weight: 600 !important;
+  font-size: 0.875rem !important;
+  font-weight: 700 !important;
   line-height: 1 !important;
   white-space: nowrap !important;
   word-break: keep-all !important;

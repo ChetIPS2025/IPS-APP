@@ -304,7 +304,7 @@ JOB_DOC_PENDING_DELETE_JOB_KEY = "job_detail_doc_pending_delete_job_id"
 JOB_DAILY_UPDATE_ADD_MODE_KEY = "job_detail_daily_update_add_job_id"
 _DAILY_UPDATE_STATUS_OPTS = ["Draft", "Open", "Submitted", "Closed"]
 _JOB_DOC_UPLOAD_TYPES = ["pdf", "doc", "docx", "xls", "xlsx", "csv", "png", "jpg", "jpeg"]
-_JOB_COLS = [0.85, 1.85, 1.2, 0.95, 0.95, 0.95, 0.95, 0.85, 0.75, 0.85, 1.0]
+_JOB_COLS = [1.0, 1.85, 1.2, 0.95, 0.95, 0.95, 0.95, 0.85, 0.75, 0.85, 1.0]
 _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("JOB #", None),
     ("PROJECT / DESCRIPTION", None),
