@@ -207,19 +207,17 @@ def connecteam_feed_card_compact_html(row: dict[str, Any]) -> str:
     )
 
     return (
-        f'<{ot} class="ips-ct-feed-card ips-ct-feed-card-compact ips-ct-feed-card-ultra{card_cls}">'
-        f'<{ot} class="ips-ct-compact-top">'
+        f'<{ot} class="news-card ips-ct-feed-card ips-ct-feed-card-compact ips-ct-feed-card-ultra{card_cls}">'
+        f'<{ot} class="news-card-head">'
         f'<{ot} class="ips-ct-avatar ips-ct-avatar-sm" aria-hidden="true">{initials}</{ot}>'
-        f'<{ot} class="ips-ct-compact-body">'
-        f'<{ot} class="ips-ct-compact-meta">'
+        f'<{ot} class="news-card-meta ips-ct-compact-meta">'
         f'<span class="ips-ct-author">{author_esc}</span>'
         f'<span class="ips-ct-meta">{posted}</span>'
         f"{pin_html}"
         f"</{ot}>"
-        f'<h4 class="ips-ct-title ips-ct-title-compact">{title}</h4>'
-        f'<p class="ips-ct-body ips-ct-body-compact">{body}</p>'
         f"</{ot}>"
-        f"</{ot}>"
+        f'<h4 class="news-card-title ips-ct-title ips-ct-title-compact">{title}</h4>'
+        f'<p class="news-card-preview ips-ct-body ips-ct-body-compact">{body}</p>'
         f"</{ot}>"
     )
 
@@ -375,7 +373,7 @@ def render_dashboard_company_updates_section(
                     unsafe_allow_html=True,
                 )
                 st.markdown(
-                    '<span class="ips-ops-news-footer-marker" aria-hidden="true"></span>',
+                    '<span class="news-footer ips-ops-news-footer-marker" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
                 btn_open, btn_read = st.columns(2, gap="small")

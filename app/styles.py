@@ -12495,9 +12495,13 @@ body.ips-auth-login [data-testid="stVerticalBlockBorderWrapper"].st-key-ips_logi
   color: {TEXT_MUTED};
   line-height: 2.2;
 }}
-.st-key-dashboard_company_updates [data-testid="stHorizontalBlock"]:not(:first-of-type) {{
+.st-key-dashboard_company_updates [data-testid="stHorizontalBlock"]:not(:first-of-type):not(:has(.stButton)) {{
   margin-top: -0.15rem;
   margin-bottom: 0.75rem;
+}}
+.st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) [data-testid="stHorizontalBlock"] {{
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
 }}
 @media (max-width: 768px) {{
   .st-key-dashboard_company_updates {{
@@ -13687,7 +13691,7 @@ def inject_ops_dashboard_css() -> None:
     """Compact operations dashboard layout — KPI row, news, quick actions, activity grid."""
     st.markdown(
         """
-<style id="ips-ops-dashboard-v14">
+<style id="ips-ops-dashboard-v15">
 /* ── App shell: flex main beside sidebar (desktop only) ── */
 .stApp:has(.ips-ops-dashboard-marker) [data-testid="stAppViewContainer"] {
   width: 100% !important;
@@ -14010,17 +14014,60 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
 .st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) {
   display: flex !important;
   flex-direction: column !important;
-  gap: 0.35rem !important;
   border: 1px solid #e8edf4 !important;
   border-radius: 10px !important;
-  padding: 0.55rem 0.65rem !important;
-  margin-bottom: 0 !important;
-  background: #fafbfd !important;
+  padding: 0 !important;
+  margin-bottom: 0.5rem !important;
+  background: #ffffff !important;
   height: auto !important;
+  min-height: 140px !important;
   overflow: visible !important;
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
+  position: relative !important;
+}
+.st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) > [data-testid="stVerticalBlock"] {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  gap: 0 !important;
+  height: auto !important;
+  min-height: 100% !important;
+  width: 100% !important;
+}
+.st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) [data-testid="stElementContainer"]:has(.ips-ops-news-item-marker) {
+  display: none !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+.st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) [data-testid="stElementContainer"]:has(.ips-ct-feed-card-wrap),
+.st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) [data-testid="stElementContainer"]:has(.news-card) {
+  flex: 0 0 auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  position: static !important;
+  width: 100% !important;
+}
+.st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) [data-testid="stElementContainer"]:has(.ips-ops-news-footer-marker) + [data-testid="stElementContainer"],
+.st-key-dashboard_company_updates .news-footer {
+  display: flex !important;
+  flex-direction: column !important;
+  margin-top: auto !important;
+  padding: 10px 16px 16px !important;
+  border-top: 1px solid #e2e8f0 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  flex: 0 0 auto !important;
+  position: static !important;
+}
+.st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) [data-testid="stElementContainer"]:has(.ips-ops-news-footer-marker) {
+  display: none !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
 }
 .ips-ops-news-title {
   margin: 0;
@@ -14028,37 +14075,131 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   font-weight: 800;
   color: #0f172a;
 }
-.st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) [data-testid="stHorizontalBlock"] {
+.news-card,
+.st-key-dashboard_company_updates .news-card {
   display: flex !important;
-  justify-content: flex-end !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  padding: 16px 16px 0 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  position: static !important;
+  overflow: visible !important;
+}
+.news-card-head {
+  display: flex !important;
   align-items: center !important;
   gap: 10px !important;
-  margin-top: 0.25rem !important;
-  padding-top: 0.4rem !important;
-  border-top: 1px solid #eef2f7 !important;
   width: 100% !important;
 }
-.st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) [data-testid="column"] {
+.news-card-meta {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 0.25rem 0.45rem !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+}
+.news-card-title,
+.st-key-dashboard_company_updates .news-card-title {
+  margin: 0 !important;
+  font-size: 0.875rem !important;
+  font-weight: 800 !important;
+  line-height: 1.3 !important;
+  color: #0f172a !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+.news-card-preview,
+.st-key-dashboard_company_updates .news-card-preview,
+.st-key-dashboard_company_updates .ips-ct-body-compact {
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  margin-top: 6px !important;
+  margin-bottom: 12px !important;
+  line-height: 1.45 !important;
+  font-size: 0.8125rem !important;
+  color: #475569 !important;
+  width: 100% !important;
+  position: static !important;
+}
+.st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) [data-testid="stElementContainer"]:has(.ips-ops-news-footer-marker) + [data-testid="stElementContainer"] [data-testid="stHorizontalBlock"] {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 12px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  width: 100% !important;
+  position: static !important;
+  transform: none !important;
+  top: auto !important;
+  bottom: auto !important;
+}
+.st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) [data-testid="stElementContainer"]:has(.ips-ops-news-footer-marker) + [data-testid="stElementContainer"] [data-testid="column"] {
   flex: 0 0 auto !important;
   width: auto !important;
   min-width: 0 !important;
   max-width: none !important;
+  display: flex !important;
+  align-items: center !important;
+  position: static !important;
 }
-.st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) .stButton > button {
-  min-height: 30px !important;
-  height: 30px !important;
-  padding: 0 0.75rem !important;
-  font-size: 0.72rem !important;
+.st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) [data-testid="stElementContainer"]:has(.ips-ops-news-footer-marker) + [data-testid="stElementContainer"] [data-testid="column"]:first-child {
+  justify-content: flex-start !important;
+}
+.st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) [data-testid="stElementContainer"]:has(.ips-ops-news-footer-marker) + [data-testid="stElementContainer"] [data-testid="column"]:last-child {
+  justify-content: flex-end !important;
+  margin-left: auto !important;
+}
+.st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) [data-testid="stElementContainer"]:has(.ips-ops-news-footer-marker) + [data-testid="stElementContainer"] .stButton,
+.st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) [data-testid="stElementContainer"]:has(.ips-ops-news-footer-marker) + [data-testid="stElementContainer"] [data-testid="stVerticalBlock"],
+.st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) [data-testid="stElementContainer"]:has(.ips-ops-news-footer-marker) + [data-testid="stElementContainer"] [data-testid="stElementContainer"] {
+  position: static !important;
+  margin: 0 !important;
+  transform: none !important;
+  top: auto !important;
+  bottom: auto !important;
   width: auto !important;
-  min-width: 64px !important;
+}
+.st-key-dashboard_company_updates [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-ops-news-item-marker) [data-testid="stElementContainer"]:has(.ips-ops-news-footer-marker) + [data-testid="stElementContainer"] .stButton > button {
+  position: static !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 32px !important;
+  height: 32px !important;
+  max-height: 32px !important;
+  padding: 0 14px !important;
+  margin: 0 !important;
+  transform: none !important;
+  top: auto !important;
+  bottom: auto !important;
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
   white-space: nowrap !important;
+  overflow: visible !important;
 }
 .ips-ct-feed-card-wrap-compact {
   margin: 0 !important;
   width: 100% !important;
+  position: static !important;
 }
 .ips-ct-feed-card-compact,
-.ips-ct-feed-card-ultra {
+.ips-ct-feed-card-ultra,
+.st-key-dashboard_company_updates .ips-ct-feed-card-compact,
+.st-key-dashboard_company_updates .ips-ct-feed-card-ultra {
   padding: 0 !important;
   border-radius: 0 !important;
   min-height: 0 !important;
@@ -14070,21 +14211,13 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   background: transparent !important;
   display: flex !important;
   flex-direction: column !important;
+  position: static !important;
 }
 .ips-ct-avatar-sm {
-  width: 1.5rem !important;
-  height: 1.5rem !important;
-  font-size: 0.58rem !important;
+  width: 1.75rem !important;
+  height: 1.75rem !important;
+  font-size: 0.62rem !important;
   flex-shrink: 0;
-}
-.ips-ct-compact-top {
-  display: flex;
-  gap: 0.45rem;
-  align-items: flex-start;
-}
-.ips-ct-compact-body {
-  flex: 1 1 auto;
-  min-width: 0;
 }
 .ips-ct-compact-meta {
   display: flex;
@@ -14109,23 +14242,23 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   padding: 0.04rem 0.35rem;
 }
 .ips-ct-title-compact {
-  margin: 0.15rem 0 0 !important;
-  font-size: 0.8125rem !important;
+  margin: 0 !important;
+  font-size: 0.875rem !important;
   font-weight: 800 !important;
-  line-height: 1.25 !important;
+  line-height: 1.3 !important;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .ips-ct-body-compact {
-  margin: 0.1rem 0 0 !important;
-  font-size: 0.75rem !important;
-  line-height: 1.35 !important;
-  color: #475569 !important;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  margin: 0 !important;
+}
+.ips-ct-feed-card-unread.news-card {
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 72%) !important;
+}
+.ips-ct-feed-card-pinned.news-card {
+  border-left: 3px solid #2563eb !important;
+  padding-left: 13px !important;
 }
 
 /* ── Quick actions: 2×3 CSS grid ── */
