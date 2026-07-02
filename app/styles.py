@@ -913,7 +913,7 @@ def inject_jobs_module_css() -> None:
     """Jobs list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-jobs-module-v23">
+<style id="ips-jobs-module-v24">
 .ips-jobs-table-wrap,
 .ips-jobs-table-wrap.jobs-table {{
   background: #ffffff;
@@ -923,27 +923,27 @@ def inject_jobs_module_css() -> None:
   margin-bottom: 0.5rem;
 }}
 .ips-jobs-header-row {{
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
-  padding: 5px 10px;
-  font-size: 0.8125rem;
+  background: transparent;
+  border-bottom: none;
+  padding: 0;
+  font-size: 0.6875rem;
   font-weight: 800;
-  color: #334155;
+  color: #475569;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  min-height: 34px;
+  min-height: 0;
   display: flex;
   align-items: center;
   white-space: nowrap;
-  overflow: visible;
-  text-overflow: clip;
+  overflow: hidden;
+  text-overflow: ellipsis;
   line-height: 1.2;
 }}
 .ips-jobs-row {{
   background: #ffffff;
   border-bottom: 1px solid #e2e8f0;
-  padding: 4px 10px;
-  min-height: 44px;
+  padding: 2px 8px;
+  min-height: 48px;
 }}
 .ips-jobs-row:hover {{
   background: #f8fbff;
@@ -953,25 +953,26 @@ def inject_jobs_module_css() -> None:
 }}
 .ips-jobs-cell {{
   color: #0f172a;
-  font-size: 0.875rem;
-  font-weight: 700;
-  line-height: 1.3;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.2;
   min-width: 0;
 }}
 .ips-jobs-number {{
-  font-size: 0.875rem;
-  font-weight: 800;
+  font-size: 0.8125rem;
+  font-weight: 700;
   color: #2563eb;
-  line-height: 1.25;
+  line-height: 1.2;
   white-space: nowrap;
 }}
 .ips-jobs-title {{
-  font-size: 0.875rem;
-  font-weight: 800;
-  line-height: 1.3;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.2;
   word-break: normal;
-  overflow-wrap: anywhere;
-  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }}
 .ips-jobs-title-link,
 .job-project-link {{
@@ -1087,48 +1088,34 @@ def inject_jobs_module_css() -> None:
   margin: 0 !important;
 }}
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
-  background: #f8fafc;
-  min-height: 36px !important;
+  background: #eef2f7;
+  min-height: 32px !important;
+  max-height: 34px !important;
   height: auto !important;
-  padding: 5px 10px !important;
+  padding: 3px 8px !important;
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  box-shadow: 0 1px 0 #dbe3ef;
 }}
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) {{
   background: #ffffff !important;
   cursor: pointer;
-  min-height: 56px !important;
-  padding: 5px 10px !important;
+  min-height: 48px !important;
+  max-height: 52px !important;
+  padding: 2px 8px !important;
+}}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-row-even) {{
+  background: #f8fafc !important;
 }}
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover {{
-  background: #f8fbff !important;
+  background: #eff6ff !important;
 }}
-.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
-  background: #f8fbff;
-}}
-.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
-  background: #eaf2ff !important;
-}}
-/* Jobs list rows — vertically center all cell content */
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row),
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.job-row),
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.jobs-table-row) {{
   display: flex !important;
   align-items: center !important;
-}}
-@media (min-width: 768px) and (max-width: 1024px) {{
-  .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row),
-  .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.job-row),
-  .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.jobs-table-row) {{
-    min-height: 58px !important;
-    padding: 6px 10px !important;
-  }}
-}}
-@media (max-width: 767px) {{
-  .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row),
-  .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.job-row),
-  .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.jobs-table-row) {{
-    min-height: 56px !important;
-    padding: 6px 10px !important;
-  }}
 }}
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"],
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"] {{
@@ -1138,6 +1125,7 @@ def inject_jobs_module_css() -> None:
   justify-content: flex-start !important;
   min-height: 0 !important;
   height: auto !important;
+  min-width: 0 !important;
 }}
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"] > [data-testid="stVerticalBlock"],
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"] > [data-testid="stElementContainer"],
@@ -1173,11 +1161,13 @@ def inject_jobs_module_css() -> None:
 .ips-jobs-money {{
   display: flex !important;
   align-items: center !important;
+  justify-content: flex-end !important;
   min-height: 0 !important;
-  font-size: 0.875rem !important;
-  font-weight: 700 !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
   color: #0f172a !important;
   font-variant-numeric: tabular-nums;
+  text-align: right !important;
 }}
 .ips-jobs-money-empty {{
   color: #64748b !important;
@@ -1268,10 +1258,10 @@ def inject_jobs_module_css() -> None:
 }}
 .st-key-jobs_table_wrap .ips-jobs-title-link button,
 .st-key-jobs_table_wrap .job-project-link button {{
-  white-space: normal !important;
-  line-height: 1.3 !important;
-  word-break: normal !important;
-  overflow-wrap: anywhere !important;
+  white-space: nowrap !important;
+  line-height: 1.2 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }}
 .st-key-jobs_table_wrap .ips-jobs-table-link button:hover,
 .st-key-jobs_table_wrap .ips-jobs-table-link button:focus,
@@ -1310,7 +1300,7 @@ def inject_jobs_module_css() -> None:
   overflow: visible !important;
   display: flex !important;
   align-items: center !important;
-  justify-content: center !important;
+  justify-content: flex-end !important;
 }}
 .st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-actions-cell)
 [data-testid="column"]:has(.job-row-actions-menu) {{
@@ -1333,19 +1323,19 @@ def inject_jobs_module_css() -> None:
   flex-wrap: nowrap !important;
   align-items: center !important;
   justify-content: center !important;
-  min-height: 30px !important;
-  height: 30px !important;
-  min-width: 96px !important;
+  min-height: 28px !important;
+  height: 28px !important;
+  min-width: 84px !important;
   width: auto !important;
   max-width: none !important;
-  padding: 0 0.75rem !important;
+  padding: 0 0.55rem !important;
   border-radius: 8px !important;
   background: {PRIMARY} !important;
   border: 1px solid {PRIMARY} !important;
   box-shadow: 0 1px 2px rgba(37, 99, 235, 0.24) !important;
   color: #ffffff !important;
-  font-size: 0.875rem !important;
-  font-weight: 700 !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
   line-height: 1 !important;
   white-space: nowrap !important;
   word-break: keep-all !important;

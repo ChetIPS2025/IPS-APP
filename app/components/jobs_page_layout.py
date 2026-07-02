@@ -41,7 +41,7 @@ def _summary_money(value: float, *, has_data: bool) -> str:
 def inject_jobs_page_layout_css() -> None:
     st.markdown(
         """
-<style id="ips-jobs-page-layout-v5">
+<style id="ips-jobs-page-layout-v6">
 section[data-testid="stMain"]:has(.ips-jobs-page) {
   background: #ffffff !important;
 }
@@ -65,8 +65,185 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap [dat
 .ips-jobs-table-wrap.jobs-table {
   background: #ffffff;
   border: 1px solid #dbe3ef;
-  border-radius: 12px;
+  border-radius: 10px;
   overflow: hidden;
+}
+.st-key-jobs_table_wrap {
+  max-height: min(calc(100vh - 220px), 940px);
+  overflow: auto;
+  position: relative;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  background: #ffffff;
+}
+.st-key-jobs_table_wrap .ips-jobs-col-marker {
+  display: block !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"] {
+  gap: 0.25rem !important;
+}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) {
+  display: flex !important;
+  align-items: center !important;
+  min-height: 48px !important;
+  max-height: 52px !important;
+  padding: 2px 8px !important;
+  background: #ffffff !important;
+  border-bottom: 1px solid #e8edf4 !important;
+  transition: background-color 0.12s ease !important;
+  cursor: pointer;
+}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-row-even) {
+  background: #f8fafc !important;
+}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-row-odd) {
+  background: #ffffff !important;
+}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover {
+  background: #eff6ff !important;
+}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {
+  display: flex !important;
+  align-items: center !important;
+  background: #eef2f7 !important;
+  min-height: 32px !important;
+  max-height: 34px !important;
+  padding: 3px 8px !important;
+  cursor: default !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 12 !important;
+  box-shadow: 0 1px 0 #dbe3ef !important;
+  border-bottom: 1px solid #dbe3ef !important;
+}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:first-of-type .ips-jobs-header-row {
+  font-weight: 800 !important;
+  font-size: 0.6875rem !important;
+  color: #475569 !important;
+  letter-spacing: 0.05em !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+}
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"],
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"] {
+  display: flex !important;
+  align-items: center !important;
+  align-self: stretch !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: 0 2px !important;
+}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-num) {
+  flex: 0 0 90px !important;
+  max-width: 90px !important;
+  min-width: 90px !important;
+  justify-content: flex-start !important;
+}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-desc) {
+  flex: 1 1 180px !important;
+  min-width: 120px !important;
+  justify-content: flex-start !important;
+}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-customer) {
+  flex: 0 0 220px !important;
+  max-width: 220px !important;
+  min-width: 140px !important;
+  justify-content: flex-start !important;
+}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-status) {
+  flex: 0 0 96px !important;
+  max-width: 110px !important;
+  min-width: 88px !important;
+  justify-content: center !important;
+}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-contract),
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-estimated),
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-actual),
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-profit),
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-margin) {
+  flex: 0 0 92px !important;
+  max-width: 92px !important;
+  min-width: 80px !important;
+  justify-content: flex-end !important;
+}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-subjobs) {
+  flex: 0 0 52px !important;
+  max-width: 52px !important;
+  min-width: 44px !important;
+  justify-content: flex-end !important;
+}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-actions) {
+  flex: 0 0 92px !important;
+  max-width: 96px !important;
+  min-width: 88px !important;
+  justify-content: flex-end !important;
+}
+.ips-jobs-cell-truncate,
+.ips-jobs-customer-cell {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  display: block !important;
+}
+.ips-jobs-table-link.ips-jobs-cell-truncate {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+.ips-jobs-table-link.ips-jobs-cell-truncate button {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  display: block !important;
+  text-align: left !important;
+}
+.ips-jobs-col-money,
+.ips-jobs-col-subjobs {
+  justify-content: flex-end !important;
+  text-align: right !important;
+  width: 100% !important;
+}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-contract) .ips-jobs-header-row,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-estimated) .ips-jobs-header-row,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-actual) .ips-jobs-header-row,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-profit) .ips-jobs-header-row,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-margin) .ips-jobs-header-row,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-subjobs) .ips-jobs-header-row {
+  justify-content: flex-end !important;
+  text-align: right !important;
+  width: 100% !important;
+}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-status) .ips-jobs-header-row {
+  justify-content: center !important;
+  text-align: center !important;
+  width: 100% !important;
+}
+@media (max-width: 1280px) {
+  .st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-margin) {
+    display: none !important;
+  }
+}
+@media (max-width: 1100px) {
+  .st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-profit) {
+    display: none !important;
+  }
+}
+@media (max-width: 960px) {
+  .st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-estimated) {
+    display: none !important;
+  }
 }
 .ips-jobs-summary-cards {
   display: grid;
@@ -143,28 +320,6 @@ section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="column"]:has(.ip
   font-size: 0.8125rem !important;
   font-weight: 600 !important;
 }
-.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) {
-  display: flex !important;
-  align-items: center !important;
-  min-height: 56px !important;
-  padding: 5px 10px !important;
-  background: #ffffff !important;
-  border-bottom: 1px solid #e8edf4 !important;
-  transition: background-color 0.15s ease !important;
-  cursor: pointer;
-}
-@media (min-width: 768px) and (max-width: 1024px) {
-  .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) {
-    min-height: 58px !important;
-    padding: 6px 10px !important;
-  }
-}
-.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"] {
-  display: flex !important;
-  align-items: center !important;
-  align-self: stretch !important;
-  height: auto !important;
-}
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"] > [data-testid="stVerticalBlock"] {
   display: flex !important;
   flex-direction: column !important;
@@ -174,23 +329,6 @@ section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="column"]:has(.ip
   height: 100% !important;
   min-height: 100% !important;
   gap: 0 !important;
-}
-.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {
-  display: flex !important;
-  align-items: center !important;
-  background: #f8fafc !important;
-  min-height: 36px !important;
-  padding: 5px 10px !important;
-  cursor: default !important;
-}
-.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:first-of-type .ips-jobs-header-row {
-  font-weight: 800 !important;
-  font-size: 0.8125rem !important;
-  color: #334155 !important;
-  letter-spacing: 0.05em !important;
-}
-.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover {
-  background: #f8fbff !important;
 }
 .ips-jobs-table-row,
 .ips-jobs-row-marker,
@@ -223,13 +361,16 @@ section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="column"]:has(.ip
 }
 .ips-jobs-number-text,
 .job-number-link .ips-jobs-number-text {
-  font-weight: 800 !important;
+  font-weight: 700 !important;
   color: #2563eb !important;
-  font-size: 0.875rem;
-  line-height: 1.25;
+  font-size: 0.8125rem;
+  line-height: 1.2;
   cursor: pointer;
-  white-space: nowrap;
+  white-space: nowrap !important;
   display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover .ips-jobs-number-text {
   color: #1d4ed8 !important;
@@ -248,8 +389,8 @@ section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="column"]:has(.ip
 .st-key-jobs_table_wrap .job-project-link button {
   background: transparent !important;
   color: #2563eb !important;
-  font-weight: 800 !important;
-  font-size: 0.875rem !important;
+  font-weight: 700 !important;
+  font-size: 0.8125rem !important;
   border: none !important;
   box-shadow: none !important;
   padding: 0 !important;
@@ -263,12 +404,15 @@ section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="column"]:has(.ip
 .st-key-jobs_table_wrap .ips-jobs-number-link button,
 .st-key-jobs_table_wrap .job-number-link button {
   white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 .st-key-jobs_table_wrap .ips-jobs-title-link button,
 .st-key-jobs_table_wrap .job-project-link button {
-  white-space: normal !important;
-  line-height: 1.3 !important;
-  overflow-wrap: anywhere !important;
+  white-space: nowrap !important;
+  line-height: 1.2 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 .st-key-jobs_table_wrap .ips-jobs-table-link button:hover,
 .st-key-jobs_table_wrap .ips-jobs-table-link button:focus {
@@ -287,13 +431,14 @@ section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="column"]:has(.ip
 }
 .ips-jobs-title-text,
 .job-project-text {
-  font-weight: 800 !important;
+  font-weight: 700 !important;
   color: #2563eb !important;
-  font-size: 0.875rem !important;
+  font-size: 0.8125rem !important;
   word-break: normal !important;
-  overflow-wrap: anywhere !important;
-  white-space: normal !important;
-  line-height: 1.3 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  line-height: 1.2 !important;
   cursor: pointer !important;
 }
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover .ips-jobs-title-text,
@@ -314,15 +459,15 @@ section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="column"]:has(.ip
   align-items: center !important;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  font-size: 0.875rem;
-  font-weight: 700;
+  font-size: 0.8125rem;
+  font-weight: 600;
   color: #0f172a;
 }
 section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell),
 section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-actions-cell) {
   display: flex !important;
   align-items: center !important;
-  justify-content: center !important;
+  justify-content: flex-end !important;
 }
 section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-testid="column"]:has(.job-status-cell),
 section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-testid="column"]:has(.ips-job-status-pill) {
@@ -331,9 +476,9 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-
 }
 .ips-jobs-cell {
   color: #0f172a;
-  font-size: 0.875rem;
-  font-weight: 700;
-  line-height: 1.35;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.2;
 }
 .ips-jobs-money-empty {
   color: #64748b;
@@ -375,13 +520,14 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-
   color: #64748b;
 }
 .ips-job-status-pill {
-  min-height: 22px;
-  height: 22px;
-  padding: 0 10px;
-  font-size: 0.75rem;
-  font-weight: 800;
+  min-height: 20px;
+  height: 20px;
+  padding: 0 8px;
+  font-size: 0.6875rem;
+  font-weight: 700;
   border: 1px solid transparent;
   line-height: 1;
+  border-radius: 999px;
 }
 .ips-job-status-draft {
   background: #e2e8f0;
@@ -428,11 +574,18 @@ section[data-testid="stMain"]:has(.ips-job-status-badge-editor-marker) [data-tes
   font-weight: 700 !important;
   box-shadow: none !important;
 }
+section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell),
+section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-actions-cell) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+}
 section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"] {
-  min-width: 96px !important;
-  min-height: 30px !important;
-  height: 30px !important;
-  padding: 0 0.75rem !important;
+  min-width: 84px !important;
+  min-height: 28px !important;
+  height: 28px !important;
+  padding: 0 0.55rem !important;
+  font-size: 0.8125rem !important;
 }
 .ips-jobs-pagination-footer {
   margin-top: 0.85rem;
