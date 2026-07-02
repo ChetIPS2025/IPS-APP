@@ -20,7 +20,7 @@ except ImportError:
     from services.jobs_service import normalize_job_status  # type: ignore
     from services.tasks_service import count_open_subjobs_by_job_id  # type: ignore
 
-_DASH_JOB_COLS = [0.55, 2.35, 1.15, 0.68, 0.72, 0.72, 0.72, 0.72, 0.58, 0.42, 0.62]
+_DASH_JOB_COLS = [0.55, 2.35, 1.15, 0.68, 0.72, 0.72, 0.72, 0.72, 0.58, 0.42, 0.85]
 _DASH_JOB_COL_MARKERS = (
     "num",
     "desc",
