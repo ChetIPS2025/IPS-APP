@@ -49,14 +49,16 @@ def render_card(title: str = "", body_html: str = "") -> None:
 
 
 def render_ops_kpi_card(label: str, value: str, icon: str, icon_bg: str) -> None:
-    """Compact operations KPI tile — icon, bold value, small label."""
+    """Compact operations KPI tile — icon ring, bold value, small label (~80–90px)."""
     ot = "d" + "iv"
     st.markdown(
         f"""
 <{ot} class="ips-ops-kpi-card">
-  <{ot} class="ips-ops-kpi-icon" style="background:{icon_bg}">{icon}</{ot}>
-  <p class="ips-ops-kpi-value">{html.escape(value)}</p>
-  <p class="ips-ops-kpi-label">{html.escape(label)}</p>
+  <{ot} class="ips-ops-kpi-icon-ring" style="background:{icon_bg}">{icon}</{ot}>
+  <{ot} class="ips-ops-kpi-text">
+    <p class="ips-ops-kpi-value">{html.escape(value)}</p>
+    <p class="ips-ops-kpi-label">{html.escape(label)}</p>
+  </{ot}>
 </{ot}>
 """,
         unsafe_allow_html=True,

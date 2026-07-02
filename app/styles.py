@@ -13683,34 +13683,66 @@ def inject_ops_dashboard_css() -> None:
     """Compact operations dashboard layout — KPI row, news, quick actions, activity grid."""
     st.markdown(
         """
-<style id="ips-ops-dashboard">
+<style id="ips-ops-dashboard-v8">
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) {
+  background: #f1f5f9 !important;
+}
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stVerticalBlock"] {
-  gap: 0.35rem !important;
+  gap: 0.2rem !important;
+}
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"] {
+  margin-bottom: 0.08rem !important;
+}
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stVerticalBlock"] > div {
+  padding-left: 20px !important;
+  padding-right: 20px !important;
 }
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-header {
-  margin-bottom: 0.15rem !important;
+  margin-bottom: 0.08rem !important;
   padding-bottom: 0 !important;
 }
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-title {
-  font-size: 1.35rem !important;
+  font-size: 2.125rem !important;
+  font-weight: 800 !important;
   margin-bottom: 0 !important;
+  color: #0f172a !important;
+  letter-spacing: -0.02em;
 }
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle {
-  font-size: 0.88rem !important;
-  margin: 0.1rem 0 0 !important;
+  display: none !important;
+}
+.ips-ops-action-label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 0.12rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ips-ops-welcome {
+  margin: 0 0 0.2rem;
+  padding: 0.15rem 0 0.2rem;
+}
+.ips-ops-welcome-greet {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.25;
+}
+.ips-ops-welcome-meta {
+  margin: 0.12rem 0 0;
+  font-size: 0.8125rem;
+  color: #64748b;
+  line-height: 1.35;
 }
 
-.ips-ops-kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 0.45rem;
-  margin: 0.35rem 0 0.5rem;
-}
 .st-key-dashboard_ops_kpis {
-  margin: 0.25rem 0 0.45rem !important;
+  margin: 0.12rem 0 0.2rem !important;
 }
 .st-key-dashboard_ops_kpis [data-testid="stHorizontalBlock"] {
-  gap: 0.45rem !important;
+  gap: 0.35rem !important;
 }
 .st-key-dashboard_ops_kpis [data-testid="column"] {
   min-width: 0 !important;
@@ -13720,90 +13752,123 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
     flex-wrap: wrap !important;
   }
   .st-key-dashboard_ops_kpis [data-testid="column"] {
-    flex: 1 1 calc(33.333% - 0.45rem) !important;
-    min-width: calc(33.333% - 0.45rem) !important;
+    flex: 1 1 calc(33.333% - 0.35rem) !important;
+    min-width: calc(33.333% - 0.35rem) !important;
   }
 }
 @media (max-width: 768px) {
   .st-key-dashboard_ops_kpis [data-testid="column"] {
-    flex: 1 1 calc(50% - 0.45rem) !important;
-    min-width: calc(50% - 0.45rem) !important;
+    flex: 1 1 calc(50% - 0.35rem) !important;
+    min-width: calc(50% - 0.35rem) !important;
   }
 }
 .ips-ops-kpi-card {
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 0.55rem 0.65rem;
-  min-height: 72px;
+  border-radius: 11px;
+  padding: 0.4rem 0.45rem;
+  min-height: 84px;
+  max-height: 90px;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  transition: transform 0.12s ease, box-shadow 0.15s ease, border-color 0.12s ease;
 }
-.ips-ops-kpi-icon {
-  width: 1.65rem;
-  height: 1.65rem;
-  border-radius: 8px;
+.ips-ops-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.14);
+  border-color: #bfdbfe;
+}
+.ips-ops-kpi-icon-ring {
+  width: 2.25rem;
+  height: 2.25rem;
+  min-width: 2.25rem;
+  border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.85rem;
-  margin-bottom: 0.25rem;
+  font-size: 0.95rem;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+}
+.ips-ops-kpi-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 .ips-ops-kpi-value {
-  font-size: 1.05rem;
+  font-size: 1.12rem;
   font-weight: 800;
   color: #0f172a;
   margin: 0;
   line-height: 1.15;
+  font-variant-numeric: tabular-nums;
 }
 .ips-ops-kpi-label {
-  font-size: 0.65rem;
+  font-size: 0.68rem;
   font-weight: 600;
   color: #64748b;
-  margin: 0.12rem 0 0;
+  margin: 0.1rem 0 0;
   line-height: 1.2;
+}
+.ips-ops-kpi-card:nth-child(6) .ips-ops-kpi-value,
+.st-key-dashboard_ops_kpis [data-testid="column"]:nth-child(5) .ips-ops-kpi-value,
+.st-key-dashboard_ops_kpis [data-testid="column"]:nth-child(6) .ips-ops-kpi-value {
+  color: #15803d;
+}
+.st-key-dashboard_ops_kpis [data-testid="column"]:nth-child(4) .ips-ops-kpi-value {
+  color: #ea580c;
 }
 
 .st-key-dashboard_company_updates {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
-  border-radius: 12px !important;
-  padding: 0.55rem 0.65rem 0.45rem !important;
-  margin-bottom: 0.35rem !important;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05) !important;
+  border-radius: 11px !important;
+  padding: 0.4rem 0.45rem 0.35rem !important;
+  margin-bottom: 0.2rem !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05) !important;
 }
 .st-key-dashboard_company_updates [data-testid="stHorizontalBlock"]:first-of-type {
-  margin-bottom: 0.35rem !important;
+  margin-bottom: 0.2rem !important;
   padding-bottom: 0 !important;
   border-bottom: none !important;
 }
 .ips-ops-news-title {
   margin: 0;
-  font-size: 0.92rem;
+  font-size: 1.25rem;
   font-weight: 800;
   color: #0f172a;
 }
 .ips-ct-feed-card-wrap-compact {
-  margin: 0 0 0.15rem !important;
+  margin: 0 !important;
 }
-.ips-ct-feed-card-compact {
-  padding: 0.45rem 0.55rem !important;
+.ips-ct-feed-card-compact,
+.ips-ct-feed-card-ultra {
+  padding: 0.35rem 0.45rem !important;
   border-radius: 10px !important;
   min-height: 0 !important;
-  max-height: 148px;
+  max-height: 92px !important;
   overflow: hidden;
+  border: 1px solid #e8edf4 !important;
+  box-shadow: none !important;
+}
+.st-key-dashboard_company_updates [data-testid="stHorizontalBlock"]:has(.ips-ct-feed-card-wrap-compact) {
+  max-height: 120px;
+  overflow: hidden;
+  margin-bottom: 0.15rem !important;
+  align-items: center !important;
 }
 .ips-ct-avatar-sm {
-  width: 1.65rem !important;
-  height: 1.65rem !important;
-  font-size: 0.62rem !important;
+  width: 1.5rem !important;
+  height: 1.5rem !important;
+  font-size: 0.58rem !important;
 }
 .ips-ct-compact-top {
   display: flex;
-  gap: 0.45rem;
+  gap: 0.35rem;
   align-items: flex-start;
 }
 .ips-ct-compact-body {
@@ -13813,8 +13878,8 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
 .ips-ct-compact-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem 0.45rem;
-  align-items: baseline;
+  gap: 0.2rem 0.35rem;
+  align-items: center;
   font-size: 0.68rem;
 }
 .ips-ct-compact-meta .ips-ct-author {
@@ -13824,103 +13889,97 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
 .ips-ct-compact-meta .ips-ct-meta {
   color: #64748b;
 }
+.ips-ct-pin-badge {
+  font-size: 0.58rem !important;
+  font-weight: 700;
+  color: #2563eb;
+  background: #dbeafe;
+  border-radius: 999px;
+  padding: 0.04rem 0.35rem;
+}
 .ips-ct-title-compact {
-  margin: 0.15rem 0 0 !important;
-  font-size: 0.82rem !important;
+  margin: 0.1rem 0 0 !important;
+  font-size: 0.8125rem !important;
   font-weight: 800 !important;
-  line-height: 1.25 !important;
+  line-height: 1.2 !important;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .ips-ct-body-compact {
-  margin: 0.12rem 0 0 !important;
-  font-size: 0.72rem !important;
-  line-height: 1.35 !important;
+  margin: 0.08rem 0 0 !important;
+  font-size: 0.75rem !important;
+  line-height: 1.3 !important;
   color: #475569 !important;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.ips-ct-compact-foot {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin-top: 0.2rem;
-}
-.ips-ct-cat-pill-sm {
-  font-size: 0.58rem !important;
-  padding: 0.06rem 0.35rem !important;
-}
-.ips-ct-pin-inline {
-  font-size: 0.72rem;
-  line-height: 1;
+.st-key-dashboard_company_updates [data-testid="column"]:has(.ips-ct-dash-actions-marker) [data-testid="stVerticalBlock"] {
+  gap: 0.2rem !important;
 }
 .st-key-dashboard_company_updates .stButton > button {
-  min-height: 30px !important;
-  height: 30px !important;
-  padding: 0 0.5rem !important;
-  font-size: 0.72rem !important;
-}
-.st-key-dashboard_company_updates [data-testid="stHorizontalBlock"]:not(:first-of-type) {
-  margin-top: -0.15rem !important;
-  margin-bottom: 0.25rem !important;
+  min-height: 26px !important;
+  height: 26px !important;
+  padding: 0 0.4rem !important;
+  font-size: 0.68rem !important;
 }
 
 .st-key-dashboard_ops_quick_actions {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
-  border-radius: 12px !important;
-  padding: 0.55rem 0.6rem 0.5rem !important;
-  margin-bottom: 0.35rem !important;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05) !important;
+  border-radius: 11px !important;
+  padding: 0.4rem 0.45rem 0.4rem !important;
+  margin-bottom: 0.2rem !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05) !important;
 }
 .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"] {
-  gap: 0.35rem !important;
+  gap: 0.3rem !important;
 }
 .ips-ops-qa-title {
-  margin: 0 0 0.35rem;
-  font-size: 0.92rem;
+  margin: 0 0 0.25rem;
+  font-size: 1.25rem;
   font-weight: 800;
   color: #0f172a;
 }
 .st-key-dashboard_ops_quick_actions .stButton > button {
-  min-height: 38px !important;
+  min-height: 52px !important;
   height: auto !important;
-  padding: 0.35rem 0.55rem !important;
-  background: #2563eb !important;
-  border: 1px solid #1d4ed8 !important;
-  border-radius: 8px !important;
+  padding: 0.35rem 0.4rem !important;
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%) !important;
+  border: 1px solid #1e40af !important;
+  border-radius: 10px !important;
   color: #ffffff !important;
   font-weight: 700 !important;
-  font-size: 0.78rem !important;
-  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.25) !important;
+  font-size: 0.75rem !important;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.28) !important;
   transition: background 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease !important;
 }
 .st-key-dashboard_ops_quick_actions .stButton > button:hover {
-  background: #1d4ed8 !important;
-  border-color: #1e40af !important;
+  background: linear-gradient(180deg, #1d4ed8 0%, #1e3a8a 100%) !important;
   transform: translateY(-1px);
-  box-shadow: 0 3px 8px rgba(37, 99, 235, 0.28) !important;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.32) !important;
 }
 .st-key-dashboard_ops_quick_actions .stButton > button p {
-  font-size: 0.78rem !important;
+  font-size: 0.75rem !important;
   font-weight: 700 !important;
-  white-space: nowrap !important;
+  white-space: pre-line !important;
+  line-height: 1.25 !important;
+  text-align: center !important;
 }
 
 .ips-ops-section-title {
-  margin: 0.35rem 0 0.3rem;
-  font-size: 0.92rem;
+  margin: 0.2rem 0 0.15rem;
+  font-size: 1.25rem;
   font-weight: 800;
   color: #0f172a;
 }
 .ips-ops-activity-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.4rem;
-  margin-bottom: 0.35rem;
+  gap: 0.35rem;
+  margin-bottom: 0.2rem;
 }
 @media (max-width: 1100px) {
   .ips-ops-activity-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -13928,40 +13987,71 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
 @media (max-width: 640px) {
   .ips-ops-activity-grid { grid-template-columns: 1fr; }
 }
-.ips-ops-activity-card {
+.ips-ops-widget {
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 0.45rem 0.55rem;
-  min-height: 88px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  border-radius: 11px;
+  padding: 0.4rem 0.45rem;
+  min-height: 108px;
+  max-height: 128px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
+  display: flex;
+  flex-direction: column;
 }
-.ips-ops-activity-title {
-  margin: 0 0 0.25rem;
-  font-size: 0.72rem;
-  font-weight: 800;
+.ips-ops-widget-head {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.2rem;
+  flex-shrink: 0;
+}
+.ips-ops-widget-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 8px;
+  background: #eff6ff;
   color: #2563eb;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  flex-shrink: 0;
 }
-.ips-ops-activity-list {
+.ips-ops-widget-title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+}
+.ips-ops-widget-list {
   list-style: none;
   margin: 0;
   padding: 0;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  max-height: 88px;
 }
-.ips-ops-activity-item {
-  font-size: 0.72rem;
+.ips-ops-widget-item {
+  font-size: 0.8125rem;
   color: #334155;
   line-height: 1.35;
-  padding: 0.08rem 0;
+  padding: 0.06rem 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.ips-ops-activity-empty {
-  font-size: 0.72rem;
+.ips-ops-widget-empty {
+  font-size: 0.8125rem;
   color: #94a3b8;
   font-style: italic;
+}
+.ips-ops-activity-card,
+.ips-ops-activity-title,
+.ips-ops-activity-list,
+.ips-ops-activity-item,
+.ips-ops-activity-empty {
+  /* legacy aliases */
 }
 
 .st-key-dashboard_management_reminders {

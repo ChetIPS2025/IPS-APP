@@ -1022,20 +1022,22 @@ def inject_dashboard_active_jobs_table_css() -> None:
     """Scope jobs list table styling to the dashboard Active Jobs panel."""
     st.markdown(
         """
-<style id="ips-dashboard-active-jobs-table">
+<style id="ips-dashboard-active-jobs-table-v2">
 .st-key-dashboard_active_jobs_table {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
-  border-radius: 12px !important;
-  padding: 0.45rem 0.55rem 0.5rem !important;
-  margin-bottom: 0.35rem !important;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05) !important;
+  border-radius: 11px !important;
+  padding: 0.35rem 0.4rem 0.4rem !important;
+  margin-bottom: 0.2rem !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06) !important;
 }
 .ips-ops-jobs-table-title {
   margin: 0 !important;
+  font-size: 1.25rem !important;
+  font-weight: 800 !important;
 }
 .st-key-dashboard_active_jobs_table .ips-dash-jobs-table {
-  max-height: min(340px, 42vh);
+  max-height: min(420px, 48vh);
   overflow: auto;
   border: 1px solid #dbe3ef;
   border-radius: 10px;
@@ -1054,24 +1056,26 @@ def inject_dashboard_active_jobs_table_css() -> None:
 }
 .st-key-dashboard_active_jobs_table [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) {
   border-bottom: 1px solid #eef2f7;
-  min-height: 34px;
+  min-height: 42px !important;
+  max-height: 44px !important;
   align-items: center !important;
 }
 .st-key-dashboard_active_jobs_table [data-testid="stHorizontalBlock"]:has(.ips-jobs-row-even) {
-  background: #fafbfd;
+  background: #f8fafc;
 }
 .st-key-dashboard_active_jobs_table [data-testid="stHorizontalBlock"]:has(.ips-jobs-row-odd) {
   background: #ffffff;
 }
 .st-key-dashboard_active_jobs_table [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover {
-  background: #f0f6ff !important;
+  background: #eff6ff !important;
 }
 .st-key-dashboard_active_jobs_table [data-testid="stHorizontalBlock"]:first-of-type {
   position: sticky;
   top: 0;
-  z-index: 2;
-  background: #f8fafc !important;
+  z-index: 4;
+  background: #eef2f7 !important;
   border-bottom: 1px solid #dbe3ef !important;
+  box-shadow: 0 1px 0 #dbe3ef;
 }
 .st-key-dashboard_active_jobs_table [data-testid="stHorizontalBlock"]:first-of-type .ips-jobs-header-row {
   font-size: 0.62rem !important;
@@ -1079,18 +1083,50 @@ def inject_dashboard_active_jobs_table_css() -> None:
   letter-spacing: 0.04em;
   color: #64748b !important;
   text-transform: uppercase;
-  padding: 0.35rem 0.2rem !important;
+  padding: 0.25rem 0.15rem !important;
 }
 .st-key-dashboard_active_jobs_table [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"],
 .st-key-dashboard_active_jobs_table [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"] {
-  padding: 0 0.15rem !important;
+  padding: 0 0.12rem !important;
   min-width: 0 !important;
+}
+.st-key-dashboard_active_jobs_table [data-testid="column"]:has(.ips-jobs-col-num) {
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 3 !important;
+  background: inherit !important;
+  box-shadow: 1px 0 0 #eef2f7;
+}
+.st-key-dashboard_active_jobs_table [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-jobs-col-num) {
+  z-index: 5 !important;
+  background: #eef2f7 !important;
+}
+.st-key-dashboard_active_jobs_table [data-testid="column"]:has(.ips-jobs-col-actions),
+.st-key-dashboard_active_jobs_table [data-testid="column"]:has(.job-actions-cell) {
+  position: sticky !important;
+  right: 0 !important;
+  z-index: 3 !important;
+  background: inherit !important;
+  box-shadow: -1px 0 0 #eef2f7;
+}
+.st-key-dashboard_active_jobs_table [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-jobs-col-actions) {
+  z-index: 5 !important;
+  background: #eef2f7 !important;
 }
 .st-key-dashboard_active_jobs_table .ips-jobs-cell,
 .st-key-dashboard_active_jobs_table .ips-jobs-money {
-  font-size: 0.78rem !important;
+  font-size: 0.8125rem !important;
   line-height: 1.25 !important;
   color: #0f172a;
+}
+.st-key-dashboard_active_jobs_table .ips-jobs-money-positive,
+.st-key-dashboard_active_jobs_table .ips-jobs-col-money:not(.ips-jobs-money-empty) {
+  color: #15803d !important;
+  font-weight: 700 !important;
+}
+.st-key-dashboard_active_jobs_table .ips-jobs-money-negative {
+  color: #ea580c !important;
+  font-weight: 700 !important;
 }
 .st-key-dashboard_active_jobs_table .ips-jobs-cell-truncate button {
   max-width: 100%;

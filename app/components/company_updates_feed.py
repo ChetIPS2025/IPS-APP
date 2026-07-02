@@ -185,14 +185,12 @@ def _is_update_unread(row: dict[str, Any]) -> bool:
 
 
 def connecteam_feed_card_compact_html(row: dict[str, Any]) -> str:
-    """Compact dashboard announcement card (~120–150px)."""
+    """Ultra-compact dashboard announcement card (max ~120px)."""
     ot = "d" + "iv"
-    normalized = _normalize_dashboard_category(row.get("category"))
-    display_cat = _display_category(_raw_category_for_display(normalized))
     author = _author_label(row)
     initials = html.escape(_author_initials(author))
     title = html.escape(str(row.get("title") or "Untitled"))
-    body = html.escape(_snippet(str(row.get("body") or ""), max_len=120))
+    body = html.escape(_snippet(str(row.get("body") or ""), max_len=90))
     posted = html.escape(_relative_posted_label(row))
     author_esc = html.escape(author)
     is_pinned = bool(row.get("pinned"))
@@ -202,31 +200,24 @@ def connecteam_feed_card_compact_html(row: dict[str, Any]) -> str:
     if is_pinned:
         card_cls += " ips-ct-feed-card-pinned"
 
-    bg, fg, border = {
-        "Announcements": ("#dbeafe", "#1d4ed8", "#bfdbfe"),
-        "Safety Alerts": ("#fee2e2", "#b91c1c", "#fecaca"),
-        "Events": ("#dcfce7", "#15803d", "#bbf7d0"),
-        "HR Updates": ("#f3e8ff", "#6d28d9", "#e9d5ff"),
-    }.get(display_cat, ("#f1f5f9", "#475569", "#e2e8f0"))
-
-    pin_html = '<span class="ips-ct-pin ips-ct-pin-inline">📌</span>' if is_pinned else ""
+    pin_html = (
+        '<span class="ips-ct-pin ips-ct-pin-inline ips-ct-pin-badge">📌 Pinned</span>'
+        if is_pinned
+        else ""
+    )
 
     return (
-        f'<{ot} class="ips-ct-feed-card ips-ct-feed-card-compact{card_cls}">'
+        f'<{ot} class="ips-ct-feed-card ips-ct-feed-card-compact ips-ct-feed-card-ultra{card_cls}">'
         f'<{ot} class="ips-ct-compact-top">'
         f'<{ot} class="ips-ct-avatar ips-ct-avatar-sm" aria-hidden="true">{initials}</{ot}>'
         f'<{ot} class="ips-ct-compact-body">'
         f'<{ot} class="ips-ct-compact-meta">'
         f'<span class="ips-ct-author">{author_esc}</span>'
         f'<span class="ips-ct-meta">{posted}</span>'
+        f"{pin_html}"
         f"</{ot}>"
         f'<h4 class="ips-ct-title ips-ct-title-compact">{title}</h4>'
         f'<p class="ips-ct-body ips-ct-body-compact">{body}</p>'
-        f'<{ot} class="ips-ct-compact-foot">'
-        f'<span class="ips-ct-cat-pill ips-ct-cat-pill-sm" style="background:{bg};color:{fg};border:1px solid {border};">'
-        f"{html.escape(display_cat)}</span>"
-        f"{pin_html}"
-        f"</{ot}>"
         f"</{ot}>"
         f"</{ot}>"
         f"</{ot}>"
@@ -367,14 +358,16 @@ def render_dashboard_company_updates_section(
 
         for row in display_rows:
             uid = str(row.get("id") or "").strip()
-            st.markdown(
-                f'<{ot} class="ips-ct-feed-card-wrap ips-ct-feed-card-wrap-compact">'
-                f"{connecteam_feed_card_compact_html(row)}"
-                f"</{ot}>",
-                unsafe_allow_html=True,
-            )
-            act1, act2 = st.columns(2, gap="small")
-            with act1:
+            card_col, act_col = st.columns([4.2, 1.3], gap="small", vertical_alignment="center")
+            with card_col:
+                st.markdown(
+                    f'<{ot} class="ips-ct-feed-card-wrap ips-ct-feed-card-wrap-compact">'
+                    f"{connecteam_feed_card_compact_html(row)}"
+                    f"</{ot}>",
+                    unsafe_allow_html=True,
+                )
+            with act_col:
+                st.markdown('<span class="ips-ct-dash-actions-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
                 if uid and st.button(
                     "Open",
                     key=f"ips_dash_cu_open_{uid}",
@@ -383,7 +376,6 @@ def render_dashboard_company_updates_section(
                 ):
                     _mark_dashboard_update_read(uid)
                     _open_company_update(uid)
-            with act2:
                 if uid and _is_update_unread(row):
                     if st.button(
                         "Mark read",

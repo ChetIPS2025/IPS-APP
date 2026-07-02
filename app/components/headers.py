@@ -201,27 +201,35 @@ def render_ops_quick_action_tiles(
     key_prefix: str = "ips_ops_qa",
     title: str = "Quick Actions",
 ) -> None:
-    """Vertical stack of primary blue action tiles for the operations dashboard."""
+    """Two-column grid of primary action tiles for the operations dashboard."""
     with st.container(key="dashboard_ops_quick_actions"):
         st.markdown(
             f'<p class="ips-ops-qa-title">{html.escape(title)}</p>',
             unsafe_allow_html=True,
         )
-        for idx, (icon, label, slug) in enumerate(actions):
-            btn_label = f"{icon}  {label}"
-            if st.button(
-                btn_label,
-                key=f"{key_prefix}_{idx}",
-                type="primary",
-                use_container_width=True,
-            ):
-                if slug:
-                    try:
-                        from app.navigation import set_nav_slug
-                    except ImportError:
-                        from navigation import set_nav_slug  # type: ignore
-                    set_nav_slug(slug)
-                    st.rerun()
+        row_size = 2
+        for row_start in range(0, len(actions), row_size):
+            cols = st.columns(row_size, gap="small")
+            for j, col in enumerate(cols):
+                idx = row_start + j
+                if idx >= len(actions):
+                    break
+                icon, label, slug = actions[idx]
+                with col:
+                    btn_label = f"{icon}\n{label}"
+                    if st.button(
+                        btn_label,
+                        key=f"{key_prefix}_{idx}",
+                        type="primary",
+                        use_container_width=True,
+                    ):
+                        if slug:
+                            try:
+                                from app.navigation import set_nav_slug
+                            except ImportError:
+                                from navigation import set_nav_slug  # type: ignore
+                            set_nav_slug(slug)
+                            st.rerun()
 
 
 def render_dashboard_quick_actions(

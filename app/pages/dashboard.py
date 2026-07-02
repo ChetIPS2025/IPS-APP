@@ -123,18 +123,73 @@ def _employees_working_today() -> int:
     )
 
 
-def _activity_card_html(title: str, lines: list[str], *, empty: str = "Nothing scheduled") -> str:
+def _time_greeting() -> str:
+    try:
+        from datetime import datetime
+
+        hour = datetime.now().hour
+    except Exception:
+        hour = 12
+    if hour < 12:
+        return "Good Morning"
+    if hour < 17:
+        return "Good Afternoon"
+    return "Good Evening"
+
+
+def _today_display_label() -> str:
+    d = date.today()
+    return d.strftime("%A, %B %d").replace(" 0", " ")
+
+
+def _ops_welcome_html(*, employees: int, active_jobs: int) -> str:
     ot = "d" + "iv"
-    if lines:
-        items = "".join(f'<li class="ips-ops-activity-item">{line}</li>' for line in lines)
-    else:
-        items = f'<li class="ips-ops-activity-empty">{html.escape(empty)}</li>'
+    name = html.escape(_welcome_name())
+    greet = html.escape(_time_greeting())
+    today = html.escape(_today_display_label())
     return (
-        f'<{ot} class="ips-ops-activity-card">'
-        f'<p class="ips-ops-activity-title">{html.escape(title)}</p>'
-        f'<ul class="ips-ops-activity-list">{items}</ul>'
+        f'<{ot} class="ips-ops-welcome">'
+        f'<p class="ips-ops-welcome-greet">{greet}, {name} 👋</p>'
+        f'<p class="ips-ops-welcome-meta">'
+        f"Today is {today} · {employees:,} employees working · {active_jobs:,} active jobs"
+        f"</p>"
         f"</{ot}>"
     )
+
+
+def _activity_widget_html(
+    icon: str,
+    title: str,
+    lines: list[str],
+    *,
+    empty: str = "Nothing scheduled",
+) -> str:
+    ot = "d" + "iv"
+    if lines:
+        items = "".join(f'<li class="ips-ops-widget-item">{line}</li>' for line in lines)
+    else:
+        items = f'<li class="ips-ops-widget-empty">{html.escape(empty)}</li>'
+    return (
+        f'<{ot} class="ips-ops-widget">'
+        f'<{ot} class="ips-ops-widget-head">'
+        f'<span class="ips-ops-widget-icon">{html.escape(icon)}</span>'
+        f'<p class="ips-ops-widget-title">{html.escape(title)}</p>'
+        f"</{ot}>"
+        f'<ul class="ips-ops-widget-list">{items}</ul>'
+        f"</{ot}>"
+    )
+
+
+def _activity_card_html(title: str, lines: list[str], *, empty: str = "Nothing scheduled") -> str:
+    icon_map = {
+        "Today's Scheduled Jobs": "📅",
+        "Employees Clocked In": "👷",
+        "Recent Job Updates": "💼",
+        "Recent Time Entries": "⏱",
+        "Recent Documents": "📎",
+        "Recent Estimates": "📋",
+    }
+    return _activity_widget_html(icon_map.get(title, "•"), title, lines, empty=empty)
 
 
 def _today_iso() -> str:
@@ -259,14 +314,17 @@ def _render_todays_activity() -> None:
     ot = "d" + "iv"
     st.markdown('<p class="ips-ops-section-title">Today\'s Activity</p>', unsafe_allow_html=True)
     panels = [
-        ("Today's Scheduled Jobs", _jobs_scheduled_today(), "No jobs scheduled today"),
-        ("Employees Clocked In", _employees_clocked_in_lines(), "No time logged this week"),
-        ("Recent Job Updates", _recent_job_update_lines(), "No recent job activity"),
-        ("Recent Time Entries", _recent_time_entry_lines(), "No time entries"),
-        ("Recent Documents", _recent_document_lines(), "No recent documents"),
-        ("Recent Estimates", _recent_estimate_lines(), "No recent estimates"),
+        ("📅", "Today's Jobs", _jobs_scheduled_today(), "No jobs scheduled today"),
+        ("👷", "Employees Clocked In", _employees_clocked_in_lines(), "No time logged this week"),
+        ("💼", "Recent Job Updates", _recent_job_update_lines(), "No recent job activity"),
+        ("⏱", "Recent Time Entries", _recent_time_entry_lines(), "No time entries"),
+        ("📎", "Recent Documents", _recent_document_lines(), "No recent documents"),
+        ("📋", "Recent Estimates", _recent_estimate_lines(), "No recent estimates"),
     ]
-    cards = "".join(_activity_card_html(title, lines, empty=empty) for title, lines, empty in panels)
+    cards = "".join(
+        _activity_widget_html(icon, title, lines, empty=empty)
+        for icon, title, lines, empty in panels
+    )
     st.markdown(f'<{ot} class="ips-ops-activity-grid">{cards}</{ot}>', unsafe_allow_html=True)
 
 
@@ -286,6 +344,7 @@ def render() -> None:
     start, end = _date_range_state()
 
     def _dash_period() -> None:
+        st.markdown('<span class="ips-ops-action-label">📅 Date Range</span>', unsafe_allow_html=True)
         dr = st.date_input(
             "Period",
             value=(start, end),
@@ -296,16 +355,28 @@ def render() -> None:
             st.session_state["ips_dash_date_start"] = dr[0]
             st.session_state["ips_dash_date_end"] = dr[1]
 
+    def _dash_refresh() -> None:
+        if st.button("🔄 Refresh", key="ips_dash_refresh", use_container_width=True):
+            st.rerun()
+
     def _dash_customize() -> None:
-        st.button("Customize", key="ips_dash_customize", use_container_width=True)
+        if st.button("⚙ Customize", key="ips_dash_customize", use_container_width=True):
+            pass
 
     render_page_brand_header(
         "Operations Dashboard",
-        f"Welcome back, {_welcome_name()}!",
-        actions=[_dash_period, _dash_customize],
+        actions=[_dash_period, _dash_refresh, _dash_customize],
+        actions_column_ratio=(1.5, 2.5),
     )
 
     kpis = load_dashboard_kpis(period_start=start, period_end=end)
+    employees_today = _employees_working_today()
+    active_jobs_count = int(kpis.get("active_jobs", 0))
+    st.markdown(
+        _ops_welcome_html(employees=employees_today, active_jobs=active_jobs_count),
+        unsafe_allow_html=True,
+    )
+
     kpis_live = bool(kpis.get("is_live"))
     if not kpis_live:
         st.markdown(
@@ -318,7 +389,7 @@ def render() -> None:
         for col, label, value, icon, bg in [
             (k1, "Active Jobs", str(kpis.get("active_jobs", 0)), "💼", "#ffedd5"),
             (k2, "Estimates Pending", str(kpis.get("open_estimates", 0)), "📋", "#f3e8ff"),
-            (k3, "Employees Working Today", str(_employees_working_today()), "👷", "#dcfce7"),
+            (k3, "Employees Working Today", str(employees_today), "👷", "#dcfce7"),
             (k4, "Open Tasks", str(_count_open_tasks()), "✅", "#e0f2fe"),
             (k5, "Open Invoices", fmt_currency(kpis.get("open_invoices", 0)), "🧾", "#dbeafe"),
             (k6, "Revenue This Month", fmt_currency(kpis.get("total_sales", 0)), "💵", "#fef3c7"),
@@ -335,9 +406,9 @@ def render() -> None:
     with qa_col:
         render_ops_quick_action_tiles(
             [
-                ("💼", "+ New Job", "jobs"),
-                ("📋", "+ New Estimate", "estimates"),
-                ("👥", "+ New Customer", "customers"),
+                ("💼", "+ Job", "jobs"),
+                ("📋", "+ Estimate", "estimates"),
+                ("👥", "+ Customer", "customers"),
                 ("📊", "Daily Report", "field_daily_reports"),
                 ("⏱", "Time Entry", "timekeeping"),
                 ("📦", "Inventory", "inventory"),
@@ -347,9 +418,10 @@ def render() -> None:
 
     _render_todays_activity()
 
-    render_dashboard_active_jobs_table(load_awarded_jobs(), limit=10)
+    render_dashboard_active_jobs_table(load_awarded_jobs(), limit=12)
 
-    render_dashboard_management_reminders_section(limit=4)
+    with st.expander("Office To-Do & More", expanded=False):
+        render_dashboard_management_reminders_section(limit=4)
 
     with st.expander("Analytics & Reports", expanded=False):
         st.markdown(f'<{ot} class="ips-ops-expander">', unsafe_allow_html=True)
