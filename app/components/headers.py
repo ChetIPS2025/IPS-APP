@@ -204,8 +204,11 @@ def render_ops_quick_action_tiles(
     """Two-column grid of primary action tiles for the operations dashboard."""
     with st.container(key="dashboard_ops_quick_actions"):
         st.markdown(
-            f'<p class="ips-ops-qa-title">{html.escape(title)}</p>'
-            f'<span class="quick-actions-grid-marker" aria-hidden="true"></span>',
+            f'<p class="ips-ops-qa-title">{html.escape(title)}</p>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            '<span class="quick-actions-grid-marker" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
         for idx, (icon, label, slug) in enumerate(actions):

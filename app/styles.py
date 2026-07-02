@@ -13691,7 +13691,7 @@ def inject_ops_dashboard_css() -> None:
     """Compact operations dashboard layout — KPI row, news, quick actions, activity grid."""
     st.markdown(
         """
-<style id="ips-ops-dashboard-v15">
+<style id="ips-ops-dashboard-v16">
 /* ── App shell: flex main beside sidebar (desktop only) ── */
 .stApp:has(.ips-ops-dashboard-marker) [data-testid="stAppViewContainer"] {
   width: 100% !important;
@@ -14266,7 +14266,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
   border-radius: 11px !important;
-  padding: 0.75rem !important;
+  padding: 20px !important;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05) !important;
   width: 100% !important;
   max-width: 100% !important;
@@ -14275,6 +14275,14 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   overflow: visible !important;
   box-sizing: border-box !important;
 }
+.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlockBorderWrapper"] {
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
 .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlockBorderWrapper"],
 .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"] {
   width: 100% !important;
@@ -14282,25 +14290,49 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   min-width: 0 !important;
   height: auto !important;
   overflow: visible !important;
+  gap: 0 !important;
 }
 .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlockBorderWrapper"] > [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker),
 .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker),
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker),
 .quick-actions-grid {
   display: grid !important;
-  grid-template-columns: repeat(2, minmax(140px, 1fr)) !important;
-  gap: 12px 18px !important;
+  grid-template-columns: repeat(2, minmax(160px, 1fr)) !important;
+  column-gap: 18px !important;
+  row-gap: 16px !important;
   align-items: stretch !important;
+  justify-items: stretch !important;
   width: 100% !important;
   box-sizing: border-box !important;
+  position: static !important;
+  transform: none !important;
 }
 .st-key-dashboard_ops_quick_actions [data-testid="stElementContainer"]:has(.ips-ops-qa-title) {
   grid-column: 1 / -1 !important;
   margin: 0 !important;
   padding: 0 !important;
+  width: 100% !important;
+  position: static !important;
+}
+.st-key-dashboard_ops_quick_actions [data-testid="stElementContainer"]:has(.quick-actions-grid-marker) {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  grid-column: 1 / -1 !important;
 }
 .quick-actions-grid-marker {
   display: none !important;
+}
+.st-key-dashboard_ops_quick_actions [data-testid="stElementContainer"] {
+  margin: 0 !important;
+  padding: 0 !important;
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  transform: none !important;
 }
 .st-key-dashboard_ops_quick_actions [data-testid="stElementContainer"]:has(.stButton),
 .st-key-dashboard_ops_quick_actions [data-testid="stElementContainer"]:has([data-testid="stButton"]) {
@@ -14309,16 +14341,27 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_o
   position: static !important;
   top: auto !important;
   left: auto !important;
+  transform: none !important;
   width: 100% !important;
   min-width: 0 !important;
   height: auto !important;
   overflow: visible !important;
+  display: block !important;
+}
+.st-key-dashboard_ops_quick_actions [data-testid="stElementContainer"]:has(.stButton) [data-testid="stVerticalBlock"],
+.st-key-dashboard_ops_quick_actions [data-testid="stElementContainer"]:has([data-testid="stButton"]) [data-testid="stVerticalBlock"] {
+  gap: 0 !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 .ips-ops-qa-title {
-  margin: 0 0 0.15rem;
+  margin: 0 0 18px 0 !important;
+  padding: 0 !important;
   font-size: 1.25rem;
   font-weight: 800;
   color: #0f172a;
+  line-height: 1.2;
 }
 .st-key-dashboard_ops_quick_actions .stButton,
 .st-key-dashboard_ops_quick_actions [data-testid="stButton"] {
@@ -14327,6 +14370,9 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_o
   margin: 0 !important;
   padding: 0 !important;
   position: static !important;
+  top: auto !important;
+  left: auto !important;
+  transform: none !important;
   display: block !important;
 }
 .st-key-dashboard_ops_quick_actions .stButton > button,
@@ -14334,9 +14380,9 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_o
 .quick-action-button,
 .quick-action-tile {
   width: 100% !important;
-  min-height: 44px !important;
-  height: 44px !important;
-  max-height: 44px !important;
+  min-height: 42px !important;
+  height: 42px !important;
+  max-height: 42px !important;
   border-radius: 10px !important;
   display: flex !important;
   flex-direction: row !important;
@@ -14348,13 +14394,14 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_o
   position: static !important;
   top: auto !important;
   left: auto !important;
+  bottom: auto !important;
   margin: 0 !important;
-  padding: 0 0.5rem !important;
+  padding: 0 16px !important;
   background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%) !important;
   border: 1px solid #1e40af !important;
   color: #ffffff !important;
   font-weight: 700 !important;
-  font-size: 0.75rem !important;
+  font-size: 0.8125rem !important;
   box-shadow: 0 2px 6px rgba(37, 99, 235, 0.28) !important;
   transition: background 0.15s ease, box-shadow 0.15s ease !important;
   transform: none !important;
@@ -14367,7 +14414,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_o
 }
 .st-key-dashboard_ops_quick_actions .stButton > button p,
 .st-key-dashboard_ops_quick_actions [data-testid="stButton"] > button p {
-  font-size: 0.75rem !important;
+  font-size: 0.8125rem !important;
   font-weight: 700 !important;
   white-space: nowrap !important;
   line-height: 1 !important;
@@ -14511,13 +14558,25 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stExp
     grid-template-columns: 1fr;
   }
 }
+@media (max-width: 768px) {
+  .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlockBorderWrapper"] > [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker),
+  .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker),
+  .quick-actions-grid {
+    grid-template-columns: repeat(2, minmax(140px, 1fr)) !important;
+    column-gap: 18px !important;
+    row-gap: 16px !important;
+  }
+}
 @media (max-width: 480px) {
   .ips-ops-kpi-grid {
     grid-template-columns: 1fr !important;
   }
+  .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlockBorderWrapper"] > [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker),
   .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker),
   .quick-actions-grid {
     grid-template-columns: 1fr !important;
+    column-gap: 0 !important;
+    row-gap: 16px !important;
   }
 }
 </style>
