@@ -153,17 +153,17 @@ def render() -> None:
             st.session_state["ips_dash_date_end"] = dr[1]
 
     def _dash_refresh() -> None:
+        st.markdown(
+            '<span class="ips-ops-action-label ips-ops-action-label-spacer" aria-hidden="true">&nbsp;</span>',
+            unsafe_allow_html=True,
+        )
         if st.button("🔄 Refresh", key="ips_dash_refresh", use_container_width=True):
             st.rerun()
 
-    def _dash_customize() -> None:
-        if st.button("⚙ Customize", key="ips_dash_customize", use_container_width=True):
-            pass
-
     render_page_brand_header(
         "Operations Dashboard",
-        actions=[_dash_period, _dash_refresh, _dash_customize],
-        actions_column_ratio=(1.5, 2.5),
+        actions=[_dash_period, _dash_refresh],
+        actions_column_ratio=(1.65, 1.35),
     )
 
     with st.container(key="dashboard_ops_shell"):

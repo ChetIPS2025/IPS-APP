@@ -14141,6 +14141,30 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   margin-bottom: 0.12rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  line-height: 1.2;
+  min-height: 0.82rem;
+}
+.ips-ops-action-label-spacer {
+  visibility: hidden;
+}
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"]:has(.ips-page-actions-marker) {
+  margin-top: 0 !important;
+}
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="column"]:has(.ips-page-actions-marker) {
+  justify-content: flex-end !important;
+}
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="column"]:has(.ips-page-actions-marker) > [data-testid="stHorizontalBlock"] {
+  align-items: flex-end !important;
+  width: 100% !important;
+}
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="column"]:has(.ips-page-actions-marker) [data-testid="stDateInput"] {
+  margin-top: 0 !important;
+}
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="column"]:has(.ips-page-actions-marker) [data-testid="stDateInput"] > div {
+  min-height: 38px !important;
+}
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="column"]:has(.ips-page-actions-marker) [data-testid="stDateInput"] input {
+  min-height: 38px !important;
 }
 .ips-ops-welcome {
   margin: 0 0 20px;
