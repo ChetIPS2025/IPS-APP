@@ -24,23 +24,29 @@ except ImportError:
     )
 
 _PAGE_SIZE_OPTIONS = (50, 75, 100, 150)
-_HIDE_IF_EMPTY_COLUMNS: frozenset[str] = frozenset()
-_JOB_COL_WEIGHTS = [0.72, 2.75, 1.15, 0.68, 0.95, 0.95]
+_HIDE_IF_EMPTY_COLUMNS: frozenset[str] = frozenset({"estimated", "actual", "profit", "margin"})
+_JOB_COL_WEIGHTS = [0.55, 2.35, 1.15, 0.68, 0.72, 0.72, 0.72, 0.72, 0.58]
 _JOB_COL_MARKERS: tuple[str, ...] = (
     "num",
     "desc",
     "customer",
     "status",
+    "contract",
     "estimated",
     "actual",
+    "profit",
+    "margin",
 )
 _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("JOB #", None),
     ("PROJECT / DESCRIPTION", None),
     ("CUSTOMER", "customer"),
     ("STATUS", "status"),
+    ("CONTRACT VALUE", None),
     ("ESTIMATED COST", None),
     ("ACTUAL COST", None),
+    ("GROSS PROFIT", None),
+    ("MARGIN %", None),
 ]
 
 
@@ -940,13 +946,12 @@ def jobs_column_has_data(
     cost_fields_fn,
     marker: str,
 ) -> bool:
-    for job in filtered:
-        costs = cost_fields_fn(job)
-        if marker == "estimated" and bool(costs.get("has_estimated")):
-            return True
-        if marker == "actual" and bool(costs.get("has_actual")):
-            return True
-    return False
+    return any(
+        (marker == "estimated" and bool(cost_fields_fn(job).get("has_estimated")))
+        or (marker == "actual" and bool(cost_fields_fn(job).get("has_actual")))
+        or (marker in {"profit", "margin"} and bool(cost_fields_fn(job).get("has_contract")))
+        for job in filtered
+    )
 
 
 def jobs_visible_table_layout(

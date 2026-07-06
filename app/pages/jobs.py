@@ -1206,8 +1206,11 @@ def _render_custom_jobs_table(
             customer = _job_customer(job)
             status = _normalize_job_status(job.get("status"))
             costs = _job_list_cost_fields(job, cost_cache=cost_cache)
+            contract_val = float(costs["contract_value"])
             estimated_val = float(costs["estimated_cost"])
             actual_val = float(costs.get("actual_cost") or 0)
+            profit_val = float(costs.get("profit") or 0)
+            margin_val = float(costs.get("margin_pct") or 0)
             raw_summary = costs.get("raw_summary")
             health_html = ""
             if isinstance(raw_summary, dict) and raw_summary:
@@ -1273,27 +1276,66 @@ def _render_custom_jobs_table(
                     status_html = f'{status_html}{health_html}'
                 st.markdown(status_html, unsafe_allow_html=True)
 
+            has_contract = bool(costs.get("has_contract"))
             has_estimated = bool(costs.get("has_estimated"))
             has_actual = bool(costs.get("has_actual"))
-            with cols[col_map["estimated"]]:
-                st.markdown(_jobs_col_marker("estimated"), unsafe_allow_html=True)
-                estimated_cls = _money_cell_class(estimated_val, available=has_estimated)
+            has_profit_data = has_contract
+            profit_cls = ""
+            if has_profit_data:
+                if profit_val > 0:
+                    profit_cls = " ips-jobs-money-positive"
+                elif profit_val < 0:
+                    profit_cls = " ips-jobs-money-negative"
+
+            with cols[col_map["contract"]]:
+                st.markdown(_jobs_col_marker("contract"), unsafe_allow_html=True)
+                contract_cls = _money_cell_class(contract_val, available=has_contract)
                 st.markdown(
-                    f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money{estimated_cls}">'
-                    f"{html.escape(_money_cell(estimated_val, available=has_estimated))}</div>",
+                    f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money{contract_cls}">'
+                    f"{html.escape(_money_cell(contract_val, available=has_contract))}</div>",
                     unsafe_allow_html=True,
                 )
-            with cols[col_map["actual"]]:
-                st.markdown(_jobs_col_marker("actual"), unsafe_allow_html=True)
-                st.markdown(
-                    _actual_cost_cell_html(
-                        actual_val,
-                        estimated_val=estimated_val,
-                        has_actual=has_actual,
-                        has_estimated=has_estimated,
-                    ),
-                    unsafe_allow_html=True,
-                )
+
+            if "estimated" in col_map:
+                with cols[col_map["estimated"]]:
+                    st.markdown(_jobs_col_marker("estimated"), unsafe_allow_html=True)
+                    estimated_cls = _money_cell_class(estimated_val, available=has_estimated)
+                    st.markdown(
+                        f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money{estimated_cls}">'
+                        f"{html.escape(_money_cell(estimated_val, available=has_estimated))}</div>",
+                        unsafe_allow_html=True,
+                    )
+            if "actual" in col_map:
+                with cols[col_map["actual"]]:
+                    st.markdown(_jobs_col_marker("actual"), unsafe_allow_html=True)
+                    st.markdown(
+                        _actual_cost_cell_html(
+                            actual_val,
+                            estimated_val=estimated_val,
+                            has_actual=has_actual,
+                            has_estimated=has_estimated,
+                        ),
+                        unsafe_allow_html=True,
+                    )
+            if "profit" in col_map:
+                with cols[col_map["profit"]]:
+                    st.markdown(_jobs_col_marker("profit"), unsafe_allow_html=True)
+                    profit_display_cls = _money_cell_class(profit_val, available=has_profit_data)
+                    st.markdown(
+                        f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money{profit_cls}{profit_display_cls}">'
+                        f"{html.escape(_money_cell(profit_val, available=has_profit_data))}</div>",
+                        unsafe_allow_html=True,
+                    )
+            if "margin" in col_map:
+                with cols[col_map["margin"]]:
+                    st.markdown(_jobs_col_marker("margin"), unsafe_allow_html=True)
+                    margin_display = _pct_cell(margin_val) if has_contract else "—"
+                    margin_cls = profit_cls if has_contract else " ips-jobs-money-empty"
+                    st.markdown(
+                        f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money{margin_cls}">'
+                        f"{html.escape(margin_display)}</div>",
+                        unsafe_allow_html=True,
+                    )
 
             if expanded:
                 st.markdown('<div class="ips-field-row-expand">', unsafe_allow_html=True)
