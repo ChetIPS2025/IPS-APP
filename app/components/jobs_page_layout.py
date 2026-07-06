@@ -24,27 +24,27 @@ except ImportError:
     )
 
 _PAGE_SIZE_OPTIONS = (50, 75, 100, 150)
-_HIDE_IF_EMPTY_COLUMNS = frozenset({"estimated", "actual", "profit"})
-_JOB_COL_WEIGHTS = [0.72, 2.75, 1.15, 0.68, 0.72, 0.72, 0.72, 0.72]
+_HIDE_IF_EMPTY_COLUMNS = frozenset({"estimated", "actual"})
+_JOB_COL_WEIGHTS = [0.72, 2.75, 1.15, 0.68, 0.72, 0.72, 0.42, 0.9]
 _JOB_COL_MARKERS: tuple[str, ...] = (
     "num",
     "desc",
     "customer",
     "status",
-    "contract",
     "estimated",
     "actual",
-    "profit",
+    "subjobs",
+    "actions",
 )
 _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("JOB #", None),
     ("PROJECT / DESCRIPTION", None),
     ("CUSTOMER", "customer"),
     ("STATUS", "status"),
-    ("CONTRACT VALUE", None),
     ("ESTIMATED COST", None),
     ("ACTUAL COST", None),
-    ("GROSS PROFIT", None),
+    ("OPEN TASKS / SUBJOBS", None),
+    ("ACTIONS", None),
 ]
 
 
@@ -63,7 +63,7 @@ def _summary_money(value: float, *, has_data: bool) -> str:
 def inject_jobs_page_layout_css() -> None:
     st.markdown(
         """
-<style id="ips-jobs-page-layout-v12">
+<style id="ips-jobs-page-layout-v13">
 section[data-testid="stMain"]:has(.ips-jobs-page) {
   background: #ffffff !important;
 }
@@ -729,6 +729,18 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-
   color: #dc2626;
   font-weight: 700;
 }
+.ips-jobs-actual-over-estimate {
+  color: #dc2626 !important;
+  font-weight: 700 !important;
+}
+.ips-jobs-actual-over-icon {
+  margin-left: 0.25rem;
+  color: #dc2626;
+  font-size: 0.75rem;
+  line-height: 1;
+  cursor: help;
+  flex-shrink: 0;
+}
 .ips-jobs-money-positive {
   color: #15803d;
   font-weight: 700;
@@ -937,8 +949,6 @@ def jobs_column_has_data(
         if marker == "estimated" and bool(costs.get("has_estimated")):
             return True
         if marker == "actual" and bool(costs.get("has_actual")):
-            return True
-        if marker in {"profit"} and bool(costs.get("has_contract")):
             return True
     return False
 

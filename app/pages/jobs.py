@@ -10,6 +10,7 @@ import streamlit as st
 
 try:
     from app.components.job_actions import render_job_action_buttons
+    from app.components.job_row_actions_ui import render_job_row_actions
     from app.components.job_status_ui import job_status_pill_html, render_job_status_badge_editor
     from app.components.jobs_page_layout import (
         close_jobs_filter_bar_shell,
@@ -128,6 +129,7 @@ except ImportError:
         cached_job_cost_summary,
         sync_all_sources_for_job,
     )
+    from components.job_row_actions_ui import render_job_row_actions  # type: ignore
     from components.job_status_ui import job_status_pill_html, render_job_status_badge_editor  # type: ignore
     from components.jobs_page_layout import (  # type: ignore
         close_jobs_filter_bar_shell,
@@ -306,26 +308,26 @@ JOB_DOC_PENDING_DELETE_JOB_KEY = "job_detail_doc_pending_delete_job_id"
 JOB_DAILY_UPDATE_ADD_MODE_KEY = "job_detail_daily_update_add_job_id"
 _DAILY_UPDATE_STATUS_OPTS = ["Draft", "Open", "Submitted", "Closed"]
 _JOB_DOC_UPLOAD_TYPES = ["pdf", "doc", "docx", "xls", "xlsx", "csv", "png", "jpg", "jpeg"]
-_JOB_COLS = [0.55, 2.75, 1.15, 0.68, 0.72, 0.72, 0.72, 0.72]
+_JOB_COLS = [0.55, 2.75, 1.15, 0.68, 0.72, 0.72, 0.42, 0.9]
 _JOB_COL_MARKERS: tuple[str, ...] = (
     "num",
     "desc",
     "customer",
     "status",
-    "contract",
     "estimated",
     "actual",
-    "profit",
+    "subjobs",
+    "actions",
 )
 _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("JOB #", None),
     ("PROJECT / DESCRIPTION", None),
     ("CUSTOMER", "customer"),
     ("STATUS", "status"),
-    ("CONTRACT VALUE", None),
     ("ESTIMATED COST", None),
     ("ACTUAL COST", None),
-    ("GROSS PROFIT", None),
+    ("OPEN TASKS / SUBJOBS", None),
+    ("ACTIONS", None),
 ]
 _JOBS_DEFAULT_VIEW = "Active Jobs"
 _JOBS_VIEW_OPTIONS = [
@@ -440,6 +442,50 @@ def _money_cell(value: float, *, available: bool = True) -> str:
 def _money_cell_class(value: float, *, available: bool = True) -> str:
     display = _money_cell(value, available=available)
     return " ips-jobs-money-empty" if display == "—" else ""
+
+
+def _actual_cost_exceeds_estimate(
+    *,
+    actual: float,
+    estimated: float,
+    has_actual: bool,
+    has_estimated: bool,
+) -> bool:
+    if not has_actual or not has_estimated:
+        return False
+    if float(estimated or 0) <= 0:
+        return False
+    return float(actual or 0) > float(estimated or 0)
+
+
+def _actual_cost_cell_html(
+    actual_val: float,
+    *,
+    estimated_val: float,
+    has_actual: bool,
+    has_estimated: bool,
+) -> str:
+    display = _money_cell(actual_val, available=has_actual)
+    empty_cls = _money_cell_class(actual_val, available=has_actual)
+    over = _actual_cost_exceeds_estimate(
+        actual=actual_val,
+        estimated=estimated_val,
+        has_actual=has_actual,
+        has_estimated=has_estimated,
+    )
+    over_cls = " ips-jobs-actual-over-estimate" if over else ""
+    warn = ""
+    if over:
+        warn = (
+            '<span class="ips-jobs-actual-over-icon" '
+            'title="Actual cost has exceeded the estimated cost." '
+            'aria-label="Actual cost has exceeded the estimated cost.">⚠</span>'
+        )
+    return (
+        f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money ips-jobs-money-actual'
+        f"{empty_cls}{over_cls}\">"
+        f"{html.escape(display)}{warn}</div>"
+    )
 
 
 def _pct_cell(value: float) -> str:
@@ -941,6 +987,10 @@ def _patch_job_cache_status(job_id: str, new_status: str) -> None:
         st.session_state[CACHE_KEY] = cache
 
 
+def _open_job_edit_from_list(job: dict) -> None:
+    _set_job_edit_mode(job)
+
+
 def _activate_job_detail_modal(job_id: str, job: dict | None = None) -> None:
     """Open the job detail/editor modal (shared by table links)."""
     jid = str(job_id or "").strip()
@@ -1146,9 +1196,9 @@ def _render_custom_jobs_table(
             customer = _job_customer(job)
             status = _normalize_job_status(job.get("status"))
             costs = _job_list_cost_fields(job, cost_cache=cost_cache)
-            contract_val = float(costs["contract_value"])
             estimated_val = float(costs["estimated_cost"])
-            profit_val = float(costs["profit"])
+            actual_val = float(costs.get("actual_cost") or 0)
+            open_subjobs = _job_open_subjobs_count(job, subjob_counts=subjob_counts)
             raw_summary = costs.get("raw_summary")
             health_html = ""
             if isinstance(raw_summary, dict) and raw_summary:
@@ -1214,25 +1264,8 @@ def _render_custom_jobs_table(
                     status_html = f'{status_html}{health_html}'
                 st.markdown(status_html, unsafe_allow_html=True)
 
-            profit_cls = ""
-            has_contract = bool(costs.get("has_contract"))
             has_estimated = bool(costs.get("has_estimated"))
             has_actual = bool(costs.get("has_actual"))
-            actual_val = float(costs.get("actual_cost") or 0)
-            has_profit_data = has_contract
-            if has_profit_data:
-                if profit_val > 0:
-                    profit_cls = " ips-jobs-money-positive"
-                elif profit_val < 0:
-                    profit_cls = " ips-jobs-money-negative"
-            with cols[col_map["contract"]]:
-                st.markdown(_jobs_col_marker("contract"), unsafe_allow_html=True)
-                contract_cls = _money_cell_class(contract_val, available=has_contract)
-                st.markdown(
-                    f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money{contract_cls}">'
-                    f"{html.escape(_money_cell(contract_val, available=has_contract))}</div>",
-                    unsafe_allow_html=True,
-                )
             if "estimated" in col_map:
                 with cols[col_map["estimated"]]:
                     st.markdown(_jobs_col_marker("estimated"), unsafe_allow_html=True)
@@ -1245,21 +1278,34 @@ def _render_custom_jobs_table(
             if "actual" in col_map:
                 with cols[col_map["actual"]]:
                     st.markdown(_jobs_col_marker("actual"), unsafe_allow_html=True)
-                    actual_cls = _money_cell_class(actual_val, available=has_actual)
                     st.markdown(
-                        f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money ips-jobs-money-actual{actual_cls}">'
-                        f"{html.escape(_money_cell(actual_val, available=has_actual))}</div>",
+                        _actual_cost_cell_html(
+                            actual_val,
+                            estimated_val=estimated_val,
+                            has_actual=has_actual,
+                            has_estimated=has_estimated,
+                        ),
                         unsafe_allow_html=True,
                     )
-            if "profit" in col_map:
-                with cols[col_map["profit"]]:
-                    st.markdown(_jobs_col_marker("profit"), unsafe_allow_html=True)
-                    profit_display_cls = _money_cell_class(profit_val, available=has_profit_data)
-                    st.markdown(
-                        f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money{profit_cls}{profit_display_cls}">'
-                        f"{html.escape(_money_cell(profit_val, available=has_profit_data))}</div>",
-                        unsafe_allow_html=True,
-                    )
+            with cols[col_map["subjobs"]]:
+                st.markdown(_jobs_col_marker("subjobs"), unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="ips-jobs-cell job-cell jobs-table-cell ips-jobs-col-subjobs">'
+                    f"{open_subjobs:,}</div>",
+                    unsafe_allow_html=True,
+                )
+            with cols[col_map["actions"]]:
+                st.markdown(_jobs_col_marker("actions"), unsafe_allow_html=True)
+                st.markdown(
+                    '<span class="ips-jobs-actions-cell ips-jobs-actions-toolbar job-actions-cell" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+                render_job_row_actions(
+                    job,
+                    on_open=_open_jobs_detail_modal,
+                    on_edit=_open_job_edit_from_list,
+                    on_status_updated=_on_job_status_updated,
+                )
 
             if expanded:
                 st.markdown('<div class="ips-field-row-expand">', unsafe_allow_html=True)
