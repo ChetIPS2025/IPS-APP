@@ -115,23 +115,132 @@ def _todo_preview_html(rows: list[dict[str, Any]]) -> str:
 
 
 def _analytics_preview_html() -> str:
-    shortcuts = [
-        ("📊", "Job Costing", "Roll-up costs and margin by job"),
-        ("🕒", "Time Reports", "Weekly hours and labor summaries"),
-        ("📋", "Estimate Reports", "Pipeline and estimate status"),
-        ("📦", "Inventory Reports", "Stock movement and usage"),
+    rows = [
+        ("job_costing", "📊", "Job Costing", "Roll-up costs and margin by job"),
+        ("timekeeping", "🕒", "Time Reports", "Weekly hours and labor summaries"),
+        ("estimates", "📄", "Estimate Reports", "Pipeline and estimate status"),
+        ("inventory", "📦", "Inventory Reports", "Stock movement and usage"),
     ]
-    items = "".join(
-        "<li class=\"ips-dash-preview-row ips-dash-preview-row-link\">"
-        f'<span class="ips-dash-preview-row-icon">{html.escape(icon)}</span>'
-        f'<div class="ips-dash-preview-row-main">'
-        f'<p class="ips-dash-preview-row-title">{html.escape(label)}</p>'
-        f'<p class="ips-dash-preview-row-sub">{html.escape(sub)}</p>'
-        f"</div>"
-        "</li>"
-        for icon, label, sub in shortcuts
+    items: list[str] = []
+    for action, icon, label, sub in rows:
+        action_attr = html.escape(action, quote=True)
+        items.append(
+            '<button type="button" class="ips-dash-analytics-row" '
+            f'data-nav-action="{action_attr}">'
+            '<span class="ips-dash-analytics-row-body">'
+            f'<span class="ips-dash-analytics-row-icon">{html.escape(icon)}</span>'
+            '<span class="ips-dash-analytics-row-text">'
+            f'<span class="ips-dash-analytics-row-title">{html.escape(label)}</span>'
+            f'<span class="ips-dash-analytics-row-sub">{html.escape(sub)}</span>'
+            "</span>"
+            "</span>"
+            '<span class="ips-dash-analytics-row-chevron" aria-hidden="true">›</span>'
+            "</button>"
+        )
+    return f'<div class="ips-dash-analytics-list">{"".join(items)}</div>'
+
+
+_ANALYTICS_NAV_LAST_KEY = "_ips_dash_analytics_nav_last"
+
+
+def _handle_analytics_nav(action: str) -> None:
+    picked = str(action or "").strip()
+    if not picked:
+        return
+    if picked == str(st.session_state.get(_ANALYTICS_NAV_LAST_KEY) or ""):
+        return
+    st.session_state[_ANALYTICS_NAV_LAST_KEY] = picked
+    if picked == "job_costing":
+        _nav_job_costing()
+    elif picked == "timekeeping":
+        _nav_slug("timekeeping")
+    elif picked == "estimates":
+        _nav_slug("estimates")
+    elif picked == "inventory":
+        _nav_slug("inventory")
+
+
+def _render_analytics_reports_nav_bridge() -> str | None:
+    try:
+        from app.ui.clean_table import _components_html
+    except ImportError:
+        from ui.clean_table import _components_html  # type: ignore
+
+    picked = _components_html(
+        """
+<script>
+(function () {
+  const w = window.parent || window;
+  const doc = w.document;
+  const hookKey = "ipsDashAnalytics::nav";
+  const rowSel = ".ips-dash-analytics-row[data-nav-action]";
+
+  function sendValue(action) {
+    const payload = { type: "streamlit:setComponentValue", value: action };
+    const frames = [window, window.parent, w].filter(function (f, i, arr) {
+      return f && arr.indexOf(f) === i;
+    });
+    for (var i = 0; i < frames.length; i++) {
+      try {
+        if (frames[i].Streamlit && typeof frames[i].Streamlit.setComponentValue === "function") {
+          frames[i].Streamlit.setComponentValue(action);
+          return;
+        }
+      } catch (err) {}
+    }
+    for (var j = 0; j < frames.length; j++) {
+      try { frames[j].postMessage(payload, "*"); } catch (err) {}
+    }
+  }
+
+  function bindRows() {
+    doc.querySelectorAll(rowSel).forEach(function (row) {
+      if (row.dataset.ipsDashAnalyticsBound === "1") return;
+      row.dataset.ipsDashAnalyticsBound = "1";
+      row.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const action = row.getAttribute("data-nav-action");
+        if (action) sendValue(action);
+      });
+    });
+  }
+
+  if (!doc.ipsDashAnalyticsRegistry) doc.ipsDashAnalyticsRegistry = {};
+  doc.ipsDashAnalyticsRegistry[hookKey] = { bind: bindRows };
+  bindRows();
+  if (!doc.ipsDashAnalyticsBindObserver) {
+    doc.ipsDashAnalyticsBindObserver = new MutationObserver(function () {
+      Object.values(doc.ipsDashAnalyticsRegistry || {}).forEach(function (cfg) {
+        if (cfg && typeof cfg.bind === "function") cfg.bind();
+      });
+    });
+    doc.ipsDashAnalyticsBindObserver.observe(doc.body, { childList: true, subtree: true });
+  }
+})();
+</script>
+        """,
+        component_key="ips_dash_analytics_nav",
+        height=0,
     )
-    return f'<ul class="ips-dash-preview-list">{items}</ul>'
+    action = str(picked or "").strip()
+    return action or None
+
+
+def _render_analytics_reports_card() -> None:
+    st.markdown(
+        '<div class="ips-dash-preview-card-head">'
+        '<span class="ips-dash-preview-card-icon">📈</span>'
+        '<p class="ips-dash-preview-card-title">Analytics &amp; Reports</p>'
+        "</div>"
+        f"{_analytics_preview_html()}",
+        unsafe_allow_html=True,
+    )
+    action = _render_analytics_reports_nav_bridge()
+    if action:
+        _handle_analytics_nav(action)
+    if st.button("View All Reports", key="ips_dash_preview_an_all", use_container_width=True):
+        _nav_slug("reports")
 
 
 def _qr_preview_html(rows: list[dict[str, Any]]) -> str:
@@ -212,27 +321,5 @@ def render_dashboard_preview_sections() -> None:
 
         with right_col:
             with st.container(key="dashboard_preview_analytics"):
-                st.markdown(
-                    '<div class="ips-dash-preview-card-head">'
-                    '<span class="ips-dash-preview-card-icon">📈</span>'
-                    '<p class="ips-dash-preview-card-title">Analytics &amp; Reports</p>'
-                    "</div>"
-                    f"{_analytics_preview_html()}",
-                    unsafe_allow_html=True,
-                )
-                ac1, ac2, ac3, ac4 = st.columns(4, gap="small")
-                with ac1:
-                    if st.button("Job Costing", key="ips_dash_preview_an_job", use_container_width=True):
-                        _nav_job_costing()
-                with ac2:
-                    if st.button("Time Reports", key="ips_dash_preview_an_time", use_container_width=True):
-                        _nav_slug("timekeeping")
-                with ac3:
-                    if st.button("Estimates", key="ips_dash_preview_an_est", use_container_width=True):
-                        _nav_slug("estimates")
-                with ac4:
-                    if st.button("Inventory", key="ips_dash_preview_an_inv", use_container_width=True):
-                        _nav_slug("inventory")
-                if st.button("View All Reports", key="ips_dash_preview_an_all", use_container_width=True):
-                    _nav_slug("reports")
+                _render_analytics_reports_card()
 

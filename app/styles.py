@@ -13691,7 +13691,7 @@ def inject_ops_dashboard_css() -> None:
     """Compact operations dashboard layout — KPI row, news, quick actions, activity grid."""
     st.markdown(
         """
-<style id="ips-ops-dashboard-v23">
+<style id="ips-ops-dashboard-v24">
 /* ── App shell: flex main beside sidebar (desktop only) ── */
 .stApp:has(.ips-ops-dashboard-marker) [data-testid="stAppViewContainer"] {
   width: 100% !important;
@@ -14506,6 +14506,90 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   background: #eff6ff !important;
   border-color: #93c5fd !important;
   color: #1d4ed8 !important;
+}
+.ips-dash-analytics-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  margin: 0 0 14px 0 !important;
+  padding: 0 !important;
+}
+.ips-dash-analytics-row {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 14px 16px !important;
+  margin: 0 !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  cursor: pointer !important;
+  text-align: left !important;
+  transition: all 0.15s ease !important;
+  font: inherit !important;
+  color: inherit !important;
+  box-shadow: none !important;
+}
+.ips-dash-analytics-row:hover,
+.ips-dash-analytics-row:focus {
+  background: #f7f9fc !important;
+  border-color: #2563eb !important;
+  transform: translateX(2px) !important;
+  outline: none !important;
+}
+.ips-dash-analytics-row-body {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+}
+.ips-dash-analytics-row-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 28px !important;
+  height: 28px !important;
+  flex-shrink: 0 !important;
+  font-size: 1rem !important;
+  line-height: 1 !important;
+}
+.ips-dash-analytics-row-text {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+  min-width: 0 !important;
+}
+.ips-dash-analytics-row-title {
+  display: block !important;
+  margin: 0 !important;
+  font-size: 0.875rem !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  line-height: 1.25 !important;
+}
+.ips-dash-analytics-row-sub {
+  display: block !important;
+  margin: 0 !important;
+  font-size: 0.75rem !important;
+  font-weight: 500 !important;
+  color: #64748b !important;
+  line-height: 1.3 !important;
+}
+.ips-dash-analytics-row-chevron {
+  flex-shrink: 0 !important;
+  margin-left: 12px !important;
+  font-size: 1.125rem !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  color: #94a3b8 !important;
+  transition: color 0.15s ease, transform 0.15s ease !important;
+}
+.ips-dash-analytics-row:hover .ips-dash-analytics-row-chevron,
+.ips-dash-analytics-row:focus .ips-dash-analytics-row-chevron {
+  color: #2563eb !important;
 }
 .st-key-dashboard_preview_analytics [data-testid="stHorizontalBlock"]:has(.stButton) {
   gap: 8px !important;
