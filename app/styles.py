@@ -9989,6 +9989,28 @@ div[data-testid="stDialog"] [data-testid="stTabContent"] {{
 div[data-testid="stDialog"] [data-testid="stRadio"] {{
   display: none !important;
 }}
+div[data-testid="stDialog"] .ips-tabs-wrap [data-testid="stRadio"] {{
+  display: block !important;
+}}
+div[data-testid="stDialog"]:has(.ips-estimate-detail-modal) > div,
+div[data-testid="stDialog"]:has(.ips-estimate-detail-modal) div[role="dialog"] {{
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  max-height: min(90vh, 920px) !important;
+}}
+div[data-testid="stDialog"]:has(.ips-estimate-detail-modal) .ips-tabs-wrap {{
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #ffffff;
+  padding-top: 0.15rem;
+  margin-bottom: 0.45rem;
+}}
+div[data-testid="stDialog"]:has(.ips-estimate-detail-modal) .ips-tabs-wrap [data-testid="stRadio"] > div {{
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scrollbar-width: thin;
+}}
 
 .ips-dialog-header {{
   margin: 0 0 0.85rem 0;

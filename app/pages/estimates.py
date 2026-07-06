@@ -1422,7 +1422,7 @@ def _render_estimate_detail_tabs(est: dict) -> None:
     customer = safe_value(est.get("customer"))
 
     if st.session_state.get(_build_mode_key(est)):
-        st.info("Build mode — use the cost tabs below to add lines and review totals.")
+        st.info("Build mode — open **Materials**, **Equipment**, or another cost tab to add lines.")
 
     editing_locked = _approved_estimate_editing_locked(est)
     if eid and not is_demo_id(eid):
@@ -1723,6 +1723,7 @@ def render_estimate_detail_dialog(est: dict) -> None:
     linked_job = str(est.get("job_id") or est.get("job_number") or "").strip()
 
     render_modal_shell()
+    st.markdown('<span class="ips-estimate-detail-modal" aria-hidden="true"></span>', unsafe_allow_html=True)
     render_modal_header(title=en, subtitle=project, status=status)
 
     editing_locked = _approved_estimate_editing_locked(est)
@@ -1752,8 +1753,8 @@ def render_estimate_detail_dialog(est: dict) -> None:
     if is_edit_mode(_MOD, rk):
         _render_estimate_edit_form(est)
     else:
-        _render_estimate_actions_panel(est)
         _render_estimate_detail_tabs_fragment(est)
+        _render_estimate_actions_panel(est)
 
 
 @st.dialog("Estimate Details", width="large", on_dismiss=_clear_estimates_detail_modal)
