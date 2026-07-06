@@ -387,14 +387,258 @@ def qr_label_2x1_sticker_download_filename(asset: dict[str, Any]) -> str:
     return f"{qr_label_download_basename(asset)}_2x1.pdf"
 
 
+def _asset_label_pil_font(size_px: int, *, bold: bool = False):
+    from PIL import ImageFont
+
+    size_px = max(7, int(size_px))
+    names = ("arialbd.ttf", "arial.ttf") if bold else ("arial.ttf", "DejaVuSans.ttf")
+    for name in names:
+        try:
+            return ImageFont.truetype(name, size_px)
+        except OSError:
+            continue
+    try:
+        return ImageFont.truetype("DejaVuSans.ttf", size_px)
+    except OSError:
+        return ImageFont.load_default()
+
+
+def _asset_number_display(asset: dict[str, Any]) -> str:
+    for key in ("asset_number", "asset_id", "asset_tag"):
+        val = str(asset.get(key) or "").strip()
+        if val:
+            return val
+    return ""
+
+
+def _asset_label_meta_lines(asset: dict[str, Any], *, size_key: str) -> list[str]:
+    lines: list[str] = []
+    num = _asset_number_display(asset)
+    if num:
+        lines.append(num)
+    category = str(asset.get("category") or asset.get("asset_category") or "").strip()
+    if category:
+        lines.append(category)
+    if size_key == "2x6":
+        serial = str(asset.get("serial_number") or "").strip()
+        if serial:
+            lines.append(f"S/N {serial}")
+        location = str(asset.get("location") or asset.get("current_location") or "").strip()
+        if location:
+            lines.append(location)
+    return lines
+
+
+def load_asset_primary_photo_bytes(asset: dict[str, Any]) -> bytes | None:
+    """Load the asset's primary uploaded photo bytes for label rendering."""
+    try:
+        from app.db import _local_file_path_for_storage, _storage_is_local, create_signed_url
+        from app.services.asset_images import asset_display_record
+        from app.services.item_images import _bucket_for_image_path, has_stored_item_image
+    except ImportError:
+        from db import _local_file_path_for_storage, _storage_is_local, create_signed_url  # type: ignore
+        from services.asset_images import asset_display_record  # type: ignore
+        from services.item_images import _bucket_for_image_path, has_stored_item_image  # type: ignore
+
+    display = asset_display_record(asset)
+    if not has_stored_item_image(display):
+        return None
+
+    for path_key in ("image_path", "photo_path"):
+        path = str(display.get(path_key) or "").strip()
+        if not path:
+            continue
+        bucket = _bucket_for_image_path(path)
+        if _storage_is_local():
+            try:
+                local_path = _local_file_path_for_storage(path, bucket)
+                if local_path.is_file():
+                    return local_path.read_bytes()
+            except Exception:
+                pass
+        else:
+            try:
+                import urllib.request
+
+                signed = create_signed_url(path, expires_in=600, bucket=bucket)
+                if signed.startswith("http"):
+                    with urllib.request.urlopen(signed, timeout=30) as resp:
+                        return resp.read()
+            except Exception:
+                pass
+
+    for url_key in ("image_url", "photo_url", "primary_photo_url", "thumbnail_url"):
+        public = str(display.get(url_key) or "").strip()
+        if public.startswith("http"):
+            try:
+                import urllib.request
+
+                with urllib.request.urlopen(public, timeout=30) as resp:
+                    return resp.read()
+            except Exception:
+                pass
+    return None
+
+
+def _asset_label_contain_square(photo_bytes: bytes, size_px: int) -> "Any":
+    from PIL import Image
+
+    img = Image.open(io.BytesIO(photo_bytes)).convert("RGB")
+    scale = min(size_px / max(img.width, 1), size_px / max(img.height, 1))
+    nw = max(1, int(img.width * scale))
+    nh = max(1, int(img.height * scale))
+    resized = img.resize((nw, nh), Image.Resampling.LANCZOS)
+    canvas = Image.new("RGB", (size_px, size_px), "white")
+    canvas.paste(resized, ((size_px - nw) // 2, (size_px - nh) // 2))
+    return canvas
+
+
+def _asset_label_paste_rounded_photo(
+    im: "Any",
+    *,
+    x: int,
+    y: int,
+    size_px: int,
+    photo_bytes: bytes | None,
+) -> None:
+    from PIL import Image, ImageDraw
+
+    radius = max(6, int(size_px * 0.08))
+    if photo_bytes:
+        try:
+            square = _asset_label_contain_square(photo_bytes, size_px)
+            mask = Image.new("L", (size_px, size_px), 0)
+            ImageDraw.Draw(mask).rounded_rectangle((0, 0, size_px, size_px), radius=radius, fill=255)
+            im.paste(square, (x, y), mask)
+            return
+        except Exception:
+            pass
+
+    placeholder = Image.new("RGB", (size_px, size_px), (245, 245, 245))
+    pd = ImageDraw.Draw(placeholder)
+    pd.rounded_rectangle((0, 0, size_px - 1, size_px - 1), radius=radius, outline=(200, 200, 200), width=2)
+    mask = Image.new("L", (size_px, size_px), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, size_px, size_px), radius=radius, fill=255)
+    im.paste(placeholder, (x, y), mask)
+
+    draw = ImageDraw.Draw(im)
+    label_font = _asset_label_pil_font(max(8, int(size_px * 0.11)))
+    label = "Asset Image"
+    icon_font = _asset_label_pil_font(max(10, int(size_px * 0.16)))
+    icon_bbox = draw.textbbox((0, 0), "📦", font=icon_font)
+    icon_w = icon_bbox[2] - icon_bbox[0]
+    icon_h = icon_bbox[3] - icon_bbox[1]
+    text_bbox = draw.textbbox((0, 0), label, font=label_font)
+    text_w = text_bbox[2] - text_bbox[0]
+    text_h = text_bbox[3] - text_bbox[1]
+    block_h = icon_h + text_h + 4
+    top = y + max(0, (size_px - block_h) // 2)
+    draw.text((x + (size_px - icon_w) // 2, top), "📦", fill=(120, 120, 120), font=icon_font)
+    draw.text((x + (size_px - text_w) // 2, top + icon_h + 2), label, fill=(100, 100, 100), font=label_font)
+
+
+def _fit_asset_name_layout(
+    name: str,
+    *,
+    text_w: int,
+    text_h: int,
+    scale: float,
+    max_lines: int = 2,
+) -> dict[str, Any]:
+    title = str(name or "").strip() or "(no name)"
+    meta_reserve = int(12 * scale)
+    available_h = max(16, text_h - meta_reserve)
+    best: dict[str, Any] | None = None
+
+    for pt in (22.0, 20.0, 18.0, 16.0, 14.0, 12.0, 11.0, 10.0, 9.0, 8.0):
+        size_px = max(8, int(pt * scale))
+        line_h = int(size_px * 1.15)
+        char_w = max(size_px * 0.52, 4.0)
+        wrap_chars = max(6, min(40, int(text_w / char_w)))
+        lines = textwrap.wrap(title, width=wrap_chars)[:max_lines]
+        if not lines:
+            lines = [title[:wrap_chars]]
+        if len(lines) == max_lines and len(title) > sum(len(x) for x in lines):
+            lines[-1] = lines[-1][: max(0, wrap_chars - 1)] + "…"
+        block_h = len(lines) * line_h
+        if block_h <= available_h:
+            best = {"size_px": size_px, "line_h": line_h, "lines": lines}
+            break
+
+    if best is None:
+        size_px = max(8, int(8 * scale))
+        wrap_chars = max(6, int(text_w / max(size_px * 0.52, 4.0)))
+        lines = textwrap.wrap(title, width=wrap_chars)[:max_lines] or [title[:wrap_chars]]
+        best = {"size_px": size_px, "line_h": int(size_px * 1.15), "lines": lines}
+    return best
+
+
+def _draw_asset_label_info(
+    draw: "Any",
+    *,
+    asset: dict[str, Any],
+    text_x: int,
+    y_top: int,
+    text_w: int,
+    text_h: int,
+    scale: float,
+    size_key: str,
+) -> None:
+    name = str(asset.get("asset_name") or asset.get("name") or "").strip()
+    name_layout = _fit_asset_name_layout(name, text_w=text_w, text_h=text_h, scale=scale, max_lines=2)
+    name_font = _asset_label_pil_font(name_layout["size_px"], bold=True)
+    meta_lines = _asset_label_meta_lines(asset, size_key=size_key)
+    meta_pt = max(8, int((11 if size_key == "2x6" else 10) * scale))
+    meta_font = _asset_label_pil_font(meta_pt, bold=False)
+    meta_line_h = int(meta_pt * 1.2)
+
+    name_block_h = len(name_layout["lines"]) * name_layout["line_h"]
+    meta_block_h = len(meta_lines) * meta_line_h
+    gap = max(2, int(4 * scale))
+    block_h = name_block_h + (gap if meta_lines else 0) + meta_block_h
+    y = int(y_top + max(0, (text_h - block_h) / 2))
+
+    for line in name_layout["lines"]:
+        draw.text((text_x, y), str(line)[:120], fill=(0, 0, 0), font=name_font)
+        y += name_layout["line_h"]
+
+    if meta_lines:
+        y += gap
+        for line in meta_lines:
+            draw.text((text_x, y), str(line)[:120], fill=(40, 40, 40), font=meta_font)
+            y += meta_line_h
+
+
+def _draw_asset_label_company_footer(
+    draw: "Any",
+    *,
+    w_px: int,
+    h_px: int,
+    margin: int,
+    company_h: int,
+    company: str,
+) -> None:
+    text = str(company or "").strip()
+    if not text:
+        return
+    font_size = max(7, int(company_h * 0.42))
+    font = _asset_label_pil_font(font_size, bold=False)
+    bbox = draw.textbbox((0, 0), text, font=font)
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+    x = margin + max(0, (w_px - 2 * margin - text_w) // 2)
+    y = h_px - margin - company_h + max(0, (company_h - text_h) // 2)
+    draw.text((x, y), text[:120], fill=(80, 80, 80), font=font)
+
+
 def qr_label_png_bytes(
     asset: dict[str, Any],
     qr_text: str,
     *,
     size: str | None = None,
 ) -> bytes:
-    """Landscape asset label PNG at 300 DPI (4\"×1\" or 6\"×2\")."""
-    from PIL import Image, ImageDraw, ImageFont
+    """Landscape asset label PNG at 300 DPI — QR | photo | asset info."""
+    from PIL import Image, ImageDraw
 
     try:
         from app.services.inventory_qr_labels import (
@@ -412,70 +656,51 @@ def qr_label_png_bytes(
     size_key = normalize_label_png_size(size)
     w_px, h_px = label_png_pixel_size(size_key)
     margin = max(8, int(h_px * 0.04))
-    gap = max(6, int(margin * 0.5))
-    company_h = max(18, int(h_px * 0.13))
-    square_sz = max(48, h_px - 2 * margin - company_h)
+    gap = max(5, int(margin * 0.45))
+    company_h = max(16, int(h_px * 0.12))
+    content_h = max(48, h_px - 2 * margin - company_h)
     scale = h_px / 300.0
-    y_square = margin
+
+    qr_col_w = max(int(content_h), int(w_px * 0.27))
+    photo_sz = content_h
+    qr_sz = min(content_h, qr_col_w - gap)
 
     im = Image.new("RGB", (w_px, h_px), "white")
     draw = ImageDraw.Draw(im)
 
+    x = margin
+    y_content = margin + max(0, (content_h - qr_sz) // 2)
     qr_raw = qr_png_bytes(qr_text)
     qr_img = Image.open(io.BytesIO(qr_raw)).convert("RGB")
-    qr_img = qr_img.resize((square_sz, square_sz), Image.Resampling.LANCZOS)
-    x = margin
-    im.paste(qr_img, (x, y_square))
-    x += square_sz + gap
+    qr_img = qr_img.resize((qr_sz, qr_sz), Image.Resampling.LANCZOS)
+    im.paste(qr_img, (x, y_content))
+    x += qr_col_w + gap
 
-    title_px = max(12, int(16 * scale))
-    meta_px = max(10, int(12 * scale))
-    try:
-        font_title = ImageFont.truetype("arialbd.ttf", title_px)
-        font_meta = ImageFont.truetype("arial.ttf", meta_px)
-        font_company = ImageFont.truetype("arial.ttf", max(7, int(10 * scale)))
-    except OSError:
-        try:
-            font_title = ImageFont.truetype("DejaVuSans-Bold.ttf", title_px)
-            font_meta = ImageFont.truetype("DejaVuSans.ttf", meta_px)
-            font_company = ImageFont.truetype("DejaVuSans.ttf", max(7, int(10 * scale)))
-        except OSError:
-            font_title = font_meta = font_company = ImageFont.load_default()
+    photo_y = margin + max(0, (content_h - photo_sz) // 2)
+    photo_bytes = load_asset_primary_photo_bytes(asset)
+    _asset_label_paste_rounded_photo(im, x=x, y=photo_y, size_px=photo_sz, photo_bytes=photo_bytes)
+    x += photo_sz + gap
 
-    asset_no = str(asset.get("asset_number") or asset.get("asset_id") or "").strip()
-    name = str(asset.get("asset_name") or "").strip() or "(no name)"
     text_x = x
     text_w = max(48, w_px - margin - text_x)
-    wrap_chars = max(10, min(42, int(text_w / max(8, title_px * 0.55))))
-
-    title_lines = textwrap.wrap(name, width=wrap_chars)[:3]
-    id_text = f"#{asset_no}" if asset_no else ""
-    id_lines = textwrap.wrap(id_text, width=wrap_chars + 4)[:2] if id_text else []
-
-    title_line_h = int(title_px * 1.25)
-    meta_line_h = int(meta_px * 1.2)
-    block_h = len(title_lines) * title_line_h + (int(title_line_h * 0.15) if id_lines else 0)
-    block_h += len(id_lines) * meta_line_h
-    y = y_square + max(0, (square_sz - block_h) // 2)
-
-    for line in title_lines:
-        draw.text((text_x, y), line[:120], fill=(0, 0, 0), font=font_title)
-        y += title_line_h
-    if id_lines:
-        y += int(title_line_h * 0.12)
-        for line in id_lines:
-            draw.text((text_x, y), line[:120], fill=(0, 0, 0), font=font_meta)
-            y += meta_line_h
-
-    company = label_company_name()
-    if company:
-        company_text = company[:120]
-        bbox = draw.textbbox((0, 0), company_text, font=font_company)
-        text_w_company = bbox[2] - bbox[0]
-        text_h_company = bbox[3] - bbox[1]
-        cx = margin + max(0, (w_px - 2 * margin - text_w_company) // 2)
-        cy = h_px - margin - company_h + max(0, (company_h - text_h_company) // 2)
-        draw.text((cx, cy), company_text, fill=(80, 80, 80), font=font_company)
+    _draw_asset_label_info(
+        draw,
+        asset=asset,
+        text_x=text_x,
+        y_top=margin,
+        text_w=text_w,
+        text_h=content_h,
+        scale=scale,
+        size_key=size_key,
+    )
+    _draw_asset_label_company_footer(
+        draw,
+        w_px=w_px,
+        h_px=h_px,
+        margin=margin,
+        company_h=company_h,
+        company=label_company_name(),
+    )
 
     out = io.BytesIO()
     im.save(out, format="PNG", dpi=(300, 300))
