@@ -1007,11 +1007,11 @@ _DEMO_EMPLOYEE_DOCUMENTS: list[dict[str, Any]] = [
 ]
 
 _DEMO_COMPANY_UPDATES: list[dict[str, Any]] = [
-    {"id": "cu1", "category": "HR Updates", "title": "New Health Insurance Coverage Effective June 1", "body": "Updated medical plan options and enrollment deadlines.", "date": "2025-05-15", "pinned": True, "is_new": True},
-    {"id": "cu2", "category": "Safety Alerts", "title": "Heat Stress Prevention Reminder", "body": "Mandatory hydration breaks when heat index exceeds 90°F.", "date": "2025-05-14", "pinned": True, "is_new": True},
-    {"id": "cu3", "category": "Events", "title": "Company BBQ — May 20", "body": "Join us at the shop at 5 PM. Families welcome.", "date": "2025-05-12", "pinned": False, "is_new": False},
-    {"id": "cu4", "category": "Announcements", "title": "Q2 Safety Award Winners", "body": "Congratulations to the Field Operations crew.", "date": "2025-05-10", "pinned": False, "is_new": False},
-    {"id": "cu5", "category": "Project Updates", "title": "J26047 Milestone Complete", "body": "Rough-in inspection passed on schedule.", "date": "2025-05-08", "pinned": False, "is_new": False},
+    {"id": "cu1", "category": "HR Updates", "title": "New Health Insurance Coverage Effective June 1", "body": "Updated medical plan options and enrollment deadlines.\nReview the summary packet in Documents.", "date": "2025-05-15", "pinned": True, "is_new": True, "priority": "Important", "created_by_name": "HR Admin"},
+    {"id": "cu2", "category": "Safety Alerts", "title": "Heat Stress Prevention Reminder", "body": "Mandatory hydration breaks when heat index exceeds 90°F.\nSupervisors must verify shade and water on every job site.", "date": "2025-05-14", "pinned": True, "is_new": True, "priority": "Urgent", "created_by_name": "Safety Team"},
+    {"id": "cu3", "category": "Events", "title": "Company BBQ — May 20", "body": "Join us at the shop at 5 PM. Families welcome.", "date": "2025-05-12", "pinned": False, "is_new": False, "priority": "Normal", "created_by_name": "IPS Team"},
+    {"id": "cu4", "category": "Announcements", "title": "Q2 Safety Award Winners", "body": "Congratulations to the Field Operations crew.", "date": "2025-05-10", "pinned": False, "is_new": False, "priority": "Normal", "created_by_name": "Operations"},
+    {"id": "cu5", "category": "Project Updates", "title": "J26047 Milestone Complete", "body": "Rough-in inspection passed on schedule.", "date": "2025-05-08", "pinned": False, "is_new": False, "priority": "Normal", "created_by_name": "Project Manager"},
 ]
 
 _DEMO_EVENTS: list[dict[str, Any]] = [

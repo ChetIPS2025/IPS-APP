@@ -14293,6 +14293,69 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   font-weight: 800;
   color: #0f172a;
 }
+.ips-cu-priority {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.ips-cu-priority-critical {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+.ips-cu-priority-high {
+  background: #ffedd5;
+  color: #c2410c;
+  border-color: #fed7aa;
+}
+.ips-cu-priority-normal {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+.ips-cu-priority-informational {
+  background: #f8fafc;
+  color: #64748b;
+  border-color: #e2e8f0;
+}
+.ips-cu-new-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.35rem;
+  padding: 0.08rem 0.4rem;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.ips-cu-card-headline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+.ips-cu-card-foot {
+  margin-top: 0.15rem;
+}
+.ips-cu-attach {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+  color: #475569;
+}
+.st-key-dashboard_ops_company_updates {
+  margin-bottom: 0.35rem;
+}
 .news-card,
 .st-key-dashboard_company_updates .news-card {
   display: flex !important;

@@ -7,6 +7,7 @@ from app.components.company_updates_feed import (
     connecteam_feed_card_html,
     dashboard_company_updates_feed_html,
     dashboard_update_visible,
+    priority_label,
     sort_dashboard_updates,
 )
 
@@ -20,15 +21,25 @@ def test_dashboard_update_visible_filters_drafts_and_projects():
     assert not dashboard_update_visible({"title": "", "status": "published", "category": "General"})
 
 
-def test_sort_dashboard_updates_pins_first():
+def test_sort_dashboard_updates_critical_before_high_before_normal():
     rows = [
-        {"id": "1", "date": "2026-05-01", "pinned": False},
-        {"id": "2", "date": "2026-05-10", "pinned": True},
-        {"id": "3", "date": "2026-05-20", "pinned": False},
+        {"id": "1", "date": "2026-05-20", "pinned": False, "priority": "Normal"},
+        {"id": "2", "date": "2026-05-10", "pinned": False, "priority": "Important"},
+        {"id": "3", "date": "2026-05-01", "pinned": False, "priority": "Urgent"},
+    ]
+    sorted_rows = sort_dashboard_updates(rows)
+    assert [r["id"] for r in sorted_rows] == ["3", "2", "1"]
+
+
+def test_sort_dashboard_updates_pins_within_same_priority():
+    rows = [
+        {"id": "1", "date": "2026-05-20", "pinned": False, "priority": "Normal"},
+        {"id": "2", "date": "2026-05-10", "pinned": True, "priority": "Normal"},
+        {"id": "3", "date": "2026-05-01", "pinned": False, "priority": "Normal"},
     ]
     sorted_rows = sort_dashboard_updates(rows)
     assert sorted_rows[0]["id"] == "2"
-    assert [r["id"] for r in sorted_rows[1:]] == ["3", "1"]
+    assert [r["id"] for r in sorted_rows[1:]] == ["1", "3"]
 
 
 def test_connecteam_feed_card_html_includes_author_and_status():
@@ -41,12 +52,14 @@ def test_connecteam_feed_card_html_includes_author_and_status():
             "date": "2026-05-29",
             "created_by_name": "Jane Smith",
             "is_new": True,
+            "priority": "Urgent",
         }
     )
     assert "Jane Smith" in html
     assert "Safety Reminder" in html
     assert "ips-ct-status-new" in html
     assert "JS" in html
+    assert priority_label("Urgent") in html
 
 
 def test_connecteam_feed_card_compact_html():
@@ -59,12 +72,19 @@ def test_connecteam_feed_card_compact_html():
             "date": "2026-05-29",
             "created_by_name": "Chet Breaux",
             "pinned": True,
+            "priority": "Important",
+            "attachment_url": "https://example.com/agenda.pdf",
+            "attachment_file_name": "agenda.pdf",
+            "is_new": True,
         }
     )
     assert "ips-ct-feed-card-compact" in html_out
     assert "Team Meeting" in html_out
     assert "CB" in html_out
     assert "ips-ct-pin-inline" in html_out
+    assert "ips-cu-new-badge" in html_out
+    assert "agenda.pdf" in html_out
+    assert priority_label("Important") in html_out
 
 
 def test_dashboard_company_updates_feed_html_empty():

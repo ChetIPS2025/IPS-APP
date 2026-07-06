@@ -165,6 +165,11 @@ def can_admin_edit_approved_timekeeping(role: str) -> bool:
     return normalize_role(role) == "admin"
 
 
+def can_manage_company_updates(role: str) -> bool:
+    """Post, edit, pin, archive, delete, and schedule company announcements."""
+    return normalize_role(role) == "admin"
+
+
 def filter_field_nav_for_role(nav: Iterable[tuple[str, str]], role: str) -> list[tuple[str, str]]:
     """Field-mode sidebar items, including scan shortcuts gated by underlying module access."""
     scan_targets = {"scan_inventory": "inventory", "scan_asset": "assets"}

@@ -23,7 +23,7 @@ def test_store_sidebar_nav_fallback_keeps_slug_and_label():
     assert '"My Jobs"' in _fallback_nav_json()
 
 
-def test_employee_field_nav_includes_company_updates():
+def test_employee_field_nav_excludes_company_updates():
     items = filter_field_nav_for_role(FIELD_NAV_PAGES, "employee")
     labels = [label for _slug, label in items]
     assert "Field Home" in labels
@@ -31,4 +31,4 @@ def test_employee_field_nav_includes_company_updates():
     assert "My Jobs" in labels
     assert "Today's Tasks" in labels
     assert "Log Time" in labels
-    assert "Company Updates" in labels
+    assert "Company Updates" not in labels

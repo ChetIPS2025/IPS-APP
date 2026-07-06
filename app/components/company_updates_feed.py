@@ -18,6 +18,16 @@ try:
 except ImportError:
     from utils.formatting import fmt_date  # type: ignore
 
+try:
+    from app.utils.permissions import can_manage_company_updates
+except ImportError:
+    from utils.permissions import can_manage_company_updates  # type: ignore
+
+try:
+    from app.auth import current_role
+except ImportError:
+    from auth import current_role  # type: ignore
+
 _CATEGORY_DISPLAY: dict[str, str] = {
     "General": "Announcements",
     "Policy": "Announcements",
@@ -27,6 +37,25 @@ _CATEGORY_DISPLAY: dict[str, str] = {
     "HR / Payroll": "HR Updates",
     "Equipment": "Project Updates",
     "Training": "Project Updates",
+}
+
+PRIORITY_EDIT_OPTS: tuple[str, ...] = ("Critical", "High", "Normal", "Informational")
+
+_PRIORITY_META: dict[str, dict[str, object]] = {
+    "critical": {"label": "Critical", "emoji": "🔴", "rank": 0, "db": "Urgent"},
+    "high": {"label": "High", "emoji": "🟠", "rank": 1, "db": "Important"},
+    "normal": {"label": "Normal", "emoji": "🔵", "rank": 2, "db": "Normal"},
+    "informational": {"label": "Informational", "emoji": "⚪", "rank": 3, "db": "Normal"},
+}
+
+_DB_TO_PRIORITY_KEY: dict[str, str] = {
+    "urgent": "critical",
+    "critical": "critical",
+    "important": "high",
+    "high": "high",
+    "normal": "normal",
+    "informational": "informational",
+    "info": "informational",
 }
 
 
@@ -44,7 +73,43 @@ def _display_department(display_cat: str) -> str:
         "Project Updates": "Operations",
     }.get(display_cat, "IPS Communications")
 
+
 _DASHBOARD_READ_KEY = "ips_dash_cu_read_ids"
+
+
+def priority_key(raw: object) -> str:
+    text = str(raw or "").strip().lower()
+    return _DB_TO_PRIORITY_KEY.get(text, "normal")
+
+
+def priority_rank(raw: object) -> int:
+    return int(_PRIORITY_META[priority_key(raw)]["rank"])
+
+
+def priority_label(raw: object) -> str:
+    meta = _PRIORITY_META[priority_key(raw)]
+    return f'{meta["emoji"]} {meta["label"]}'
+
+
+def priority_for_form(raw: object) -> str:
+    return str(_PRIORITY_META[priority_key(raw)]["label"])
+
+
+def priority_to_db(raw: object) -> str:
+    key = priority_key(raw)
+    return str(_PRIORITY_META[key]["db"])
+
+
+def priority_badge_html(raw: object) -> str:
+    meta = _PRIORITY_META[priority_key(raw)]
+    label = html.escape(str(meta["label"]))
+    emoji = html.escape(str(meta["emoji"]))
+    key = priority_key(raw)
+    return (
+        f'<span class="ips-cu-priority ips-cu-priority-{key}">'
+        f"{emoji} {label}"
+        f"</span>"
+    )
 
 
 def _snippet(body: str, *, max_len: int = 160) -> str:
@@ -52,6 +117,40 @@ def _snippet(body: str, *, max_len: int = 160) -> str:
     if len(text) <= max_len:
         return text
     return text[: max_len - 1].rstrip() + "…"
+
+
+def _preview_snippet(body: str, *, max_lines: int = 3, line_len: int = 88) -> str:
+    text = str(body or "").strip()
+    if not text:
+        return ""
+    lines = [ln.strip() for ln in text.replace("\r\n", "\n").split("\n") if ln.strip()]
+    if not lines:
+        lines = [" ".join(text.split())]
+    parts: list[str] = []
+    for ln in lines[:max_lines]:
+        if len(ln) > line_len:
+            parts.append(ln[: line_len - 1].rstrip() + "…")
+        else:
+            parts.append(ln)
+    return " ".join(parts)
+
+
+def _has_attachment(row: dict[str, Any]) -> bool:
+    for key in ("attachment_url", "attachment_file_name", "attachment_path"):
+        if str(row.get(key) or "").strip():
+            return True
+    return False
+
+
+def _attachment_indicator_html(row: dict[str, Any]) -> str:
+    if not _has_attachment(row):
+        return ""
+    name = str(row.get("attachment_file_name") or "Attachment").strip() or "Attachment"
+    return (
+        f'<span class="ips-cu-attach" title="{html.escape(name)}">'
+        f"📎 {html.escape(name)}"
+        f"</span>"
+    )
 
 
 DASHBOARD_ANNOUNCEMENT_CATEGORIES: frozenset[str] = frozenset(
@@ -113,13 +212,14 @@ def dashboard_update_visible(row: dict[str, Any]) -> bool:
 
 
 def sort_dashboard_updates(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Pinned first, then newest by date."""
+    """Critical first, then high priority, pinned, then newest."""
     by_date = sorted(
         rows,
         key=lambda row: str(row.get("date") or row.get("created_at") or ""),
         reverse=True,
     )
-    return sorted(by_date, key=lambda row: not bool(row.get("pinned")))
+    by_pinned = sorted(by_date, key=lambda row: not bool(row.get("pinned")))
+    return sorted(by_pinned, key=lambda row: priority_rank(row.get("priority")))
 
 
 def _author_label(row: dict[str, Any]) -> str:
@@ -190,19 +290,28 @@ def connecteam_feed_card_compact_html(row: dict[str, Any]) -> str:
     author = _author_label(row)
     initials = html.escape(_author_initials(author))
     title = html.escape(str(row.get("title") or "Untitled"))
-    body = html.escape(_snippet(str(row.get("body") or ""), max_len=90))
+    body = html.escape(_preview_snippet(str(row.get("body") or ""), max_lines=3))
     posted = html.escape(_relative_posted_label(row))
     author_esc = html.escape(author)
     is_pinned = bool(row.get("pinned"))
     is_unread = _is_update_unread(row)
+    priority_html = priority_badge_html(row.get("priority"))
+    attach_html = _attachment_indicator_html(row)
 
     card_cls = " ips-ct-feed-card-unread" if is_unread else " ips-ct-feed-card-read"
     if is_pinned:
         card_cls += " ips-ct-feed-card-pinned"
+    if priority_key(row.get("priority")) == "critical":
+        card_cls += " ips-ct-feed-card-urgent"
 
     pin_html = (
         '<span class="ips-ct-pin ips-ct-pin-inline ips-ct-pin-badge">📌 Pinned</span>'
         if is_pinned
+        else ""
+    )
+    new_html = (
+        '<span class="ips-cu-new-badge">NEW</span>'
+        if is_unread
         else ""
     )
 
@@ -213,11 +322,15 @@ def connecteam_feed_card_compact_html(row: dict[str, Any]) -> str:
         f'<{ot} class="news-card-meta ips-ct-compact-meta">'
         f'<span class="ips-ct-author">{author_esc}</span>'
         f'<span class="ips-ct-meta">{posted}</span>'
-        f"{pin_html}"
+        f"{pin_html}{new_html}"
         f"</{ot}>"
         f"</{ot}>"
+        f'<{ot} class="ips-cu-card-headline">'
+        f"{priority_html}"
         f'<h4 class="news-card-title ips-ct-title ips-ct-title-compact">{title}</h4>'
+        f"</{ot}>"
         f'<p class="news-card-preview ips-ct-body ips-ct-body-compact">{body}</p>'
+        f"{f'<{ot} class=\"ips-cu-card-foot\">{attach_html}</{ot}>' if attach_html else ''}"
         f"</{ot}>"
     )
 
@@ -231,12 +344,12 @@ def connecteam_feed_card_html(row: dict[str, Any]) -> str:
     author = _author_label(row)
     initials = html.escape(_author_initials(author))
     title = html.escape(str(row.get("title") or "Untitled"))
-    body = html.escape(_snippet(str(row.get("body") or ""), max_len=220))
+    body = html.escape(_preview_snippet(str(row.get("body") or ""), max_lines=3))
     posted = html.escape(_relative_posted_label(row))
     author_esc = html.escape(author)
     is_pinned = bool(row.get("pinned"))
     is_unread = _is_update_unread(row)
-    urgent = normalized == "Safety Alert" or str(row.get("priority") or "").lower() == "urgent"
+    urgent = priority_key(row.get("priority")) == "critical"
 
     card_cls = " ips-ct-feed-card-unread" if is_unread else " ips-ct-feed-card-read"
     if is_pinned:
@@ -252,13 +365,15 @@ def connecteam_feed_card_html(row: dict[str, Any]) -> str:
     }.get(display_cat, ("#f1f5f9", "#475569", "#e2e8f0"))
 
     status_html = (
-        f'<span class="ips-ct-status ips-ct-status-new"><span class="dot"></span>New</span>'
+        f'<span class="ips-ct-status ips-ct-status-new"><span class="dot"></span>NEW</span>'
         if is_unread
         else '<span class="ips-ct-status ips-ct-status-read">✓ Read</span>'
     )
     pin_html = (
         f'<span class="ips-ct-pin">📌 Pinned</span>' if is_pinned else ""
     )
+    priority_html = priority_badge_html(row.get("priority"))
+    attach_html = _attachment_indicator_html(row)
 
     return (
         f'<{ot} class="ips-ct-feed-card{card_cls}">'
@@ -270,12 +385,13 @@ def connecteam_feed_card_html(row: dict[str, Any]) -> str:
         f"</{ot}>"
         f"{status_html}"
         f"</{ot}>"
+        f"{priority_html}"
         f'<h3 class="ips-ct-title">{title}</h3>'
         f'<p class="ips-ct-body">{body}</p>'
         f'<{ot} class="ips-ct-foot">'
         f'<span class="ips-ct-cat-pill" style="background:{bg};color:{fg};border:1px solid {border};">'
         f"{html.escape(display_cat)}</span>"
-        f"{pin_html}"
+        f"{pin_html}{attach_html}"
         f"</{ot}>"
         f"</{ot}>"
     )
@@ -326,6 +442,10 @@ def _dashboard_item_key(uid: str, idx: int) -> str:
     return f"dashboard_cu_item_{safe}"
 
 
+def _can_post_company_updates() -> bool:
+    return can_manage_company_updates(current_role())
+
+
 def render_dashboard_company_updates_section(
     rows: list[dict[str, Any]],
     *,
@@ -340,17 +460,25 @@ def render_dashboard_company_updates_section(
         hdr_l, hdr_r = st.columns([2, 1], gap="small", vertical_alignment="center")
         with hdr_l:
             st.markdown(
-                f'<p class="ips-ops-news-title">Recent Company News</p>',
+                '<p class="ips-ops-news-title">Company Updates</p>',
                 unsafe_allow_html=True,
             )
         with hdr_r:
-            btn_post, btn_all = st.columns(2, gap="small")
-            with btn_post:
-                if st.button("+ Post Update", key="ips_dash_cu_new", type="primary", use_container_width=True):
-                    _go_company_updates_page(open_new=True)
-            with btn_all:
-                if st.button("View All", key="ips_dash_cu_all", use_container_width=True):
-                    _go_company_updates_page()
+            if _can_post_company_updates():
+                btn_post, btn_all = st.columns(2, gap="small")
+                with btn_post:
+                    if st.button(
+                        "+ Post Update",
+                        key="ips_dash_cu_new",
+                        type="primary",
+                        use_container_width=True,
+                    ):
+                        _go_company_updates_page(open_new=True)
+                with btn_all:
+                    if st.button("View All", key="ips_dash_cu_all", use_container_width=True):
+                        _go_company_updates_page()
+            elif st.button("View All", key="ips_dash_cu_all", use_container_width=True):
+                _go_company_updates_page()
 
         if not display_rows:
             st.markdown(

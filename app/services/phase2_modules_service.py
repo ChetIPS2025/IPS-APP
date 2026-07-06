@@ -919,8 +919,20 @@ def normalize_company_update(row: dict[str, Any]) -> dict[str, Any]:
         "title": str(row.get("title") or ""),
         "body": str(row.get("body") or row.get("message") or ""),
         "date": str(row.get("date") or row.get("created_at") or "")[:10],
+        "created_at": str(row.get("created_at") or row.get("date") or "")[:19],
         "pinned": bool(row.get("pinned")),
         "is_new": bool(row.get("is_new")),
+        "priority": str(row.get("priority") or "Normal"),
+        "status": str(row.get("status") or ""),
+        "audience": str(row.get("audience") or row.get("visibility") or ""),
+        "is_active": row.get("is_active") is not False,
+        "attachment_url": str(row.get("attachment_url") or ""),
+        "attachment_file_name": str(row.get("attachment_file_name") or ""),
+        "attachment_path": str(row.get("attachment_path") or ""),
+        "created_by_name": str(row.get("created_by_name") or row.get("posted_by_name") or ""),
+        "created_by": str(row.get("created_by") or row.get("posted_by") or ""),
+        "event_date": str(row.get("event_date") or "")[:10],
+        "notes": str(row.get("notes") or ""),
     }
 
 
@@ -1950,14 +1962,24 @@ def save_document_hub(ui: dict[str, Any], *, row_id: str | None = None) -> Servi
 
 
 def save_company_update(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
+    try:
+        from app.components.company_updates_feed import priority_to_db
+    except ImportError:
+        from components.company_updates_feed import priority_to_db  # type: ignore
     payload = {
         "title": ui.get("title"),
         "message": ui.get("body") or ui.get("message"),
         "category": ui.get("category") or "Announcements",
-        "priority": ui.get("priority") or "Normal",
+        "priority": priority_to_db(ui.get("priority") or "Normal"),
         "pinned": bool(ui.get("pinned")),
         "is_active": ui.get("is_active", True) is not False,
     }
+    attachment_url = str(ui.get("attachment_url") or "").strip()
+    if attachment_url:
+        payload["attachment_url"] = attachment_url
+    attachment_name = str(ui.get("attachment_file_name") or "").strip()
+    if attachment_name:
+        payload["attachment_file_name"] = attachment_name
     if row_id:
         return update_row("company_updates", payload, {"id": row_id})
     return insert_row("company_updates", payload)

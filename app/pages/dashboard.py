@@ -193,35 +193,34 @@ def render() -> None:
             ]
             render_ops_kpi_row(kpi_items)
 
+        with st.container(key="dashboard_ops_company_updates"):
+            render_dashboard_company_updates_section(
+                load_recent_company_updates(limit=5),
+                limit=5,
+            )
+
         with st.container(key="dashboard_ops_row2"):
             st.markdown(
                 '<span class="ips-ops-row2-grid-marker" aria-hidden="true"></span>',
                 unsafe_allow_html=True,
             )
-            news_col, qa_col = st.columns([2, 1], gap="medium")
-            with news_col:
-                render_dashboard_company_updates_section(
-                    load_recent_company_updates(limit=5),
-                    limit=5,
-                )
-            with qa_col:
-                render_ops_quick_action_tiles(
-                    [
-                        ("📁", "New Job", "jobs"),
-                        ("📄", "New Estimate", "estimates"),
-                        ("👤", "New Customer", "customers"),
-                        ("📝", "Daily Report", "field_daily_reports"),
-                        ("🕒", "Time Entry", "timekeeping"),
-                        ("📦", "Inventory", "inventory"),
-                        ("✅", "Create Task", "tasks"),
-                        ("📎", "Upload Document", "documents"),
-                        ("📦", "Add Inventory", "inventory"),
-                        ("🚛", "Add Asset", "assets"),
-                        ("📝", "Start Daily Report", "field_daily_reports"),
-                        ("📊", "Run Job Cost Report", "job_costing"),
-                    ],
-                    key_prefix="ips_ops_qa",
-                )
+            render_ops_quick_action_tiles(
+                [
+                    ("📁", "New Job", "jobs"),
+                    ("📄", "New Estimate", "estimates"),
+                    ("👤", "New Customer", "customers"),
+                    ("📝", "Daily Report", "field_daily_reports"),
+                    ("🕒", "Time Entry", "timekeeping"),
+                    ("📦", "Inventory", "inventory"),
+                    ("✅", "Create Task", "tasks"),
+                    ("📎", "Upload Document", "documents"),
+                    ("📦", "Add Inventory", "inventory"),
+                    ("🚛", "Add Asset", "assets"),
+                    ("📝", "Start Daily Report", "field_daily_reports"),
+                    ("📊", "Run Job Cost Report", "job_costing"),
+                ],
+                key_prefix="ips_ops_qa",
+            )
 
         render_dashboard_estimates_waiting_table(load_estimates(), limit=5)
 

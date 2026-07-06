@@ -37,11 +37,18 @@ try:
         set_edit_mode,
         set_view_mode,
     )
-    from app.pages._core._data import load_company_updates, load_employees, persist_company_update
+    from app.pages._core._data import (
+        delete_company_update,
+        load_company_updates,
+        load_employees,
+        persist_company_update,
+    )
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._session import select_key
     from app.styles import inject_updates_module_css
     from app.utils.formatting import fmt_date, fmt_datetime
+    from app.utils.permissions import can_manage_company_updates
+    from app.components.company_updates_feed import PRIORITY_EDIT_OPTS, priority_for_form
 except ImportError:
     from components.headers import render_page_brand_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
@@ -73,11 +80,23 @@ except ImportError:
         set_edit_mode,
         set_view_mode,
     )
-    from pages._core._data import load_company_updates, load_employees, persist_company_update  # type: ignore
+    from pages._core._data import (  # type: ignore
+        delete_company_update,
+        load_company_updates,
+        load_employees,
+        persist_company_update,
+    )
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
     from styles import inject_updates_module_css  # type: ignore
     from utils.formatting import fmt_date, fmt_datetime  # type: ignore
+    from utils.permissions import can_manage_company_updates  # type: ignore
+    from components.company_updates_feed import PRIORITY_EDIT_OPTS, priority_for_form  # type: ignore
+
+try:
+    from app.auth import current_role
+except ImportError:
+    from auth import current_role  # type: ignore
 
 _SEL = select_key("company_updates")
 _MODULE = "company_updates"
@@ -123,6 +142,10 @@ _AUDIENCE_EDIT_OPTS = [
     "Management",
 ]
 _SORT_OPTS = ("Newest First", "Oldest First", "Title A–Z")
+
+
+def _can_manage_company_updates() -> bool:
+    return can_manage_company_updates(current_role())
 
 
 def _user_name_lookup() -> dict[str, str]:
@@ -351,6 +374,9 @@ def _seed_cu_edit_form(update: dict) -> None:
     )[:10]
     st.session_state[f"cu_edit_pinned_{rk}"] = bool(update.get("pinned") or update.get("is_pinned"))
     st.session_state[f"cu_edit_notes_{rk}"] = str(update.get("notes") or "")
+    st.session_state[f"cu_edit_priority_{rk}"] = priority_for_form(update.get("priority"))
+    st.session_state[f"cu_edit_attachment_url_{rk}"] = str(update.get("attachment_url") or "")
+    st.session_state[f"cu_edit_attachment_name_{rk}"] = str(update.get("attachment_file_name") or "")
 
 
 def _render_cu_view_tabs(update: dict) -> None:
@@ -359,6 +385,8 @@ def _render_cu_view_tabs(update: dict) -> None:
     audience = _normalize_audience(update.get("audience") or update.get("visibility"))
     is_pinned = bool(update.get("pinned") or update.get("is_pinned"))
     body = str(update.get("body") or "").strip() or "No message body."
+    attachment_url = str(update.get("attachment_url") or "").strip()
+    attachment_name = str(update.get("attachment_file_name") or "").strip()
     body_html = (
         '<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
         f"{html.escape(body)}"
@@ -377,6 +405,7 @@ def _render_cu_view_tabs(update: dict) -> None:
             f'{detail_field_html("Status", status, html_value=_status_pill_html(status))}'
             f"{detail_field_html('Created By', update.get('created_by_display'))}"
             f"{detail_field_html('Created', update.get('created_display'))}"
+            f"{detail_field_html('Priority', priority_for_form(update.get('priority')))}"
             f"{detail_field_html('Pinned', 'Yes' if is_pinned else 'No')}"
             "</div>"
         )
@@ -393,7 +422,18 @@ def _render_cu_view_tabs(update: dict) -> None:
         st.markdown(dialog_card_html("Audience", audience_html), unsafe_allow_html=True)
 
     with tab_attachments:
-        placeholder_html("Linked documents and attachments will appear here when connected to Supabase.")
+        if attachment_url:
+            label = attachment_name or "Download attachment"
+            st.markdown(
+                dialog_card_html(
+                    "Attachments",
+                    f'<a href="{html.escape(attachment_url)}" target="_blank" rel="noopener">'
+                    f"{html.escape(label)}</a>",
+                ),
+                unsafe_allow_html=True,
+            )
+        else:
+            placeholder_html("No attachments for this update.")
 
     with tab_event:
         if category == "Event" or update.get("event_date") or update.get("event_at"):
@@ -450,9 +490,15 @@ def _render_cu_edit_form(update: dict) -> None:
     with ec2:
         st.selectbox("Audience", _AUDIENCE_EDIT_OPTS, key=f"cu_edit_audience_{rk}")
         st.text_input("Event date", key=f"cu_edit_event_date_{rk}", placeholder="YYYY-MM-DD")
+        st.selectbox("Priority", PRIORITY_EDIT_OPTS, key=f"cu_edit_priority_{rk}")
     st.text_area("Body / content", key=f"cu_edit_body_{rk}", height=120)
     st.text_area("Notes", key=f"cu_edit_notes_{rk}", height=80)
     st.checkbox("Pinned", key=f"cu_edit_pinned_{rk}")
+    ac1, ac2 = st.columns(2)
+    with ac1:
+        st.text_input("Attachment URL", key=f"cu_edit_attachment_url_{rk}", placeholder="https://…")
+    with ac2:
+        st.text_input("Attachment label", key=f"cu_edit_attachment_name_{rk}", placeholder="File name")
 
     cancelled, saved = render_save_cancel_actions(
         module=_MODULE,
@@ -473,6 +519,9 @@ def _render_cu_edit_form(update: dict) -> None:
             "audience": st.session_state.get(f"cu_edit_audience_{rk}"),
             "event_date": st.session_state.get(f"cu_edit_event_date_{rk}"),
             "notes": st.session_state.get(f"cu_edit_notes_{rk}"),
+            "priority": st.session_state.get(f"cu_edit_priority_{rk}"),
+            "attachment_url": st.session_state.get(f"cu_edit_attachment_url_{rk}"),
+            "attachment_file_name": st.session_state.get(f"cu_edit_attachment_name_{rk}"),
             "is_active": _status_to_active(status),
         }
         row_id = None if is_demo_id(uid) else uid
@@ -483,6 +532,19 @@ def _render_cu_edit_form(update: dict) -> None:
             st.rerun()
         else:
             st.error(msg or "Could not save update.")
+
+    if uid and st.button("Delete update", key=f"cu_edit_delete_{rk}", type="secondary"):
+        row_id = None if is_demo_id(uid) else uid
+        if row_id:
+            ok, msg = delete_company_update(row_id)
+            if ok:
+                _clear_update_modal()
+                st.success(msg or "Update deleted.")
+                st.rerun()
+            else:
+                st.error(msg or "Could not delete update.")
+        else:
+            st.warning("Sample updates cannot be deleted.")
 
 
 def render_company_update_detail_dialog(update: dict) -> None:
@@ -499,11 +561,12 @@ def render_company_update_detail_dialog(update: dict) -> None:
         subtitle=category,
         status=status,
     )
-    render_modal_edit_button(
-        module=_MODULE,
-        record_key=rk,
-        key_prefix=f"cu_modal_{rk}",
-    )
+    if _can_manage_company_updates():
+        render_modal_edit_button(
+            module=_MODULE,
+            record_key=rk,
+            key_prefix=f"cu_modal_{rk}",
+        )
     render_modal_meta_grid(
         [
             ("Category", category),
@@ -513,7 +576,7 @@ def render_company_update_detail_dialog(update: dict) -> None:
         ]
     )
 
-    if edit_mode:
+    if edit_mode and _can_manage_company_updates():
         _render_cu_edit_form(update)
     else:
         _render_cu_view_tabs(update)
@@ -674,10 +737,10 @@ def render() -> None:
     render_page_brand_header(
         "Company Updates",
         "Share announcements, safety alerts, events, and company news.",
-        actions=[_cu_new],
+        actions=[_cu_new] if _can_manage_company_updates() else [],
     )
 
-    if st.session_state.get("ips_cu_form"):
+    if _can_manage_company_updates() and st.session_state.get("ips_cu_form"):
         with st.expander("New company update", expanded=True):
             st.text_input("Title", key="cu_new_title")
             nc1, nc2 = st.columns(2)
@@ -687,9 +750,15 @@ def render() -> None:
             with nc2:
                 st.selectbox("Audience", _AUDIENCE_EDIT_OPTS, key="cu_new_audience")
                 st.text_input("Event date", key="cu_new_event_date", placeholder="YYYY-MM-DD")
+                st.selectbox("Priority", PRIORITY_EDIT_OPTS, key="cu_new_priority", index=2)
             st.text_area("Body / content", key="cu_new_body", height=100)
             st.text_area("Notes", key="cu_new_notes", height=60)
             st.checkbox("Pinned", key="cu_new_pinned")
+            na1, na2 = st.columns(2)
+            with na1:
+                st.text_input("Attachment URL", key="cu_new_attachment_url", placeholder="https://…")
+            with na2:
+                st.text_input("Attachment label", key="cu_new_attachment_name", placeholder="File name")
             if st.button("Publish", key="cu_save_new", type="primary"):
                 status = str(st.session_state.get("cu_new_status") or "Published")
                 ok, msg = persist_company_update(
@@ -702,6 +771,9 @@ def render() -> None:
                         "audience": st.session_state.get("cu_new_audience"),
                         "event_date": st.session_state.get("cu_new_event_date"),
                         "notes": st.session_state.get("cu_new_notes"),
+                        "priority": st.session_state.get("cu_new_priority"),
+                        "attachment_url": st.session_state.get("cu_new_attachment_url"),
+                        "attachment_file_name": st.session_state.get("cu_new_attachment_name"),
                         "is_active": _status_to_active(status),
                     }
                 )
