@@ -10,7 +10,6 @@ import streamlit as st
 
 try:
     from app.components.job_actions import render_job_action_buttons
-    from app.components.job_row_actions_ui import render_job_row_actions
     from app.components.job_status_ui import job_status_pill_html, render_job_status_badge_editor
     from app.components.jobs_page_layout import (
         close_jobs_filter_bar_shell,
@@ -129,7 +128,6 @@ except ImportError:
         cached_job_cost_summary,
         sync_all_sources_for_job,
     )
-    from components.job_row_actions_ui import render_job_row_actions  # type: ignore
     from components.job_status_ui import job_status_pill_html, render_job_status_badge_editor  # type: ignore
     from components.jobs_page_layout import (  # type: ignore
         close_jobs_filter_bar_shell,
@@ -308,7 +306,7 @@ JOB_DOC_PENDING_DELETE_JOB_KEY = "job_detail_doc_pending_delete_job_id"
 JOB_DAILY_UPDATE_ADD_MODE_KEY = "job_detail_daily_update_add_job_id"
 _DAILY_UPDATE_STATUS_OPTS = ["Draft", "Open", "Submitted", "Closed"]
 _JOB_DOC_UPLOAD_TYPES = ["pdf", "doc", "docx", "xls", "xlsx", "csv", "png", "jpg", "jpeg"]
-_JOB_COLS = [0.55, 2.35, 1.15, 0.68, 0.72, 0.72, 0.72, 0.72, 0.58, 0.42, 0.62]
+_JOB_COLS = [0.55, 2.55, 1.15, 0.68, 0.72, 0.72, 0.72, 0.72, 0.58, 0.42]
 _JOB_COL_MARKERS: tuple[str, ...] = (
     "num",
     "desc",
@@ -320,7 +318,6 @@ _JOB_COL_MARKERS: tuple[str, ...] = (
     "profit",
     "margin",
     "subjobs",
-    "actions",
 )
 _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("JOB #", None),
@@ -333,7 +330,6 @@ _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("GROSS PROFIT", None),
     ("MARGIN %", None),
     ("OPEN TASKS / SUBJOBS", None),
-    ("ACTIONS", None),
 ]
 _JOBS_DEFAULT_VIEW = "Active Jobs"
 _JOBS_VIEW_OPTIONS = [
@@ -949,12 +945,8 @@ def _patch_job_cache_status(job_id: str, new_status: str) -> None:
         st.session_state[CACHE_KEY] = cache
 
 
-def _open_job_edit_from_list(job: dict) -> None:
-    _set_job_edit_mode(job)
-
-
 def _activate_job_detail_modal(job_id: str, job: dict | None = None) -> None:
-    """Open the job detail/editor modal (shared by table links and row actions)."""
+    """Open the job detail/editor modal (shared by table links)."""
     jid = str(job_id or "").strip()
     if not jid:
         return
@@ -1290,18 +1282,6 @@ def _render_custom_jobs_table(
                     f'<div class="ips-jobs-cell job-cell jobs-table-cell ips-jobs-col-subjobs">'
                     f"{open_subjobs:,}</div>",
                     unsafe_allow_html=True,
-                )
-            with cols[col_map["actions"]]:
-                st.markdown(_jobs_col_marker("actions"), unsafe_allow_html=True)
-                st.markdown(
-                    '<span class="ips-jobs-actions-cell ips-jobs-actions-toolbar job-actions-cell" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                render_job_row_actions(
-                    job,
-                    on_open=_open_jobs_detail_modal,
-                    on_edit=_open_job_edit_from_list,
-                    on_status_updated=_on_job_status_updated,
                 )
 
             if expanded:
