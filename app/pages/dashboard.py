@@ -8,7 +8,7 @@ from datetime import date, timedelta
 import streamlit as st
 
 try:
-    from app.auth import current_profile, current_role
+    from app.auth import current_profile
     from app.components.cards import render_ops_kpi_row
     from app.components.dashboard_active_jobs_table import render_dashboard_active_jobs_table
     from app.components.company_updates_feed import render_dashboard_company_updates_section
@@ -20,16 +20,14 @@ try:
     from app.pages._core._data import (
         load_awarded_jobs,
         load_dashboard_kpis,
-        load_estimates,
         load_recent_company_updates,
         load_tasks,
         load_timekeeping_summaries,
-        load_documents_hub,
     )
     from app.styles import inject_global_css, inject_ops_dashboard_css
-    from app.utils.formatting import fmt_currency, fmt_date
+    from app.utils.formatting import fmt_currency
 except ImportError:
-    from auth import current_profile, current_role  # type: ignore
+    from auth import current_profile  # type: ignore
     from components.cards import render_ops_kpi_row  # type: ignore
     from components.dashboard_active_jobs_table import render_dashboard_active_jobs_table  # type: ignore
     from components.company_updates_feed import render_dashboard_company_updates_section  # type: ignore
@@ -41,14 +39,12 @@ except ImportError:
     from pages._core._data import (  # type: ignore
         load_awarded_jobs,
         load_dashboard_kpis,
-        load_documents_hub,
-        load_estimates,
         load_recent_company_updates,
         load_tasks,
         load_timekeeping_summaries,
     )
     from styles import inject_global_css, inject_ops_dashboard_css  # type: ignore
-    from utils.formatting import fmt_currency, fmt_date  # type: ignore
+    from utils.formatting import fmt_currency  # type: ignore
 
 
 _CLOSED_TASK_STATUSES = frozenset({"done", "cancelled", "closed", "completed"})
@@ -123,178 +119,6 @@ def _ops_welcome_html(*, employees: int, active_jobs: int) -> str:
         f"</p>"
         f"</{ot}>"
     )
-
-
-def _activity_widget_html(
-    icon: str,
-    title: str,
-    lines: list[str],
-    *,
-    empty: str = "Nothing scheduled",
-) -> str:
-    ot = "d" + "iv"
-    if lines:
-        items = "".join(f'<li class="ips-ops-widget-item">{line}</li>' for line in lines)
-    else:
-        items = f'<li class="ips-ops-widget-empty">{html.escape(empty)}</li>'
-    return (
-        f'<{ot} class="ips-ops-widget">'
-        f'<{ot} class="ips-ops-widget-head">'
-        f'<span class="ips-ops-widget-icon">{html.escape(icon)}</span>'
-        f'<p class="ips-ops-widget-title">{html.escape(title)}</p>'
-        f"</{ot}>"
-        f'<ul class="ips-ops-widget-list">{items}</ul>'
-        f"</{ot}>"
-    )
-
-
-def _activity_card_html(title: str, lines: list[str], *, empty: str = "Nothing scheduled") -> str:
-    icon_map = {
-        "Today's Scheduled Jobs": "📅",
-        "Employees Clocked In": "👷",
-        "Recent Job Updates": "💼",
-        "Recent Time Entries": "⏱",
-        "Recent Documents": "📎",
-        "Recent Estimates": "📋",
-    }
-    return _activity_widget_html(icon_map.get(title, "•"), title, lines, empty=empty)
-
-
-def _today_iso() -> str:
-    return date.today().isoformat()
-
-
-def _jobs_scheduled_today(limit: int = 4) -> list[str]:
-    today = _today_iso()
-    lines: list[str] = []
-    for job in load_awarded_jobs():
-        when = str(job.get("awarded_date") or job.get("start_date") or "")[:10]
-        if when != today:
-            continue
-        num = str(job.get("job_number") or "").strip()
-        name = str(job.get("job_name") or job.get("name") or "").strip()
-        label = f"{num} — {name}" if num and name else (num or name or "Scheduled job")
-        lines.append(html.escape(label))
-        if len(lines) >= limit:
-            break
-    return lines
-
-
-def _employees_clocked_in_lines(limit: int = 4) -> list[str]:
-    today = date.today()
-    week_start = today - timedelta(days=today.weekday())
-    lines: list[str] = []
-    for row in load_timekeeping_summaries(week_start):
-        hours = float(row.get("st_total") or 0) + float(row.get("ot_total") or 0)
-        if hours <= 0:
-            continue
-        name = str(row.get("name") or "Employee").strip()
-        dept = str(row.get("department") or "").strip()
-        suffix = f" · {html.escape(dept)}" if dept else ""
-        lines.append(f"{html.escape(name)}{suffix} — {hours:.1f}h")
-        if len(lines) >= limit:
-            break
-    return lines
-
-
-def _recent_job_update_lines(limit: int = 4) -> list[str]:
-    jobs = sorted(
-        load_awarded_jobs(),
-        key=lambda row: str(row.get("updated_at") or row.get("awarded_date") or ""),
-        reverse=True,
-    )
-    lines: list[str] = []
-    for job in jobs:
-        num = str(job.get("job_number") or "").strip()
-        name = str(job.get("job_name") or job.get("name") or "").strip()
-        status = str(job.get("status") or "").strip()
-        label = f"{num} — {name}" if num and name else (num or name or "Job update")
-        if status:
-            label = f"{label} ({status})"
-        lines.append(html.escape(label))
-        if len(lines) >= limit:
-            break
-    return lines
-
-
-def _recent_time_entry_lines(limit: int = 4) -> list[str]:
-    today = date.today()
-    week_start = today - timedelta(days=today.weekday())
-    rows = sorted(
-        load_timekeeping_summaries(week_start),
-        key=lambda row: float(row.get("st_total") or 0) + float(row.get("ot_total") or 0),
-        reverse=True,
-    )
-    lines: list[str] = []
-    for row in rows:
-        hours = float(row.get("st_total") or 0) + float(row.get("ot_total") or 0)
-        if hours <= 0:
-            continue
-        name = str(row.get("name") or "Employee").strip()
-        status = str(row.get("status") or "Draft").strip()
-        lines.append(html.escape(f"{name} — {hours:.1f}h ({status})"))
-        if len(lines) >= limit:
-            break
-    return lines
-
-
-def _recent_document_lines(limit: int = 4) -> list[str]:
-    role = current_role() or "admin"
-    docs = sorted(
-        load_documents_hub(role=role),
-        key=lambda row: str(row.get("uploaded_at") or row.get("date") or row.get("created_at") or ""),
-        reverse=True,
-    )
-    lines: list[str] = []
-    for doc in docs:
-        title = str(doc.get("title") or doc.get("name") or doc.get("filename") or "Document").strip()
-        when = str(doc.get("uploaded_at") or doc.get("date") or "")[:10]
-        label = f"{title} · {fmt_date(when)}" if when else title
-        lines.append(html.escape(label))
-        if len(lines) >= limit:
-            break
-    return lines
-
-
-def _recent_estimate_lines(limit: int = 4) -> list[str]:
-    estimates = sorted(
-        load_estimates(),
-        key=lambda row: str(row.get("estimate_date") or row.get("updated_at") or row.get("created_at") or ""),
-        reverse=True,
-    )
-    lines: list[str] = []
-    for est in estimates:
-        num = str(est.get("estimate_number") or est.get("number") or "Estimate").strip()
-        customer = str(est.get("customer") or est.get("customer_name") or "").strip()
-        status = str(est.get("status") or "").strip()
-        label = num
-        if customer:
-            label = f"{num} — {customer}"
-        if status:
-            label = f"{label} ({status})"
-        lines.append(html.escape(label))
-        if len(lines) >= limit:
-            break
-    return lines
-
-
-def _render_todays_activity() -> None:
-    ot = "d" + "iv"
-    with st.container(key="dashboard_ops_activity"):
-        st.markdown('<p class="ips-ops-section-title">Today\'s Activity</p>', unsafe_allow_html=True)
-        panels = [
-            ("📅", "Today's Jobs", _jobs_scheduled_today(), "No jobs scheduled today"),
-            ("👷", "Employees Clocked In", _employees_clocked_in_lines(), "No time logged this week"),
-            ("💼", "Recent Job Updates", _recent_job_update_lines(), "No recent job activity"),
-            ("⏱", "Recent Time Entries", _recent_time_entry_lines(), "No time entries"),
-            ("📎", "Recent Documents", _recent_document_lines(), "No recent documents"),
-            ("📋", "Recent Estimates", _recent_estimate_lines(), "No recent estimates"),
-        ]
-        cards = "".join(
-            _activity_widget_html(icon, title, lines, empty=empty)
-            for icon, title, lines, empty in panels
-        )
-        st.markdown(f'<{ot} class="ips-ops-activity-grid">{cards}</{ot}>', unsafe_allow_html=True)
 
 
 def render() -> None:
@@ -388,8 +212,6 @@ def render() -> None:
                     ],
                     key_prefix="ips_ops_qa",
                 )
-
-        _render_todays_activity()
 
         render_dashboard_active_jobs_table(load_awarded_jobs(), limit=12)
 

@@ -13774,7 +13774,6 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stEle
 }
 .st-key-dashboard_ops_kpis,
 .st-key-dashboard_ops_row2,
-.st-key-dashboard_ops_activity,
 .st-key-dashboard_active_jobs_table {
   margin-bottom: 20px !important;
   width: 100% !important;
@@ -13783,7 +13782,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stEle
   overflow: visible !important;
 }
 .st-key-dashboard_active_jobs_table {
-  margin-top: 20px !important;
+  margin-top: 0 !important;
 }
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stHorizontalBlock"]:has(.ips-page-title-block):has(.ips-page-actions-marker) {
   display: flex !important;
@@ -14355,91 +14354,11 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   background: linear-gradient(180deg, #1d4ed8 0%, #1e3a8a 100%);
   box-shadow: 0 6px 14px rgba(37, 99, 235, 0.34);
 }
-
-/* ── Today's activity grid ── */
-.st-key-dashboard_ops_activity {
-  width: 100% !important;
-  max-width: 100% !important;
-  min-width: 0 !important;
-  overflow: visible !important;
-}
 .ips-ops-section-title {
   margin: 0 0 12px;
   font-size: 1.25rem;
   font-weight: 800;
   color: #0f172a;
-}
-.ips-ops-activity-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  align-items: stretch;
-}
-.ips-ops-widget {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 11px;
-  padding: 0.65rem 0.75rem;
-  min-height: 170px;
-  height: 100%;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  overflow: hidden;
-}
-.ips-ops-widget-head {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-bottom: 0.35rem;
-  flex-shrink: 0;
-}
-.ips-ops-widget-icon {
-  width: 1.35rem;
-  height: 1.35rem;
-  border-radius: 8px;
-  background: #eff6ff;
-  color: #2563eb;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
-  flex-shrink: 0;
-}
-.ips-ops-widget-title {
-  margin: 0;
-  font-size: 0.9375rem;
-  font-weight: 800;
-  color: #0f172a;
-  line-height: 1.2;
-}
-.ips-ops-widget-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  overflow-y: auto;
-  flex: 1 1 auto;
-  min-height: 0;
-}
-.ips-ops-widget-item {
-  font-size: 0.8125rem;
-  color: #334155;
-  line-height: 1.35;
-  padding: 0.08rem 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.ips-ops-widget-empty {
-  font-size: 0.8125rem;
-  color: #94a3b8;
-  font-style: italic;
 }
 
 /* ── Dashboard preview cards (replaces expanders) ── */
@@ -14657,9 +14576,6 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stExp
     min-width: 100% !important;
     max-width: 100% !important;
   }
-  .ips-ops-activity-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 @media (max-width: 768px) {
   section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stVerticalBlock"] > div {
@@ -14671,9 +14587,6 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stExp
   }
   .ips-ops-kpi-grid {
     grid-template-columns: repeat(2, minmax(150px, 1fr)) !important;
-  }
-  .ips-ops-activity-grid {
-    grid-template-columns: 1fr;
   }
 }
 @media (max-width: 480px) {
