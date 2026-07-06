@@ -854,7 +854,7 @@ def normalize_employee(row: dict[str, Any]) -> dict[str, Any]:
         "last_login": str(row.get("last_login") or "—"),
         "phone": phone or "—",
         "username": str(row.get("username") or eid[:8]),
-        "member_since": str(row.get("created_at") or row.get("member_since") or row.get("hire_date") or "")[:10],
+        "member_since": str(row.get("created_at") or row.get("member_since") or "")[:10],
     }
 
 
@@ -1854,23 +1854,44 @@ def _clean_employee_number(raw: object) -> str | None:
     return num
 
 
+def _parse_employee_hire_date(value: Any) -> tuple[str | None, str | None]:
+    """Return (YYYY-MM-DD or None, error_message)."""
+    if value in (None, "", "—"):
+        return None, None
+    try:
+        from app.services.certification_helpers import coerce_date, date_to_iso
+    except ImportError:
+        from services.certification_helpers import coerce_date, date_to_iso  # type: ignore
+    if not coerce_date(value):
+        return None, "Hire date must be a valid date (YYYY-MM-DD)."
+    return date_to_iso(value), None
+
+
 def save_employee(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
     try:
         from app.services.employee_role_service import (
             canonical_permission_label,
             sync_linked_profile_permission_role,
         )
+        from app.services.users_service import can_edit_employee_profile
     except ImportError:
         from services.employee_role_service import (  # type: ignore
             canonical_permission_label,
             sync_linked_profile_permission_role,
         )
+        from services.users_service import can_edit_employee_profile  # type: ignore
+
+    if not can_edit_employee_profile():
+        return ServiceResult(ok=False, error="You do not have permission to update employees.")
 
     active = str(ui.get("status", "Active")).lower() in ("active", "true", "1")
     permission_role = canonical_permission_label(
         str(ui.get("permission_role") or ui.get("role") or "Employee")
     ) or "Employee"
     billing_class = str(ui.get("trade") or ui.get("billing_class") or "").strip()
+    hire_date, hire_err = _parse_employee_hire_date(ui.get("hire_date"))
+    if hire_err:
+        return ServiceResult(ok=False, error=hire_err)
     payload = {
         "name": ui.get("name"),
         "email": ui.get("email"),
@@ -1880,7 +1901,7 @@ def save_employee(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
         "crew": ui.get("crew") or "",
         "position": ui.get("position") or billing_class or "",
         "trade": billing_class,
-        "hire_date": ui.get("hire_date") or None,
+        "hire_date": hire_date,
         "employee_number": _clean_employee_number(ui.get("employee_number")),
         "status": ui.get("status") or ("Active" if active else "Inactive"),
         "is_active": active,

@@ -65,6 +65,7 @@ try:
     from app.services.repository import clear_data_cache_for_table
     from app.services.users_service import (
         admin_reset_employee_password,
+        can_edit_employee_profile,
         can_manage_user_actions,
         get_user_delete_context,
         resolve_employee_auth_login,
@@ -130,6 +131,7 @@ except ImportError:
     from services.repository import clear_data_cache_for_table  # type: ignore
     from services.users_service import (  # type: ignore
         admin_reset_employee_password,
+        can_edit_employee_profile,
         can_manage_user_actions,
         get_user_delete_context,
         resolve_employee_auth_login,
@@ -235,6 +237,17 @@ def _employee_number_edit_value(user: dict) -> str:
     if not num or num.casefold() in {"—", "-", "none", "null"}:
         return ""
     return num
+
+
+def _employee_hire_date_edit_value(user: dict):
+    try:
+        from app.services.certification_helpers import coerce_date
+    except ImportError:
+        from services.certification_helpers import coerce_date  # type: ignore
+    raw = user.get("hire_date")
+    if raw in (None, "", "—"):
+        return None
+    return coerce_date(raw)
 
 
 def _user_display_employee_number(user: dict) -> str:
@@ -532,6 +545,8 @@ def _seed_employee_edit_form(emp: dict) -> None:
     status = str(emp.get("status") or "Active")
     st.session_state[f"emp_edit_status_{rk}"] = status if status in ("Active", "Inactive") else "Active"
     st.session_state[f"emp_edit_is_employee_{rk}"] = bool(emp.get("is_employee", False))
+    st.session_state[f"emp_edit_hire_{rk}"] = _employee_hire_date_edit_value(emp)
+    st.session_state[f"emp_edit_hire_clear_{rk}"] = False
 
 
 def _render_employee_detail_tabs(emp: dict) -> None:
@@ -662,6 +677,9 @@ def _render_employee_edit_form(emp: dict) -> None:
     render_edit_form_header("Edit User")
     if is_demo_id(eid):
         st.caption("Demo records cannot be saved to the database.")
+    if not can_edit_employee_profile():
+        st.warning("You do not have permission to update employee profiles.")
+        return
 
     ec1, ec2 = st.columns(2, gap="medium")
     with ec1:
@@ -669,6 +687,18 @@ def _render_employee_edit_form(emp: dict) -> None:
         st.text_input("Employee #", key=f"emp_edit_empnum_{rk}")
         st.text_input("Email", key=f"emp_edit_email_{rk}")
         st.text_input("Phone", key=f"emp_edit_phone_{rk}", placeholder="(337) 555-0100")
+        st.date_input(
+            "Hire Date",
+            key=f"emp_edit_hire_{rk}",
+            value=None,
+            format="YYYY-MM-DD",
+            help="Employment start date. Member Since is not changed by this field.",
+        )
+        st.checkbox(
+            "Clear hire date",
+            key=f"emp_edit_hire_clear_{rk}",
+            help="Save with no hire date (shows as — on the profile).",
+        )
     with ec2:
         st.selectbox(
             "Billing classification",
@@ -697,12 +727,16 @@ def _render_employee_edit_form(emp: dict) -> None:
     if cancelled:
         st.rerun()
     if saved and not is_demo_id(eid):
+        hire_date = None if st.session_state.get(f"emp_edit_hire_clear_{rk}") else st.session_state.get(
+            f"emp_edit_hire_{rk}"
+        )
         ok, msg = persist_employee(
             {
                 "name": st.session_state.get(f"emp_edit_name_{rk}"),
                 "employee_number": st.session_state.get(f"emp_edit_empnum_{rk}"),
                 "email": st.session_state.get(f"emp_edit_email_{rk}"),
                 "phone": st.session_state.get(f"emp_edit_phone_{rk}"),
+                "hire_date": hire_date,
                 "permission_role": st.session_state.get(f"emp_edit_permission_{rk}"),
                 "role": st.session_state.get(f"emp_edit_permission_{rk}"),
                 "trade": st.session_state.get(f"emp_edit_billing_{rk}"),
