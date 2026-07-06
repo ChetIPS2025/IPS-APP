@@ -11075,6 +11075,14 @@ button[data-testid="stBaseButton-popover"],
   max-width: none !important;
   flex: 0 0 auto !important;
 }
+section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton,
+section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"],
+section[data-testid="stSidebar"] [class*="st-key-ips_logout"] .stButton,
+section[data-testid="stSidebar"] [class*="st-key-ips_logout"] [data-testid="stButton"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  flex: 1 1 auto !important;
+}
 .stButton > button p,
 .stButton > button span,
 .stButton > button div,
@@ -11210,6 +11218,17 @@ button[data-testid="stBaseButton-popover"],
   color: inherit !important;
   font-weight: 600 !important;
   text-align: left !important;
+}
+section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"],
+section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"],
+section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stBaseButton-secondary"],
+section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stBaseButton-primary"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+  display: flex !important;
+  justify-content: flex-start !important;
 }
 </style>
 """,
@@ -13440,7 +13459,11 @@ section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"]
   max-width: 100% !important;
 }}
 section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton > button,
-section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button {{
+section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button,
+section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"],
+section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"],
+section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stBaseButton-secondary"],
+section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stBaseButton-primary"] {{
   width: 100% !important;
   max-width: 100% !important;
   display: flex !important;
@@ -13448,7 +13471,9 @@ section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"]
   justify-content: flex-start !important;
   text-align: left !important;
   background: transparent !important;
+  background-color: transparent !important;
   border: none !important;
+  border-color: transparent !important;
   box-shadow: none !important;
   outline: none !important;
   color: #334155 !important;
@@ -13461,7 +13486,9 @@ section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"]
   transition: background 0.12s ease, color 0.12s ease !important;
 }}
 section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton > button p,
-section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button p {{
+section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button p,
+section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"] p,
+section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"] p {{
   display: flex !important;
   align-items: center !important;
   gap: 0.55rem !important;
@@ -13477,13 +13504,16 @@ section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"]
 section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton > button[kind="secondary"],
 section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton > button[data-testid="baseButton-secondary"],
 section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button[kind="secondary"],
-section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button[data-testid="baseButton-secondary"] {{
+section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button[data-testid="baseButton-secondary"],
+section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"] {{
   background: transparent !important;
+  background-color: transparent !important;
   border: none !important;
   box-shadow: none !important;
 }}
 section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton > button:hover,
-section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button:hover {{
+section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button:hover,
+section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"]:hover {{
   background: #f8fafc !important;
   color: #0f172a !important;
   border: none !important;
@@ -13491,8 +13521,12 @@ section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"]
 }}
 section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] .stButton > button,
 section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] [data-testid="stButton"] > button,
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"],
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"],
 section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] .stButton > button:hover,
-section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] [data-testid="stButton"] > button:hover {{
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] [data-testid="stButton"] > button:hover,
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"]:hover,
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"]:hover {{
   background: {PRIMARY} !important;
   color: #ffffff !important;
   font-weight: 600 !important;
@@ -13657,10 +13691,15 @@ section[data-testid="stSidebar"] hr {{
   border-color: {BORDER} !important;
 }}
 section[data-testid="stSidebar"] [class*="st-key-ips_sidebar_collapse_toggle"] {{
-  position: absolute;
-  top: 0.35rem;
-  right: 0.35rem;
-  z-index: 2;
+  position: absolute !important;
+  top: 0.35rem !important;
+  right: 0.35rem !important;
+  z-index: 2 !important;
+}}
+section[data-testid="stSidebar"] > div,
+section[data-testid="stSidebar"] [data-testid="stSidebarContent"],
+section[data-testid="stSidebar"] .block-container {{
+  position: relative !important;
 }}
 
 /* Tabs — underline style */

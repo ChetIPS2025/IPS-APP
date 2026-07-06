@@ -54,19 +54,33 @@ def ensure_narrow_viewport_detected() -> None:
         height=0,
     )
 
-# Main content only — sidebar nav styling stays in ui.py
+# Main content only — sidebar nav styling stays in sidebar_shell.py
 _IPS_GLOBAL_MOBILE_CSS = """
 <style>
-/* Sidebar width (matches Streamlit + legacy .stSidebar hook) */
+/* Sidebar chrome only; width tokens live in sidebar_shell (230 expanded / 64 collapsed) */
 [data-testid="stSidebar"],
 section[data-testid="stSidebar"],
 .stSidebar {
-  width: 230px !important;
-  min-width: 230px !important;
   background-color: #ffffff !important;
   background: #ffffff !important;
   border-right: 1px solid #E5EAF2 !important;
   color: #111827 !important;
+}
+@media (min-width: 900px) {
+  body:not(.ips-sidebar-collapsed) [data-testid="stSidebar"],
+  body:not(.ips-sidebar-collapsed) section[data-testid="stSidebar"],
+  body:not(.ips-sidebar-collapsed) .stSidebar {
+    width: 230px !important;
+    min-width: 230px !important;
+    max-width: 230px !important;
+  }
+  body.ips-sidebar-collapsed [data-testid="stSidebar"],
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"],
+  body.ips-sidebar-collapsed .stSidebar {
+    width: 64px !important;
+    min-width: 64px !important;
+    max-width: 64px !important;
+  }
 }
 
 @media (max-width: 900px) {

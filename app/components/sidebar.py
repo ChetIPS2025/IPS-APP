@@ -187,11 +187,12 @@ def render_sidebar(active_slug: str) -> None:
                 unsafe_allow_html=True,
             )
             btn_label = _nav_button_label(slug, label, collapsed=collapsed)
+            btn_type = "primary" if is_active else "secondary"
             if st.button(
                 btn_label,
                 key=f"nav_{slug}",
                 use_container_width=True,
-                type="secondary",
+                type=btn_type,
                 help=label,
             ):
                 if not is_active or slug in _SCAN_SLUGS:

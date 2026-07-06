@@ -154,6 +154,7 @@ def _fallback_nav_json() -> str:
 def inject_sidebar_shell() -> None:
     """Inject sidebar layout CSS/JS once per authenticated session."""
     collapsed = is_sidebar_collapsed()
+    inject_sidebar_nav_override_css()
     if st.session_state.get(IPS_SIDEBAR_SHELL_KEY):
         inject_sidebar_menu_wire()
         inject_sidebar_layout_state(collapsed)
@@ -170,6 +171,177 @@ def inject_sidebar_shell() -> None:
     st.markdown(_shell_css(), unsafe_allow_html=True)
     inject_sidebar_menu_wire()
     inject_sidebar_layout_state(collapsed)
+
+
+def inject_sidebar_nav_override_css() -> None:
+    """Inject flat sidebar nav overrides last so they beat global button + theme CSS."""
+    st.markdown(_sidebar_nav_override_css(), unsafe_allow_html=True)
+
+
+def _sidebar_nav_override_css() -> str:
+    """Final cascade override for sidebar navigation rows (not button chrome)."""
+    return """
+<style id="ips-sidebar-nav-override-v1">
+section[data-testid="stSidebar"] > div,
+section[data-testid="stSidebar"] [data-testid="stSidebarContent"],
+section[data-testid="stSidebar"] .block-container {
+  position: relative !important;
+}
+section[data-testid="stSidebar"] [class*="st-key-nav_"],
+section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stElementContainer"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton,
+section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  flex: 1 1 auto !important;
+  margin: 0 !important;
+}
+section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton > button,
+section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button,
+section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"],
+section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"],
+section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="baseButton-secondary"],
+section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="baseButton-primary"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  color: #334155 !important;
+  font-weight: 500 !important;
+  font-size: 0.8125rem !important;
+  min-height: 2.25rem !important;
+  height: auto !important;
+  padding: 0.45rem 0.65rem !important;
+  margin: 0.05rem 0 !important;
+  border-radius: 8px !important;
+  transition: background 0.12s ease, color 0.12s ease !important;
+}
+section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton > button p,
+section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button p,
+section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"] p,
+section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"] p,
+section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"] span,
+section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"] span {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.55rem !important;
+  width: 100% !important;
+  margin: 0 !important;
+  text-align: left !important;
+  font-weight: inherit !important;
+  color: inherit !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton > button:hover,
+section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button:hover,
+section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"]:hover {
+  background: #f8fafc !important;
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] .stButton > button,
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] [data-testid="stButton"] > button,
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"],
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"],
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] .stButton > button:hover,
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] [data-testid="stButton"] > button:hover,
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"]:hover,
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"]:hover {
+  background: #2563eb !important;
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] .stButton > button p,
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] [data-testid="stButton"] > button p,
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"] p,
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"] p {
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+section[data-testid="stSidebar"] .sidebar-logo-wrap img,
+section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"] img,
+section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed img,
+section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {
+  max-width: 90px !important;
+  max-height: 32px !important;
+  width: auto !important;
+  height: auto !important;
+  object-fit: contain !important;
+}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap img,
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"] img,
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed img,
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {
+  max-width: 36px !important;
+  max-height: 36px !important;
+}
+section[data-testid="stSidebar"] [class*="st-key-ips_sidebar_collapse_toggle"] {
+  position: absolute !important;
+  top: 0.35rem !important;
+  right: 0.35rem !important;
+  z-index: 4 !important;
+  width: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+section[data-testid="stSidebar"] [class*="st-key-ips_sidebar_collapse_toggle"] .stButton > button,
+section[data-testid="stSidebar"] [class*="st-key-ips_sidebar_collapse_toggle"] button[data-testid="stBaseButton-secondary"] {
+  width: 1.65rem !important;
+  min-width: 1.65rem !important;
+  max-width: 1.65rem !important;
+  height: 1.65rem !important;
+  min-height: 1.65rem !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 8px !important;
+  border: none !important;
+  background: transparent !important;
+  color: #64748b !important;
+  box-shadow: none !important;
+  justify-content: center !important;
+}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton,
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] {
+  width: auto !important;
+  max-width: none !important;
+}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton > button,
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button,
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"],
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"] {
+  width: 2.5rem !important;
+  min-width: 2.5rem !important;
+  max-width: 2.5rem !important;
+  height: 2.5rem !important;
+  min-height: 2.5rem !important;
+  padding: 0 !important;
+  margin: 0.2rem auto !important;
+  border-radius: 10px !important;
+  justify-content: center !important;
+}
+</style>
+"""
 
 
 def inject_sidebar_layout_state(collapsed: bool) -> None:
