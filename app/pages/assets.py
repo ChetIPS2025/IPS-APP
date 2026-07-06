@@ -301,7 +301,7 @@ _ASSETS_EQUIPMENT_LAYOUT_BUMP_KEY = "_ips_assets_equipment_layout_bump"
 _ALL_SMALL_TOOL_IDS_KEY = "_ips_small_tools_visible_ids"
 _TABLE_KEY = "assets_list"
 _SMALL_TOOLS_TABLE_KEY = "assets_small_tools_list"
-_ASSET_COLS = [0.42, 0.85, 3.0, 1.0, 1.15, 1.2, 1.05, 1.3, 1.05, 0.85]
+_ASSET_COLS = [0.85, 3.0, 1.0, 1.15, 1.2, 1.05, 1.3, 1.05, 0.85]
 _SMALL_TOOL_COLS = [0.4, 0.8, 1.85, 0.95, 0.95, 1.25, 1.1, 0.9, 0.75]
 _SMALL_TOOL_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
@@ -322,7 +322,6 @@ _SMALL_TOOL_FILTER_SPECS: list[tuple[str, object]] = [
     ("condition", lambda r: _small_tool_condition_label(r)),
 ]
 _ASSET_HEADER_SPECS: list[tuple[str, str | None]] = [
-    ("", None),
     ("IMAGE", None),
     ("ASSET NAME", None),
     ("ASSET #", None),
@@ -904,7 +903,6 @@ def _render_custom_assets_table(
 
     all_asset_ids = [str(a.get("id") or "").strip() for a in filtered if str(a.get("id") or "").strip()]
     st.session_state[_ALL_ASSET_IDS_KEY] = all_asset_ids
-    _sync_asset_checkbox_state(all_asset_ids)
 
     with st.container(key="assets_table_wrap"):
         st.markdown('<div class="ips-assets-table-wrap asset-table">', unsafe_allow_html=True)
@@ -954,6 +952,7 @@ def _render_custom_assets_table(
                     f'<span class="ips-assets-row-marker ips-assets-equipment-table-row assets-table-row {stripe_cls}" data-row-id="{html.escape(aid, quote=True)}" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
+                _render_asset_thumbnail(asset)
                 if field_mode:
                     if st.button(
                         "▾" if expanded else "▸",
@@ -962,78 +961,57 @@ def _render_custom_assets_table(
                     ):
                         toggle_field_expanded(FIELD_EXPANDED_ASSET_KEY, aid)
                         st.rerun()
-                else:
-                    st.checkbox(
-                        "",
-                        key=_asset_select_key(aid),
-                        label_visibility="collapsed",
-                        on_change=_on_asset_checkbox_change,
-                        args=(aid, all_asset_ids),
-                    )
 
             with cols[1]:
-                _render_asset_thumbnail(asset)
-
-            with cols[2]:
                 rentable_badge = _asset_rentable_badge_html(asset)
                 name_label = name if name and name != "—" else "View asset"
-                st.markdown(
-                    '<div class="ips-assets-name-cell-wrap asset-name-cell">',
-                    unsafe_allow_html=True,
+                badges_html = (
+                    f'<div class="ips-assets-name-badges">{rentable_badge}</div>' if rentable_badge else ""
                 )
                 st.markdown(
-                    '<div class="ips-assets-name-link asset-name-link">',
+                    f'<div class="ips-assets-name-cell-wrap asset-name-cell">'
+                    f'<a href="#" class="ips-assets-name-text asset-name-link" '
+                    f'data-row-id="{html.escape(aid, quote=True)}" '
+                    f'title="{html.escape(name_label, quote=True)}">{html.escape(name_label)}</a>'
+                    f"{badges_html}"
+                    f"</div>",
                     unsafe_allow_html=True,
                 )
-                if st.button(
-                    name_label,
-                    key=f"ast_name_{aid}",
-                    help=f"Open {name_label}",
-                ):
-                    _open_assets_detail_modal(aid, asset)
-                    st.rerun()
-                st.markdown("</div>", unsafe_allow_html=True)
-                if rentable_badge:
-                    st.markdown(
-                        f'<div class="ips-assets-name-badges">{rentable_badge}</div>',
-                        unsafe_allow_html=True,
-                    )
-                st.markdown("</div>", unsafe_allow_html=True)
 
-            with cols[3]:
+            with cols[2]:
                 st.markdown(
                     f'<div class="ips-assets-cell ips-assets-muted">{html.escape(_asset_number(asset))}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[4]:
+            with cols[3]:
                 st.markdown(
                     f'<div class="ips-assets-cell asset-category-cell">{html.escape(category)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[5]:
+            with cols[4]:
                 st.markdown(
                     f'<div class="ips-assets-cell">{html.escape(location)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[6]:
+            with cols[5]:
                 st.markdown(_asset_status_pill_html(status), unsafe_allow_html=True)
 
-            with cols[7]:
+            with cols[6]:
                 st.markdown(
                     f'<div class="ips-assets-muted ips-assets-cell">{html.escape(assigned)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[8]:
+            with cols[7]:
                 st.markdown(
                     f'<div class="ips-assets-muted ips-assets-cell">{html.escape(next_service)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[9]:
+            with cols[8]:
                 if not is_field_context():
                     st.markdown('<span class="asset-actions-cell" aria-hidden="true"></span>', unsafe_allow_html=True)
                     render_asset_row_actions(

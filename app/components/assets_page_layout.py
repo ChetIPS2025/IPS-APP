@@ -318,8 +318,9 @@ section[data-testid="stMain"]:has(.ips-assets-page) [data-testid="column"]:has(.
   margin-top: 0.05rem;
 }
 .ips-assets-name-text,
-.asset-name-link.ips-assets-name-text {
-  font-weight: 700 !important;
+.asset-name-link.ips-assets-name-text,
+a.asset-name-link {
+  font-weight: 600 !important;
   color: #2563eb !important;
   font-size: 0.875rem;
   line-height: 1.25;
@@ -329,19 +330,16 @@ section[data-testid="stMain"]:has(.ips-assets-page) [data-testid="column"]:has(.
   text-overflow: ellipsis;
   display: inline-block;
   max-width: 100%;
+  text-decoration: none;
 }
-.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row):hover .ips-assets-name-text {
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row):hover .ips-assets-name-text,
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row):hover a.asset-name-link {
   color: #1d4ed8 !important;
   text-decoration: underline;
 }
-.asset-name-link {
-  font-weight: 700;
-  color: #2563eb;
-  cursor: pointer;
-  text-decoration: none;
-}
-.asset-name-link:hover {
-  color: #1d4ed8;
+a.asset-name-link:hover,
+a.asset-name-link:focus {
+  color: #1d4ed8 !important;
   text-decoration: underline;
 }
 .ips-asset-status-pill {
@@ -531,6 +529,21 @@ def render_assets_equipment_row_click_bridge() -> str | None:
     return anchor.closest('[data-testid="stVerticalBlockBorderWrapper"]') || anchor.parentElement;
   }
 
+  function bindNameLinks() {
+    const scope = tableScope();
+    if (!scope) return;
+    scope.querySelectorAll(".asset-name-link[data-row-id]").forEach(function (link) {
+      if (link.dataset.ipsAssetsNameBound === "1") return;
+      link.dataset.ipsAssetsNameBound = "1";
+      link.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = link.getAttribute("data-row-id");
+        if (id) sendValue(id);
+      });
+    });
+  }
+
   function bindRows() {
     const scope = tableScope();
     if (!scope) return;
@@ -547,6 +560,7 @@ def render_assets_equipment_row_click_bridge() -> str | None:
         sendValue(id);
       });
     });
+    bindNameLinks();
   }
 
   if (!doc.ipsAssetsRowClickRegistry) doc.ipsAssetsRowClickRegistry = {};

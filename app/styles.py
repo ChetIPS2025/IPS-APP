@@ -3870,12 +3870,32 @@ def inject_assets_module_css() -> None:
 .st-key-assets_table_wrap .ips-assets-name-cell-wrap,
 .st-key-assets_table_wrap .asset-name-cell {{
   display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  min-width: 360px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  min-width: 0;
   width: 100%;
   max-width: 100%;
   overflow: hidden;
+}}
+.st-key-assets_table_wrap a.asset-name-link,
+.st-key-assets_table_wrap .ips-assets-name-text {{
+  font-weight: 600 !important;
+  color: {PRIMARY} !important;
+  font-size: 0.875rem;
+  line-height: 1.25;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  max-width: 100%;
+  text-decoration: none;
+}}
+.st-key-assets_table_wrap a.asset-name-link:hover,
+.st-key-assets_table_wrap a.asset-name-link:focus {{
+  color: {PRIMARY_HOVER} !important;
+  text-decoration: underline;
 }}
 .st-key-assets_table_wrap .ips-assets-name-link,
 .st-key-assets_table_wrap .asset-name-button {{
@@ -4490,7 +4510,13 @@ def inject_assets_module_css() -> None:
   padding: 4px;
 }}
 {checkbox_css}
-.st-key-assets_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child,
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-header) > [data-testid="column"]:first-child,
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row) > [data-testid="column"]:first-child {{
+  flex: 0 0 72px !important;
+  width: 72px !important;
+  min-width: 72px !important;
+  max-width: 72px !important;
+}}
 .st-key-assets_small_tools_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {{
   flex: 0 0 40px !important;
   width: 40px !important;
