@@ -120,6 +120,15 @@ def render_module(slug: str | None = None) -> None:
     active = normalize_nav_slug(slug or nav_slug() or "dashboard")
     role = current_role()
     if not role_can_access_page(role, active):
+        try:
+            from app.navigation import default_nav_slug, set_nav_slug
+        except ImportError:
+            from navigation import default_nav_slug, set_nav_slug  # type: ignore
+        fallback = default_nav_slug()
+        if active != fallback and role_can_access_page(role, fallback):
+            set_nav_slug(fallback)
+            st.rerun()
+            return
         st.error("You do not have access to this page.")
         return
 

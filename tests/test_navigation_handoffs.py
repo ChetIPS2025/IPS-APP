@@ -16,6 +16,7 @@ from app.navigation import (
     navigate_to_estimate_detail,
     navigate_to_estimate_materials,
     navigate_to_weekly_timesheet,
+    normalize_nav_slug,
     open_jobs_job_costing,
     set_nav_slug,
 )
@@ -56,6 +57,15 @@ class TestNavigationHandoffs(unittest.TestCase):
         set_nav_slug("scan_inventory")
         self.assertEqual(st.session_state["ips_nav_page"], "inventory")
         self.assertTrue(st.session_state[INVENTORY_SCAN_EMBED_KEY])
+
+    def test_normalize_unknown_slug_falls_back_to_dashboard(self) -> None:
+        self.assertEqual(normalize_nav_slug("asset_detail"), "dashboard")
+        self.assertEqual(normalize_nav_slug("scan_inventory"), "inventory")
+        self.assertEqual(normalize_nav_slug(""), "dashboard")
+
+    def test_normalize_unknown_slug_falls_back_to_field_dashboard(self) -> None:
+        st.session_state["ips_field_mode"] = True
+        self.assertEqual(normalize_nav_slug("not_a_real_page"), "field_dashboard")
 
 
 if __name__ == "__main__":

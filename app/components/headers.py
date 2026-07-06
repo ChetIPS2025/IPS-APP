@@ -286,6 +286,9 @@ def _render_ops_quick_actions_nav_bridge() -> str | None:
     return slug or None
 
 
+_OPS_QA_LAST_NAV_KEY = "_ips_ops_qa_last_nav"
+
+
 def render_ops_quick_action_tiles(
     actions: list[tuple[str, str, str]],
     *,
@@ -297,13 +300,28 @@ def render_ops_quick_action_tiles(
     with st.container(key="dashboard_ops_quick_actions"):
         st.markdown(_build_ops_quick_actions_html(actions, title=title), unsafe_allow_html=True)
         slug = _render_ops_quick_actions_nav_bridge()
-        if slug:
-            try:
-                from app.navigation import set_nav_slug
-            except ImportError:
-                from navigation import set_nav_slug  # type: ignore
-            set_nav_slug(slug)
-            st.rerun()
+        if not slug:
+            return
+        picked = str(slug).strip()
+        if not picked:
+            return
+        if picked == str(st.session_state.get(_OPS_QA_LAST_NAV_KEY) or ""):
+            return
+        try:
+            from app.auth import current_role
+            from app.navigation import normalize_nav_slug, set_nav_slug
+            from app.utils.permissions import role_can_access_page
+        except ImportError:
+            from auth import current_role  # type: ignore
+            from navigation import normalize_nav_slug, set_nav_slug  # type: ignore
+            from utils.permissions import role_can_access_page  # type: ignore
+        target = normalize_nav_slug(picked)
+        st.session_state[_OPS_QA_LAST_NAV_KEY] = picked
+        if not role_can_access_page(current_role(), target):
+            st.warning("You do not have access to that page.")
+            return
+        set_nav_slug(target)
+        st.rerun()
 
 
 def render_dashboard_quick_actions(

@@ -240,15 +240,26 @@ def apply_pending_navigation() -> None:
     set_nav_slug(label)
 
 
+def default_nav_slug() -> str:
+    """Safe fallback when ``ips_nav_page`` cannot be resolved to a built module."""
+    if st.session_state.get("ips_field_mode"):
+        return "field_dashboard"
+    return "dashboard"
+
+
 def normalize_nav_slug(raw: str | None) -> str:
     """
     Resolve ``ips_nav_page`` to a rebuilt module slug.
 
     Accepts modern slugs (``jobs``) and legacy labels (``Job Database``).
+    Unknown values fall back to :func:`default_nav_slug` so stale session keys
+    cannot strand the user on an access-denied blank page.
     """
     s = str(raw or "").strip()
     if not s:
-        return "dashboard"
+        return default_nav_slug()
+    if s in {"scan_inventory", "scan_asset"}:
+        return "inventory" if s == "scan_inventory" else "assets"
     if s in ACTIVE_MODULE_SLUGS:
         return "employees" if s == "users" else s
     if s == "job_costing":
@@ -259,9 +270,11 @@ def normalize_nav_slug(raw: str | None) -> str:
     slug = s.lower().replace(" ", "_").replace("-", "_")
     if slug == "job_costing":
         return "jobs"
+    if slug in {"scan_inventory", "scan_asset"}:
+        return "inventory" if slug == "scan_inventory" else "assets"
     if slug in ACTIVE_MODULE_SLUGS:
         return "employees" if slug == "users" else slug
-    return slug
+    return default_nav_slug()
 
 
 def current_nav_slug() -> str:
@@ -333,6 +346,7 @@ __all__ = [
     "WJT_PREFILL_WEEK_KEY",
     "apply_pending_navigation",
     "current_nav_slug",
+    "default_nav_slug",
     "ensure_nav_defaults",
     "navigate_to_estimate_detail",
     "navigate_to_estimate_materials",
