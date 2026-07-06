@@ -13572,8 +13572,12 @@ section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [
 }}
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton > button,
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button,
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"],
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"],
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [class*="st-key-nav_"] .stButton > button,
-section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [class*="st-key-nav_"] [data-testid="stButton"] > button {{
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [class*="st-key-nav_"] [data-testid="stButton"] > button,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"],
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"] {{
   width: 2.5rem !important;
   min-width: 2.5rem !important;
   max-width: 2.5rem !important;
@@ -13705,11 +13709,24 @@ section[data-testid="stSidebar"] hr {{
   margin: 0.35rem 0.55rem !important;
   border-color: {BORDER} !important;
 }}
+.sidebar-header-top {{
+  width: 100%;
+}}
+.sidebar-header-top [data-testid="column"]:last-child {{
+  display: flex !important;
+  justify-content: flex-end !important;
+  align-items: flex-start !important;
+}}
 section[data-testid="stSidebar"] [class*="st-key-ips_sidebar_collapse_toggle"] {{
-  position: absolute !important;
-  top: 0.35rem !important;
-  right: 0.35rem !important;
-  z-index: 2 !important;
+  position: static !important;
+  top: auto !important;
+  right: auto !important;
+  width: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}}
+section[data-testid="stSidebar"] {{
+  position: relative !important;
 }}
 section[data-testid="stSidebar"] > div,
 section[data-testid="stSidebar"] [data-testid="stSidebarContent"],

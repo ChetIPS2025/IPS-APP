@@ -297,9 +297,9 @@ body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap--
   max-height: 36px !important;
 }
 section[data-testid="stSidebar"] [class*="st-key-ips_sidebar_collapse_toggle"] {
-  position: absolute !important;
-  top: 0.35rem !important;
-  right: 0.35rem !important;
+  position: static !important;
+  top: auto !important;
+  right: auto !important;
   z-index: 4 !important;
   width: auto !important;
   margin: 0 !important;
@@ -336,9 +336,25 @@ body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_
   height: 2.5rem !important;
   min-height: 2.5rem !important;
   padding: 0 !important;
-  margin: 0.2rem auto !important;
+  margin: 0.15rem auto !important;
   border-radius: 10px !important;
   justify-content: center !important;
+}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] .stButton > button,
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] [data-testid="stButton"] > button,
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"],
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"],
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] .stButton > button,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] [data-testid="stButton"] > button,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"],
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"] {
+  width: 2.5rem !important;
+  min-width: 2.5rem !important;
+  max-width: 2.5rem !important;
+  height: 2.5rem !important;
+  min-height: 2.5rem !important;
+  background: #2563eb !important;
+  color: #ffffff !important;
 }
 </style>
 """
@@ -547,8 +563,16 @@ button.ips-header-menu-btn {{
     flex-direction: column !important;
     align-items: flex-start !important;
     gap: 0.15rem !important;
-    padding-right: 1.85rem !important;
+    padding-right: 0 !important;
     min-width: 0 !important;
+  }}
+  .sidebar-header-top {{
+    width: 100% !important;
+  }}
+  .sidebar-header-top [data-testid="column"]:last-child {{
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: flex-start !important;
   }}
   .sidebar-header--collapsed .sidebar-header-brand {{
     align-items: center !important;
@@ -625,9 +649,9 @@ button.ips-header-menu-btn {{
     border-top: 1px solid #e5eaf2 !important;
   }}
   section[data-testid="stSidebar"] [class*="st-key-ips_sidebar_collapse_toggle"] {{
-    position: absolute !important;
-    top: 0.35rem !important;
-    right: 0.35rem !important;
+    position: static !important;
+    top: auto !important;
+    right: auto !important;
     z-index: 3 !important;
     flex: 0 0 auto !important;
     width: auto !important;
