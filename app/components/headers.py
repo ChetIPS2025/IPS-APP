@@ -201,98 +201,38 @@ def render_person_profile_header(
     )
 
 
-def _build_ops_quick_actions_html(
-    actions: list[tuple[str, str, str]],
-    *,
-    title: str,
-) -> str:
-    buttons: list[str] = []
-    for icon, label, slug in actions:
-        slug_attr = html.escape(str(slug or "").strip(), quote=True)
-        icon_esc = html.escape(str(icon or "").strip())
-        label_esc = html.escape(str(label or "").strip())
-        buttons.append(
-            f'<button type="button" class="quick-action-btn" data-nav-slug="{slug_attr}">'
-            f'<span class="quick-action-icon" aria-hidden="true">{icon_esc}</span>'
-            f'<span class="quick-action-label">{label_esc}</span>'
-            f"</button>"
-        )
-    return (
-        '<div class="ips-ops-quick-toolbar">'
-        f'<p class="ips-ops-quick-toolbar-title">{html.escape(title)}</p>'
-        f'<div class="quick-actions-toolbar">{"".join(buttons)}</div>'
-        "</div>"
-    )
-
-
-def _render_ops_quick_actions_nav_bridge() -> str | None:
+def _navigate_ops_quick_action(slug: str) -> None:
+    """Navigate from operations dashboard quick actions."""
+    picked = str(slug or "").strip()
+    if not picked:
+        return
     try:
-        from app.ui.clean_table import _components_html
+        from app.auth import current_role
+        from app.navigation import normalize_nav_slug, set_nav_slug
+        from app.utils.permissions import role_can_access_page
     except ImportError:
-        from ui.clean_table import _components_html  # type: ignore
+        from auth import current_role  # type: ignore
+        from navigation import normalize_nav_slug, set_nav_slug  # type: ignore
+        from utils.permissions import role_can_access_page  # type: ignore
 
-    picked = _components_html(
-        """
-<script>
-(function () {
-  const w = window.parent || window;
-  const doc = w.document;
-  const hookKey = "ipsOpsQuickActions::nav";
-  const btnSel = ".quick-actions-toolbar .quick-action-btn[data-nav-slug]";
+    if picked == "job_costing":
+        if not role_can_access_page(current_role(), "jobs"):
+            st.warning("You do not have access to that page.")
+            return
+        try:
+            from app.navigation import open_jobs_job_costing
+        except ImportError:
+            from navigation import open_jobs_job_costing  # type: ignore
+        open_jobs_job_costing()
+        st.rerun()
+        return
 
-  function sendValue(slug) {
-    const payload = { type: "streamlit:setComponentValue", value: slug };
-    const frames = [window, window.parent, w].filter(function (f, i, arr) {
-      return f && arr.indexOf(f) === i;
-    });
-    for (var i = 0; i < frames.length; i++) {
-      try {
-        if (frames[i].Streamlit && typeof frames[i].Streamlit.setComponentValue === "function") {
-          frames[i].Streamlit.setComponentValue(slug);
-          return;
-        }
-      } catch (err) {}
-    }
-    for (var j = 0; j < frames.length; j++) {
-      try { frames[j].postMessage(payload, "*"); } catch (err) {}
-    }
-  }
-
-  function bindButtons() {
-    doc.querySelectorAll(btnSel).forEach(function (btn) {
-      if (btn.dataset.ipsOpsQaBound === "1") return;
-      btn.dataset.ipsOpsQaBound = "1";
-      btn.addEventListener("click", function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        const slug = btn.getAttribute("data-nav-slug");
-        if (slug) sendValue(slug);
-      });
-    });
-  }
-
-  if (!doc.ipsOpsQuickActionsRegistry) doc.ipsOpsQuickActionsRegistry = {};
-  doc.ipsOpsQuickActionsRegistry[hookKey] = { bind: bindButtons };
-  bindButtons();
-  if (!doc.ipsOpsQuickActionsBindObserver) {
-    doc.ipsOpsQuickActionsBindObserver = new MutationObserver(function () {
-      Object.values(doc.ipsOpsQuickActionsRegistry || {}).forEach(function (cfg) {
-        if (cfg && typeof cfg.bind === "function") cfg.bind();
-      });
-    });
-    doc.ipsOpsQuickActionsBindObserver.observe(doc.body, { childList: true, subtree: true });
-  }
-})();
-</script>
-        """,
-        component_key="ips_ops_quick_actions_nav",
-        height=0,
-    )
-    slug = str(picked or "").strip()
-    return slug or None
-
-
-_OPS_QA_LAST_NAV_KEY = "_ips_ops_qa_last_nav"
+    target = normalize_nav_slug(picked)
+    if not role_can_access_page(current_role(), target):
+        st.warning("You do not have access to that page.")
+        return
+    set_nav_slug(target)
+    st.rerun()
 
 
 def render_ops_quick_action_tiles(
@@ -302,43 +242,26 @@ def render_ops_quick_action_tiles(
     title: str = "Quick Actions",
 ) -> None:
     """Compact Quick Actions toolbar for the operations dashboard."""
-    _ = key_prefix  # retained for call-site compatibility
     with st.container(key="dashboard_ops_quick_actions"):
-        st.markdown(_build_ops_quick_actions_html(actions, title=title), unsafe_allow_html=True)
-        slug = _render_ops_quick_actions_nav_bridge()
-        if not slug:
-            return
-        picked = str(slug).strip()
-        if not picked:
-            return
-        if picked == str(st.session_state.get(_OPS_QA_LAST_NAV_KEY) or ""):
-            return
-        try:
-            from app.auth import current_role
-            from app.navigation import normalize_nav_slug, set_nav_slug
-            from app.utils.permissions import role_can_access_page
-        except ImportError:
-            from auth import current_role  # type: ignore
-            from navigation import normalize_nav_slug, set_nav_slug  # type: ignore
-            from utils.permissions import role_can_access_page  # type: ignore
-        st.session_state[_OPS_QA_LAST_NAV_KEY] = picked
-        if picked == "job_costing":
-            if not role_can_access_page(current_role(), "jobs"):
-                st.warning("You do not have access to that page.")
-                return
-            try:
-                from app.navigation import open_jobs_job_costing
-            except ImportError:
-                from navigation import open_jobs_job_costing  # type: ignore
-            open_jobs_job_costing()
-            st.rerun()
-            return
-        target = normalize_nav_slug(picked)
-        if not role_can_access_page(current_role(), target):
-            st.warning("You do not have access to that page.")
-            return
-        set_nav_slug(target)
-        st.rerun()
+        st.markdown(
+            f'<p class="ips-ops-quick-toolbar-title">{html.escape(title)}</p>',
+            unsafe_allow_html=True,
+        )
+        row_size = 5
+        for row_start in range(0, len(actions), row_size):
+            cols = st.columns(row_size, gap="small")
+            for j, col in enumerate(cols):
+                idx = row_start + j
+                if idx >= len(actions):
+                    break
+                icon, label, slug = actions[idx]
+                with col:
+                    if st.button(
+                        f"{icon} {label}",
+                        key=f"{key_prefix}_{idx}",
+                        use_container_width=True,
+                    ):
+                        _navigate_ops_quick_action(slug)
 
 
 def render_dashboard_quick_actions(
@@ -374,12 +297,7 @@ def render_dashboard_quick_actions(
                         use_container_width=True,
                     ):
                         if slug:
-                            try:
-                                from app.navigation import set_nav_slug
-                            except ImportError:
-                                from navigation import set_nav_slug  # type: ignore
-                            set_nav_slug(slug)
-                            st.rerun()
+                            _navigate_ops_quick_action(slug)
 
 
 def render_quick_actions_grid(

@@ -14702,6 +14702,46 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   position: static !important;
   transform: none !important;
 }
+.st-key-dashboard_ops_quick_actions [data-testid="stHorizontalBlock"] {
+  flex-wrap: wrap !important;
+  gap: 10px !important;
+  align-items: stretch !important;
+}
+.st-key-dashboard_ops_quick_actions [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+  min-width: 130px !important;
+  flex: 1 1 130px !important;
+  width: auto !important;
+}
+.st-key-dashboard_ops_quick_actions .stButton {
+  width: 100% !important;
+}
+.st-key-dashboard_ops_quick_actions .stButton > button {
+  min-height: 32px !important;
+  height: 32px !important;
+  padding: 0 12px !important;
+  background: #ffffff !important;
+  border: 1px solid #2563eb !important;
+  border-radius: 6px !important;
+  color: #0f172a !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  line-height: 1 !important;
+  box-shadow: none !important;
+  white-space: nowrap !important;
+  transition: background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+.st-key-dashboard_ops_quick_actions .stButton > button:hover {
+  background: #2563eb !important;
+  border-color: #2563eb !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.22) !important;
+}
+.st-key-dashboard_ops_quick_actions .stButton > button p {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
 .ips-ops-quick-toolbar {
   width: 100%;
   box-sizing: border-box;
