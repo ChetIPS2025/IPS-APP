@@ -404,12 +404,6 @@ def inject_assets_page_styles() -> None:
             text-decoration: underline !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
-        .st-key-assets_table_wrap .ips-assets-name-link button,
-        section[data-testid="stMain"]:has(.ips-assets-page)
-        .st-key-assets_table_wrap .asset-name-button button {
-            display: none !important;
-        }
-        section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap .asset-name-cell,
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap .asset-name-button,

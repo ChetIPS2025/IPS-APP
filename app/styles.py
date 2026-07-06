@@ -3821,7 +3821,7 @@ def inject_assets_module_css() -> None:
     ast_list_wrap = ".st-key-assets_table_wrap, .st-key-assets_small_tools_table_wrap"
     assets_equipment_grid = (
         "40px 88px minmax(360px, 2fr) minmax(150px, 0.9fr) minmax(150px, 0.9fr) "
-        "minmax(120px, 0.8fr) minmax(150px, 0.9fr) minmax(160px, 0.9fr) 120px"
+        "minmax(120px, 0.8fr) minmax(150px, 0.9fr) minmax(160px, 0.9fr)"
     )
     assets_serialized_grid = (
         "40px 52px minmax(160px, 1.8fr) minmax(100px, 0.9fr) minmax(110px, 1fr) "

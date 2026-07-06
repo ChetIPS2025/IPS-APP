@@ -112,7 +112,6 @@ try:
     from app.components.asset_row_actions_ui import (
         ASSET_OPEN_ACTIVITY_KEY,
         render_asset_activity_snippet,
-        render_asset_row_actions,
     )
     from app.components.assets_page_layout import (
         close_assets_filter_bar_shell,
@@ -250,7 +249,6 @@ except ImportError:
     from components.asset_row_actions_ui import (  # type: ignore
         ASSET_OPEN_ACTIVITY_KEY,
         render_asset_activity_snippet,
-        render_asset_row_actions,
     )
     from components.assets_page_layout import (  # type: ignore
         close_assets_filter_bar_shell,
@@ -301,7 +299,7 @@ _ASSETS_EQUIPMENT_LAYOUT_BUMP_KEY = "_ips_assets_equipment_layout_bump"
 _ALL_SMALL_TOOL_IDS_KEY = "_ips_small_tools_visible_ids"
 _TABLE_KEY = "assets_list"
 _SMALL_TOOLS_TABLE_KEY = "assets_small_tools_list"
-_ASSET_COLS = [0.42, 0.85, 4.5, 1.45, 1.55, 1.35, 1.65, 1.25, 1.15]
+_ASSET_COLS = [0.42, 0.85, 4.5, 1.45, 1.55, 1.35, 1.65, 1.25]
 _SMALL_TOOL_COLS = [0.4, 0.8, 1.85, 0.95, 0.95, 1.25, 1.1, 0.9, 0.75]
 _SMALL_TOOL_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
@@ -330,7 +328,6 @@ _ASSET_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("STATUS", "status"),
     ("ASSIGNED TO", None),
     ("NEXT SERVICE DUE", None),
-    ("ACTIONS", None),
 ]
 _COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
     ("category", lambda r: _asset_category(r)),
@@ -916,11 +913,6 @@ def _render_custom_assets_table(
                         '<span class="ips-assets-table-header-marker ips-assets-equipment-table-header assets-table-header" aria-hidden="true"></span>',
                         unsafe_allow_html=True,
                     )
-                elif hidx == 8:
-                    st.markdown(
-                        '<span class="ips-assets-actions-header-cell assets-table-header" aria-hidden="true"></span>',
-                        unsafe_allow_html=True,
-                    )
                 if field:
                     render_table_header_cell(
                         label,
@@ -986,9 +978,17 @@ def _render_custom_assets_table(
                     unsafe_allow_html=True,
                 )
                 st.markdown(
-                    f'<span class="asset-name-link ips-assets-name-text" title="{html.escape(name_label, quote=True)}">{html.escape(name_label)}</span>',
+                    '<div class="ips-assets-name-link asset-name-link">',
                     unsafe_allow_html=True,
                 )
+                if st.button(
+                    name_label,
+                    key=f"ast_name_{aid}",
+                    help=f"Open {name_label}",
+                ):
+                    _open_assets_detail_modal(aid, asset)
+                    st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
                 if rentable_badge:
                     st.markdown(
                         f'<div class="ips-assets-name-badges">{rentable_badge}</div>',
@@ -1022,21 +1022,6 @@ def _render_custom_assets_table(
                     f'<div class="ips-assets-muted ips-assets-cell">{html.escape(next_service)}</div>',
                     unsafe_allow_html=True,
                 )
-
-            with cols[8]:
-                if not field_mode:
-                    st.markdown(
-                        '<span class="ips-assets-actions-cell ips-assets-actions-toolbar asset-actions-cell" aria-hidden="true"></span>',
-                        unsafe_allow_html=True,
-                    )
-                    render_asset_row_actions(
-                        asset,
-                        on_view=_row_action_view,
-                        on_edit=_row_action_edit,
-                        on_change_type=_row_action_change_type,
-                        on_history=_row_action_history,
-                        on_after_change=clear_assets_cache,
-                    )
 
             if expanded:
                 st.markdown('<div class="ips-field-row-expand">', unsafe_allow_html=True)
@@ -1501,26 +1486,6 @@ def _put_asset_in_modal_cache(asset_id: str, asset: dict | None) -> None:
         cache = dict(cache)
     cache[aid] = asset
     st.session_state[_ASSETS_CACHE_KEY] = cache
-
-
-def _row_action_view(asset: dict) -> None:
-    aid = str(asset.get("id") or "").strip()
-    _open_assets_detail_modal(aid, asset)
-
-
-def _row_action_edit(asset: dict) -> None:
-    _row_action_view(asset)
-    _set_asset_edit_mode(asset)
-
-
-def _row_action_change_type(asset: dict) -> None:
-    _row_action_edit(asset)
-
-
-def _row_action_history(asset: dict) -> None:
-    aid = str(asset.get("id") or "").strip()
-    _open_assets_detail_modal(aid, asset)
-    st.session_state[ASSET_OPEN_ACTIVITY_KEY] = aid
 
 
 def _open_assets_detail_modal(asset_id: str, asset: dict | None = None) -> None:

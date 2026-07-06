@@ -331,11 +331,6 @@ section[data-testid="stMain"]:has(.ips-assets-page) [data-testid="column"]:has(.
   color: #1d4ed8 !important;
   text-decoration: underline;
 }
-section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-link button,
-section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .ips-assets-name-link button,
-section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_table_wrap .asset-name-button button {
-  display: none !important;
-}
 .asset-name-link {
   font-weight: 700;
   color: #2563eb;
