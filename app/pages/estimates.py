@@ -50,10 +50,12 @@ try:
         customer_location_select_options,
         get_estimate,
         load_assets,
+        load_documents_hub,
         load_estimates,
         load_inventory,
         load_jobs,
         lookup_options,
+        persist_document,
         persist_estimate,
     )
     from app.components.estimate_actions import render_estimate_action_buttons
@@ -76,7 +78,7 @@ try:
         render_table_header_cell,
     )
     from app.components.table_pagination import paginate_rows, reset_table_page
-    from app.pages._core._crud import is_demo_id
+    from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._session import select_key
     from app.services.estimates_service import (
         approve_estimate_and_sync_job,
@@ -101,6 +103,7 @@ try:
     )
     from app.styles import inject_estimates_module_css
     from app.utils.formatting import fmt_currency, fmt_date
+    from app.utils.permissions import normalize_role
     from app.services.estimate_expiration_service import (
         default_expiration_date,
         effective_expiration_date,
@@ -151,10 +154,12 @@ except ImportError:
         customer_location_select_options,
         get_estimate,
         load_assets,
+        load_documents_hub,
         load_estimates,
         load_inventory,
         load_jobs,
         lookup_options,
+        persist_document,
         persist_estimate,
     )
     from components.estimate_actions import render_estimate_action_buttons  # type: ignore
@@ -177,7 +182,7 @@ except ImportError:
         clear_table_filters,
         render_table_header_cell,
     )
-    from pages._core._crud import is_demo_id  # type: ignore
+    from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
     from services.estimates_service import (  # type: ignore
         approve_estimate_and_sync_job,
@@ -202,6 +207,7 @@ except ImportError:
     )
     from styles import inject_estimates_module_css  # type: ignore
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
+    from utils.permissions import normalize_role  # type: ignore
     from services.estimate_expiration_service import (  # type: ignore
         default_expiration_date,
         effective_expiration_date,
@@ -237,6 +243,7 @@ _ESTIMATE_DETAIL_TABS = [
     "Subcontractors",
     "Other Costs",
     "Summary",
+    "Documents",
 ]
 _ESTIMATE_COLS = [0.35, 1.05, 2.2, 1.55, 1.05, 1.05, 1.15, 0.95, 1.15]
 _ESTIMATE_COL_MARKERS = ("sel", "num", "desc", "customer", "job", "status", "date", "total", "actions")
@@ -1417,6 +1424,96 @@ def _render_estimate_detail_tabs_fragment(est: dict) -> None:
     _render_estimate_detail_tabs(est)
 
 
+def _estimate_documents_link_ref(est: dict) -> str:
+    num = str(est.get("estimate_number") or "").strip()
+    name = str(est.get("project_name") or est.get("description") or "").strip()
+    if num and name:
+        return f"{num} — {name}"
+    return num or name or "Estimate"
+
+
+def _estimate_documents_for(est: dict, eid: str) -> list[dict]:
+    ref = _estimate_documents_link_ref(est)
+    num = str(est.get("estimate_number") or "").strip()
+    rows: list[dict] = []
+    for doc in load_documents_hub(role=normalize_role(current_role())):
+        mod = str(doc.get("linked_module") or "").strip().lower()
+        if mod not in {"estimates", "estimate"}:
+            continue
+        linked_id = str(doc.get("linked_record_id") or "").strip()
+        linked_ref = str(doc.get("linked_ref") or "")
+        if linked_id == eid or (num and num in linked_ref) or ref in linked_ref:
+            rows.append(doc)
+    rows.sort(key=lambda r: str(r.get("upload_date") or r.get("created_at") or ""), reverse=True)
+    return rows
+
+
+def _render_estimate_documents_tab(est: dict) -> None:
+    eid = str(est.get("id") or "").strip()
+    if not eid or is_demo_id(eid):
+        placeholder_html("Save this estimate to attach documents.")
+        return
+
+    ref = _estimate_documents_link_ref(est)
+    upload_key = f"est_doc_upload_{eid}"
+
+    head_l, head_r = st.columns([3, 1], gap="small")
+    with head_l:
+        st.markdown("**Estimate attachments**")
+        st.caption("Specifications, vendor quotes, proposals, and other files for this estimate.")
+    with head_r:
+        if st.button("+ Upload", key=f"est_doc_btn_{eid}", use_container_width=True):
+            st.session_state[upload_key] = True
+            st.rerun()
+
+    if st.session_state.get(upload_key):
+        with st.expander("Upload attachment", expanded=True):
+            st.file_uploader("File", key=f"est_doc_file_{eid}")
+            st.selectbox("Document type", lookup_options("document_types"), key=f"est_doc_type_{eid}")
+            st.text_area("Notes", key=f"est_doc_notes_{eid}", height=80)
+            save_col, cancel_col = st.columns(2)
+            with save_col:
+                if st.button("Save attachment", key=f"est_doc_save_{eid}", type="primary", use_container_width=True):
+                    up = st.session_state.get(f"est_doc_file_{eid}")
+                    fname = str(getattr(up, "name", "") or "attachment.pdf") if up else "attachment.pdf"
+                    try:
+                        from app.auth import current_profile
+                    except ImportError:
+                        from auth import current_profile  # type: ignore
+                    prof = current_profile() or {}
+                    ok, msg = persist_document(
+                        {
+                            "file_name": fname,
+                            "doc_type": st.session_state.get(f"est_doc_type_{eid}"),
+                            "linked_module": "Estimates",
+                            "linked_ref": ref,
+                            "uploaded_by": str(prof.get("full_name") or prof.get("email") or ""),
+                            "notes": st.session_state.get(f"est_doc_notes_{eid}"),
+                        }
+                    )
+                    if apply_persist_feedback(ok, msg, clear_keys=(upload_key,)):
+                        st.rerun()
+            with cancel_col:
+                if st.button("Cancel", key=f"est_doc_cancel_{eid}", use_container_width=True):
+                    st.session_state.pop(upload_key, None)
+                    st.rerun()
+
+    docs = _estimate_documents_for(est, eid)
+    if not docs:
+        placeholder_html("No attachments yet. Upload specifications, quotes, or supporting documents.")
+        return
+
+    for doc in docs:
+        st.markdown(
+            f"**{html.escape(str(doc.get('file_name') or 'Document'))}** · "
+            f"{html.escape(str(doc.get('doc_type') or '—'))} · "
+            f"Uploaded {html.escape(fmt_date(doc.get('upload_date')))}"
+        )
+        notes = str(doc.get("notes") or "").strip()
+        if notes:
+            st.caption(notes)
+
+
 def _render_estimate_detail_tabs(est: dict) -> None:
     eid = str(est.get("id") or "")
     en = safe_value(est.get("estimate_number"))
@@ -1547,6 +1644,9 @@ def _render_estimate_detail_tabs(est: dict) -> None:
 
     elif active_tab == "Summary":
         render_summary_tab(est)
+
+    elif active_tab == "Documents":
+        _render_estimate_documents_tab(est)
 
 
 def _render_estimate_revision_panel(est: dict) -> None:

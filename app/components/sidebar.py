@@ -55,7 +55,19 @@ def render_sidebar(active_slug: str) -> None:
         from components.sidebar_shell import store_sidebar_nav_fallback  # type: ignore
     store_sidebar_nav_fallback(nav_items)
     _ESTIMATING_SLUGS = frozenset({"estimates", "pricing_guide"})
+    _OPERATIONS_SLUGS = frozenset({"inventory", "assets"})
+    _LABOR_SLUGS = frozenset({"timekeeping"})
+    _MANAGEMENT_SLUGS = frozenset({"tasks", "reports"})
+    _ADMIN_SLUGS = frozenset({"employees", "admin", "settings"})
     _SCAN_SLUGS = frozenset({"scan_inventory", "scan_asset"})
+    _SECTION_HEADERS: list[tuple[frozenset[str], str]] = [
+        (_ESTIMATING_SLUGS, "Estimating"),
+        (_OPERATIONS_SLUGS, "Operations"),
+        (_LABOR_SLUGS, "Labor"),
+        (_MANAGEMENT_SLUGS, "Management"),
+        (_ADMIN_SLUGS, "Admin"),
+    ]
+    _shown_sections: set[str] = set()
 
     with st.sidebar:
         st.markdown(f'<{_OT} class="ips-sidebar-logo-wrap">', unsafe_allow_html=True)
@@ -70,18 +82,19 @@ def render_sidebar(active_slug: str) -> None:
         )
 
         st.markdown(f'<p class="ips-sidebar-nav-label">Navigation</p>', unsafe_allow_html=True)
-        estimating_header_shown = False
         for item in nav_items:
             if len(item) == 3:
                 slug, label, _icon = item
             else:
                 slug, label = item  # type: ignore[misc]
-            if slug in _ESTIMATING_SLUGS and not estimating_header_shown:
-                st.markdown(
-                    '<p class="ips-sidebar-nav-label" style="margin-top:0.75rem;">Estimating</p>',
-                    unsafe_allow_html=True,
-                )
-                estimating_header_shown = True
+            for section_slugs, section_label in _SECTION_HEADERS:
+                if slug in section_slugs and section_label not in _shown_sections:
+                    st.markdown(
+                        f'<p class="ips-sidebar-nav-label" style="margin-top:0.75rem;">{html.escape(section_label)}</p>',
+                        unsafe_allow_html=True,
+                    )
+                    _shown_sections.add(section_label)
+                    break
             is_active = slug == active_slug or (slug in _SCAN_SLUGS and active_slug in {"inventory", "assets"})
             if st.button(
                 label,

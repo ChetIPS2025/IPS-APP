@@ -8,7 +8,7 @@ from datetime import date, timedelta
 import streamlit as st
 
 try:
-    from app.auth import current_profile
+    from app.auth import current_profile, current_role
     from app.components.cards import render_ops_kpi_row
     from app.components.dashboard_active_jobs_table import render_dashboard_active_jobs_table
     from app.components.dashboard_estimates_waiting_table import render_dashboard_estimates_waiting_table
@@ -29,7 +29,7 @@ try:
     from app.styles import inject_global_css, inject_ops_dashboard_css
     from app.utils.formatting import fmt_currency
 except ImportError:
-    from auth import current_profile  # type: ignore
+    from auth import current_profile, current_role  # type: ignore
     from components.cards import render_ops_kpi_row  # type: ignore
     from components.dashboard_active_jobs_table import render_dashboard_active_jobs_table  # type: ignore
     from components.dashboard_estimates_waiting_table import render_dashboard_estimates_waiting_table  # type: ignore
@@ -51,9 +51,6 @@ except ImportError:
     from utils.formatting import fmt_currency  # type: ignore
 
 
-_CLOSED_TASK_STATUSES = frozenset({"done", "cancelled", "closed", "completed"})
-
-
 def _welcome_name() -> str:
     prof = current_profile() or {}
     nm = str(prof.get("full_name") or "").strip()
@@ -72,11 +69,18 @@ def _date_range_state() -> tuple[date, date]:
     return start, end
 
 
-def _count_open_tasks() -> int:
-    return sum(
-        1
-        for task in load_tasks()
-        if str(task.get("status") or "").strip().lower() not in _CLOSED_TASK_STATUSES
+def _my_todo_count() -> int:
+    try:
+        from app.services.management_reminders_service import filter_dashboard_reminders
+    except ImportError:
+        from services.management_reminders_service import filter_dashboard_reminders  # type: ignore
+    return len(
+        filter_dashboard_reminders(
+            load_tasks(),
+            profile=current_profile() or {},
+            role=current_role(),
+            limit=999,
+        )
     )
 
 
@@ -187,7 +191,7 @@ def render() -> None:
                 ("Active Jobs", str(kpis.get("active_jobs", 0)), "💼", "#ffedd5"),
                 ("Estimates Pending", str(kpis.get("open_estimates", 0)), "📋", "#f3e8ff"),
                 ("Employees Working Today", str(employees_today), "👷", "#dcfce7"),
-                ("Open Tasks", str(_count_open_tasks()), "✅", "#e0f2fe"),
+                ("My To-Do", str(_my_todo_count()), "✅", "#e0f2fe"),
                 ("Open Invoices", fmt_currency(kpis.get("open_invoices", 0)), "🧾", "#dbeafe"),
                 ("Revenue This Month", fmt_currency(kpis.get("total_sales", 0)), "💵", "#fef3c7"),
             ]
@@ -211,8 +215,7 @@ def render() -> None:
                 ("🕒", "Timekeeping", "timekeeping"),
                 ("📝", "Daily Report", "field_daily_reports"),
                 ("📦", "Inventory", "inventory"),
-                ("✅", "Create Task", "tasks"),
-                ("📎", "Upload Document", "documents"),
+                ("✅", "Add To-Do", "tasks"),
                 ("🚛", "Add Asset", "assets"),
                 ("📊", "Run Job Cost Report", "job_costing"),
             ],

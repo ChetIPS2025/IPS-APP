@@ -321,7 +321,7 @@ def render_dashboard_preview_sections() -> None:
             with st.container(key="dashboard_preview_todos"):
                 _render_preview_card_shell(
                     icon="✅",
-                    title="Office To-Do & More",
+                    title="My To-Do",
                     body_html=_todo_preview_html(todo_rows),
                     view_key="ips_dash_preview_todos_all",
                     on_view_all=lambda: _nav_slug("tasks"),

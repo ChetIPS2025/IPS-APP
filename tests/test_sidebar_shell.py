@@ -29,6 +29,6 @@ def test_employee_field_nav_excludes_company_updates():
     assert "Field Home" in labels
     assert "Today's Work" in labels
     assert "My Jobs" in labels
-    assert "Today's Tasks" in labels
+    assert "My To-Do" in labels
     assert "Log Time" in labels
     assert "Company Updates" not in labels

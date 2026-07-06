@@ -215,7 +215,7 @@ _TASK_TABS = [
 _TASK_STATUS_OPTS = ["Open", "Closed"]
 _PRIORITY_FILTER_OPTS = ["All Priorities", "High", "Medium", "Low"]
 TASK_VIEW_KEY = "task_view_filter"
-TASK_VIEW_OPTS = ["Open Tasks", "Closed Tasks", "All Tasks"]
+TASK_VIEW_OPTS = ["Open To-Dos", "Closed To-Dos", "All To-Dos"]
 FIELD_TASK_VIEW_OPTS = ["Due Today", *TASK_VIEW_OPTS]
 JOB_TASK_VIEW_OPTS = ["Open", "Closed", "All"]
 SELECTED_JOB_SUBJOB_KEY = "selected_job_subjob_id"
@@ -433,9 +433,9 @@ def _apply_task_view_filter(rows: list[dict], view: str) -> list[dict]:
             if normalize_task_status(t.get("status")) == "Open"
             and str(t.get("due_date") or "")[:10] == today
         ]
-    if view == "Closed Tasks":
+    if view == "Closed To-Dos":
         return [t for t in rows if normalize_task_status(t.get("status")) == "Closed"]
-    if view == "Open Tasks":
+    if view == "Open To-Dos":
         return [t for t in rows if normalize_task_status(t.get("status")) == "Open"]
     return list(rows)
 
@@ -443,17 +443,17 @@ def _apply_task_view_filter(rows: list[dict], view: str) -> list[dict]:
 def _task_count_caption(count: int, view: str) -> str:
     if view == "Due Today":
         return f"{count} task(s) due today"
-    if view == "Open Tasks":
-        return f"{count} open task(s)"
-    if view == "Closed Tasks":
-        return f"{count} closed task(s)"
+    if view == "Open To-Dos":
+        return f"{count} open to-do(s)"
+    if view == "Closed To-Dos":
+        return f"{count} closed to-do(s)"
     return f"{count} task(s)"
 
 
 def _render_task_view_selector() -> None:
     opts = FIELD_TASK_VIEW_OPTS if is_field_context() else TASK_VIEW_OPTS
     if TASK_VIEW_KEY not in st.session_state:
-        st.session_state[TASK_VIEW_KEY] = "Due Today" if is_field_context() else "Open Tasks"
+        st.session_state[TASK_VIEW_KEY] = "Due Today" if is_field_context() else "Open To-Dos"
     current = str(st.session_state.get(TASK_VIEW_KEY) or "")
     if current not in opts:
         st.session_state[TASK_VIEW_KEY] = opts[0]
@@ -1487,12 +1487,12 @@ def render() -> None:
     filter_options = build_filter_options(enriched_tasks, _COLUMN_FILTER_SPECS)
 
     def _task_new() -> None:
-        if st.button("+ New Task", key="task_new", type="primary", use_container_width=True):
+        if st.button("+ New To-Do", key="task_new", type="primary", use_container_width=True):
             st.session_state["ips_task_form"] = True
 
     render_page_brand_header(
-        "Tasks",
-        "Track to-dos, assignments, and linked jobs or estimates.",
+        "To-Do",
+        "Office and management to-dos — follow-ups, approvals, orders, payroll, and vendor calls.",
         actions=[_task_new],
     )
 
@@ -1509,7 +1509,7 @@ def render() -> None:
         _render_task_view_selector()
         c1, c2 = st.columns([5, 0.6])
         with c1:
-            st.text_input("Search", placeholder="Search tasks…", key="task_search", label_visibility="collapsed")
+            st.text_input("Search", placeholder="Search to-dos…", key="task_search", label_visibility="collapsed")
         with c2:
             if st.button("Clear", key="task_clear", use_container_width=True):
                 clear_table_filters(
@@ -1519,7 +1519,7 @@ def render() -> None:
                 )
                 _clear_task_selection(st.session_state.get(_ALL_TASK_IDS_KEY))
                 clear_field_expanded(FIELD_EXPANDED_TASK_KEY)
-                st.session_state[TASK_VIEW_KEY] = "Due Today" if is_field_context() else "Open Tasks"
+                st.session_state[TASK_VIEW_KEY] = "Due Today" if is_field_context() else "Open To-Dos"
                 reset_table_page(_TABLE_KEY)
                 st.rerun()
 
@@ -1532,7 +1532,7 @@ def render() -> None:
         default_job_label = pre_job_label if pre_job_label in job_labels else job_labels[0]
         if "task_new_job" not in st.session_state and pre_job_label:
             st.session_state["task_new_job"] = default_job_label
-        with st.expander("New task", expanded=True):
+        with st.expander("New to-do", expanded=True):
             st.text_input("Title", key="task_new_title")
             nc1, nc2 = st.columns(2)
             with nc1:
@@ -1554,7 +1554,7 @@ def render() -> None:
                 picked_job_id = _resolve_job_id_from_label(picked_job_label, job_options)
             st.selectbox("Linked estimate", _estimate_options({}), key="task_new_est")
             st.text_area("Description", key="task_new_desc")
-            if st.button("Create Task", key="task_create", type="primary"):
+            if st.button("Create To-Do", key="task_create", type="primary"):
                 assignee = st.session_state.get("task_new_assignee")
                 if assignee == "— Unassigned —":
                     assignee = ""
@@ -1578,7 +1578,7 @@ def render() -> None:
                     clear_tasks_cache()
                     st.rerun()
 
-    view = str(st.session_state.get(TASK_VIEW_KEY) or ("Due Today" if is_field_context() else "Open Tasks"))
+    view = str(st.session_state.get(TASK_VIEW_KEY) or ("Due Today" if is_field_context() else "Open To-Dos"))
     view_opts = FIELD_TASK_VIEW_OPTS if is_field_context() else TASK_VIEW_OPTS
     if view not in view_opts:
         view = view_opts[0]
