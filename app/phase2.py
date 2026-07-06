@@ -29,6 +29,8 @@ try:
         inventory,
         jobs,
         pipeline,
+        rental_equipment,
+        rental_equipment_inspection,
         reports,
         settings,
         tasks,
@@ -61,6 +63,8 @@ except ImportError:
         inventory,
         jobs,
         pipeline,
+        rental_equipment,
+        rental_equipment_inspection,
         reports,
         settings,
         tasks,
@@ -98,6 +102,8 @@ BUILT_MODULES: dict[str, object] = {
     "field_daily_reports": field_daily_reports.render,
     "field_crew_time": field_crew_time.render,
     "coupling_inspection": coupling_inspection.render,
+    "rental_equipment": rental_equipment.render,
+    "rental_equipment_inspection": rental_equipment_inspection.render,
 }
 
 

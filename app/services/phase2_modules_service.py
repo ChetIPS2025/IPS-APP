@@ -1815,9 +1815,36 @@ def save_asset(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResul
         eid = str(ui.get("current_holder_employee_id") or "").strip()
         payload["current_holder_employee_id"] = eid or None
     payload = {k: v for k, v in payload.items() if v is not None}
+    prev_job_id: str | None = None
+    if row_id and "assigned_job_id" in ui:
+        try:
+            from app.services.repository import fetch_by_id
+        except ImportError:
+            from services.repository import fetch_by_id  # type: ignore
+        prev_row = fetch_by_id("assets", row_id)
+        if isinstance(prev_row, dict):
+            prev_job_id = str(prev_row.get("assigned_job_id") or "").strip() or None
     if row_id:
-        return update_row_admin("assets", payload, {"id": row_id})
-    return insert_row_admin("assets", payload)
+        result = update_row_admin("assets", payload, {"id": row_id})
+    else:
+        result = insert_row_admin("assets", payload)
+    if result.ok and "assigned_job_id" in ui:
+        try:
+            from app.services.rental_equipment_inspection_hooks import notify_asset_job_assignment_changed
+        except ImportError:
+            from services.rental_equipment_inspection_hooks import notify_asset_job_assignment_changed  # type: ignore
+        new_job = str(payload.get("assigned_job_id") or "").strip() or None
+        asset_key = row_id or str((result.data or {}).get("id") or "").strip()
+        if asset_key:
+            try:
+                notify_asset_job_assignment_changed(
+                    asset_key,
+                    previous_job_id=prev_job_id,
+                    new_job_id=new_job,
+                )
+            except Exception:
+                pass
+    return result
 
 
 def _clean_employee_number(raw: object) -> str | None:

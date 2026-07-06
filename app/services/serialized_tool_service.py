@@ -573,6 +573,15 @@ def checkout_serialized_tool(
                     "assigned_to_name": employee_name,
                 },
             )
+    try:
+        from app.services.rental_equipment_inspection_hooks import notify_rental_equipment_assigned
+    except ImportError:
+        from services.rental_equipment_inspection_hooks import notify_rental_equipment_assigned  # type: ignore
+    try:
+        row = result.data if isinstance(result.data, dict) else {}
+        notify_rental_equipment_assigned(row, job_id=job_id)
+    except Exception:
+        pass
     return result
 
 

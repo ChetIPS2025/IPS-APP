@@ -180,6 +180,7 @@ NAV_PAGES: list[tuple[str, str, str]] = [
     ("pricing_guide", "Pricing Guide", "book-open"),
     ("inventory", "Inventory", "package"),
     ("assets", "Assets", "truck"),
+    ("rental_equipment", "Rental Equipment", "clipboard-check"),
     ("timekeeping", "Timekeeping", "clock"),
     ("tasks", "To-Do", "check-square"),
     ("reports", "Reports", "bar-chart-2"),
@@ -199,6 +200,7 @@ FIELD_NAV_PAGES: list[tuple[str, str]] = [
     ("tasks", "My To-Do"),
     ("timekeeping", "Log Time"),
     ("assets", "Assets"),
+    ("rental_equipment", "Rental Equipment"),
     ("inventory", "Inventory"),
     ("employee_certifications", "Certifications"),
 ]

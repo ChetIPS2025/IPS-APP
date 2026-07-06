@@ -520,11 +520,35 @@ def sync_asset_assignment_to_job(
         _db().insert_row("job_equipment", payload)
     except Exception as exc:
         _LOG.debug("job_equipment auto-line skipped: %s", exc)
+    try:
+        from app.services.rental_equipment_inspection_hooks import notify_rental_equipment_assigned
+    except ImportError:
+        from services.rental_equipment_inspection_hooks import notify_rental_equipment_assigned  # type: ignore
+    try:
+        notify_rental_equipment_assigned(asset, job_id=jid)
+    except Exception as exc:
+        _LOG.debug("rental checkout inspection hook skipped: %s", exc)
 
 
 def void_asset_assignment_cost(assignment_id: str) -> None:
     """Remove ledger cost when equipment is checked in or assignment voided."""
     delete_job_cost_transaction(SOURCE_ASSET_ASSIGNMENT, str(assignment_id or "").strip())
+    try:
+        from app.services.repository import fetch_by_id
+        from app.services.rental_equipment_inspection_hooks import notify_rental_equipment_returned
+    except ImportError:
+        from services.repository import fetch_by_id  # type: ignore
+        from services.rental_equipment_inspection_hooks import notify_rental_equipment_returned  # type: ignore
+    try:
+        rows = _db().fetch_by_match("asset_assignments", {"id": str(assignment_id or "").strip()}, limit=1) or []
+        if rows:
+            asset_id = str(rows[0].get("asset_id") or "").strip()
+            job_id = str(rows[0].get("assigned_job_id") or "").strip() or None
+            asset = fetch_by_id("assets", asset_id)
+            if isinstance(asset, dict):
+                notify_rental_equipment_returned(asset, job_id=job_id)
+    except Exception as exc:
+        _LOG.debug("rental return inspection hook skipped: %s", exc)
 
 
 def fetch_job_cost_transactions(job_id: str, *, limit: int = 2000) -> list[dict[str, Any]]:
