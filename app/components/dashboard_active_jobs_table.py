@@ -144,7 +144,10 @@ def _render_job_link(
         link_class = f"{link_class} ips-jobs-cell-truncate".strip()
     title_attr = f' title="{html.escape(label, quote=True)}"' if label else ""
     btn_width = use_container_width if use_container_width is not None else (not truncate)
-    st.markdown(f'<div class="ips-jobs-table-link {link_class}"{title_attr}>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="ips-jobs-cell-content ips-jobs-table-link {link_class}"{title_attr}>',
+        unsafe_allow_html=True,
+    )
     if st.button(
         label,
         key=key,
@@ -208,7 +211,8 @@ def render_dashboard_active_jobs_table(
             with col:
                 st.markdown(_col_marker(marker), unsafe_allow_html=True)
                 st.markdown(
-                    f'<div class="ips-jobs-header-row ips-jobs-cell">{html.escape(label)}</div>',
+                    f'<div class="ips-jobs-cell-content ips-jobs-header-row ips-jobs-cell">'
+                    f"{html.escape(label)}</div>",
                     unsafe_allow_html=True,
                 )
 
@@ -267,7 +271,7 @@ def render_dashboard_active_jobs_table(
                     title_label,
                     key=f"dash_job_title_{jid}",
                     job=job,
-                    extra_class="ips-jobs-title-link job-project-link ips-jobs-cell job-cell jobs-table-cell",
+                    extra_class="ips-jobs-title-link job-project-link",
                     truncate=True,
                 )
 
@@ -275,7 +279,7 @@ def render_dashboard_active_jobs_table(
                 st.markdown(_col_marker("customer"), unsafe_allow_html=True)
                 customer_title = html.escape(customer, quote=True)
                 st.markdown(
-                    f'<div class="ips-jobs-cell job-cell jobs-table-cell ips-jobs-customer-cell '
+                    f'<div class="ips-jobs-cell-content ips-jobs-cell ips-jobs-customer-cell '
                     f'ips-jobs-cell-truncate" title="{customer_title}">{html.escape(customer)}</div>',
                     unsafe_allow_html=True,
                 )
@@ -286,13 +290,17 @@ def render_dashboard_active_jobs_table(
                     '<span class="job-status-cell ips-jobs-status-cell" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
-                st.markdown(job_status_pill_html(status), unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="ips-jobs-cell-content ips-jobs-status-wrap">'
+                    f"{job_status_pill_html(status)}</div>",
+                    unsafe_allow_html=True,
+                )
 
             with cols[4]:
                 st.markdown(_col_marker("contract"), unsafe_allow_html=True)
                 contract_cls = _money_cell_class(contract_val, available=has_contract)
                 st.markdown(
-                    f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money{contract_cls}">'
+                    f'<div class="ips-jobs-cell-content ips-jobs-money ips-jobs-cell ips-jobs-col-money{contract_cls}">'
                     f"{html.escape(_money_cell(contract_val, available=has_contract))}</div>",
                     unsafe_allow_html=True,
                 )
@@ -300,7 +308,7 @@ def render_dashboard_active_jobs_table(
                 st.markdown(_col_marker("estimated"), unsafe_allow_html=True)
                 estimated_cls = _money_cell_class(estimated_val, available=has_estimated)
                 st.markdown(
-                    f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money{estimated_cls}">'
+                    f'<div class="ips-jobs-cell-content ips-jobs-money ips-jobs-cell ips-jobs-col-money{estimated_cls}">'
                     f"{html.escape(_money_cell(estimated_val, available=has_estimated))}</div>",
                     unsafe_allow_html=True,
                 )
@@ -308,7 +316,7 @@ def render_dashboard_active_jobs_table(
                 st.markdown(_col_marker("actual"), unsafe_allow_html=True)
                 actual_cls = _money_cell_class(actual_val, available=has_actual)
                 st.markdown(
-                    f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money ips-jobs-money-actual{actual_cls}">'
+                    f'<div class="ips-jobs-cell-content ips-jobs-money ips-jobs-cell ips-jobs-col-money ips-jobs-money-actual{actual_cls}">'
                     f"{html.escape(_money_cell(actual_val, available=has_actual))}</div>",
                     unsafe_allow_html=True,
                 )
@@ -316,7 +324,7 @@ def render_dashboard_active_jobs_table(
                 st.markdown(_col_marker("profit"), unsafe_allow_html=True)
                 profit_display_cls = _money_cell_class(profit_val, available=has_profit_data)
                 st.markdown(
-                    f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money{profit_cls}{profit_display_cls}">'
+                    f'<div class="ips-jobs-cell-content ips-jobs-money ips-jobs-cell ips-jobs-col-money{profit_cls}{profit_display_cls}">'
                     f"{html.escape(_money_cell(profit_val, available=has_profit_data))}</div>",
                     unsafe_allow_html=True,
                 )
@@ -325,14 +333,14 @@ def render_dashboard_active_jobs_table(
                 margin_display = _pct_cell(margin_val) if has_contract else "—"
                 margin_cls = profit_cls if has_contract else " ips-jobs-money-empty"
                 st.markdown(
-                    f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money{margin_cls}">'
+                    f'<div class="ips-jobs-cell-content ips-jobs-money ips-jobs-cell ips-jobs-col-money{margin_cls}">'
                     f"{html.escape(margin_display)}</div>",
                     unsafe_allow_html=True,
                 )
             with cols[9]:
                 st.markdown(_col_marker("subjobs"), unsafe_allow_html=True)
                 st.markdown(
-                    f'<div class="ips-jobs-cell job-cell jobs-table-cell ips-jobs-col-subjobs">'
+                    f'<div class="ips-jobs-cell-content ips-jobs-cell ips-jobs-col-subjobs">'
                     f"{open_subjobs:,}</div>",
                     unsafe_allow_html=True,
                 )
@@ -343,11 +351,16 @@ def render_dashboard_active_jobs_table(
                     'aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
+                st.markdown(
+                    '<div class="ips-jobs-cell-content ips-jobs-actions-wrap">',
+                    unsafe_allow_html=True,
+                )
                 render_job_row_actions(
                     job,
                     on_open=_open_job_nav,
                     on_edit=_open_job_edit,
                     on_status_updated=lambda _jid, _status: None,
                 )
+                st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)

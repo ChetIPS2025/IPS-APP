@@ -13691,7 +13691,7 @@ def inject_ops_dashboard_css() -> None:
     """Compact operations dashboard layout — KPI row, news, quick actions, activity grid."""
     st.markdown(
         """
-<style id="ips-ops-dashboard-v17">
+<style id="ips-ops-dashboard-v19">
 /* ── App shell: flex main beside sidebar (desktop only) ── */
 .stApp:has(.ips-ops-dashboard-marker) [data-testid="stAppViewContainer"] {
   width: 100% !important;
@@ -14267,7 +14267,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
   border-radius: 11px !important;
-  padding: 20px !important;
+  padding: 20px 24px !important;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05) !important;
   width: 100% !important;
   max-width: 100% !important;
@@ -14297,7 +14297,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
 .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker),
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker) {
   display: grid !important;
-  grid-template-columns: repeat(2, minmax(160px, 1fr)) !important;
+  grid-template-columns: repeat(2, minmax(170px, 1fr)) !important;
   gap: 16px !important;
   width: 100% !important;
   box-sizing: border-box !important;
@@ -14361,17 +14361,16 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_o
   position: static !important;
   top: auto !important;
   left: auto !important;
-  transform: none !important;
 }
 .st-key-dashboard_ops_quick_actions .stButton > button,
 .st-key-dashboard_ops_quick_actions [data-testid="stButton"] > button,
 .quick-action-button,
 .quick-action-tile {
   width: 100% !important;
-  min-height: 42px !important;
-  height: 42px !important;
-  max-height: 42px !important;
-  border-radius: 10px !important;
+  min-height: 40px !important;
+  height: 40px !important;
+  max-height: 40px !important;
+  border-radius: 8px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -14383,25 +14382,25 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_o
   left: auto !important;
   bottom: auto !important;
   margin: 0 !important;
-  padding: 0 16px !important;
+  padding: 0 14px !important;
   background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%) !important;
   border: 1px solid #1e40af !important;
   color: #ffffff !important;
   font-weight: 600 !important;
-  font-size: 0.8125rem !important;
-  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.28) !important;
+  font-size: 14px !important;
+  line-height: 1 !important;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.24) !important;
   transition: all 0.15s ease !important;
-  transform: none !important;
 }
 .st-key-dashboard_ops_quick_actions .stButton > button:hover,
 .st-key-dashboard_ops_quick_actions [data-testid="stButton"] > button:hover {
   background: linear-gradient(180deg, #1d4ed8 0%, #1e3a8a 100%) !important;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.32) !important;
-  transform: none !important;
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.34) !important;
+  transform: translateY(-2px) !important;
 }
 .st-key-dashboard_ops_quick_actions .stButton > button p,
 .st-key-dashboard_ops_quick_actions [data-testid="stButton"] > button p {
-  font-size: 0.8125rem !important;
+  font-size: 14px !important;
   font-weight: 600 !important;
   white-space: nowrap !important;
   line-height: 1 !important;
@@ -14410,6 +14409,12 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_o
   max-width: 100% !important;
   margin: 0 !important;
   padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  color: #ffffff !important;
+  letter-spacing: 0.01em !important;
 }
 
 /* ── Today's activity grid ── */
@@ -14498,7 +14503,194 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_o
   font-style: italic;
 }
 
-/* ── Expanders ── */
+/* ── Dashboard preview cards (replaces expanders) ── */
+.st-key-dashboard_preview_sections {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-top: 20px !important;
+  margin-bottom: 20px !important;
+}
+.st-key-dashboard_preview_sections [data-testid="stHorizontalBlock"] {
+  align-items: stretch !important;
+  gap: 16px !important;
+}
+.st-key-dashboard_preview_sections [data-testid="column"] {
+  min-width: 0 !important;
+}
+.st-key-dashboard_preview_todos,
+.st-key-dashboard_preview_qr,
+.st-key-dashboard_preview_analytics,
+.st-key-dashboard_preview_extra_qa {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 11px !important;
+  padding: 16px 18px 14px !important;
+  margin-bottom: 16px !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05) !important;
+  overflow: visible !important;
+  box-sizing: border-box !important;
+}
+.ips-dash-preview-card-head {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  margin: 0 0 12px 0 !important;
+}
+.ips-dash-preview-card-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 30px !important;
+  height: 30px !important;
+  border-radius: 8px !important;
+  background: #eff6ff !important;
+  color: #2563eb !important;
+  font-size: 16px !important;
+  flex-shrink: 0 !important;
+}
+.ips-dash-preview-card-title {
+  margin: 0 !important;
+  font-size: 1rem !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+  line-height: 1.2 !important;
+}
+.ips-dash-preview-list {
+  list-style: none !important;
+  margin: 0 0 12px 0 !important;
+  padding: 0 !important;
+}
+.ips-dash-preview-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  padding: 8px 10px !important;
+  border-radius: 8px !important;
+  border: 1px solid transparent !important;
+  transition: background 0.15s ease, border-color 0.15s ease !important;
+}
+.ips-dash-preview-row:hover {
+  background: #f8fbff !important;
+  border-color: #dbeafe !important;
+}
+.ips-dash-preview-row-main {
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+}
+.ips-dash-preview-row-title {
+  margin: 0 !important;
+  font-size: 0.8125rem !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  line-height: 1.25 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+.ips-dash-preview-row-sub {
+  margin: 2px 0 0 0 !important;
+  font-size: 0.72rem !important;
+  color: #64748b !important;
+  line-height: 1.3 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+.ips-dash-preview-row-badges {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  flex-shrink: 0 !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+}
+.ips-dash-preview-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 20px !important;
+  padding: 0 7px !important;
+  border-radius: 999px !important;
+  font-size: 0.625rem !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+}
+.ips-dash-preview-priority-urgent { background: #fee2e2 !important; color: #991b1b !important; }
+.ips-dash-preview-priority-high { background: #ffedd5 !important; color: #9a3412 !important; }
+.ips-dash-preview-priority-medium { background: #e0f2fe !important; color: #075985 !important; }
+.ips-dash-preview-priority-low { background: #f1f5f9 !important; color: #475569 !important; }
+.ips-dash-preview-status-open { background: #dbeafe !important; color: #1d4ed8 !important; }
+.ips-dash-preview-status-active { background: #fef3c7 !important; color: #92400e !important; }
+.ips-dash-preview-status-blocked { background: #fee2e2 !important; color: #991b1b !important; }
+.ips-dash-preview-status-done { background: #dcfce7 !important; color: #166534 !important; }
+.ips-dash-preview-empty {
+  margin: 0 0 12px 0 !important;
+  font-size: 0.8125rem !important;
+  color: #94a3b8 !important;
+  font-style: italic !important;
+}
+.st-key-dashboard_preview_todos .stButton > button,
+.st-key-dashboard_preview_qr .stButton > button,
+.st-key-dashboard_preview_analytics .stButton > button {
+  min-height: 34px !important;
+  height: 34px !important;
+  border-radius: 8px !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  background: #ffffff !important;
+  color: #2563eb !important;
+  border: 1px solid #bfdbfe !important;
+  box-shadow: none !important;
+}
+.st-key-dashboard_preview_todos .stButton > button:hover,
+.st-key-dashboard_preview_qr .stButton > button:hover,
+.st-key-dashboard_preview_analytics .stButton > button:hover {
+  background: #eff6ff !important;
+  border-color: #93c5fd !important;
+  color: #1d4ed8 !important;
+}
+.st-key-dashboard_preview_analytics [data-testid="stHorizontalBlock"]:has(.stButton) {
+  gap: 8px !important;
+  margin-bottom: 8px !important;
+}
+.st-key-dashboard_preview_extra_qa [data-testid="stHorizontalBlock"]:has(.stButton) {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  margin-bottom: 0 !important;
+}
+.st-key-dashboard_preview_extra_qa .stButton > button {
+  min-height: 38px !important;
+  height: 38px !important;
+  border-radius: 8px !important;
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  padding: 0 10px !important;
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%) !important;
+  border: 1px solid #1e40af !important;
+  color: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.22) !important;
+  transition: all 0.15s ease !important;
+}
+.st-key-dashboard_preview_extra_qa .stButton > button:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.28) !important;
+}
+.ips-dash-preview-grid-marker,
+.ips-dash-preview-qa-grid-marker {
+  display: none !important;
+}
+@media (max-width: 992px) {
+  .st-key-dashboard_preview_sections [data-testid="column"] {
+    flex: 1 1 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+/* ── Expanders (legacy) ── */
 .st-key-dashboard_management_reminders {
   padding: 0.75rem !important;
   margin-bottom: 20px !important;
@@ -14549,7 +14741,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stExp
   .quick-actions-grid,
   .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlockBorderWrapper"] > [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker),
   .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker) {
-    grid-template-columns: repeat(2, minmax(140px, 1fr)) !important;
+    grid-template-columns: repeat(2, minmax(150px, 1fr)) !important;
     gap: 16px !important;
   }
 }

@@ -100,7 +100,7 @@ try:
         set_field_job_id,
         toggle_field_expanded,
     )
-    from app.ui.streamlit_perf import fragment
+    from app.ui.streamlit_perf import fragment, ips_app_rerun
 except ImportError:
     from components.job_ips_forms import render_job_ips_forms_tab  # type: ignore
     from components.job_materials_ui import render_job_materials_tab  # type: ignore
@@ -192,7 +192,7 @@ except ImportError:
         set_field_job_id,
         toggle_field_expanded,
     )
-    from ui.streamlit_perf import fragment  # type: ignore
+    from ui.streamlit_perf import fragment, ips_app_rerun  # type: ignore
 
 _SEL = select_key("jobs")
 _TABLE_KEY = "jobs_list"
@@ -953,12 +953,30 @@ def _open_job_edit_from_list(job: dict) -> None:
     _set_job_edit_mode(job)
 
 
+def _activate_job_detail_modal(job_id: str, job: dict | None = None) -> None:
+    """Open the job detail/editor modal (shared by table links and row actions)."""
+    jid = str(job_id or "").strip()
+    if not jid:
+        return
+    on_job_detail_modal_open(jid)
+    st.session_state[SELECTED_JOB_KEY] = jid
+    st.session_state[SHOW_MODAL_KEY] = True
+    st.session_state[_SEL] = jid
+    st.session_state[_JOBS_MODAL_KEY] = jid
+    if isinstance(job, dict):
+        st.session_state[_job_edit_mode_key(job)] = False
+    else:
+        st.session_state[
+            f"job_edit_mode_{''.join(ch if ch.isalnum() else '_' for ch in jid) or 'job'}"
+        ] = False
+
+
 def _open_job_from_list(job: dict) -> None:
     jid = str(job.get("id") or "").strip()
     if not jid:
         return
-    _open_jobs_detail_modal(jid, job)
-    st.rerun()
+    _activate_job_detail_modal(jid, job)
+    ips_app_rerun()
 
 
 def _jobs_col_marker(name: str) -> str:
@@ -1193,7 +1211,7 @@ def _render_custom_jobs_table(
                     title_label,
                     key=f"job_open_title_{jid}",
                     job=job,
-                    extra_class="ips-jobs-title-link job-project-link ips-jobs-cell job-cell jobs-table-cell",
+                    extra_class="ips-jobs-title-link job-project-link",
                     help_text=project if project and project != "—" else "Open job details",
                     truncate=True,
                 )
@@ -1315,8 +1333,8 @@ def _render_custom_jobs_table(
             open_id = str(picked).strip()
             open_job = jobs_by_id.get(open_id)
             if open_job:
-                _open_jobs_detail_modal(open_id, open_job)
-                st.rerun()
+                _activate_job_detail_modal(open_id, open_job)
+                ips_app_rerun()
 
     return all_job_ids
 
@@ -1466,18 +1484,7 @@ def _seed_job_edit_form(job: dict) -> None:
 
 
 def _open_jobs_detail_modal(job_id: str, _job: dict | None = None) -> None:
-    jid = str(job_id or "").strip()
-    if not jid:
-        return
-    on_job_detail_modal_open(jid)
-    st.session_state[SELECTED_JOB_KEY] = jid
-    st.session_state[SHOW_MODAL_KEY] = True
-    st.session_state[_SEL] = jid
-    st.session_state[_JOBS_MODAL_KEY] = jid
-    if isinstance(_job, dict):
-        st.session_state[_job_edit_mode_key(_job)] = False
-    else:
-        st.session_state[f"job_edit_mode_{''.join(ch if ch.isalnum() else '_' for ch in jid) or 'job'}"] = False
+    _activate_job_detail_modal(job_id, _job)
 
 
 def _safe_value(value: object, fallback: str = "—") -> str:

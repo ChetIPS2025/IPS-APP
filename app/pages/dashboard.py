@@ -10,62 +10,40 @@ import streamlit as st
 try:
     from app.auth import current_profile, current_role
     from app.components.cards import render_ops_kpi_row
-    from app.components.charts import render_donut_chart, render_horizontal_bars, render_line_chart
     from app.components.dashboard_active_jobs_table import render_dashboard_active_jobs_table
     from app.components.company_updates_feed import render_dashboard_company_updates_section
-    from app.components.dashboard_management_reminders import render_dashboard_management_reminders_section
-    from app.components.feeds import render_activity_feed
-    from app.components.qr_scan_history_ui import inject_qr_scan_history_css, qr_scan_history_table_html
+    from app.components.dashboard_preview_cards import render_dashboard_preview_sections
     from app.components.headers import (
-        render_dashboard_quick_actions,
         render_ops_quick_action_tiles,
         render_page_brand_header,
     )
     from app.pages._core._data import (
-        dashboard_job_status_overview,
-        dashboard_quote_aging_bars,
-        dashboard_sales_categories,
-        dashboard_sales_series,
-        dashboard_upcoming_deadlines,
         load_awarded_jobs,
         load_dashboard_kpis,
-        load_documents_hub,
         load_estimates,
         load_recent_company_updates,
-        load_recent_item_activity,
-        load_recent_qr_scans,
         load_tasks,
         load_timekeeping_summaries,
+        load_documents_hub,
     )
     from app.styles import inject_global_css, inject_ops_dashboard_css
     from app.utils.formatting import fmt_currency, fmt_date
 except ImportError:
     from auth import current_profile, current_role  # type: ignore
     from components.cards import render_ops_kpi_row  # type: ignore
-    from components.charts import render_donut_chart, render_horizontal_bars, render_line_chart  # type: ignore
     from components.dashboard_active_jobs_table import render_dashboard_active_jobs_table  # type: ignore
     from components.company_updates_feed import render_dashboard_company_updates_section  # type: ignore
-    from components.dashboard_management_reminders import render_dashboard_management_reminders_section  # type: ignore
-    from components.feeds import render_activity_feed  # type: ignore
-    from components.qr_scan_history_ui import inject_qr_scan_history_css, qr_scan_history_table_html  # type: ignore
+    from components.dashboard_preview_cards import render_dashboard_preview_sections  # type: ignore
     from components.headers import (  # type: ignore
-        render_dashboard_quick_actions,
         render_ops_quick_action_tiles,
         render_page_brand_header,
     )
     from pages._core._data import (  # type: ignore
-        dashboard_job_status_overview,
-        dashboard_quote_aging_bars,
-        dashboard_sales_categories,
-        dashboard_sales_series,
-        dashboard_upcoming_deadlines,
         load_awarded_jobs,
         load_dashboard_kpis,
         load_documents_hub,
         load_estimates,
         load_recent_company_updates,
-        load_recent_item_activity,
-        load_recent_qr_scans,
         load_tasks,
         load_timekeeping_summaries,
     )
@@ -92,16 +70,6 @@ def _date_range_state() -> tuple[date, date]:
         start = end.replace(day=1)
         st.session_state["ips_dash_date_start"] = start
     return start, end
-
-
-def _data_source_badge(is_live: bool) -> str:
-    if is_live:
-        return '<span class="ips-report-source ips-report-source-live">Live data</span>'
-    return '<span class="ips-report-source ips-report-source-sample">Sample data</span>'
-
-
-def _panel_title(title: str, *, is_live: bool) -> str:
-    return f'<p class="ips-panel-title">{html.escape(title)}{_data_source_badge(is_live)}</p>'
 
 
 def _count_open_tasks() -> int:
@@ -411,11 +379,11 @@ def render() -> None:
             with qa_col:
                 render_ops_quick_action_tiles(
                     [
-                        ("💼", "+ Job", "jobs"),
-                        ("📋", "+ Estimate", "estimates"),
-                        ("👥", "+ Customer", "customers"),
-                        ("📊", "Daily Report", "field_daily_reports"),
-                        ("⏱", "Time Entry", "timekeeping"),
+                        ("📁", "New Job", "jobs"),
+                        ("📄", "New Estimate", "estimates"),
+                        ("👤", "New Customer", "customers"),
+                        ("📝", "Daily Report", "field_daily_reports"),
+                        ("🕒", "Time Entry", "timekeeping"),
                         ("📦", "Inventory", "inventory"),
                     ],
                     key_prefix="ips_ops_qa",
@@ -425,103 +393,4 @@ def render() -> None:
 
         render_dashboard_active_jobs_table(load_awarded_jobs(), limit=12)
 
-    with st.expander("Office To-Do & More", expanded=False):
-        render_dashboard_management_reminders_section(limit=4)
-
-    with st.expander("Analytics & Reports", expanded=False):
-        st.markdown(f'<{ot} class="ips-ops-expander">', unsafe_allow_html=True)
-        row1_l, row1_m, row1_r = st.columns([2.2, 1.2, 1], gap="small")
-        labels, series, sales_live = dashboard_sales_series(period_start=start, period_end=end)
-        cats, cats_live = dashboard_sales_categories(period_start=start, period_end=end)
-        activity, activity_live = load_recent_item_activity(limit=8)
-
-        with row1_l:
-            st.markdown(
-                f'<{ot} class="ips-panel-card ips-panel-card-compact">{_panel_title("Sales Overview", is_live=sales_live)}',
-                unsafe_allow_html=True,
-            )
-            render_line_chart(labels, series)
-            st.markdown(f"</{ot}>", unsafe_allow_html=True)
-        with row1_m:
-            st.markdown(
-                f'<{ot} class="ips-panel-card ips-panel-card-compact">{_panel_title("Sales by Category", is_live=cats_live)}',
-                unsafe_allow_html=True,
-            )
-            total = sum(cats.values())
-            render_donut_chart(
-                cats,
-                center_label="Total",
-                center_value=fmt_currency(total),
-                money_legend=True,
-            )
-            st.markdown(f"</{ot}>", unsafe_allow_html=True)
-        with row1_r:
-            st.markdown(
-                f'<{ot} class="ips-panel-card ips-panel-card-compact">'
-                f'{_panel_title("Recent Activity", is_live=activity_live)}',
-                unsafe_allow_html=True,
-            )
-            render_activity_feed(activity, empty_message="No recent system activity.")
-            st.markdown(f"</{ot}>", unsafe_allow_html=True)
-
-        row2_l, row2_m, row2_r = st.columns([1.2, 1.2, 1], gap="small")
-        job_status, job_status_live = dashboard_job_status_overview()
-        aging_bars, aging_live = dashboard_quote_aging_bars()
-        deadlines, deadlines_live = dashboard_upcoming_deadlines()
-        with row2_l:
-            st.markdown(
-                f'<{ot} class="ips-panel-card ips-panel-card-compact">{_panel_title("Job Status Overview", is_live=job_status_live)}',
-                unsafe_allow_html=True,
-            )
-            render_donut_chart(
-                job_status,
-                center_label="Jobs",
-                center_value=str(sum(job_status.values())),
-                money_legend=False,
-            )
-            st.markdown(f"</{ot}>", unsafe_allow_html=True)
-        with row2_m:
-            st.markdown(
-                f'<{ot} class="ips-panel-card ips-panel-card-compact">{_panel_title("Open Quote Aging", is_live=aging_live)}',
-                unsafe_allow_html=True,
-            )
-            render_horizontal_bars(aging_bars)
-            st.markdown(f"</{ot}>", unsafe_allow_html=True)
-        with row2_r:
-            st.markdown(
-                f'<{ot} class="ips-panel-card ips-panel-card-compact">{_panel_title("Upcoming Deadlines", is_live=deadlines_live)}',
-                unsafe_allow_html=True,
-            )
-            for d in deadlines:
-                st.markdown(
-                    f'<{ot} class="ips-deadline-row">'
-                    f'<span>{html.escape(d["title"])}<br><span class="ips-activity-meta">{fmt_date(d["date"])}</span></span>'
-                    f'<span class="ips-deadline-badge {html.escape(d["level"])}">{html.escape(d["badge"])}</span>'
-                    f"</{ot}>",
-                    unsafe_allow_html=True,
-                )
-            st.markdown(f"</{ot}>", unsafe_allow_html=True)
-        st.markdown(f"</{ot}>", unsafe_allow_html=True)
-
-    with st.expander("Recent QR Scans", expanded=False):
-        inject_qr_scan_history_css()
-        qr_scans, qr_live = load_recent_qr_scans(limit=8)
-        st.markdown(
-            f'<{ot} class="ips-panel-card ips-panel-card-compact">'
-            f'{_panel_title("Recent QR Scans", is_live=qr_live)}'
-            f'{qr_scan_history_table_html(qr_scans, compact=True)}'
-            f"</{ot}>",
-            unsafe_allow_html=True,
-        )
-
-    with st.expander("Additional Quick Actions", expanded=False):
-        render_dashboard_quick_actions(
-            [
-                ("🧾", "New Invoice", "reports"),
-                ("📥", "New PO", "reports"),
-                ("🚛", "Add Asset", "assets"),
-                ("📎", "Upload Doc", "documents"),
-            ],
-            key_prefix="ips_dash_qa_extra",
-            title="More Actions",
-        )
+        render_dashboard_preview_sections()

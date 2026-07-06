@@ -19,16 +19,16 @@ def test_is_office_reminder_when_no_job():
     assert is_office_reminder({"title": "PM fan", "job_id": "job-1"}) is False
 
 
-def test_filter_shows_all_open_office_for_managers():
+def test_filter_scoped_to_current_user_even_for_admin():
     today = date.today()
     rows = [
-        {"id": "1", "title": "A", "status": "Open", "assigned_to": "Pat", "due_date": today.isoformat()},
-        {"id": "2", "title": "B", "status": "Open", "job_id": "j1", "assigned_to": "Pat"},
-        {"id": "3", "title": "C", "status": "Complete", "assigned_to": "Pat"},
+        {"id": "1", "title": "Mine", "status": "Open", "assigned_to": "Pat", "due_date": today.isoformat()},
+        {"id": "2", "title": "Theirs", "status": "Open", "assigned_to": "Other Person", "due_date": today.isoformat()},
+        {"id": "3", "title": "Job task", "status": "Open", "job_id": "j1", "assigned_to": "Pat"},
     ]
-    out = filter_dashboard_reminders(rows, profile={"full_name": "Other"}, role="admin", limit=5)
+    out = filter_dashboard_reminders(rows, profile={"full_name": "Pat"}, role="admin", limit=5)
     assert len(out) == 1
-    assert out[0]["title"] == "A"
+    assert out[0]["title"] == "Mine"
 
 
 def test_filter_assignee_scoped_for_employee():
@@ -48,10 +48,24 @@ def test_filter_assignee_scoped_for_employee():
 def test_overdue_sorted_first():
     today = date.today()
     rows = [
-        {"id": "1", "title": "Later", "status": "Open", "due_date": (today + timedelta(days=5)).isoformat()},
-        {"id": "2", "title": "Late", "status": "Open", "due_date": (today - timedelta(days=2)).isoformat()},
+        {
+            "id": "1",
+            "title": "Later",
+            "status": "Open",
+            "assigned_to": "Pat",
+            "due_date": (today + timedelta(days=5)).isoformat(),
+            "created_at": "2026-05-01T10:00:00",
+        },
+        {
+            "id": "2",
+            "title": "Late",
+            "status": "Open",
+            "assigned_to": "Pat",
+            "due_date": (today - timedelta(days=2)).isoformat(),
+            "created_at": "2026-05-02T10:00:00",
+        },
     ]
-    out = filter_dashboard_reminders(rows, profile={}, role="admin", limit=5)
+    out = filter_dashboard_reminders(rows, profile={"full_name": "Pat"}, role="admin", limit=5)
     assert out[0]["title"] == "Late"
 
 

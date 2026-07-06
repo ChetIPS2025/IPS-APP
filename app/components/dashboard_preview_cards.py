@@ -1,0 +1,278 @@
+"""Dashboard preview cards — always-visible recent items (replaces collapsed expanders)."""
+
+from __future__ import annotations
+
+import html
+from typing import Any
+
+import streamlit as st
+
+try:
+    from app.auth import current_profile, current_role
+    from app.components.qr_scan_history_ui import inject_qr_scan_history_css
+    from app.pages._core._data import load_recent_qr_scans, load_tasks
+    from app.services.management_reminders_service import due_date_badge, filter_dashboard_reminders
+    from app.utils.formatting import fmt_date, fmt_datetime
+except ImportError:
+    from auth import current_profile, current_role  # type: ignore
+    from components.qr_scan_history_ui import inject_qr_scan_history_css  # type: ignore
+    from pages._core._data import load_recent_qr_scans, load_tasks  # type: ignore
+    from services.management_reminders_service import due_date_badge, filter_dashboard_reminders  # type: ignore
+    from utils.formatting import fmt_date, fmt_datetime  # type: ignore
+
+
+def _nav_slug(slug: str) -> None:
+    try:
+        from app.navigation import set_nav_slug
+    except ImportError:
+        from navigation import set_nav_slug  # type: ignore
+    set_nav_slug(slug)
+    st.rerun()
+
+
+def _nav_job_costing() -> None:
+    try:
+        from app.navigation import open_jobs_job_costing
+    except ImportError:
+        from navigation import open_jobs_job_costing  # type: ignore
+    open_jobs_job_costing()
+    st.rerun()
+
+
+def _priority_badge(priority: object) -> str:
+    pri = str(priority or "Medium").strip() or "Medium"
+    css = {
+        "Urgent": "ips-dash-preview-priority-urgent",
+        "High": "ips-dash-preview-priority-high",
+        "Medium": "ips-dash-preview-priority-medium",
+        "Low": "ips-dash-preview-priority-low",
+    }.get(pri, "ips-dash-preview-priority-medium")
+    return f'<span class="ips-dash-preview-badge {css}">{html.escape(pri)}</span>'
+
+
+def _status_badge(status: object) -> str:
+    val = str(status or "Open").strip() or "Open"
+    low = val.casefold()
+    if low in {"done", "complete", "completed", "closed"}:
+        cls = "ips-dash-preview-status-done"
+    elif low in {"blocked", "cancelled", "canceled"}:
+        cls = "ips-dash-preview-status-blocked"
+    elif low in {"in progress", "in_progress", "active"}:
+        cls = "ips-dash-preview-status-active"
+    else:
+        cls = "ips-dash-preview-status-open"
+    return f'<span class="ips-dash-preview-badge {cls}">{html.escape(val)}</span>'
+
+
+def _todo_link_label(row: dict[str, Any]) -> str:
+    job = str(row.get("linked_job") or "").strip()
+    if job and job not in {"—", "— None —"}:
+        return job
+    est = str(row.get("linked_estimate") or "").strip()
+    if est and est not in {"—", "— None —"}:
+        return est
+    customer = str(row.get("customer") or row.get("customer_name") or "").strip()
+    return customer
+
+
+def _todo_preview_rows(limit: int = 5) -> list[dict[str, Any]]:
+    profile = current_profile() or {}
+    return filter_dashboard_reminders(
+        load_tasks(),
+        profile=profile,
+        role=current_role(),
+        limit=limit,
+    )
+
+
+def _todo_preview_html(rows: list[dict[str, Any]]) -> str:
+    if not rows:
+        return '<p class="ips-dash-preview-empty">No open to-dos assigned to you.</p>'
+    items: list[str] = []
+    for row in rows:
+        title = html.escape(str(row.get("title") or "Untitled"))
+        due_raw = str(row.get("due_date") or "")[:10]
+        due_txt = html.escape(fmt_date(due_raw) if due_raw else "No due date")
+        due_label, due_level = due_date_badge(row.get("due_date"))
+        link = _todo_link_label(row)
+        link_html = ""
+        if link:
+            link_html = f' · <span class="ips-dash-preview-meta">{html.escape(link)}</span>'
+        items.append(
+            '<li class="ips-dash-preview-row">'
+            f'<div class="ips-dash-preview-row-main">'
+            f'<p class="ips-dash-preview-row-title">{title}</p>'
+            f'<p class="ips-dash-preview-row-sub">Due {due_txt}{link_html}</p>'
+            f"</div>"
+            f'<div class="ips-dash-preview-row-badges">'
+            f'{_priority_badge(row.get("priority"))}'
+            f'{_status_badge(row.get("status"))}'
+            f'<span class="ips-deadline-badge {html.escape(due_level)}">{html.escape(due_label)}</span>'
+            f"</div>"
+            "</li>"
+        )
+    return f'<ul class="ips-dash-preview-list">{"".join(items)}</ul>'
+
+
+def _analytics_preview_html() -> str:
+    shortcuts = [
+        ("📊", "Job Costing", "Roll-up costs and margin by job"),
+        ("🕒", "Time Reports", "Weekly hours and labor summaries"),
+        ("📋", "Estimate Reports", "Pipeline and estimate status"),
+        ("📦", "Inventory Reports", "Stock movement and usage"),
+    ]
+    items = "".join(
+        "<li class=\"ips-dash-preview-row ips-dash-preview-row-link\">"
+        f'<span class="ips-dash-preview-row-icon">{html.escape(icon)}</span>'
+        f'<div class="ips-dash-preview-row-main">'
+        f'<p class="ips-dash-preview-row-title">{html.escape(label)}</p>'
+        f'<p class="ips-dash-preview-row-sub">{html.escape(sub)}</p>'
+        f"</div>"
+        "</li>"
+        for icon, label, sub in shortcuts
+    )
+    return f'<ul class="ips-dash-preview-list">{items}</ul>'
+
+
+def _qr_preview_html(rows: list[dict[str, Any]]) -> str:
+    if not rows:
+        return '<p class="ips-dash-preview-empty">No QR scans recorded yet.</p>'
+    items: list[str] = []
+    for row in rows[:5]:
+        item = html.escape(str(row.get("item_name") or "—"))
+        scanned_by = html.escape(str(row.get("scanned_by") or "—"))
+        when = html.escape(fmt_datetime(row.get("scanned_at"), compact=True))
+        job = str(row.get("job_shop") or "—").strip()
+        job_html = ""
+        if job and job not in {"—", "-"}:
+            job_html = f' · {html.escape(job)}'
+        items.append(
+            '<li class="ips-dash-preview-row">'
+            f'<div class="ips-dash-preview-row-main">'
+            f'<p class="ips-dash-preview-row-title">{item}</p>'
+            f'<p class="ips-dash-preview-row-sub">{scanned_by} · {when}{job_html}</p>'
+            f"</div>"
+            "</li>"
+        )
+    return f'<ul class="ips-dash-preview-list">{"".join(items)}</ul>'
+
+
+def _render_preview_card_shell(
+    *,
+    icon: str,
+    title: str,
+    body_html: str,
+    view_key: str,
+    on_view_all,
+) -> None:
+    ot = "d" + "iv"
+    st.markdown(
+        f'<{ot} class="ips-dash-preview-card-head">'
+        f'<span class="ips-dash-preview-card-icon">{html.escape(icon)}</span>'
+        f'<p class="ips-dash-preview-card-title">{html.escape(title)}</p>'
+        f"</{ot}>"
+        f"{body_html}",
+        unsafe_allow_html=True,
+    )
+    if st.button("View All", key=view_key, use_container_width=True):
+        on_view_all()
+
+
+def _render_extra_quick_actions(*, key_prefix: str = "ips_dash_preview_qa") -> None:
+    actions: list[tuple[str, str, str | None]] = [
+        ("✅", "Create Task", "tasks"),
+        ("📎", "Upload Document", "documents"),
+        ("📦", "Add Inventory", "inventory"),
+        ("🚛", "Add Asset", "assets"),
+        ("📝", "Start Daily Report", "field_daily_reports"),
+        ("📊", "Run Job Cost Report", "job_costing"),
+    ]
+    st.markdown('<div class="ips-dash-preview-qa-grid-marker" aria-hidden="true"></div>', unsafe_allow_html=True)
+    row_size = 2
+    for row_start in range(0, len(actions), row_size):
+        cols = st.columns(row_size, gap="small")
+        for col_idx, col in enumerate(cols):
+            idx = row_start + col_idx
+            if idx >= len(actions):
+                continue
+            icon, label, slug = actions[idx]
+            with col:
+                if st.button(
+                    f"{icon}\u2002{label}",
+                    key=f"{key_prefix}_{idx}",
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    if slug == "job_costing":
+                        _nav_job_costing()
+                    elif slug:
+                        _nav_slug(slug)
+
+
+def render_dashboard_preview_sections() -> None:
+    """Two-column grid of always-visible preview cards."""
+    inject_qr_scan_history_css()
+    qr_rows, _qr_live = load_recent_qr_scans(limit=5)
+    todo_rows = _todo_preview_rows(limit=5)
+
+    with st.container(key="dashboard_preview_sections"):
+        st.markdown(
+            '<span class="ips-dash-preview-grid-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        left_col, right_col = st.columns(2, gap="medium")
+
+        with left_col:
+            with st.container(key="dashboard_preview_todos"):
+                _render_preview_card_shell(
+                    icon="✅",
+                    title="Office To-Do & More",
+                    body_html=_todo_preview_html(todo_rows),
+                    view_key="ips_dash_preview_todos_all",
+                    on_view_all=lambda: _nav_slug("tasks"),
+                )
+
+            with st.container(key="dashboard_preview_qr"):
+                _render_preview_card_shell(
+                    icon="📱",
+                    title="Recent QR Scans",
+                    body_html=_qr_preview_html(qr_rows),
+                    view_key="ips_dash_preview_qr_all",
+                    on_view_all=lambda: _nav_slug("inventory"),
+                )
+
+        with right_col:
+            with st.container(key="dashboard_preview_analytics"):
+                st.markdown(
+                    '<div class="ips-dash-preview-card-head">'
+                    '<span class="ips-dash-preview-card-icon">📈</span>'
+                    '<p class="ips-dash-preview-card-title">Analytics &amp; Reports</p>'
+                    "</div>"
+                    f"{_analytics_preview_html()}",
+                    unsafe_allow_html=True,
+                )
+                ac1, ac2, ac3, ac4 = st.columns(4, gap="small")
+                with ac1:
+                    if st.button("Job Costing", key="ips_dash_preview_an_job", use_container_width=True):
+                        _nav_job_costing()
+                with ac2:
+                    if st.button("Time Reports", key="ips_dash_preview_an_time", use_container_width=True):
+                        _nav_slug("timekeeping")
+                with ac3:
+                    if st.button("Estimates", key="ips_dash_preview_an_est", use_container_width=True):
+                        _nav_slug("estimates")
+                with ac4:
+                    if st.button("Inventory", key="ips_dash_preview_an_inv", use_container_width=True):
+                        _nav_slug("inventory")
+                if st.button("View All Reports", key="ips_dash_preview_an_all", use_container_width=True):
+                    _nav_slug("reports")
+
+            with st.container(key="dashboard_preview_extra_qa"):
+                st.markdown(
+                    '<div class="ips-dash-preview-card-head">'
+                    '<span class="ips-dash-preview-card-icon">⚡</span>'
+                    '<p class="ips-dash-preview-card-title">Additional Quick Actions</p>'
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
+                _render_extra_quick_actions()

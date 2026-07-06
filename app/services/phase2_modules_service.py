@@ -932,16 +932,20 @@ def normalize_task(row: dict[str, Any]) -> dict[str, Any]:
     if status == "Complete":
         status = "Done"
     jid = row.get("job_id")
+    created = str(row.get("created_at") or row.get("updated_at") or "")[:19]
     return {
         "id": str(row.get("id") or ""),
         "title": str(row.get("title") or ""),
         "status": status,
         "priority": pri,
         "assigned_to": str(row.get("assignee_name") or row.get("assigned_to") or "—"),
+        "assigned_to_email": str(row.get("assigned_to_email") or row.get("assignee_email") or "").strip(),
+        "assigned_to_employee_id": str(row.get("assigned_to_employee_id") or row.get("assignee_id") or "").strip(),
         "job_id": str(jid).strip() if jid else None,
         "linked_job": str(row.get("job_label") or row.get("linked_job") or "— None —"),
         "linked_estimate": str(row.get("estimate_label") or row.get("linked_estimate") or "— None —"),
         "due_date": str(row.get("due_date") or "")[:10],
+        "created_at": created,
         "description": str(row.get("description") or ""),
         "notes": str(row.get("notes") or ""),
         "activity": list(row.get("activity") or []),

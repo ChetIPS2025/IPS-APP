@@ -12,7 +12,6 @@ except ImportError:
     from services.task_display_helpers import normalize_task_status  # type: ignore
     from services.tasks_service import _resolve_task_job_id  # type: ignore
 
-_MANAGEMENT_VIEW_ALL_ROLES = frozenset({"admin", "project manager", "supervisor"})
 _OFFICE_REMINDER_CREATE_ROLES = frozenset({"admin", "project manager", "supervisor", "employee"})
 
 __all__ = [
@@ -35,48 +34,87 @@ def is_open_reminder(row: dict[str, Any]) -> bool:
     return normalize_task_status(row.get("status")) == "Open"
 
 
-def _assignee_label(row: dict[str, Any]) -> str:
-    return str(row.get("assigned_to") or row.get("assignee_name") or "").strip()
-
-
-def _profile_display_names(profile: dict[str, Any]) -> set[str]:
-    names: set[str] = set()
-    full = str(profile.get("full_name") or "").strip()
-    if full:
-        names.add(full.casefold())
-    email = str(profile.get("email") or "").strip()
-    if email:
-        names.add(email.casefold())
-        local = email.split("@", 1)[0].strip()
-        if local:
-            names.add(local.casefold())
-    return names
+def _profile_assignee_keys(profile: dict[str, Any]) -> set[str]:
+    keys: set[str] = set()
+    for val in (
+        profile.get("id"),
+        profile.get("employee_id"),
+        profile.get("email"),
+        profile.get("full_name"),
+        profile.get("name"),
+    ):
+        text = str(val or "").strip()
+        if not text:
+            continue
+        keys.add(text.casefold())
+        if "@" in text:
+            local = text.split("@", 1)[0].strip()
+            if local:
+                keys.add(local.casefold())
+    return keys
 
 
 def _matches_profile(row: dict[str, Any], profile: dict[str, Any]) -> bool:
-    assignee = _assignee_label(row)
-    if not assignee or assignee in {"—", "— Select —", "-", "— None —"}:
+    keys = _profile_assignee_keys(profile)
+    if not keys:
         return False
-    key = assignee.casefold()
-    names = _profile_display_names(profile)
-    if key in names:
-        return True
-    for name in names:
-        if name and (name in key or key in name):
+
+    candidates: list[str] = []
+    for field in (
+        "assigned_to",
+        "assigned_to_email",
+        "assigned_to_employee_id",
+        "assignee_name",
+        "assignee_email",
+        "assignee_id",
+    ):
+        val = str(row.get(field) or "").strip()
+        if val and val not in {"—", "— Select —", "-", "— None —", "— Unassigned —"}:
+            candidates.append(val.casefold())
+
+    for candidate in candidates:
+        if candidate in keys:
             return True
+        for key in keys:
+            if key and (key in candidate or candidate in key):
+                return True
     return False
 
 
 def visible_to_user(row: dict[str, Any], *, profile: dict[str, Any], role: str) -> bool:
+    del role
     if not is_office_reminder(row) or not is_open_reminder(row):
         return False
-    role_key = str(role or "viewer").strip().lower()
-    if role_key in _MANAGEMENT_VIEW_ALL_ROLES:
-        return True
     return _matches_profile(row, profile)
 
 
-def _due_sort_key(row: dict[str, Any]) -> tuple[int, str, str]:
+def _created_sort_ts(row: dict[str, Any]) -> float:
+    for key in ("created_at", "updated_at"):
+        raw = str(row.get(key) or "").strip()
+        if not raw:
+            continue
+        try:
+            from datetime import datetime
+
+            if "T" in raw:
+                return datetime.fromisoformat(raw.replace("Z", "+00:00")).timestamp()
+            return datetime.fromisoformat(raw[:10]).timestamp()
+        except ValueError:
+            continue
+    activity = row.get("activity")
+    if isinstance(activity, list) and activity:
+        raw = str(activity[0].get("when") or "").strip()
+        if raw:
+            try:
+                from datetime import datetime
+
+                return datetime.strptime(raw[:16], "%Y-%m-%d %H:%M").timestamp()
+            except ValueError:
+                pass
+    return 0.0
+
+
+def _due_sort_key(row: dict[str, Any]) -> tuple[int, str, float, str]:
     raw = str(row.get("due_date") or "")[:10]
     overdue_rank = 1
     if raw:
@@ -94,7 +132,12 @@ def _due_sort_key(row: dict[str, Any]) -> tuple[int, str, str]:
     else:
         raw = "9999-99-99"
         overdue_rank = 3
-    return (overdue_rank, raw, str(row.get("title") or "").casefold())
+    return (
+        overdue_rank,
+        raw,
+        -_created_sort_ts(row),
+        str(row.get("title") or "").casefold(),
+    )
 
 
 def filter_dashboard_reminders(

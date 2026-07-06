@@ -223,7 +223,7 @@ def render_ops_quick_action_tiles(
                 if action_idx >= len(actions):
                     continue
                 icon, label, slug = actions[action_idx]
-                btn_label = f"{icon} {label}"
+                btn_label = f"{icon}\u2002{label}"
                 with col:
                     if st.button(
                         btn_label,
