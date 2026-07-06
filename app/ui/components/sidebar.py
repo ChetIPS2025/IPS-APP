@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_SIDEBAR_THEME_KEY = "ips_sidebar_theme_v2"
+IPS_SIDEBAR_THEME_KEY = "ips_sidebar_theme_v3"
 
 
 def inject_sidebar_theme() -> None:
@@ -20,24 +20,24 @@ def inject_sidebar_theme() -> None:
             box-shadow: none !important;
         }
         section[data-testid="stSidebar"] [data-testid="stExpander"] summary {
-            font-size: 0.68rem !important;
+            font-size: 0.625rem !important;
             font-weight: 700 !important;
-            letter-spacing: 0.06em !important;
+            letter-spacing: 0.08em !important;
             text-transform: uppercase !important;
             padding: 0.2rem 0 !important;
             min-height: 1.75rem !important;
+            color: #64748b !important;
         }
-        section[data-testid="stSidebar"] div.stButton > button[kind="primary"] {
-            background: #2563eb !important;
-            border-color: #1d4ed8 !important;
-            color: #fff !important;
+        section[data-testid="stSidebar"] .sidebar-nav-item + div.stButton > button,
+        section[data-testid="stSidebar"] .sidebar-nav-item + div.stButton > button[kind="secondary"] {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
         }
-        section[data-testid="stSidebar"] .ips-sidebar-collapse-row + div.stButton > button {
-            font-weight: 700 !important;
-            margin-bottom: 0.35rem !important;
-        }
-        body.ips-sidebar-collapsed section[data-testid="stSidebar"] .ips-sidebar-collapse-row + div.stButton > button p {
-            font-size: 1.25rem !important;
+        section[data-testid="stSidebar"] [class*="st-key-ips_sidebar_collapse_toggle"] .stButton > button {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
         }
         </style>
         """,

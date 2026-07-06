@@ -13248,9 +13248,9 @@ section[data-testid="stMain"] [data-testid="stExpander"] summary {{
   font-weight: 600 !important;
 }}
 
-/* Sidebar — layout chrome (width/collapse handled by sidebar_shell.py) */
+/* Sidebar — professional flat navigation (layout width in sidebar_shell.py) */
 section[data-testid="stSidebar"] {{
-  background: {SIDEBAR_BG} !important;
+  background: #ffffff !important;
   border-right: 1px solid {BORDER} !important;
   z-index: 99995 !important;
 }}
@@ -13258,102 +13258,207 @@ section[data-testid="stSidebar"] > div {{
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: {SIDEBAR_BG} !important;
+  background: #ffffff !important;
 }}
-.ips-sidebar-section-label {{
-  margin-top: 0.75rem !important;
+.sidebar-header {{
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.35rem;
+  padding: 0.35rem 0.55rem 0.25rem;
 }}
+.sidebar-logo-wrap,
 .ips-sidebar-logo-wrap {{
-  padding: 0.45rem 0.65rem 0.55rem;
-  border-bottom: 1px solid {BORDER};
-  margin-bottom: 0.25rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 0 0.15rem;
+  margin: 0;
+  border: none;
   background: transparent !important;
 }}
+.sidebar-logo-wrap img,
+.sidebar-logo-wrap [data-testid="stImage"],
+.sidebar-logo-wrap [data-testid="stImage"] img,
 .ips-sidebar-logo-wrap img,
 .ips-sidebar-logo-wrap [data-testid="stImage"],
 .ips-sidebar-logo-wrap [data-testid="stImage"] img {{
-  max-height: 38px;
+  max-height: 34px;
   width: auto;
   display: block;
   background: transparent !important;
 }}
+section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"],
 section[data-testid="stSidebar"] .ips-sidebar-logo-wrap [data-testid="stImage"] {{
   background: transparent !important;
   padding: 0 !important;
   margin: 0 !important;
 }}
+section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"] > div,
 section[data-testid="stSidebar"] .ips-sidebar-logo-wrap [data-testid="stImage"] > div {{
   background: transparent !important;
 }}
-section[data-testid="stSidebar"] .ips-sidebar-logo-wrap [data-testid="stImage"] img {{
-  background: transparent !important;
+.sidebar-logo-tagline,
+.ips-sidebar-tagline {{
+  font-size: 0.6875rem;
+  color: {TEXT_MUTED};
+  margin: 0.1rem 0 0;
+  line-height: 1.25;
+  font-weight: 500;
+}}
+.sidebar-divider {{
+  margin: 0.15rem 0.65rem 0.35rem !important;
+  border: none !important;
+  border-top: 1px solid {BORDER} !important;
+  opacity: 1 !important;
 }}
 .ips-sidebar-brand {{
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 700;
   color: {TEXT};
   margin: 0;
 }}
-.ips-sidebar-tagline {{
-  font-size: 0.7rem;
-  color: {TEXT_MUTED};
-  margin: 0.15rem 0 0;
-}}
-.ips-sidebar-nav-label {{
-  font-size: 0.65rem;
+.sidebar-section-title,
+.ips-sidebar-nav-label,
+.ips-sidebar-section-label {{
+  font-size: 0.625rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   color: {TEXT_MUTED};
-  padding: 0.5rem 0.85rem 0.25rem;
+  padding: 0.65rem 0.75rem 0.2rem;
   margin: 0;
+}}
+.sidebar-footer-label {{
+  padding-top: 0.15rem !important;
+}}
+.sidebar-nav-scroll {{
+  padding: 0.1rem 0.45rem;
 }}
 .ips-sidebar-spacer {{
   flex: 1 1 auto;
   min-height: 1.5rem;
 }}
+.sidebar-version,
 .ips-sidebar-version {{
   font-size: 0.68rem;
   color: {TEXT_MUTED};
   text-align: center;
-  padding: 0.5rem 0.75rem 0.75rem;
+  padding: 0.45rem 0.75rem 0.5rem;
   margin: 0;
-  border-top: 1px solid {BORDER};
   letter-spacing: 0.02em;
 }}
-section[data-testid="stSidebar"] .stButton > button {{
+.sidebar-user,
+.ips-sidebar-user {{
+  font-size: 0.75rem;
+  color: {TEXT_MUTED};
+  padding: 0.35rem 0.75rem 0.5rem;
+  line-height: 1.35;
+}}
+.sidebar-user strong,
+.ips-sidebar-user strong {{
+  color: {TEXT};
+  font-weight: 600;
+}}
+.sidebar-footer {{
+  border-top: 1px solid {BORDER};
+  padding-top: 0.35rem;
+}}
+/* Flat nav rows — icon via marker + label in button */
+section[data-testid="stSidebar"] .sidebar-nav-item + div[class*="stButton"] {{
+  margin: 0.05rem 0 !important;
+}}
+section[data-testid="stSidebar"] .sidebar-nav-item + div[class*="stButton"] > button {{
   width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
   justify-content: flex-start !important;
   text-align: left !important;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  color: {TEXT} !important;
+  outline: none !important;
+  color: #1e293b !important;
   font-weight: 500 !important;
   font-size: 0.8125rem !important;
-  min-height: 2.15rem !important;
-  padding: 0.4rem 0.75rem !important;
-  margin: 0.05rem 0.4rem !important;
-  border-radius: 8px !important;
+  min-height: 2.25rem !important;
+  padding: 0.45rem 0.75rem !important;
+  margin: 0 !important;
+  border-radius: 9px !important;
+  transition: background 0.12s ease, color 0.12s ease !important;
 }}
-section[data-testid="stSidebar"] .stButton > button:hover {{
-  background: #f1f5f9 !important;
+section[data-testid="stSidebar"] .sidebar-nav-item + div[class*="stButton"] > button p {{
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.625rem !important;
+  width: 100% !important;
+  margin: 0 !important;
+  text-align: left !important;
+  font-weight: inherit !important;
+  color: inherit !important;
 }}
-section[data-testid="stSidebar"] .stButton > button[kind="primary"],
-section[data-testid="stSidebar"] .stButton > button[data-testid="baseButton-primary"] {{
+section[data-testid="stSidebar"] .sidebar-nav-item + div[class*="stButton"] > button[kind="secondary"],
+section[data-testid="stSidebar"] .sidebar-nav-item + div[class*="stButton"] > button[data-testid="baseButton-secondary"] {{
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}}
+section[data-testid="stSidebar"] .sidebar-nav-item.active + div[class*="stButton"] > button[kind="secondary"],
+section[data-testid="stSidebar"] .sidebar-nav-item.active + div[class*="stButton"] > button[data-testid="baseButton-secondary"] {{
+  background: {PRIMARY} !important;
+  color: #ffffff !important;
+}}
+section[data-testid="stSidebar"] .sidebar-nav-item + div[class*="stButton"] > button:hover {{
+  background: #eff6ff !important;
+  color: #1e3a8a !important;
+  border: none !important;
+  box-shadow: none !important;
+}}
+section[data-testid="stSidebar"] .sidebar-nav-item.active + div[class*="stButton"] > button,
+section[data-testid="stSidebar"] .sidebar-nav-item.active + div[class*="stButton"] > button:hover {{
   background: {PRIMARY} !important;
   color: #ffffff !important;
   font-weight: 600 !important;
   border: none !important;
   box-shadow: none !important;
 }}
-section[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {{
-  background: {PRIMARY_HOVER} !important;
+section[data-testid="stSidebar"] .sidebar-nav-item.active + div[class*="stButton"] > button p {{
   color: #ffffff !important;
+  font-weight: 600 !important;
 }}
-section[data-testid="stSidebar"] .stButton > button[kind="secondary"] {{
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-nav-item + div[class*="stButton"] > button {{
+  justify-content: center !important;
+  padding: 0.45rem 0.25rem !important;
+  min-height: 2.35rem !important;
+}}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-nav-item + div[class*="stButton"] > button p {{
+  justify-content: center !important;
+  text-align: center !important;
+  font-size: 1rem !important;
+}}
+body.ips-sidebar-collapsed .sidebar-section-title {{
+  display: none !important;
+}}
+/* Footer actions — subtle, not primary nav rows */
+section[data-testid="stSidebar"] .sidebar-footer-action + div[class*="stButton"] > button {{
+  width: 100% !important;
   background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: {TEXT_MUTED} !important;
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  min-height: 2rem !important;
+  padding: 0.4rem 0.75rem !important;
+  margin: 0.15rem 0 0 !important;
+  border-radius: 8px !important;
+}}
+section[data-testid="stSidebar"] .sidebar-footer-action + div[class*="stButton"] > button:hover {{
+  background: #f8fafc !important;
   color: {TEXT} !important;
+}}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-footer-action + div[class*="stButton"] > button {{
+  justify-content: center !important;
+  padding: 0.4rem 0.2rem !important;
 }}
 section[data-testid="stSidebar"] hr {{
   margin: 0.5rem 0.65rem !important;

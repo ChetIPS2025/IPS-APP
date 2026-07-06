@@ -16,8 +16,8 @@ IPS_SIDEBAR_COLLAPSED_SESSION_KEY = "ips_sidebar_collapsed"
 IPS_SIDEBAR_COLLAPSE_AFTER_NAV_KEY = "ips_sidebar_collapse_after_nav"
 IPS_SIDEBAR_COLLAPSED_STORAGE_KEY = "ips_sidebar_collapsed"
 IPS_SIDEBAR_DESKTOP_MIN_PX = 900
-IPS_SIDEBAR_EXPANDED_WIDTH_PX = 232
-IPS_SIDEBAR_COLLAPSED_WIDTH_PX = 68
+IPS_SIDEBAR_EXPANDED_WIDTH_PX = 240
+IPS_SIDEBAR_COLLAPSED_WIDTH_PX = 72
 
 
 def is_sidebar_collapsed() -> bool:
@@ -200,7 +200,7 @@ def _shell_css() -> str:
     col = IPS_SIDEBAR_COLLAPSED_WIDTH_PX
     mobile_max = IPS_SIDEBAR_DESKTOP_MIN_PX - 1
     return f"""
-<style id="ips-sidebar-shell-v3">
+<style id="ips-sidebar-shell-v4">
 .ips-main-header-menu,
 button.ips-header-menu-btn {{
   display: none !important;
@@ -323,100 +323,88 @@ button.ips-header-menu-btn {{
   #ips-sidebar-backdrop {{
     display: none !important;
   }}
-  .ips-sidebar-topbar {{
+  .sidebar-header {{
     display: flex !important;
-    align-items: center !important;
-    justify-content: flex-end !important;
-    padding: 0.15rem 0.35rem 0.35rem !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    gap: 0.35rem !important;
+    padding: 0.35rem 0.55rem 0.25rem !important;
   }}
-  body.ips-sidebar-collapsed .ips-sidebar-topbar {{
+  .sidebar-header--collapsed {{
+    flex-direction: column !important;
+    align-items: center !important;
+    padding: 0.35rem 0.25rem 0.2rem !important;
+  }}
+  .sidebar-logo-wrap--collapsed {{
+    width: 100% !important;
+    display: flex !important;
     justify-content: center !important;
-    padding: 0.2rem 0.15rem 0.35rem !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+  }}
+  .sidebar-logo-wrap--collapsed img,
+  .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {{
+    max-height: 28px !important;
+    width: auto !important;
+    margin: 0 auto !important;
+  }}
+  body.ips-sidebar-collapsed .sidebar-section-title,
+  body.ips-sidebar-collapsed .sidebar-logo-tagline,
+  body.ips-sidebar-collapsed .sidebar-divider {{
+    display: none !important;
+  }}
+  .ips-sidebar-nav-scroll,
+  .sidebar-nav-scroll {{
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 0.15rem 0.45rem !important;
+  }}
+  .ips-sidebar-footer,
+  .sidebar-footer {{
+    flex: 0 0 auto !important;
+    margin-top: auto !important;
+    padding: 0.5rem 0.45rem 0.35rem !important;
+    border-top: 1px solid #e5eaf2 !important;
+  }}
+  section[data-testid="stSidebar"] [class*="st-key-ips_sidebar_collapse_toggle"] {{
+    flex: 0 0 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+  }}
+  section[data-testid="stSidebar"] [class*="st-key-ips_sidebar_collapse_toggle"] .stButton {{
+    width: auto !important;
   }}
   section[data-testid="stSidebar"] [class*="st-key-ips_sidebar_collapse_toggle"] .stButton > button {{
-    width: 2rem !important;
-    min-width: 2rem !important;
-    max-width: 2rem !important;
-    height: 2rem !important;
-    min-height: 2rem !important;
+    width: 1.75rem !important;
+    min-width: 1.75rem !important;
+    max-width: 1.75rem !important;
+    height: 1.75rem !important;
+    min-height: 1.75rem !important;
     padding: 0 !important;
-    margin: 0 auto !important;
+    margin: 0 !important;
     border-radius: 8px !important;
-    border: 1px solid #e2e8f0 !important;
-    background: #ffffff !important;
-    color: #2563eb !important;
-    font-size: 1.15rem !important;
-    font-weight: 700 !important;
+    border: none !important;
+    background: transparent !important;
+    color: #64748b !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
     line-height: 1 !important;
     box-shadow: none !important;
     justify-content: center !important;
   }}
   section[data-testid="stSidebar"] [class*="st-key-ips_sidebar_collapse_toggle"] .stButton > button:hover {{
     background: #eff6ff !important;
-    border-color: #bfdbfe !important;
+    color: #2563eb !important;
   }}
-  body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-ips_sidebar_collapse_toggle"] .stButton > button {{
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-header--collapsed [class*="st-key-ips_sidebar_collapse_toggle"] {{
+    width: 100% !important;
+  }}
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-header--collapsed [class*="st-key-ips_sidebar_collapse_toggle"] .stButton > button {{
     width: 100% !important;
     max-width: 100% !important;
-  }}
-  .ips-sidebar-nav-scroll {{
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-    padding: 0 0.2rem !important;
-  }}
-  .ips-sidebar-footer {{
-    flex: 0 0 auto !important;
-    margin-top: auto !important;
-    padding-top: 0.35rem !important;
-    border-top: 1px solid #e5eaf2 !important;
-  }}
-  section[data-testid="stSidebar"] .stButton > button {{
-    width: calc(100% - 0.5rem) !important;
-    justify-content: flex-start !important;
-    text-align: left !important;
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    color: #0f172a !important;
-    font-weight: 600 !important;
-    font-size: 0.8125rem !important;
-    min-height: 2.35rem !important;
-    padding: 0.45rem 0.65rem !important;
-    margin: 0.06rem 0.25rem !important;
-    border-radius: 10px !important;
-    transition: background 0.12s ease, color 0.12s ease !important;
-  }}
-  section[data-testid="stSidebar"] .stButton > button:hover {{
-    background: #f1f5f9 !important;
-    color: #0f172a !important;
-  }}
-  section[data-testid="stSidebar"] .stButton > button[kind="primary"],
-  section[data-testid="stSidebar"] .stButton > button[data-testid="baseButton-primary"] {{
-    background: #2563eb !important;
-    color: #ffffff !important;
-    border: none !important;
-    box-shadow: none !important;
-  }}
-  section[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {{
-    background: #1d4ed8 !important;
-    color: #ffffff !important;
-  }}
-  section[data-testid="stSidebar"] .stButton > button[kind="secondary"] {{
-    background: transparent !important;
-    color: #0f172a !important;
-  }}
-  body.ips-sidebar-collapsed section[data-testid="stSidebar"] .stButton > button {{
-    justify-content: center !important;
-    text-align: center !important;
-    padding: 0.4rem 0.2rem !important;
-    min-height: 2.5rem !important;
-    font-size: 1.05rem !important;
-  }}
-  body.ips-sidebar-collapsed section[data-testid="stSidebar"] .stButton > button p {{
-    margin: 0 auto !important;
-    text-align: center !important;
   }}
 }}
 @media (max-width: {mobile_max}px) {{
@@ -626,7 +614,7 @@ def _shell_script(nav_json: str) -> str:
     side.addEventListener('click', function (ev) {{
       var btn = ev.target && ev.target.closest ? ev.target.closest('button') : null;
       if (!btn || !side.contains(btn)) return;
-      if (btn.closest('.ips-sidebar-collapse-row')) return;
+      if (btn.closest('.sidebar-collapse-btn') || btn.closest('[class*="st-key-ips_sidebar_collapse_toggle"]')) return;
       var txt = (btn.textContent || '').toLowerCase();
       if (txt.indexOf('log out') >= 0 || txt.indexOf('logout') >= 0) return;
       if (btn.getAttribute('data-testid') === 'collapsedControl') return;

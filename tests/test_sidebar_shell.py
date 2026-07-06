@@ -6,7 +6,9 @@ import streamlit as st
 
 from app.components.sidebar_nav_icons import nav_icon_for_slug
 from app.components.sidebar_shell import (
+    IPS_SIDEBAR_COLLAPSED_WIDTH_PX,
     IPS_SIDEBAR_COLLAPSE_AFTER_NAV_KEY,
+    IPS_SIDEBAR_EXPANDED_WIDTH_PX,
     IPS_SIDEBAR_NAV_FALLBACK_KEY,
     _fallback_nav_json,
     apply_pending_sidebar_collapse,
@@ -48,6 +50,11 @@ def test_nav_button_label_collapsed_icon_only():
     assert icon_only == "💼"
     assert nav_icon_for_slug("jobs") == "💼"
     assert nav_icon_for_slug("unknown_slug") == "•"
+
+
+def test_sidebar_width_tokens_match_design_spec():
+    assert IPS_SIDEBAR_EXPANDED_WIDTH_PX == 240
+    assert IPS_SIDEBAR_COLLAPSED_WIDTH_PX == 72
 
 
 def test_employee_nav_is_simplified_portal_menu():
