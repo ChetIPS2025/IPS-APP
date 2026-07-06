@@ -933,6 +933,11 @@ def normalize_company_update(row: dict[str, Any]) -> dict[str, Any]:
         "created_by": str(row.get("created_by") or row.get("posted_by") or ""),
         "event_date": str(row.get("event_date") or "")[:10],
         "notes": str(row.get("notes") or ""),
+        "banner_path": str(row.get("banner_path") or ""),
+        "banner_file_name": str(row.get("banner_file_name") or ""),
+        "banner_mime_type": str(row.get("banner_mime_type") or ""),
+        "banner_caption": str(row.get("banner_caption") or ""),
+        "banner_uploaded_at": str(row.get("banner_uploaded_at") or "")[:19],
     }
 
 
@@ -1980,6 +1985,8 @@ def save_company_update(ui: dict[str, Any], *, row_id: str | None = None) -> Ser
     attachment_name = str(ui.get("attachment_file_name") or "").strip()
     if attachment_name:
         payload["attachment_file_name"] = attachment_name
+    if "banner_caption" in ui:
+        payload["banner_caption"] = str(ui.get("banner_caption") or "").strip()[:500]
     if row_id:
         return update_row("company_updates", payload, {"id": row_id})
     return insert_row("company_updates", payload)

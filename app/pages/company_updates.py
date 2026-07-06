@@ -42,6 +42,9 @@ try:
         load_company_updates,
         load_employees,
         persist_company_update,
+        persist_company_update_banner,
+        persist_company_update_record,
+        remove_company_update_banner_row,
     )
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._session import select_key
@@ -49,6 +52,7 @@ try:
     from app.utils.formatting import fmt_date, fmt_datetime
     from app.utils.permissions import can_manage_company_updates
     from app.components.company_updates_feed import PRIORITY_EDIT_OPTS, priority_for_form
+    from app.services.updates_service import BANNER_UPLOAD_TYPES, resolve_company_update_banner_url
 except ImportError:
     from components.headers import render_page_brand_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
@@ -85,6 +89,9 @@ except ImportError:
         load_company_updates,
         load_employees,
         persist_company_update,
+        persist_company_update_banner,
+        persist_company_update_record,
+        remove_company_update_banner_row,
     )
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
@@ -92,6 +99,7 @@ except ImportError:
     from utils.formatting import fmt_date, fmt_datetime  # type: ignore
     from utils.permissions import can_manage_company_updates  # type: ignore
     from components.company_updates_feed import PRIORITY_EDIT_OPTS, priority_for_form  # type: ignore
+    from services.updates_service import BANNER_UPLOAD_TYPES, resolve_company_update_banner_url  # type: ignore
 
 try:
     from app.auth import current_role
@@ -146,6 +154,72 @@ _SORT_OPTS = ("Newest First", "Oldest First", "Title A–Z")
 
 def _can_manage_company_updates() -> bool:
     return can_manage_company_updates(current_role())
+
+
+def _update_banner_url(update: dict) -> str:
+    return str(update.get("banner_view_url") or resolve_company_update_banner_url(update) or "").strip()
+
+
+@st.dialog("Banner image", width="large")
+def _show_banner_preview_dialog(url: str, caption: str = "") -> None:
+    st.image(url, use_container_width=True)
+    if caption:
+        st.caption(caption)
+
+
+def _render_cu_banner_view(update: dict) -> None:
+    url = _update_banner_url(update)
+    if not url:
+        return
+    caption = str(update.get("banner_caption") or "").strip()
+    rk = record_session_key(update, "id")
+    alt = html.escape(caption or str(update.get("title") or "Update banner"))
+    figcaption = (
+        f"<figcaption class=\"ips-cu-banner-caption\">{html.escape(caption)}</figcaption>"
+        if caption
+        else ""
+    )
+    st.markdown(
+        f'<figure class="ips-cu-banner-figure">'
+        f'<a href="{html.escape(url)}" target="_blank" rel="noopener" class="ips-cu-banner-link">'
+        f'<img class="ips-cu-banner-detail" src="{html.escape(url)}" alt="{alt}" />'
+        f"</a>"
+        f"{figcaption}"
+        f"</figure>",
+        unsafe_allow_html=True,
+    )
+    if st.button("View full size", key=f"cu_banner_full_{rk}"):
+        _show_banner_preview_dialog(url, caption)
+
+
+def _render_cu_banner_admin_controls(update: dict, *, rk: str, prefix: str) -> None:
+    url = _update_banner_url(update)
+    st.markdown("##### Banner image (optional)")
+    if url:
+        st.image(url, caption=str(update.get("banner_caption") or "") or None, use_container_width=True)
+    st.text_input(
+        "Banner caption (optional)",
+        key=f"{prefix}_banner_caption_{rk}",
+        placeholder="Short caption shown below the banner",
+    )
+    st.file_uploader(
+        "Upload banner image",
+        type=list(BANNER_UPLOAD_TYPES),
+        key=f"{prefix}_banner_upload_{rk}",
+        help="JPG, PNG, or WEBP — max 5 MB. Upload replaces any existing banner.",
+    )
+    if url and st.button("Remove banner", key=f"{prefix}_banner_remove_{rk}"):
+        uid = str(update.get("id") or "")
+        row_id = None if is_demo_id(uid) else uid
+        if not row_id:
+            st.warning("Sample updates cannot change banner storage.")
+        else:
+            ok, msg = remove_company_update_banner_row(row_id, existing_row=update)
+            if ok:
+                st.success(msg or "Banner removed.")
+                st.rerun()
+            else:
+                st.error(msg or "Could not remove banner.")
 
 
 def _user_name_lookup() -> dict[str, str]:
@@ -377,6 +451,7 @@ def _seed_cu_edit_form(update: dict) -> None:
     st.session_state[f"cu_edit_priority_{rk}"] = priority_for_form(update.get("priority"))
     st.session_state[f"cu_edit_attachment_url_{rk}"] = str(update.get("attachment_url") or "")
     st.session_state[f"cu_edit_attachment_name_{rk}"] = str(update.get("attachment_file_name") or "")
+    st.session_state[f"cu_edit_banner_caption_{rk}"] = str(update.get("banner_caption") or "")
 
 
 def _render_cu_view_tabs(update: dict) -> None:
@@ -398,6 +473,7 @@ def _render_cu_view_tabs(update: dict) -> None:
     )
 
     with tab_overview:
+        _render_cu_banner_view(update)
         overview_html = (
             '<div class="ips-detail-grid">'
             f"{detail_field_html('Title', update.get('title'))}"
@@ -499,6 +575,7 @@ def _render_cu_edit_form(update: dict) -> None:
         st.text_input("Attachment URL", key=f"cu_edit_attachment_url_{rk}", placeholder="https://…")
     with ac2:
         st.text_input("Attachment label", key=f"cu_edit_attachment_name_{rk}", placeholder="File name")
+    _render_cu_banner_admin_controls(update, rk=rk, prefix="cu_edit")
 
     cancelled, saved = render_save_cancel_actions(
         module=_MODULE,
@@ -522,11 +599,22 @@ def _render_cu_edit_form(update: dict) -> None:
             "priority": st.session_state.get(f"cu_edit_priority_{rk}"),
             "attachment_url": st.session_state.get(f"cu_edit_attachment_url_{rk}"),
             "attachment_file_name": st.session_state.get(f"cu_edit_attachment_name_{rk}"),
+            "banner_caption": st.session_state.get(f"cu_edit_banner_caption_{rk}"),
             "is_active": _status_to_active(status),
         }
         row_id = None if is_demo_id(uid) else uid
         ok, msg = persist_company_update(ui, row_id=row_id)
         if ok:
+            uploaded = st.session_state.get(f"cu_edit_banner_upload_{rk}")
+            if uploaded is not None and row_id:
+                ok_banner, msg_banner = persist_company_update_banner(
+                    row_id,
+                    uploaded,
+                    caption=str(st.session_state.get(f"cu_edit_banner_caption_{rk}") or ""),
+                    existing_row=update,
+                )
+                if not ok_banner:
+                    st.warning(msg_banner or "Update saved, but banner upload failed.")
             set_view_mode(_MODULE, rk)
             st.success(msg or "Update saved.")
             st.rerun()
@@ -759,26 +847,46 @@ def render() -> None:
                 st.text_input("Attachment URL", key="cu_new_attachment_url", placeholder="https://…")
             with na2:
                 st.text_input("Attachment label", key="cu_new_attachment_name", placeholder="File name")
+            st.text_input("Banner caption (optional)", key="cu_new_banner_caption", placeholder="Short caption shown below the banner")
+            st.file_uploader(
+                "Upload banner image",
+                type=list(BANNER_UPLOAD_TYPES),
+                key="cu_new_banner_upload",
+                help="JPG, PNG, or WEBP — max 5 MB.",
+            )
             if st.button("Publish", key="cu_save_new", type="primary"):
                 status = str(st.session_state.get("cu_new_status") or "Published")
-                ok, msg = persist_company_update(
-                    {
-                        "title": st.session_state.get("cu_new_title"),
-                        "body": st.session_state.get("cu_new_body"),
-                        "category": st.session_state.get("cu_new_cat"),
-                        "pinned": st.session_state.get("cu_new_pinned"),
-                        "status": status,
-                        "audience": st.session_state.get("cu_new_audience"),
-                        "event_date": st.session_state.get("cu_new_event_date"),
-                        "notes": st.session_state.get("cu_new_notes"),
-                        "priority": st.session_state.get("cu_new_priority"),
-                        "attachment_url": st.session_state.get("cu_new_attachment_url"),
-                        "attachment_file_name": st.session_state.get("cu_new_attachment_name"),
-                        "is_active": _status_to_active(status),
-                    }
-                )
-                if apply_persist_feedback(ok, msg, clear_keys=("ips_cu_form",)):
-                    st.rerun()
+                ui = {
+                    "title": st.session_state.get("cu_new_title"),
+                    "body": st.session_state.get("cu_new_body"),
+                    "category": st.session_state.get("cu_new_cat"),
+                    "pinned": st.session_state.get("cu_new_pinned"),
+                    "status": status,
+                    "audience": st.session_state.get("cu_new_audience"),
+                    "event_date": st.session_state.get("cu_new_event_date"),
+                    "notes": st.session_state.get("cu_new_notes"),
+                    "priority": st.session_state.get("cu_new_priority"),
+                    "attachment_url": st.session_state.get("cu_new_attachment_url"),
+                    "attachment_file_name": st.session_state.get("cu_new_attachment_name"),
+                    "banner_caption": st.session_state.get("cu_new_banner_caption"),
+                    "is_active": _status_to_active(status),
+                }
+                ok, msg, saved = persist_company_update_record(ui)
+                if not ok:
+                    st.error(msg or "Could not publish update.")
+                else:
+                    saved_id = str(saved.get("id") or "")
+                    uploaded = st.session_state.get("cu_new_banner_upload")
+                    if uploaded is not None and saved_id and not is_demo_id(saved_id):
+                        ok_banner, msg_banner = persist_company_update_banner(
+                            saved_id,
+                            uploaded,
+                            caption=str(st.session_state.get("cu_new_banner_caption") or ""),
+                        )
+                        if not ok_banner:
+                            st.warning(msg_banner or "Update published, but banner upload failed.")
+                    if apply_persist_feedback(True, msg, clear_keys=("ips_cu_form",)):
+                        st.rerun()
 
     def _filters() -> None:
         c1, c2, c3 = st.columns([5, 0.6, 1])

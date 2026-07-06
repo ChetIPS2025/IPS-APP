@@ -153,6 +153,18 @@ def _attachment_indicator_html(row: dict[str, Any]) -> str:
     )
 
 
+def _banner_image_html(row: dict[str, Any]) -> tuple[str, bool]:
+    url = str(row.get("banner_view_url") or "").strip()
+    if not url:
+        return "", False
+    alt = html.escape(str(row.get("banner_caption") or row.get("title") or "Update banner"))
+    src = html.escape(url)
+    return (
+        f'<img class="ips-cu-banner" src="{src}" alt="{alt}" loading="lazy" />',
+        True,
+    )
+
+
 DASHBOARD_ANNOUNCEMENT_CATEGORIES: frozenset[str] = frozenset(
     {
         "Announcement",
@@ -297,12 +309,15 @@ def connecteam_feed_card_compact_html(row: dict[str, Any]) -> str:
     is_unread = _is_update_unread(row)
     priority_html = priority_badge_html(row.get("priority"))
     attach_html = _attachment_indicator_html(row)
+    banner_html, has_banner = _banner_image_html(row)
 
     card_cls = " ips-ct-feed-card-unread" if is_unread else " ips-ct-feed-card-read"
     if is_pinned:
         card_cls += " ips-ct-feed-card-pinned"
     if priority_key(row.get("priority")) == "critical":
         card_cls += " ips-ct-feed-card-urgent"
+    if has_banner:
+        card_cls += " ips-cu-has-banner"
 
     pin_html = (
         '<span class="ips-ct-pin ips-ct-pin-inline ips-ct-pin-badge">📌 Pinned</span>'
@@ -315,8 +330,8 @@ def connecteam_feed_card_compact_html(row: dict[str, Any]) -> str:
         else ""
     )
 
-    return (
-        f'<{ot} class="news-card ips-ct-feed-card ips-ct-feed-card-compact ips-ct-feed-card-ultra{card_cls}">'
+    body_html = (
+        f'<{ot} class="ips-cu-card-content">'
         f'<{ot} class="news-card-head">'
         f'<{ot} class="ips-ct-avatar ips-ct-avatar-sm" aria-hidden="true">{initials}</{ot}>'
         f'<{ot} class="news-card-meta ips-ct-compact-meta">'
@@ -331,6 +346,12 @@ def connecteam_feed_card_compact_html(row: dict[str, Any]) -> str:
         f"</{ot}>"
         f'<p class="news-card-preview ips-ct-body ips-ct-body-compact">{body}</p>'
         f"{f'<{ot} class=\"ips-cu-card-foot\">{attach_html}</{ot}>' if attach_html else ''}"
+        f"</{ot}>"
+    )
+
+    return (
+        f'<{ot} class="news-card ips-ct-feed-card ips-ct-feed-card-compact ips-ct-feed-card-ultra{card_cls}">'
+        f"{banner_html}{body_html}"
         f"</{ot}>"
     )
 

@@ -1008,7 +1008,7 @@ _DEMO_EMPLOYEE_DOCUMENTS: list[dict[str, Any]] = [
 
 _DEMO_COMPANY_UPDATES: list[dict[str, Any]] = [
     {"id": "cu1", "category": "HR Updates", "title": "New Health Insurance Coverage Effective June 1", "body": "Updated medical plan options and enrollment deadlines.\nReview the summary packet in Documents.", "date": "2025-05-15", "pinned": True, "is_new": True, "priority": "Important", "created_by_name": "HR Admin"},
-    {"id": "cu2", "category": "Safety Alerts", "title": "Heat Stress Prevention Reminder", "body": "Mandatory hydration breaks when heat index exceeds 90°F.\nSupervisors must verify shade and water on every job site.", "date": "2025-05-14", "pinned": True, "is_new": True, "priority": "Urgent", "created_by_name": "Safety Team"},
+    {"id": "cu2", "category": "Safety Alerts", "title": "Heat Stress Prevention Reminder", "body": "Mandatory hydration breaks when heat index exceeds 90°F.\nSupervisors must verify shade and water on every job site.", "date": "2025-05-14", "pinned": True, "is_new": True, "priority": "Urgent", "created_by_name": "Safety Team", "banner_view_url": "https://images.unsplash.com/photo-1504386106331-0e077397b042?auto=format&fit=crop&w=1200&q=80", "banner_caption": "Stay hydrated on hot days."},
     {"id": "cu3", "category": "Events", "title": "Company BBQ — May 20", "body": "Join us at the shop at 5 PM. Families welcome.", "date": "2025-05-12", "pinned": False, "is_new": False, "priority": "Normal", "created_by_name": "IPS Team"},
     {"id": "cu4", "category": "Announcements", "title": "Q2 Safety Award Winners", "body": "Congratulations to the Field Operations crew.", "date": "2025-05-10", "pinned": False, "is_new": False, "priority": "Normal", "created_by_name": "Operations"},
     {"id": "cu5", "category": "Project Updates", "title": "J26047 Milestone Complete", "body": "Rough-in inspection passed on schedule.", "date": "2025-05-08", "pinned": False, "is_new": False, "priority": "Normal", "created_by_name": "Project Manager"},
@@ -1107,6 +1107,11 @@ def load_company_updates(*, category: str = "All Updates") -> list[dict[str, Any
         from services.updates_service import list_company_updates  # type: ignore
     rows, used = list_company_updates(category=category, demo=list(_DEMO_COMPANY_UPDATES))
     _mark_if_demo(used)
+    try:
+        from app.services.updates_service import enrich_company_update_banner
+    except ImportError:
+        from services.updates_service import enrich_company_update_banner  # type: ignore
+    rows = [enrich_company_update_banner(row) for row in rows]
     try:
         from app.components.install_share import with_welcome_install_update
     except ImportError:
@@ -2425,6 +2430,69 @@ def persist_company_update(ui: dict[str, Any], *, row_id: str | None = None) -> 
     except ImportError:
         from services.updates_service import save_company_update  # type: ignore
     return _persist_result(save_company_update(ui, row_id=row_id), success="Update published.")
+
+
+def persist_company_update_record(
+    ui: dict[str, Any],
+    *,
+    row_id: str | None = None,
+) -> tuple[bool, str, dict[str, Any]]:
+    """Like persist_company_update but returns saved row data (includes id for new rows)."""
+    if _demo_blocked(row_id):
+        return False, _DEMO_SAVE_MSG, {}
+    try:
+        from app.services.repository import user_facing_error
+        from app.services.updates_service import save_company_update
+    except ImportError:
+        from services.repository import user_facing_error  # type: ignore
+        from services.updates_service import save_company_update  # type: ignore
+    result = save_company_update(ui, row_id=row_id)
+    err = user_facing_error(result)
+    if err:
+        return False, err, {}
+    data = result.data if isinstance(result.data, dict) else {}
+    return True, "Update published.", data
+
+
+def persist_company_update_banner(
+    update_id: str,
+    uploaded_file: Any,
+    *,
+    caption: str = "",
+    existing_row: dict[str, Any] | None = None,
+) -> tuple[bool, str]:
+    if _demo_blocked(update_id):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.updates_service import upload_company_update_banner
+    except ImportError:
+        from services.updates_service import upload_company_update_banner  # type: ignore
+    return _persist_result(
+        upload_company_update_banner(
+            update_id,
+            uploaded_file,
+            caption=caption,
+            existing_row=existing_row,
+        ),
+        success="Banner uploaded.",
+    )
+
+
+def remove_company_update_banner_row(
+    update_id: str,
+    *,
+    existing_row: dict[str, Any] | None = None,
+) -> tuple[bool, str]:
+    if _demo_blocked(update_id):
+        return False, _DEMO_SAVE_MSG
+    try:
+        from app.services.updates_service import remove_company_update_banner
+    except ImportError:
+        from services.updates_service import remove_company_update_banner  # type: ignore
+    return _persist_result(
+        remove_company_update_banner(update_id, existing_row=existing_row),
+        success="Banner removed.",
+    )
 
 
 def persist_task(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:

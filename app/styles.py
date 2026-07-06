@@ -14356,6 +14356,43 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
 .st-key-dashboard_ops_company_updates {
   margin-bottom: 0.35rem;
 }
+.ips-cu-banner {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 5;
+  object-fit: cover;
+  border-radius: 10px 10px 0 0;
+}
+.news-card.ips-cu-has-banner,
+.st-key-dashboard_company_updates .news-card.ips-cu-has-banner {
+  padding: 0 16px 0 !important;
+  overflow: hidden;
+}
+.news-card.ips-cu-has-banner .ips-cu-card-content,
+.st-key-dashboard_company_updates .news-card.ips-cu-has-banner .ips-cu-card-content {
+  padding: 16px 0 0 !important;
+}
+.ips-cu-banner-figure {
+  margin: 0 0 0.85rem;
+}
+.ips-cu-banner-link {
+  display: block;
+  text-decoration: none;
+}
+.ips-cu-banner-detail {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 5;
+  object-fit: cover;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.ips-cu-banner-caption {
+  margin: 0.45rem 0 0;
+  font-size: 0.82rem;
+  color: #64748b;
+  text-align: center;
+}
 .news-card,
 .st-key-dashboard_company_updates .news-card {
   display: flex !important;
