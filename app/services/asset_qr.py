@@ -393,78 +393,89 @@ def qr_label_png_bytes(
     *,
     size: str | None = None,
 ) -> bytes:
-    """Portrait asset label PNG at 300 DPI (1\"×4\" or 2\"×6\")."""
+    """Landscape asset label PNG at 300 DPI (4\"×1\" or 6\"×2\")."""
     from PIL import Image, ImageDraw, ImageFont
 
     try:
-        from app.services.inventory_qr_labels import label_png_pixel_size, normalize_label_png_size
+        from app.services.inventory_qr_labels import (
+            label_company_name,
+            label_png_pixel_size,
+            normalize_label_png_size,
+        )
     except ImportError:
-        from services.inventory_qr_labels import label_png_pixel_size, normalize_label_png_size  # type: ignore
+        from services.inventory_qr_labels import (  # type: ignore
+            label_company_name,
+            label_png_pixel_size,
+            normalize_label_png_size,
+        )
 
     size_key = normalize_label_png_size(size)
     w_px, h_px = label_png_pixel_size(size_key)
-    margin = max(12, int(min(w_px, h_px) * 0.04))
-    gap = max(8, int(margin * 0.45))
-    scale = w_px / 300.0
+    margin = max(8, int(h_px * 0.04))
+    gap = max(6, int(margin * 0.5))
+    company_h = max(18, int(h_px * 0.13))
+    square_sz = max(48, h_px - 2 * margin - company_h)
+    scale = h_px / 300.0
+    y_square = margin
 
     im = Image.new("RGB", (w_px, h_px), "white")
     draw = ImageDraw.Draw(im)
 
-    qr_size = min(int(w_px * 0.72), w_px - 2 * margin, int(h_px * 0.34))
     qr_raw = qr_png_bytes(qr_text)
     qr_img = Image.open(io.BytesIO(qr_raw)).convert("RGB")
-    qr_img = qr_img.resize((qr_size, qr_size), Image.Resampling.LANCZOS)
-    qx = (w_px - qr_size) // 2
-    qy = margin
-    im.paste(qr_img, (qx, qy))
+    qr_img = qr_img.resize((square_sz, square_sz), Image.Resampling.LANCZOS)
+    x = margin
+    im.paste(qr_img, (x, y_square))
+    x += square_sz + gap
 
-    title_px = max(14, int(17 * scale))
-    meta_px = max(11, int(13 * scale))
+    title_px = max(12, int(16 * scale))
+    meta_px = max(10, int(12 * scale))
     try:
-        font_title = ImageFont.truetype("arial.ttf", title_px)
+        font_title = ImageFont.truetype("arialbd.ttf", title_px)
         font_meta = ImageFont.truetype("arial.ttf", meta_px)
+        font_company = ImageFont.truetype("arial.ttf", max(7, int(10 * scale)))
     except OSError:
         try:
-            font_title = ImageFont.truetype("DejaVuSans.ttf", title_px)
+            font_title = ImageFont.truetype("DejaVuSans-Bold.ttf", title_px)
             font_meta = ImageFont.truetype("DejaVuSans.ttf", meta_px)
+            font_company = ImageFont.truetype("DejaVuSans.ttf", max(7, int(10 * scale)))
         except OSError:
-            font_title = font_meta = ImageFont.load_default()
+            font_title = font_meta = font_company = ImageFont.load_default()
 
-    aid = str(asset.get("asset_id") or "").strip()
-    name = str(asset.get("asset_name") or "").strip()
-    serial = str(asset.get("serial_number") or "").strip()
-    model = str(asset.get("model") or "").strip()
+    asset_no = str(asset.get("asset_number") or asset.get("asset_id") or "").strip()
+    name = str(asset.get("asset_name") or "").strip() or "(no name)"
+    text_x = x
+    text_w = max(48, w_px - margin - text_x)
+    wrap_chars = max(10, min(42, int(text_w / max(8, title_px * 0.55))))
 
-    wrap_chars = max(16, min(34, int((w_px - 2 * margin) / max(8, title_px * 0.55))))
-    lines: list[tuple[str, str]] = []
-    for line in textwrap.wrap(name or "(no name)", width=wrap_chars)[:4]:
-        lines.append((line[:120], "title"))
-    for block in [
-        f"ID: {aid}" if aid else "",
-        f"S/N: {serial}" if serial else "",
-        f"Model: {model}" if model else "",
-    ]:
-        if not block:
-            continue
-        for line in textwrap.wrap(block, width=wrap_chars + 2)[:2]:
-            lines.append((line[:120], "meta"))
+    title_lines = textwrap.wrap(name, width=wrap_chars)[:3]
+    id_text = f"#{asset_no}" if asset_no else ""
+    id_lines = textwrap.wrap(id_text, width=wrap_chars + 4)[:2] if id_text else []
 
-    line_heights = [
-        int(title_px * 1.35) if kind == "title" else int(meta_px * 1.35)
-        for _, kind in lines
-    ]
-    block_h = sum(line_heights) + gap * max(0, len(lines) - 1)
-    text_top = qr_size + margin + gap
-    text_h = max(48, h_px - margin - text_top)
-    y = text_top + max(0, (text_h - block_h) // 2)
+    title_line_h = int(title_px * 1.25)
+    meta_line_h = int(meta_px * 1.2)
+    block_h = len(title_lines) * title_line_h + (int(title_line_h * 0.15) if id_lines else 0)
+    block_h += len(id_lines) * meta_line_h
+    y = y_square + max(0, (square_sz - block_h) // 2)
 
-    for (line, kind), line_h in zip(lines, line_heights):
-        font = font_title if kind == "title" else font_meta
-        bbox = draw.textbbox((0, 0), line, font=font)
-        line_w = bbox[2] - bbox[0]
-        x = margin + max(0, (w_px - 2 * margin - line_w) // 2)
-        draw.text((x, y), line, fill=(0, 0, 0), font=font)
-        y += line_h + gap
+    for line in title_lines:
+        draw.text((text_x, y), line[:120], fill=(0, 0, 0), font=font_title)
+        y += title_line_h
+    if id_lines:
+        y += int(title_line_h * 0.12)
+        for line in id_lines:
+            draw.text((text_x, y), line[:120], fill=(0, 0, 0), font=font_meta)
+            y += meta_line_h
+
+    company = label_company_name()
+    if company:
+        company_text = company[:120]
+        bbox = draw.textbbox((0, 0), company_text, font=font_company)
+        text_w_company = bbox[2] - bbox[0]
+        text_h_company = bbox[3] - bbox[1]
+        cx = margin + max(0, (w_px - 2 * margin - text_w_company) // 2)
+        cy = h_px - margin - company_h + max(0, (company_h - text_h_company) // 2)
+        draw.text((cx, cy), company_text, fill=(80, 80, 80), font=font_company)
 
     out = io.BytesIO()
     im.save(out, format="PNG", dpi=(300, 300))

@@ -50,17 +50,26 @@ LABEL_PNG_SIZE_CHOICES: tuple[tuple[str, str], ...] = (
 )
 
 
+def label_company_name() -> str:
+    try:
+        from app.services.company_settings_service import load_app_settings
+    except ImportError:
+        from services.company_settings_service import load_app_settings  # type: ignore
+    return str(load_app_settings().get("company_name") or "Industrial Plant Solutions").strip()
+
+
 def normalize_label_png_size(size: str | None) -> str:
     token = str(size or "").strip().lower().replace('"', "").replace("×", "x").replace(" ", "")
-    if token in {LABEL_PNG_SIZE_2X6, "2in x 6in", "2inx6in"}:
+    if token in {LABEL_PNG_SIZE_2X6, "2in x 6in", "2inx6in", "6x2", "6inx2in"}:
         return LABEL_PNG_SIZE_2X6
     return LABEL_PNG_SIZE_1X4
 
 
 def label_png_pixel_size(size: str | None) -> tuple[int, int]:
+    """Landscape print-ready pixels at 300 DPI (width × height)."""
     if normalize_label_png_size(size) == LABEL_PNG_SIZE_2X6:
-        return 600, 1800
-    return 300, 1200
+        return 1800, 600
+    return 1200, 300
 
 
 def label_png_download_filename(base: str, size: str | None) -> str:
@@ -273,6 +282,28 @@ def _draw_png_label_text(
     draw.text((sku_x, sku_y), sku_text, fill=(0, 0, 0), font=sku_font)
 
 
+def _draw_png_company_footer(
+    draw,
+    *,
+    w_px: int,
+    h_px: int,
+    margin: int,
+    company_h: int,
+    company: str,
+) -> None:
+    text = str(company or "").strip()
+    if not text:
+        return
+    font_size = max(7, int(company_h * 0.42))
+    font = _pil_font(font_size, bold=False)
+    bbox = draw.textbbox((0, 0), text, font=font)
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+    x = margin + max(0, (w_px - 2 * margin - text_w) // 2)
+    y = h_px - margin - company_h + max(0, (company_h - text_h) // 2)
+    draw.text((x, y), text[:120], fill=(80, 80, 80), font=font)
+
+
 def _square_image_bytes(image_bytes: bytes, size_px: int) -> bytes:
     """Fit image into a square canvas (same aspect treatment as QR block)."""
     from PIL import Image
@@ -370,53 +401,58 @@ def inventory_label_png_bytes(
     *,
     size: str | None = None,
 ) -> bytes:
-    """Portrait inventory label PNG at 300 DPI (1\"×4\" or 2\"×6\")."""
+    """Landscape inventory label PNG at 300 DPI (4\"×1\" or 6\"×2\")."""
     from PIL import Image, ImageDraw
 
     size_key = normalize_label_png_size(size)
     w_px, h_px = label_png_pixel_size(size_key)
-    margin = max(12, int(min(w_px, h_px) * 0.04))
-    gap = max(8, int(margin * 0.45))
+    margin = max(8, int(h_px * 0.04))
+    gap = max(6, int(margin * 0.5))
+    company_h = max(18, int(h_px * 0.13))
+    square_sz = max(48, h_px - 2 * margin - company_h)
+    y_square = margin
 
     im = Image.new("RGB", (w_px, h_px), "white")
     draw = ImageDraw.Draw(im)
 
-    qr_size = min(int(w_px * 0.72), w_px - 2 * margin, int(h_px * 0.34))
-    x_qr = (w_px - qr_size) // 2
-    y = margin
-
+    x = margin
     qr_raw = generate_qr_png_bytes(qr_text)
     qr_img = Image.open(io.BytesIO(qr_raw)).convert("RGB")
-    qr_img = qr_img.resize((qr_size, qr_size), Image.Resampling.LANCZOS)
-    im.paste(qr_img, (x_qr, y))
-    y += qr_size + gap
+    qr_img = qr_img.resize((square_sz, square_sz), Image.Resampling.LANCZOS)
+    im.paste(qr_img, (x, y_square))
+    x += square_sz + gap
 
     thumb_bytes = load_inventory_thumbnail_bytes(item)
     if thumb_bytes:
-        thumb_size = min(int(qr_size * 0.42), w_px - 2 * margin, max(48, h_px - y - margin - 80))
         try:
-            sq_bytes = _square_image_bytes(thumb_bytes, thumb_size)
+            sq_bytes = _square_image_bytes(thumb_bytes, square_sz)
             thumb = Image.open(io.BytesIO(sq_bytes)).convert("RGB")
-            x_thumb = (w_px - thumb_size) // 2
-            im.paste(thumb, (x_thumb, y))
-            y += thumb_size + gap
+            im.paste(thumb, (x, y_square))
+            x += square_sz + gap
         except Exception:
             pass
 
     sku = resolve_inventory_sku(item)
     description = inventory_item_description(item)
-    text_x = margin
-    text_w = w_px - 2 * margin
-    text_h = max(48, h_px - margin - y)
+    text_x = x
+    text_w = max(48, w_px - margin - text_x)
     _draw_png_label_text(
         draw,
         text_x=text_x,
-        y_top=y,
+        y_top=y_square,
         text_w=text_w,
-        text_h=text_h,
+        text_h=square_sz,
         description=description,
         sku=sku,
-        centered=True,
+        centered=False,
+    )
+    _draw_png_company_footer(
+        draw,
+        w_px=w_px,
+        h_px=h_px,
+        margin=margin,
+        company_h=company_h,
+        company=label_company_name(),
     )
 
     out = io.BytesIO()

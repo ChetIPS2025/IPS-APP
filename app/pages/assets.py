@@ -1556,6 +1556,7 @@ def _asset_for_qr(asset: dict) -> dict:
 
 def _render_asset_qr_block(asset: dict, aid: str) -> None:
     try:
+        from app.components.qr_label_toolbar import render_qr_label_png_buttons
         from app.services.asset_qr import (
             qr_embed_subject,
             qr_label_download_basename,
@@ -1563,8 +1564,8 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
             qr_payload,
             qr_png_bytes,
         )
-        from app.services.inventory_qr_labels import LABEL_PNG_SIZE_CHOICES, label_png_download_filename
     except ImportError:
+        from components.qr_label_toolbar import render_qr_label_png_buttons  # type: ignore
         from services.asset_qr import (  # type: ignore
             qr_embed_subject,
             qr_label_download_basename,
@@ -1572,7 +1573,6 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
             qr_payload,
             qr_png_bytes,
         )
-        from services.inventory_qr_labels import LABEL_PNG_SIZE_CHOICES, label_png_download_filename  # type: ignore
 
     qr_asset = _asset_for_qr(asset)
     token = qr_payload(qr_asset)
@@ -1622,33 +1622,15 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
             if result.ok and isinstance(result.data, dict):
                 clear_assets_cache()
                 st.session_state["ips_sel_assets"] = aid
-                st.success("QR label rebuilt. Download Label PNG when ready.")
+                st.success("QR label rebuilt. Download a label PNG when ready.")
                 st.rerun()
             else:
                 st.error(str(getattr(result, "error", None) or "Could not rebuild QR."))
-        size_opts = [key for key, _ in LABEL_PNG_SIZE_CHOICES]
-        size_labels = {key: label for key, label in LABEL_PNG_SIZE_CHOICES}
-        st.caption("Label size")
-        size_key = st.radio(
-            "Label size",
-            options=size_opts,
-            format_func=lambda key: size_labels[key],
-            horizontal=True,
-            key=f"ast_qr_label_size_{aid}",
-            label_visibility="collapsed",
+        render_qr_label_png_buttons(
+            key_prefix=f"ast_qr_{aid}",
+            basename=qr_label_download_basename(qr_asset),
+            build_png=lambda size_key: qr_label_png_bytes(qr_asset, subject, size=size_key),
         )
-        try:
-            st.download_button(
-                "Label PNG",
-                data=qr_label_png_bytes(qr_asset, subject, size=size_key),
-                file_name=label_png_download_filename(qr_label_download_basename(qr_asset), size_key),
-                mime="image/png",
-                key=f"ast_qr_label_png_{aid}",
-                type="primary",
-                use_container_width=True,
-            )
-        except Exception:
-            pass
 
 
 def _render_asset_documents_tab(asset: dict) -> None:

@@ -59,8 +59,8 @@ class TestInventoryQrLabels(unittest.TestCase):
         subject = "https://app.example.com/?scan=inventory&token=abc"
         png_1x4 = inventory_label_png_bytes(_SAMPLE_ITEM, subject, size="1x4")
         png_2x6 = inventory_label_png_bytes(_SAMPLE_ITEM, subject, size="2x6")
-        self.assertEqual(Image.open(io.BytesIO(png_1x4)).size, (300, 1200))
-        self.assertEqual(Image.open(io.BytesIO(png_2x6)).size, (600, 1800))
+        self.assertEqual(Image.open(io.BytesIO(png_1x4)).size, (1200, 300))
+        self.assertEqual(Image.open(io.BytesIO(png_2x6)).size, (1800, 600))
 
     @patch("app.services.inventory_qr_labels.load_inventory_thumbnail_bytes", return_value=None)
     def test_label_for_download_returns_pdf(self, _thumb) -> None:
