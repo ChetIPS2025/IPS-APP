@@ -51,28 +51,37 @@ def _menu_button(*, marker: str, label: str, key: str, tone: str = "default") ->
     return st.button(label, key=key, use_container_width=True)
 
 
-def _linked_estimate_pdf(job: dict[str, Any]) -> tuple[bytes | None, str]:
+def _linked_estimate_for_job(job: dict[str, Any]) -> dict[str, Any] | None:
     jid = str(job.get("id") or "").strip()
     job_est_id = str(job.get("estimate_id") or "").strip()
     if not jid and not job_est_id:
-        return None, ""
+        return None
     try:
         from app.pages._core._data import load_estimates
-        from app.services.proposal_pdf_service import generate_estimate_proposal_pdf_by_id
     except ImportError:
         from pages._core._data import load_estimates  # type: ignore
-        from services.proposal_pdf_service import generate_estimate_proposal_pdf_by_id  # type: ignore
     linked = [
         e
         for e in load_estimates()
         if str(e.get("job_id") or "") == jid or (job_est_id and str(e.get("id") or "") == job_est_id)
     ]
-    if not linked:
-        return None, ""
-    est = linked[0]
+    return linked[0] if linked else None
+
+
+def _generate_estimate_pdf(est: dict[str, Any]) -> tuple[bytes | None, str, str]:
+    """Return proposal PDF bytes, download name, and optional user-facing error note."""
     est_no = str(est.get("estimate_number") or "estimate").strip() or "estimate"
-    pdf_bytes = generate_estimate_proposal_pdf_by_id(str(est.get("id") or ""), est)
-    return pdf_bytes, f"{est_no}_proposal.pdf"
+    try:
+        from app.services.proposal_pdf_service import generate_estimate_proposal_pdf_by_id
+    except ImportError:
+        from services.proposal_pdf_service import generate_estimate_proposal_pdf_by_id  # type: ignore
+    try:
+        pdf_bytes = generate_estimate_proposal_pdf_by_id(str(est.get("id") or ""), est)
+    except RuntimeError as exc:
+        return None, "", str(exc).strip()
+    except Exception as exc:
+        return None, "", str(exc).strip() or "Could not build proposal PDF."
+    return pdf_bytes, f"{est_no}_proposal.pdf", ""
 
 
 def render_job_detail_header_menu(
@@ -136,16 +145,33 @@ def render_job_detail_header_menu(
             on_print_packet(job)
             st.rerun()
 
-        pdf_bytes, pdf_name = _linked_estimate_pdf(job)
-        if pdf_bytes:
-            st.download_button(
-                "Export PDF",
-                data=pdf_bytes,
-                file_name=pdf_name,
-                mime="application/pdf",
-                key=f"job_detail_export_pdf_{job_key}",
-                use_container_width=True,
-            )
+        linked_est = _linked_estimate_for_job(job)
+        export_cache_key = f"job_detail_export_pdf_{job_key}"
+        cached_export = st.session_state.get(export_cache_key)
+        if isinstance(cached_export, tuple) and len(cached_export) == 2:
+            pdf_bytes, pdf_name = cached_export
+            if pdf_bytes:
+                st.download_button(
+                    "Export PDF",
+                    data=pdf_bytes,
+                    file_name=pdf_name,
+                    mime="application/pdf",
+                    key=f"{export_cache_key}_download",
+                    use_container_width=True,
+                )
+        elif linked_est and _menu_button(
+            marker="export",
+            label="Export PDF",
+            key=f"{export_cache_key}_generate",
+        ):
+            pdf_bytes, pdf_name, pdf_err = _generate_estimate_pdf(linked_est)
+            if pdf_bytes:
+                st.session_state[export_cache_key] = (pdf_bytes, pdf_name)
+                st.rerun()
+            elif pdf_err:
+                st.warning(pdf_err)
+            else:
+                st.info("Could not build proposal PDF.")
         elif _menu_button(
             marker="export",
             label="Export PDF",
