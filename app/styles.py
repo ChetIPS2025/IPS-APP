@@ -3717,6 +3717,103 @@ div[data-testid="stVerticalBlock"]:has(span.ips-asset-qr-scan-scope) button[kind
     )
 
 
+def inject_trailer_dashboard_css() -> None:
+    """Mobile tool trailer dashboard (field supervisors, iPad/phone)."""
+    st.markdown(
+        """
+<style id="ips-trailer-dashboard-v1">
+.ips-trailer-dash-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #0f172a;
+  text-align: center;
+  margin-bottom: 2px;
+}
+.ips-trailer-dash-sub {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #2563eb;
+  text-align: center;
+  margin-bottom: 12px;
+}
+.ips-trailer-dash-hero {
+  width: 100%;
+  max-width: 420px;
+  max-height: 220px;
+  object-fit: cover;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  display: block;
+  margin: 0 auto 12px;
+}
+.ips-trailer-dash-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 12px 0 16px;
+}
+.ips-trailer-dash-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #f8fafc;
+}
+.ips-trailer-dash-card-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.ips-trailer-dash-card-value {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin-top: 4px;
+  line-height: 1.25;
+}
+.ips-trailer-inv-row,
+.ips-trailer-history-row {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: #fff;
+}
+.ips-trailer-muted {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+.ips-trailer-history-kind {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+div[data-testid="stVerticalBlock"]:has(span.ips-trailer-dash-scope) button {
+  min-height: 46px !important;
+  font-size: 0.92rem !important;
+  font-weight: 700 !important;
+}
+div[data-testid="stVerticalBlock"]:has(span.ips-trailer-dash-scope) input,
+div[data-testid="stVerticalBlock"]:has(span.ips-trailer-dash-scope) textarea {
+  min-height: 44px !important;
+  font-size: 1rem !important;
+}
+@media (max-width: 640px) {
+  .ips-trailer-dash-cards {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
 def inject_assets_module_css() -> None:
     """Assets list custom table styling."""
     checkbox_css = _list_table_checkbox_column_css("assets_table_wrap")

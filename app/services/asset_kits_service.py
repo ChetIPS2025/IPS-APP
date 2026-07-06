@@ -590,6 +590,8 @@ def create_asset_kit_audit(
         "job_id": audit_data.get("job_id"),
         "status": str(audit_data.get("status") or "Completed"),
         "notes": str(audit_data.get("notes") or ""),
+        "audit_type": str(audit_data.get("audit_type") or "Full"),
+        "photo_paths": audit_data.get("photo_paths") or [],
     }
     audit_result = insert_row(_KIT_AUDITS, audit_payload)
     if not audit_result.ok:
@@ -628,6 +630,8 @@ def create_asset_kit_audit(
                 "missing_quantity": miss_q,
                 "damaged_quantity": dmg_q,
                 "notes": str(line.get("notes") or ""),
+                "photo_path": str(line.get("photo_path") or "") or None,
+                "photo_url": str(line.get("photo_url") or "") or None,
             },
         )
         update_asset_kit_item(
