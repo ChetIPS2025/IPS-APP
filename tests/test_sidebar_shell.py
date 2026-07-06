@@ -72,8 +72,8 @@ def test_nav_button_label_collapsed_icon_only():
 
 
 def test_sidebar_width_tokens_match_design_spec():
-    assert IPS_SIDEBAR_EXPANDED_WIDTH_PX == 240
-    assert IPS_SIDEBAR_COLLAPSED_WIDTH_PX == 72
+    assert IPS_SIDEBAR_EXPANDED_WIDTH_PX == 230
+    assert IPS_SIDEBAR_COLLAPSED_WIDTH_PX == 64
 
 
 def test_employee_nav_is_simplified_portal_menu():

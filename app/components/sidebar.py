@@ -73,6 +73,13 @@ def _nav_button_label(slug: str, label: str, *, collapsed: bool) -> str:
     return f"{icon}\u2002{label}"
 
 
+def _section_for_slug(slug: str, sections: list[tuple[frozenset[str], str]]) -> str | None:
+    for section_slugs, section_label in sections:
+        if slug in section_slugs:
+            return section_label
+    return None
+
+
 def _render_collapse_toggle(*, collapsed: bool) -> None:
     toggle_help = "Expand sidebar" if collapsed else "Collapse sidebar"
     toggle_icon = "»" if collapsed else "«"
@@ -94,13 +101,15 @@ def _render_collapse_toggle(*, collapsed: bool) -> None:
 def _render_sidebar_header(*, collapsed: bool) -> None:
     header_cls = "sidebar-header sidebar-header--collapsed" if collapsed else "sidebar-header"
     st.markdown(f'<{_OT} class="{header_cls}">', unsafe_allow_html=True)
+    st.markdown(f'<{_OT} class="sidebar-header-brand">', unsafe_allow_html=True)
     logo = _logo_path(compact=collapsed)
     logo_wrap_cls = "sidebar-logo-wrap sidebar-logo-wrap--collapsed" if collapsed else "sidebar-logo-wrap"
     st.markdown(f'<{_OT} class="{logo_wrap_cls}">', unsafe_allow_html=True)
     if logo:
-        st.image(str(logo), use_container_width=not collapsed)
+        st.image(str(logo), width=36 if collapsed else 90)
     elif not collapsed:
         st.markdown('<p class="ips-sidebar-brand">IPS Operations</p>', unsafe_allow_html=True)
+    st.markdown(f"<{_CT}>", unsafe_allow_html=True)
     if not collapsed:
         st.markdown('<p class="sidebar-logo-tagline">Industrial Plant Solutions</p>', unsafe_allow_html=True)
     st.markdown(f"<{_CT}>", unsafe_allow_html=True)
@@ -154,15 +163,21 @@ def render_sidebar(active_slug: str) -> None:
                 slug, label, _icon = item
             else:
                 slug, label = item  # type: ignore[misc]
-            if not collapsed:
-                for section_slugs, section_label in _SECTION_HEADERS:
-                    if slug in section_slugs and section_label not in _shown_sections:
+            section_label = _section_for_slug(slug, _SECTION_HEADERS)
+            if collapsed:
+                if section_label and section_label not in _shown_sections:
+                    if _shown_sections:
                         st.markdown(
-                            f'<p class="sidebar-section-title">{html.escape(section_label)}</p>',
+                            '<hr class="sidebar-nav-group-divider" aria-hidden="true" />',
                             unsafe_allow_html=True,
                         )
-                        _shown_sections.add(section_label)
-                        break
+                    _shown_sections.add(section_label)
+            elif section_label and section_label not in _shown_sections:
+                st.markdown(
+                    f'<p class="sidebar-section-title">{html.escape(section_label)}</p>',
+                    unsafe_allow_html=True,
+                )
+                _shown_sections.add(section_label)
             is_active = slug == active_slug or (slug in _SCAN_SLUGS and active_slug in {"inventory", "assets"})
             if slug == "employee_qr_scan" and active_slug in {"inventory", "assets"}:
                 is_active = True
