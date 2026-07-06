@@ -115,206 +115,154 @@ def _label_fonts():
     from PIL import ImageFont
 
     try:
-        return ImageFont.truetype("arial.ttf", 17), ImageFont.truetype("arial.ttf", 13)
+        return ImageFont.truetype("arial.ttf", 14), ImageFont.truetype("arial.ttf", 11)
     except OSError:
         try:
-            return ImageFont.truetype("DejaVuSans.ttf", 17), ImageFont.truetype("DejaVuSans.ttf", 13)
+            return ImageFont.truetype("DejaVuSans.ttf", 14), ImageFont.truetype("DejaVuSans.ttf", 11)
         except OSError:
             default = ImageFont.load_default()
             return default, default
 
 
+def _square_image_bytes(image_bytes: bytes, size_px: int) -> bytes:
+    """Fit image into a square canvas (same aspect treatment as QR block)."""
+    from PIL import Image
+
+    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    img.thumbnail((size_px, size_px), Image.Resampling.LANCZOS)
+    sq = Image.new("RGB", (size_px, size_px), "white")
+    ox = (size_px - img.width) // 2
+    oy = (size_px - img.height) // 2
+    sq.paste(img, (ox, oy))
+    out = io.BytesIO()
+    sq.save(out, format="JPEG", quality=88)
+    return out.getvalue()
+
+
 def inventory_label_pdf_bytes(item: dict[str, Any], qr_text: str) -> bytes:
     """
-    Portrait label (2.0\" × 2.5\"): thumbnail, description, SKU, QR scan code.
+    Landscape label (4.0\" × 1.0\"): QR and product image equal squares, description + SKU on the right.
     """
     from reportlab.lib.units import inch
     from reportlab.lib.utils import ImageReader
     from reportlab.pdfgen import canvas
 
     buf = io.BytesIO()
-    w_pt, h_pt = 2.0 * inch, 2.5 * inch
+    w_pt, h_pt = 4.0 * inch, 1.0 * inch
+    margin = 0.05 * inch
+    gap = 0.05 * inch
+    square_sz = h_pt - 2 * margin
+
     c = canvas.Canvas(buf, pagesize=(w_pt, h_pt))
     c.setFillColorRGB(1, 1, 1)
     c.rect(0, 0, w_pt, h_pt, fill=1, stroke=0)
 
-    margin = 0.12 * inch
     sku = resolve_inventory_sku(item)
     description = inventory_item_description(item)
+    y_square = (h_pt - square_sz) / 2
+    x = margin
 
-    y_top = h_pt - margin
+    c.drawImage(
+        ImageReader(io.BytesIO(generate_qr_png_bytes(qr_text))),
+        x,
+        y_square,
+        width=square_sz,
+        height=square_sz,
+        mask="auto",
+    )
+    x += square_sz + gap
+
     thumb_bytes = load_inventory_thumbnail_bytes(item)
     if thumb_bytes:
         try:
-            from PIL import Image
-
-            thumb_h = 0.55 * inch
-            thumb_w = w_pt - 2 * margin
-            img = Image.open(io.BytesIO(thumb_bytes)).convert("RGB")
-            img.thumbnail((int(thumb_w), int(thumb_h)), Image.Resampling.LANCZOS)
-            thumb_out = io.BytesIO()
-            img.save(thumb_out, format="JPEG", quality=88)
-            thumb_out.seek(0)
-            ir = ImageReader(thumb_out)
-            draw_w, draw_h = img.size
-            x_thumb = margin + (thumb_w - draw_w) / 2
-            y_thumb = y_top - draw_h
-            c.drawImage(ir, x_thumb, y_thumb, width=draw_w, height=draw_h, mask="auto")
-            y_top = y_thumb - 0.08 * inch
+            sq_bytes = _square_image_bytes(thumb_bytes, max(48, int(square_sz)))
+            c.drawImage(
+                ImageReader(io.BytesIO(sq_bytes)),
+                x,
+                y_square,
+                width=square_sz,
+                height=square_sz,
+                mask="auto",
+            )
+            x += square_sz + gap
         except Exception:
             pass
 
-    qr_sz = 0.82 * inch
-    y_qr = margin
-    c.drawImage(
-        ImageReader(io.BytesIO(generate_qr_png_bytes(qr_text))),
-        (w_pt - qr_sz) / 2,
-        y_qr,
-        width=qr_sz,
-        height=qr_sz,
-        mask="auto",
-    )
+    text_x = x
+    text_right = w_pt - margin
+    wrap_chars = max(10, min(32, int((text_right - text_x) / 4.2)))
+    y = y_square + square_sz - 4
+    line_h = 8.5
 
-    y = y_top
-    line_gap = 8.5
     c.setFillColorRGB(0, 0, 0)
-    c.setFont("Helvetica-Bold", 8)
-    for line in textwrap.wrap(description, width=34)[:3]:
-        if y <= y_qr + qr_sz + 0.08 * inch:
+    c.setFont("Helvetica-Bold", 7)
+    for line in textwrap.wrap(description, width=wrap_chars)[:2]:
+        if y < margin:
             break
-        c.drawString(margin, y, line[:120])
-        y -= line_gap
+        c.drawString(text_x, y, line[:120])
+        y -= line_h
 
-    y -= 1
-    c.setFont("Helvetica", 7)
-    for line in textwrap.wrap(f"SKU: {sku}", width=40)[:2]:
-        if y <= y_qr + qr_sz + 0.06 * inch:
-            break
-        c.drawString(margin, y, line[:120])
-        y -= line_gap - 1
+    c.setFont("Helvetica", 6.5)
+    c.drawString(text_x, max(margin, y - 1), f"SKU: {sku}"[:120])
 
     c.save()
     return buf.getvalue()
 
 
 def inventory_label_2x1_sticker_pdf_bytes(item: dict[str, Any], qr_text: str) -> bytes:
-    """Landscape 2\" × 1\" sticker: QR left, thumbnail + text right."""
-    from reportlab.lib.units import inch
-    from reportlab.lib.utils import ImageReader
-    from reportlab.pdfgen import canvas
-
-    buf = io.BytesIO()
-    w_pt, h_pt = 2.0 * inch, 1.0 * inch
-    c = canvas.Canvas(buf, pagesize=(w_pt, h_pt))
-    c.setFillColorRGB(1, 1, 1)
-    c.rect(0, 0, w_pt, h_pt, fill=1, stroke=0)
-
-    margin = 0.06 * inch
-    gap = 0.05 * inch
-    qr_sz = min(0.72 * inch, h_pt - 2 * margin)
-    x_qr = margin
-    y_qr = (h_pt - qr_sz) / 2
-    c.drawImage(
-        ImageReader(io.BytesIO(generate_qr_png_bytes(qr_text))),
-        x_qr,
-        y_qr,
-        width=qr_sz,
-        height=qr_sz,
-        mask="auto",
-    )
-
-    text_x = x_qr + qr_sz + gap
-    text_right = w_pt - margin
-    max_w_pt = text_right - text_x
-    wrap_chars = max(8, min(24, int(max_w_pt / 3.4)))
-
-    sku = resolve_inventory_sku(item)
-    description = inventory_item_description(item)
-    y = y_qr + qr_sz - 5
-    line_h = 7.5
-
-    thumb_bytes = load_inventory_thumbnail_bytes(item)
-    if thumb_bytes and max_w_pt > 0.35 * inch:
-        try:
-            from PIL import Image
-
-            mini_h = min(0.28 * inch, qr_sz * 0.45)
-            mini_w = max_w_pt * 0.35
-            img = Image.open(io.BytesIO(thumb_bytes)).convert("RGB")
-            img.thumbnail((int(mini_w), int(mini_h)), Image.Resampling.LANCZOS)
-            thumb_out = io.BytesIO()
-            img.save(thumb_out, format="JPEG", quality=88)
-            thumb_out.seek(0)
-            ir = ImageReader(thumb_out)
-            draw_w, draw_h = img.size
-            c.drawImage(ir, text_x, y - draw_h + 2, width=draw_w, height=draw_h, mask="auto")
-            text_x += draw_w + gap * 0.6
-            max_w_pt = text_right - text_x
-            wrap_chars = max(8, min(22, int(max_w_pt / 3.4)))
-        except Exception:
-            pass
-
-    c.setFillColorRGB(0, 0, 0)
-    c.setFont("Helvetica-Bold", 6.5)
-    for line in textwrap.wrap(description, width=wrap_chars)[:2]:
-        if y < margin + line_h:
-            break
-        c.drawString(text_x, y, line[:100])
-        y -= line_h
-
-    if y >= margin:
-        c.setFont("Helvetica", 5.8)
-        c.drawString(text_x, max(margin, y - 1), f"SKU: {sku}"[:100])
-
-    c.save()
-    return buf.getvalue()
+    """Landscape 4\" × 1\" sticker (same layout as Print Label)."""
+    return inventory_label_pdf_bytes(item, qr_text)
 
 
 def inventory_label_2x1_sticker_download_filename(item: dict[str, Any]) -> str:
-    return f"{inventory_label_download_basename(item)}_2x1.pdf"
+    return f"{inventory_label_download_basename(item)}_4x1.pdf"
 
 
 def inventory_label_png_bytes(item: dict[str, Any], qr_text: str) -> bytes:
+    """PNG fallback matching 4\" × 1\" layout at 300 DPI."""
     from PIL import Image, ImageDraw
 
-    w_px, h_px = 400, 520
+    dpi = 300
+    w_px, h_px = 4 * dpi, 1 * dpi
+    margin = int(0.05 * dpi)
+    gap = int(0.05 * dpi)
+    square_px = h_px - 2 * margin
+
     im = Image.new("RGB", (w_px, h_px), "white")
     draw = ImageDraw.Draw(im)
     font_title, font_meta = _label_fonts()
 
-    y = 12
-    margin = 14
-    thumb_bytes = load_inventory_thumbnail_bytes(item)
-    if thumb_bytes:
-        try:
-            thumb = Image.open(io.BytesIO(thumb_bytes)).convert("RGB")
-            thumb.thumbnail((w_px - 2 * margin, 120), Image.Resampling.LANCZOS)
-            x_thumb = (w_px - thumb.width) // 2
-            im.paste(thumb, (x_thumb, y))
-            y += thumb.height + 10
-        except Exception:
-            pass
+    x = margin
+    y_square = margin
 
     qr_raw = generate_qr_png_bytes(qr_text)
     qr_img = Image.open(io.BytesIO(qr_raw)).convert("RGB")
-    qr_target = 180
-    qr_img = qr_img.resize((qr_target, qr_target), Image.Resampling.LANCZOS)
-    qx = (w_px - qr_target) // 2
-    qy = h_px - qr_target - 16
-    im.paste(qr_img, (qx, qy))
+    qr_img = qr_img.resize((square_px, square_px), Image.Resampling.LANCZOS)
+    im.paste(qr_img, (x, y_square))
+    x += square_px + gap
+
+    thumb_bytes = load_inventory_thumbnail_bytes(item)
+    if thumb_bytes:
+        try:
+            sq_bytes = _square_image_bytes(thumb_bytes, square_px)
+            thumb = Image.open(io.BytesIO(sq_bytes)).convert("RGB")
+            im.paste(thumb, (x, y_square))
+            x += square_px + gap
+        except Exception:
+            pass
 
     sku = resolve_inventory_sku(item)
     description = inventory_item_description(item)
-    gap_title = 16
-    gap_meta = 12
-    for line in textwrap.wrap(description, width=28)[:3]:
-        if y >= qy - 8:
+    text_x = x
+    y = margin + 8
+    line_gap = 22
+    for line in textwrap.wrap(description, width=28)[:2]:
+        if y > h_px - margin - 10:
             break
-        draw.text((margin, y), line[:120], fill=(0, 0, 0), font=font_title)
-        y += gap_title
+        draw.text((text_x, y), line[:120], fill=(0, 0, 0), font=font_title)
+        y += line_gap
 
-    y += 2
-    draw.text((margin, min(y, qy - gap_meta)), f"SKU: {sku}"[:120], fill=(0, 0, 0), font=font_meta)
+    draw.text((text_x, h_px - margin - 18), f"SKU: {sku}"[:120], fill=(0, 0, 0), font=font_meta)
 
     out = io.BytesIO()
     im.save(out, format="PNG")

@@ -655,7 +655,7 @@ def _render_inventory_qr_block(item: dict) -> None:
         with act2:
             try:
                 st.download_button(
-                    "2×1 sticker",
+                    "4×1 sticker",
                     data=inventory_label_2x1_sticker_pdf_bytes(item, subject),
                     file_name=inventory_label_2x1_sticker_download_filename(item),
                     mime="application/pdf",
