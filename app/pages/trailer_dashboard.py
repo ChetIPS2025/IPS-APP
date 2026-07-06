@@ -9,6 +9,7 @@ import streamlit as st
 
 try:
     from app.auth import current_profile
+    from app.components.kit_audit_item_ui import clear_audit_item_photos, render_audit_item_fields
     from app.pages._core._data import load_jobs
     from app.services.asset_kits_service import get_asset_kit_items
     from app.services.assets_service import get_asset_image_url, upload_asset_image
@@ -16,7 +17,6 @@ try:
     from app.services.trailer_dashboard_service import (
         INSPECTION_CHECKLIST,
         REQUEST_PRIORITIES,
-        SPOT_AUDIT_CONDITIONS,
         add_tool_to_trailer,
         complete_spot_audit,
         create_trailer_tool_request,
@@ -34,6 +34,7 @@ try:
     from app.utils.formatting import fmt_date
 except ImportError:
     from auth import current_profile  # type: ignore
+    from components.kit_audit_item_ui import clear_audit_item_photos, render_audit_item_fields  # type: ignore
     from pages._core._data import load_jobs  # type: ignore
     from services.asset_kits_service import get_asset_kit_items  # type: ignore
     from services.assets_service import get_asset_image_url, upload_asset_image  # type: ignore
@@ -41,7 +42,6 @@ except ImportError:
     from services.trailer_dashboard_service import (  # type: ignore
         INSPECTION_CHECKLIST,
         REQUEST_PRIORITIES,
-        SPOT_AUDIT_CONDITIONS,
         add_tool_to_trailer,
         complete_spot_audit,
         create_trailer_tool_request,
@@ -212,7 +212,10 @@ def _render_audit(asset: dict[str, Any]) -> None:
     trailer_id = str(asset.get("id") or "")
     _render_back(trailer_id)
     st.markdown("### Perform Audit")
-    st.caption("Randomly selected tools — locate each item, photograph it, confirm quantity, and rate condition.")
+    st.caption(
+        "Randomly selected tools — set status and condition for each item, attach photo proof, "
+        "then complete the audit. Missing items require a note instead of a photo."
+    )
 
     sample: list[dict[str, Any]] = st.session_state.get(_AUDIT_SAMPLE_KEY) or []
     if not sample:
@@ -226,78 +229,55 @@ def _render_audit(asset: dict[str, Any]) -> None:
     summary = get_trailer_dashboard_summary(trailer_id, asset)
     prof_name = _profile_name()
     prof_phone = _profile_phone()
+    user_id = _profile_user_id()
 
-    with st.form(_sk(trailer_id, "audit_form")):
-        supervisor = st.text_input("Supervisor", value=prof_name or summary.get("assigned_supervisor") or "")
-        phone = st.text_input("Phone", value=prof_phone)
-        notes = st.text_area("Audit notes", height=60)
-        line_meta: list[dict[str, Any]] = []
-        for idx, it in enumerate(sample):
-            iid = str(it.get("id") or "")
-            st.markdown(f"**{idx + 1}. {html.escape(str(it.get('item_name') or 'Tool'))}**", unsafe_allow_html=True)
-            c1, c2 = st.columns(2)
-            with c1:
-                qty = st.number_input(
-                    "Quantity",
-                    min_value=0.0,
-                    value=float(it.get("quantity_actual") or it.get("quantity_expected") or 1),
-                    key=f"aud_qty_{trailer_id}_{iid}",
-                )
-            with c2:
-                cond = st.selectbox(
-                    "Condition",
-                    SPOT_AUDIT_CONDITIONS,
-                    key=f"aud_cond_{trailer_id}_{iid}",
-                )
-            photo = st.file_uploader(
-                "Required photo",
-                type=["png", "jpg", "jpeg", "webp"],
-                key=f"aud_photo_{trailer_id}_{iid}",
-            )
-            line_meta.append({"item": it, "kit_item_id": iid, "qty": qty, "condition": cond, "photo": photo})
-        submit = st.form_submit_button("Complete Audit", type="primary", use_container_width=True)
-
-    if not submit:
-        return
-
-    if not str(supervisor or "").strip():
-        st.error("Supervisor name is required.")
-        return
-
-    audit_lines: list[dict[str, Any]] = []
-    for entry in line_meta:
-        it = entry["item"]
-        photo_path, photo_url = _upload_photo(trailer_id, entry.get("photo"))
-        audit_lines.append(
-            {
-                "kit_item_id": entry["kit_item_id"],
-                "expected_quantity": it.get("quantity_expected") or 1,
-                "actual_quantity": entry["qty"],
-                "condition": entry["condition"],
-                "photo_path": photo_path,
-                "photo_url": photo_url,
-            }
-        )
-
-    result = complete_spot_audit(
-        trailer_id,
-        {
-            "performed_by_name": supervisor,
-            "performed_by_phone": phone,
-            "performed_by_user_id": _profile_user_id(),
-            "performed_by_employee_id": _profile_employee_id(),
-            "assigned_supervisor_name": supervisor,
-            "job_id": asset.get("assigned_job_id"),
-            "notes": notes,
-        },
-        audit_lines,
+    supervisor = st.text_input(
+        "Supervisor",
+        value=prof_name or summary.get("assigned_supervisor") or "",
+        key=_sk(trailer_id, "audit_supervisor"),
     )
-    if result.ok:
-        st.success("Audit saved.")
-        _set_view(trailer_id, "home")
-        st.rerun()
-    else:
-        st.error(result.error or "Could not save audit.")
+    phone = st.text_input("Phone", value=prof_phone, key=_sk(trailer_id, "audit_phone"))
+    audit_notes = st.text_area("Audit notes (optional)", height=60, key=_sk(trailer_id, "audit_notes"))
+
+    st.divider()
+    audit_lines: list[dict[str, Any]] = []
+    for idx, it in enumerate(sample):
+        st.markdown(f"#### Item {idx + 1}")
+        line = render_audit_item_fields(
+            it,
+            trailer_id=trailer_id,
+            key_prefix=_sk(trailer_id, "audit"),
+            uploaded_by=user_id,
+            show_quantity=True,
+        )
+        audit_lines.append(line)
+        st.divider()
+
+    if st.button("Complete Audit", type="primary", key=_sk(trailer_id, "audit_submit"), use_container_width=True):
+        if not str(supervisor or "").strip():
+            st.error("Supervisor name is required.")
+            return
+
+        result = complete_spot_audit(
+            trailer_id,
+            {
+                "performed_by_name": supervisor,
+                "performed_by_phone": phone,
+                "performed_by_user_id": user_id,
+                "performed_by_employee_id": _profile_employee_id(),
+                "assigned_supervisor_name": supervisor,
+                "job_id": asset.get("assigned_job_id"),
+                "notes": audit_notes,
+            },
+            audit_lines,
+        )
+        if result.ok:
+            clear_audit_item_photos(trailer_id, [str(i.get("id") or "") for i in sample])
+            st.success("Audit saved.")
+            _set_view(trailer_id, "home")
+            st.rerun()
+        else:
+            st.error(result.error or "Could not save audit.")
 
 
 def _render_request(trailer_id: str, asset: dict[str, Any]) -> None:

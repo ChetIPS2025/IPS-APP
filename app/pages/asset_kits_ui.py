@@ -10,6 +10,8 @@ from typing import Any
 import streamlit as st
 
 try:
+    from app.auth import current_profile
+    from app.components.kit_audit_item_ui import clear_audit_item_photos, render_audit_item_fields
     from app.components.action_styles import danger_outline
     from app.components.status import status_pill_html
     from app.pages._core._data import load_assets, load_inventory, load_jobs
@@ -35,6 +37,8 @@ try:
     from app.services.serialized_tool_service import audit_trailer_tools, dispatch_trailer_to_job
     from app.utils.formatting import fmt_currency, fmt_date
 except ImportError:
+    from auth import current_profile  # type: ignore
+    from components.kit_audit_item_ui import clear_audit_item_photos, render_audit_item_fields  # type: ignore
     from components.action_styles import danger_outline  # type: ignore
     from components.status import status_pill_html  # type: ignore
     from pages._core._data import load_assets, load_inventory, load_jobs  # type: ignore
@@ -708,52 +712,51 @@ def _render_audit_form(asset: dict, aid: str, items: list[dict]) -> None:
         st.session_state[_sk(aid, "view")] = "list"
         st.rerun()
     st.markdown("##### Kit Audit / Inspection")
+    st.caption(
+        "Verify every item with status, condition, and photo proof. "
+        "Missing items require a note explaining where the item was expected or what was checked."
+    )
+    prof = current_profile() or {}
+    user_id = str(prof.get("id") or "").strip() or None
+
     emp_opts = _employee_options()
     job_opts = _job_options()
     emp_labels = [x[0] for x in emp_opts]
     job_labels = [x[0] for x in job_opts]
 
-    with st.form(f"kit_audit_meta_{aid}"):
-        c1, c2 = st.columns(2)
-        with c1:
-            performer = st.text_input("Performed by name")
-            phone = st.text_input("Phone")
-        with c2:
-            sup = st.selectbox("Supervisor responsible", emp_labels)
-            job_label = st.selectbox("Job", job_labels)
-        audit_notes = st.text_area("Audit notes", height=50)
-        st.markdown("**Checklist**")
-        lines: list[dict[str, Any]] = []
-        for it in items:
-            iid = str(it.get("id") or "")
-            serial = str(it.get("serial_number") or "").strip()
-            title = _kit_item_row_label(it, items)
-            if serial:
-                title = f"{title} · S/N {serial}"
-            st.markdown(f"**{title}**")
-            lc1, lc2, lc3, lc4 = st.columns([1, 1, 1.2, 1.2])
-            with lc1:
-                exp_q = st.number_input("Expected", min_value=0.0, value=float(it.get("quantity_expected") or 1), key=f"aud_exp_{aid}_{iid}")
-            with lc2:
-                act_q = st.number_input("Actual", min_value=0.0, value=float(it.get("quantity_actual") or 1), key=f"aud_act_{aid}_{iid}")
-            with lc3:
-                cond = st.selectbox("Condition", CONDITIONS, index=CONDITIONS.index(str(it.get("condition") or "Good")) if str(it.get("condition") or "Good") in CONDITIONS else 1, key=f"aud_cond_{aid}_{iid}")
-            with lc4:
-                stat = st.selectbox("Status", ITEM_STATUSES, index=ITEM_STATUSES.index(str(it.get("status") or "Present")) if str(it.get("status") or "Present") in ITEM_STATUSES else 0, key=f"aud_stat_{aid}_{iid}")
-            line_notes = st.text_input("Notes", key=f"aud_note_{aid}_{iid}", label_visibility="collapsed", placeholder="Notes")
-            lines.append(
-                {
-                    "kit_item_id": iid,
-                    "expected_quantity": exp_q,
-                    "actual_quantity": act_q,
-                    "condition": cond,
-                    "status": stat,
-                    "notes": line_notes,
-                }
-            )
-        submit = st.form_submit_button("Submit Audit", type="primary")
+    c1, c2 = st.columns(2)
+    with c1:
+        performer = st.text_input(
+            "Performed by name",
+            value=str(prof.get("full_name") or prof.get("name") or ""),
+            key=f"kit_audit_perf_{aid}",
+        )
+        phone = st.text_input("Phone", key=f"kit_audit_phone_{aid}")
+    with c2:
+        sup = st.selectbox("Supervisor responsible", emp_labels, key=f"kit_audit_sup_{aid}")
+        job_label = st.selectbox("Job", job_labels, key=f"kit_audit_job_{aid}")
+    audit_notes = st.text_area("Audit notes (optional)", height=50, key=f"kit_audit_notes_{aid}")
 
-    if submit:
+    if not items:
+        st.warning("No kit items to audit.")
+        return
+
+    st.divider()
+    lines: list[dict[str, Any]] = []
+    for idx, it in enumerate(items):
+        st.markdown(f"#### Item {idx + 1}")
+        lines.append(
+            render_audit_item_fields(
+                it,
+                trailer_id=aid,
+                key_prefix=f"kit_audit_{aid}",
+                uploaded_by=user_id,
+                show_quantity=True,
+            )
+        )
+        st.divider()
+
+    if st.button("Submit Audit", type="primary", key=f"kit_audit_submit_{aid}", use_container_width=True):
         if not str(performer or "").strip():
             st.error("Performed by name is required.")
             return
@@ -764,14 +767,18 @@ def _render_audit_form(asset: dict, aid: str, items: list[dict]) -> None:
             {
                 "performed_by_name": performer,
                 "performed_by_phone": phone,
+                "performed_by_user_id": user_id,
+                "performed_by_employee_id": str(prof.get("employee_id") or "").strip() or None,
                 "assigned_supervisor_id": emp.get("id"),
                 "assigned_supervisor_name": sup if sup != "— None —" else "",
                 "job_id": jid or None,
                 "notes": audit_notes,
+                "audit_type": "Full",
             },
             lines,
         )
         if result.ok:
+            clear_audit_item_photos(aid, [str(i.get("id") or "") for i in items])
             data = result.data or {}
             miss_v = data.get("missing_value") or 0
             dmg_v = data.get("damaged_value") or 0

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import random
+import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -44,6 +45,8 @@ _TRAILER_PHOTOS = "trailer_photos"
 _ASSETS = "assets"
 
 SPOT_AUDIT_CONDITIONS = ("Excellent", "Good", "Fair", "Replace")
+AUDIT_ITEM_STATUSES = ("Present", "Missing", "Damaged", "Needs Repair")
+AUDIT_ITEM_CONDITIONS = ("New", "Good", "Fair", "Damaged", "Needs Repair")
 REQUEST_PRIORITIES = ("Low", "Normal", "High", "Urgent")
 INSPECTION_CHECKLIST = (
     ("tires_ok", "Tires"),
@@ -91,7 +94,7 @@ def _job_label(job_id: object) -> str:
 
 
 def map_spot_audit_condition(condition: str) -> tuple[str, str]:
-    """Map supervisor spot-audit condition to kit item condition + status."""
+    """Map legacy supervisor spot-audit condition to kit item condition + status."""
     c = _clean(condition)
     if c == "Excellent":
         return "Good", "Present"
@@ -102,6 +105,100 @@ def map_spot_audit_condition(condition: str) -> tuple[str, str]:
     if c == "Replace":
         return "Needs Repair", "Needs Replacement"
     return "Good", "Present"
+
+
+def normalize_audit_item_status(status: str) -> str:
+    """Map audit UI status to persisted kit item status."""
+    s = _clean(status)
+    if s.casefold() == "needs repair":
+        return "Needs Replacement"
+    return s or "Present"
+
+
+def audit_item_requires_photo(status: str) -> bool:
+    s = _clean(status).casefold()
+    return s in {"present", "damaged", "needs repair"}
+
+
+def audit_item_requires_missing_note(status: str) -> bool:
+    return _clean(status).casefold() == "missing"
+
+
+def validate_audit_item_line(line: dict[str, Any], *, item_label: str = "Item") -> str | None:
+    status = _clean(line.get("status"))
+    if not status:
+        return f"{item_label}: status is required."
+    if audit_item_requires_photo(status):
+        if not _clean(line.get("photo_path")) and not _clean(line.get("photo_url")):
+            return f"{item_label}: photo is required when status is {status}."
+    if audit_item_requires_missing_note(status) and not _clean(line.get("notes")):
+        return f"{item_label}: note is required when status is Missing (where expected / what was checked)."
+    return None
+
+
+def validate_audit_item_lines(lines: list[dict[str, Any]], *, labels: dict[str, str] | None = None) -> str | None:
+    if not lines:
+        return "No audit items to save."
+    labels = labels or {}
+    for line in lines:
+        kid = _clean(line.get("kit_item_id"))
+        label = labels.get(kid) or _clean(line.get("item_name")) or "Item"
+        err = validate_audit_item_line(line, item_label=label)
+        if err:
+            return err
+    return None
+
+
+def upload_audit_item_photo(
+    trailer_id: str,
+    kit_item_id: str,
+    uploaded_file: Any,
+    *,
+    uploaded_by: str | None = None,
+    audit_id: str | None = None,
+) -> tuple[str, str]:
+    """Upload audit evidence photo tied to trailer + kit item (does not change trailer primary image)."""
+    pid = _clean(trailer_id)
+    kid = _clean(kit_item_id)
+    if not pid or not kid or uploaded_file is None:
+        return "", ""
+    try:
+        from app.config import settings
+        from app.db import _storage_is_local, create_signed_url, upload_bytes, upload_bytes_admin
+        from app.services.item_images import ASSET_IMAGE_BUCKET, resize_item_image_bytes
+    except ImportError:
+        from config import settings  # type: ignore
+        from db import _storage_is_local, create_signed_url, upload_bytes, upload_bytes_admin  # type: ignore
+        from services.item_images import ASSET_IMAGE_BUCKET, resize_item_image_bytes  # type: ignore
+
+    raw = uploaded_file.getvalue() if hasattr(uploaded_file, "getvalue") else b""
+    if not raw:
+        return "", ""
+    fname = str(getattr(uploaded_file, "name", "") or "audit-photo.jpg")
+    try:
+        data, out_name = resize_item_image_bytes(raw)
+    except Exception:
+        data, out_name = raw, fname
+
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    safe = re.sub(r"[^\w.-]+", "_", fname).strip("._")[:80] or "audit-photo"
+    if not safe.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+        safe = f"{safe}.jpg"
+    audit_seg = _clean(audit_id) or "pending"
+    user_seg = re.sub(r"[^\w.-]+", "_", _clean(uploaded_by))[:32] or "user"
+    storage_path = f"assets/{pid}/kit_audits/{kid}/{audit_seg}/{ts}_{user_seg}_{safe}"
+    bucket = str(getattr(settings, "storage_bucket", "") or ASSET_IMAGE_BUCKET)
+    content_type = str(getattr(uploaded_file, "type", "") or "image/jpeg")
+    upload_fn = upload_bytes_admin if _storage_is_local() else upload_bytes
+    try:
+        upload_fn(storage_path, data, content_type=content_type, bucket=bucket)
+    except Exception:
+        return "", ""
+    try:
+        url = create_signed_url(storage_path, expires_in=3600, bucket=bucket)
+    except Exception:
+        url = ""
+    return storage_path, url if str(url).startswith("http") else ""
 
 
 def get_trailer_inventory_items(trailer_id: str) -> list[dict[str, Any]]:
@@ -175,12 +272,18 @@ def complete_spot_audit(
     audit_data: dict[str, Any],
     audit_lines: list[dict[str, Any]],
 ) -> ServiceResult:
-    """Save a 5-item spot audit with required photos and supervisor attestation."""
+    """Save a spot audit with per-item status, condition, and photo proof."""
     pid = _clean(trailer_id)
     if not pid:
         return ServiceResult(ok=False, error="Trailer id is required.")
-    if not audit_lines:
-        return ServiceResult(ok=False, error="No audit items to save.")
+
+    labels = {
+        _clean(line.get("kit_item_id")): _clean(line.get("item_name") or line.get("tool_name") or "Item")
+        for line in audit_lines
+    }
+    validation_err = validate_audit_item_lines(audit_lines, labels=labels)
+    if validation_err:
+        return ServiceResult(ok=False, error=validation_err)
 
     normalized: list[dict[str, Any]] = []
     photo_paths: list[str] = []
@@ -188,9 +291,8 @@ def complete_spot_audit(
         kid = _clean(line.get("kit_item_id"))
         if not kid:
             continue
-        if not _clean(line.get("photo_path")) and not _clean(line.get("photo_url")):
-            return ServiceResult(ok=False, error="Each audited item requires a photo.")
-        cond, stat = map_spot_audit_condition(str(line.get("condition") or "Good"))
+        cond = _clean(line.get("condition") or "Good")
+        stat = normalize_audit_item_status(str(line.get("status") or "Present"))
         photo_path = _clean(line.get("photo_path"))
         photo_url = _clean(line.get("photo_url"))
         if photo_path:
@@ -215,7 +317,7 @@ def complete_spot_audit(
         **audit_data,
         "audit_type": "Spot Check",
         "photo_paths": photo_paths,
-        "notes": _clean(audit_data.get("notes") or "Tool trailer spot audit (5 items)."),
+        "notes": _clean(audit_data.get("notes") or "Tool trailer spot audit."),
     }
     return audit_trailer_tools(pid, payload, normalized)
 
@@ -526,10 +628,14 @@ def list_trailer_photos(trailer_id: str, *, limit: int = 30) -> list[dict[str, A
 
 
 __all__ = [
+    "AUDIT_ITEM_CONDITIONS",
+    "AUDIT_ITEM_STATUSES",
     "INSPECTION_CHECKLIST",
     "REQUEST_PRIORITIES",
     "SPOT_AUDIT_CONDITIONS",
     "add_tool_to_trailer",
+    "audit_item_requires_missing_note",
+    "audit_item_requires_photo",
     "complete_spot_audit",
     "create_trailer_tool_request",
     "get_trailer_dashboard_summary",
@@ -537,10 +643,14 @@ __all__ = [
     "get_trailer_inventory_items",
     "list_trailer_photos",
     "map_spot_audit_condition",
+    "normalize_audit_item_status",
     "remove_tool_from_trailer",
     "report_broken_trailer_tool",
     "save_trailer_inspection",
     "select_spot_audit_items",
     "transfer_trailer",
+    "upload_audit_item_photo",
     "upload_trailer_photo",
+    "validate_audit_item_line",
+    "validate_audit_item_lines",
 ]

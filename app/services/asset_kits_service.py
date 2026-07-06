@@ -570,6 +570,20 @@ def create_asset_kit_audit(
     items = get_asset_kit_items(pid)
     by_id = {str(i.get("id")): i for i in items}
 
+    try:
+        from app.services.trailer_dashboard_service import normalize_audit_item_status, validate_audit_item_lines
+    except ImportError:
+        from services.trailer_dashboard_service import normalize_audit_item_status, validate_audit_item_lines  # type: ignore
+
+    labels = {str(i.get("id") or ""): str(i.get("item_name") or "Item") for i in items}
+    for line in audit_items:
+        kid = str(line.get("kit_item_id") or "").strip()
+        if kid and not line.get("item_name"):
+            line["item_name"] = labels.get(kid, "Item")
+    validation_err = validate_audit_item_lines(list(audit_items), labels=labels)
+    if validation_err:
+        return ServiceResult(ok=False, error=validation_err)
+
     exp_count = len(items)
     present_count = 0
     missing_count = 0
@@ -604,7 +618,7 @@ def create_asset_kit_audit(
         exp_q = _f(line.get("expected_quantity") or base.get("quantity_expected") or 1)
         act_q = _f(line.get("actual_quantity") or exp_q)
         cond = str(line.get("condition") or base.get("condition") or "Good")
-        stat = str(line.get("status") or base.get("status") or "Present")
+        stat = normalize_audit_item_status(str(line.get("status") or base.get("status") or "Present"))
         miss_q = max(0.0, exp_q - act_q)
         dmg_q = act_q if stat.lower() in {"damaged", "needs repair", "needs replacement"} else 0.0
         unit_v = _f(base.get("unit_value"))
