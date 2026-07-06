@@ -12,7 +12,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 try:
-    from app.auth import current_role
+    from app.auth import current_profile, current_role
     from app.components.status import status_pill_html
     from app.services.job_labor_summary_service import get_job_labor_summary
     from app.services.job_weekly_timesheets import monday_of_week, week_bounds
@@ -24,6 +24,7 @@ try:
         list_timesheets_for_job,
         load_timesheet_data,
         render_timesheet_html,
+        save_timesheet,
         signed_url_for_timesheet,
         timesheet_table_available,
     )
@@ -31,7 +32,7 @@ try:
     from app.utils.formatting import fmt_currency, fmt_date, fmt_hours
     from app.utils.permissions import can_submit_timekeeping
 except ImportError:
-    from auth import current_role  # type: ignore
+    from auth import current_profile, current_role  # type: ignore
     from components.status import status_pill_html  # type: ignore
     from services.job_labor_summary_service import get_job_labor_summary  # type: ignore
     from services.job_weekly_timesheets import monday_of_week, week_bounds  # type: ignore
@@ -43,6 +44,7 @@ except ImportError:
         list_timesheets_for_job,
         load_timesheet_data,
         render_timesheet_html,
+        save_timesheet,
         signed_url_for_timesheet,
         timesheet_table_available,
     )
@@ -57,6 +59,19 @@ def _week_start_key(key_prefix: str) -> str:
 
 def _init_week_state(key_prefix: str) -> date:
     state_key = _week_start_key(key_prefix)
+    prefill_key = f"{key_prefix}_week_prefilled"
+    if prefill_key not in st.session_state:
+        try:
+            from app.navigation import WJT_PREFILL_WEEK_KEY
+        except ImportError:
+            from navigation import WJT_PREFILL_WEEK_KEY  # type: ignore
+        pre_week = str(st.session_state.pop(WJT_PREFILL_WEEK_KEY, "") or "").strip()[:10]
+        if pre_week:
+            try:
+                st.session_state[state_key] = monday_of_week(date.fromisoformat(pre_week))
+                st.session_state[prefill_key] = True
+            except ValueError:
+                pass
     if state_key not in st.session_state:
         st.session_state[state_key] = monday_of_week(date.today())
     raw = st.session_state[state_key]
@@ -166,15 +181,18 @@ def render_job_labor_summary_section(job: dict[str, Any], *, key_prefix: str) ->
         st.dataframe(df_wk, use_container_width=True, hide_index=True)
 
 
-def render_job_weekly_customer_timesheets_section(job: dict[str, Any], *, key_prefix: str) -> None:
-    """Read-only customer weekly timesheet view/export from approved timekeeping."""
+def render_job_weekly_timesheets_tab(job: dict[str, Any], *, key_prefix: str) -> None:
+    """Weekly customer timesheets for one job (view/generate/export only)."""
     jid = str(job.get("id") or "").strip()
     kp = key_prefix
 
-    st.markdown("### Weekly Customer Timesheets")
+    st.markdown(
+        '<span class="ips-job-weekly-ts-tab-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
     st.caption(
-        "Generated from approved supervisor time in Timekeeping. "
-        "Customer timesheets are view/export only here — edit hours in Timekeeping."
+        "Customer weekly timesheets for this job only — built from approved Timekeeping. "
+        "Supervisors enter hours in Timekeeping; edit time here via **Edit Time in Timekeeping**."
     )
 
     if not timesheet_table_available(force=True):
@@ -226,6 +244,27 @@ def render_job_weekly_customer_timesheets_section(job: dict[str, Any], *, key_pr
         return
 
     labor_count = sum(1 for ln in data.labor_lines if ln.total_hours > 0)
+
+    gen1, gen2 = st.columns([1.2, 2], gap="small")
+    with gen1:
+        if st.button(
+            "Generate Timesheet",
+            type="primary",
+            use_container_width=True,
+            key=f"{kp}_generate",
+            disabled=labor_count == 0,
+            help="Save a weekly timesheet from approved Timekeeping for this job and week.",
+        ):
+            try:
+                prof = current_profile() or {}
+                uid = str(prof.get("id") or "")
+                data.status = "Generated"
+                save_timesheet(data, created_by=uid, lock=False)
+                st.success("Weekly timesheet generated from approved Timekeeping.")
+                st.rerun()
+            except Exception as exc:
+                st.error(str(exc))
+
     if labor_count == 0:
         st.info(
             "No **approved** timekeeping hours for this job and week. "
@@ -313,12 +352,17 @@ def render_job_weekly_customer_timesheets_section(job: dict[str, Any], *, key_pr
                     st.rerun()
 
 
-def render_job_labor_and_timesheets_tab(job: dict[str, Any], *, key_prefix: str) -> None:
-    """Labor Summary + Weekly Customer Timesheets (read-only on Job Detail)."""
+def render_job_labor_summary_tab(job: dict[str, Any], *, key_prefix: str) -> None:
+    """Approved labor rollup for one job."""
     st.markdown(
         '<span class="ips-job-labor-readonly-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
     render_job_labor_summary_section(job, key_prefix=f"{key_prefix}_summary")
+
+
+def render_job_labor_and_timesheets_tab(job: dict[str, Any], *, key_prefix: str) -> None:
+    """Legacy combined tab — prefer separate Labor Summary and Weekly Timesheets tabs."""
+    render_job_labor_summary_tab(job, key_prefix=key_prefix)
     st.divider()
-    render_job_weekly_customer_timesheets_section(job, key_prefix=f"{key_prefix}_wcts")
+    render_job_weekly_timesheets_tab(job, key_prefix=f"{key_prefix}_wts")

@@ -181,7 +181,6 @@ NAV_PAGES: list[tuple[str, str, str]] = [
     ("inventory", "Inventory", "package"),
     ("assets", "Assets", "truck"),
     ("timekeeping", "Timekeeping", "clock"),
-    ("weekly_timesheets", "Weekly Timesheets", "file-text"),
     ("employees", "Users", "users"),
     ("company_updates", "Company Updates", "megaphone"),
     ("tasks", "Tasks", "check-square"),

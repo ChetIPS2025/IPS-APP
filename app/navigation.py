@@ -151,6 +151,20 @@ def open_jobs_job_costing(*, job_id: str = "") -> None:
     set_nav_slug("jobs")
 
 
+def open_jobs_weekly_timesheets(*, job_id: str = "", week_start: str | None = None) -> None:
+    """Open Jobs module with Job Details on the Weekly Timesheets tab."""
+    jid = str(job_id or "").strip()
+    ws = str(week_start or "").strip()[:10]
+    if ws:
+        st.session_state[WJT_PREFILL_WEEK_KEY] = ws
+    if jid:
+        st.session_state[_JOBS_SELECTED_KEY] = jid
+        st.session_state[_JOBS_SHOW_MODAL_KEY] = True
+        st.session_state[_JOBS_MODAL_SESSION_KEY] = jid
+    st.session_state[JOBS_DETAIL_FOCUS_TAB_KEY] = "Weekly Timesheets"
+    set_nav_slug("jobs")
+
+
 def redirect_to_jobs_job_costing(*, job_id: str = "") -> None:
     """Open Jobs module with Job Details on the Job Costing tab."""
     jid = str(job_id or "").strip()
@@ -181,14 +195,8 @@ def navigate_to_estimate_detail(estimate_id: str, *, tab: str = "Details") -> No
 
 
 def navigate_to_weekly_timesheet(*, job_id: str = "", week_start: str | None = None) -> None:
-    """Open Weekly Timesheets with optional job and week prefill."""
-    jid = str(job_id or "").strip()
-    if jid:
-        st.session_state[WJT_PREFILL_JOB_KEY] = jid
-    ws = str(week_start or "").strip()[:10]
-    if ws:
-        st.session_state[WJT_PREFILL_WEEK_KEY] = ws
-    set_nav_slug("weekly_timesheets")
+    """Open Job Detail Weekly Timesheets tab with optional job and week prefill."""
+    open_jobs_weekly_timesheets(job_id=job_id, week_start=week_start)
 
 
 def navigate_to_timekeeping(*, job_id: str = "", week_start: str | None = None) -> None:
@@ -375,6 +383,7 @@ __all__ = [
     "normalize_nav_slug",
     "on_nav_change",
     "open_jobs_job_costing",
+    "open_jobs_weekly_timesheets",
     "queue_pending_nav",
     "redirect_to_jobs_job_costing",
     "render_module",

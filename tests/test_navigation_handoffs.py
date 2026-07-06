@@ -52,9 +52,11 @@ class TestNavigationHandoffs(unittest.TestCase):
 
     def test_navigate_to_weekly_timesheet_prefill(self) -> None:
         navigate_to_weekly_timesheet(job_id="job-1", week_start="2026-05-26")
-        self.assertEqual(st.session_state[WJT_PREFILL_JOB_KEY], "job-1")
+        self.assertEqual(st.session_state["selected_job_id"], "job-1")
+        self.assertTrue(st.session_state["show_job_detail_modal"])
         self.assertEqual(st.session_state[WJT_PREFILL_WEEK_KEY], "2026-05-26")
-        self.assertEqual(st.session_state["ips_nav_page"], "weekly_timesheets")
+        self.assertEqual(st.session_state[JOBS_DETAIL_FOCUS_TAB_KEY], "Weekly Timesheets")
+        self.assertEqual(st.session_state["ips_nav_page"], "jobs")
 
     def test_navigate_to_timekeeping_prefill(self) -> None:
         navigate_to_timekeeping(job_id="job-9", week_start="2026-05-26")

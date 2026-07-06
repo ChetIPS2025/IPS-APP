@@ -3616,11 +3616,11 @@ def render() -> None:
     except ImportError:
         from auth import current_role  # type: ignore
         from utils.permissions import role_can_access_page  # type: ignore
-    if role_can_access_page(current_role(), "weekly_timesheets"):
+    if role_can_access_page(current_role(), "jobs"):
         st.divider()
-        st.markdown("**Weekly job timesheets**")
-        st.caption("Build customer-facing weekly timesheets from timekeeping hours and job expenses.")
-        if st.button("Open Weekly Timesheets", key="tk_open_weekly_ts", use_container_width=False):
+        st.markdown("**Weekly customer timesheets**")
+        st.caption("Generate and send weekly timesheets from the job's **Weekly Timesheets** tab in Job Detail.")
+        if st.button("Open Job Weekly Timesheets", key="tk_open_weekly_ts", use_container_width=False):
             try:
                 from app.navigation import navigate_to_weekly_timesheet
             except ImportError:

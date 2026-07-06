@@ -50,7 +50,10 @@ try:
         cached_job_cost_summary,
         sync_all_sources_for_job,
     )
-    from app.components.job_labor_readonly_panel import render_job_labor_and_timesheets_tab
+    from app.components.job_labor_readonly_panel import (
+        render_job_labor_summary_tab,
+        render_job_weekly_timesheets_tab,
+    )
     from app.components.headers import render_page_brand_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
@@ -142,7 +145,10 @@ except ImportError:
         jobs_visible_table_layout,
     )
     from components.job_actions import render_job_action_buttons  # type: ignore
-    from components.job_labor_readonly_panel import render_job_labor_and_timesheets_tab  # type: ignore
+    from components.job_labor_readonly_panel import (  # type: ignore
+        render_job_labor_summary_tab,
+        render_job_weekly_timesheets_tab,
+    )
     from components.headers import render_page_brand_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
@@ -211,7 +217,8 @@ _JOB_TABS = [
     "Schedule",
     "Subjobs",
     "IPS Forms",
-    "Labor & Timesheets",
+    "Labor Summary",
+    "Weekly Timesheets",
     "Documents",
     "Photos",
     "Daily Updates",
@@ -278,7 +285,8 @@ def _job_detail_tab_labels(job: dict) -> list[str]:
         "Overview",
         _count_label("Subjobs", open_subjobs),
         "Schedule",
-        _count_label("Labor & Timesheets", weekly_ts_count),
+        "Labor Summary",
+        _count_label("Weekly Timesheets", weekly_ts_count),
         "Job Costing",
         "Materials",
         "Equipment",
@@ -2533,6 +2541,7 @@ def _render_job_detail_tabs(job: dict, *, cost_summary: dict | None = None) -> N
         tab_overview,
         tab_tasks,
         tab_schedule,
+        tab_labor,
         tab_weekly_ts,
         tab_costing,
         tab_materials,
@@ -2679,15 +2688,25 @@ def _render_job_detail_tabs(job: dict, *, cost_summary: dict | None = None) -> N
     with tab_ips_forms:
         _render_job_ips_forms_tab(job)
 
-    with tab_weekly_ts:
+    with tab_labor:
         jid = str(job.get("id") or "").strip()
         if jid:
-            render_job_labor_and_timesheets_tab(
+            render_job_labor_summary_tab(
                 job,
                 key_prefix=f"job_labor_{_job_session_key(job)}",
             )
         else:
-            _render_dialog_placeholder("Save this job before viewing labor and timesheets.")
+            _render_dialog_placeholder("Save this job before viewing labor summary.")
+
+    with tab_weekly_ts:
+        jid = str(job.get("id") or "").strip()
+        if jid:
+            render_job_weekly_timesheets_tab(
+                job,
+                key_prefix=f"job_wts_{_job_session_key(job)}",
+            )
+        else:
+            _render_dialog_placeholder("Save this job before viewing weekly timesheets.")
 
     with tab_documents:
         _render_job_documents_tab(job)
@@ -2949,36 +2968,44 @@ def render_job_detail_dialog(job: dict) -> None:
         _render_job_actions_panel(job)
         close_job_detail_footer_shell()
 
-    _focus_job_costing_tab_if_requested()
+    _focus_job_detail_tab_if_requested()
 
 
-def _focus_job_costing_tab_if_requested() -> None:
-    """Select the Job Costing tab when opened via Jobs deep-link (no layout change)."""
+def _focus_job_detail_tab_if_requested() -> None:
+    """Select a Job Detail tab when opened via deep-link (Job Costing, Weekly Timesheets, etc.)."""
     try:
         from app.navigation import JOBS_DETAIL_FOCUS_TAB_KEY
     except ImportError:
         from navigation import JOBS_DETAIL_FOCUS_TAB_KEY  # type: ignore
     focus = str(st.session_state.pop(JOBS_DETAIL_FOCUS_TAB_KEY, "") or "").strip()
-    if focus != "Job Costing":
+    if not focus:
         return
     try:
         from app.ui.clean_table import _components_html
     except ImportError:
         from ui.clean_table import _components_html  # type: ignore
+    label_js = focus.replace("\\", "\\\\").replace("'", "\\'")
     _components_html(
-        """
+        f"""
 <script>
-(function () {
+(function () {{
   const w = window.parent || window;
   const doc = w.document;
   const dialog = doc.querySelector('[data-testid="stDialog"]');
   if (!dialog) return;
+  const want = '{label_js}'.toLowerCase();
   const tabs = dialog.querySelectorAll('[data-testid="stTabs"] button[role="tab"]');
-  if (tabs && tabs[4]) tabs[4].click();
-})();
+  for (const tab of tabs) {{
+    const text = (tab.textContent || '').trim().toLowerCase();
+    if (text === want || text.startsWith(want)) {{
+      tab.click();
+      return;
+    }}
+  }}
+}})();
 </script>
         """,
-        component_key="ips_jobs_focus_costing_tab",
+        component_key=f"ips_jobs_focus_tab_{label_js.replace(' ', '_')}",
         height=1,
     )
 
