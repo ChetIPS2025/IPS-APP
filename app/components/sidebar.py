@@ -61,8 +61,29 @@ def _logo_path() -> Path | None:
     return None
 
 
-def _nav_button_label(slug: str, label: str) -> str:
-    return f"{nav_icon_for_slug(slug)}  {label}"
+def _nav_button_label(slug: str, label: str, *, collapsed: bool) -> str:
+    icon = nav_icon_for_slug(slug)
+    if collapsed:
+        return icon
+    return f"{icon}  {label}"
+
+
+def _render_collapse_toggle(*, collapsed: bool) -> None:
+    toggle_help = "Expand sidebar" if collapsed else "Collapse sidebar"
+    toggle_icon = "›" if collapsed else "‹"
+    st.markdown(
+        f'<span class="ips-sidebar-collapse-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    if st.button(
+        toggle_icon,
+        key="ips_sidebar_collapse_toggle",
+        help=toggle_help,
+        use_container_width=collapsed,
+    ):
+        set_sidebar_collapsed(not collapsed)
+        request_sidebar_toggle()
+        st.rerun()
 
 
 def render_sidebar(active_slug: str) -> None:
@@ -78,6 +99,7 @@ def render_sidebar(active_slug: str) -> None:
     else:
         nav_items = filter_nav_for_role(NAV_PAGES, role)
     store_sidebar_nav_fallback(nav_items)
+
     _ESTIMATING_SLUGS = frozenset({"estimates", "pricing_guide"})
     _OPERATIONS_SLUGS = frozenset({"inventory", "assets", "rental_equipment"})
     _LABOR_SLUGS = frozenset({"timekeeping"})
@@ -93,34 +115,31 @@ def render_sidebar(active_slug: str) -> None:
     ]
     _shown_sections: set[str] = set()
 
+    shell_cls = "ips-sidebar-shell ips-sidebar-collapsed" if collapsed else "ips-sidebar-shell ips-sidebar-expanded"
+    st.markdown(
+        f'<span class="{shell_cls}" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+
     with st.sidebar:
-        st.markdown(f'<{_OT} class="ips-sidebar-collapse-row">', unsafe_allow_html=True)
-        toggle_label = "Expand sidebar" if collapsed else "Collapse sidebar"
-        toggle_icon = "»" if collapsed else "«"
-        if st.button(
-            f"{toggle_icon}  {toggle_label}",
-            key="ips_sidebar_collapse_toggle",
-            help=toggle_label,
-            use_container_width=True,
-        ):
-            set_sidebar_collapsed(not collapsed)
-            request_sidebar_toggle()
-            st.rerun()
+        st.markdown(f'<{_OT} class="ips-sidebar-topbar">', unsafe_allow_html=True)
+        _render_collapse_toggle(collapsed=collapsed)
         st.markdown(f"<{_CT}>", unsafe_allow_html=True)
 
-        st.markdown(f'<{_OT} class="ips-sidebar-logo-wrap">', unsafe_allow_html=True)
-        logo = _logo_path()
-        if logo:
-            st.image(str(logo), use_container_width=True)
-        else:
-            st.markdown('<p class="ips-sidebar-brand">IPS Operations</p>', unsafe_allow_html=True)
-        st.markdown(
-            f'<p class="ips-sidebar-tagline">Industrial Plant Solutions</p><{_CT}>',
-            unsafe_allow_html=True,
-        )
-
         if not collapsed:
-            st.markdown(f'<p class="ips-sidebar-nav-label">Navigation</p>', unsafe_allow_html=True)
+            st.markdown(f'<{_OT} class="ips-sidebar-logo-wrap">', unsafe_allow_html=True)
+            logo = _logo_path()
+            if logo:
+                st.image(str(logo), use_container_width=True)
+            else:
+                st.markdown('<p class="ips-sidebar-brand">IPS Operations</p>', unsafe_allow_html=True)
+            st.markdown(
+                f'<p class="ips-sidebar-tagline">Industrial Plant Solutions</p><{_CT}>',
+                unsafe_allow_html=True,
+            )
+            st.markdown('<p class="ips-sidebar-nav-label">Navigation</p>', unsafe_allow_html=True)
+
+        st.markdown(f'<{_OT} class="ips-sidebar-nav-scroll">', unsafe_allow_html=True)
         for item in nav_items:
             if len(item) == 3:
                 slug, label, _icon = item
@@ -130,7 +149,7 @@ def render_sidebar(active_slug: str) -> None:
                 for section_slugs, section_label in _SECTION_HEADERS:
                     if slug in section_slugs and section_label not in _shown_sections:
                         st.markdown(
-                            f'<p class="ips-sidebar-nav-label" style="margin-top:0.75rem;">{html.escape(section_label)}</p>',
+                            f'<p class="ips-sidebar-nav-label ips-sidebar-section-label">{html.escape(section_label)}</p>',
                             unsafe_allow_html=True,
                         )
                         _shown_sections.add(section_label)
@@ -138,7 +157,12 @@ def render_sidebar(active_slug: str) -> None:
             is_active = slug == active_slug or (slug in _SCAN_SLUGS and active_slug in {"inventory", "assets"})
             if slug == "employee_qr_scan" and active_slug in {"inventory", "assets"}:
                 is_active = True
-            btn_label = _nav_button_label(slug, label)
+            btn_label = _nav_button_label(slug, label, collapsed=collapsed)
+            st.markdown(
+                f'<span class="ips-nav-btn-wrap ips-nav-btn-{"active" if is_active else "idle"}" '
+                f'data-nav-slug="{html.escape(slug)}" aria-hidden="true"></span>',
+                unsafe_allow_html=True,
+            )
             if st.button(
                 btn_label,
                 key=f"nav_{slug}",
@@ -150,12 +174,13 @@ def render_sidebar(active_slug: str) -> None:
                     set_nav_slug(slug)
                     request_sidebar_collapse_after_nav()
                     st.rerun()
+        st.markdown(f"<{_CT}>", unsafe_allow_html=True)
 
-        st.markdown(f'<{_OT} class="ips-sidebar-spacer"><{_CT}>', unsafe_allow_html=True)
+        st.markdown(f'<{_OT} class="ips-sidebar-footer">', unsafe_allow_html=True)
 
         if not collapsed and not is_employee_nav:
             st.markdown('<p class="ips-sidebar-field-toggle-label">View mode</p>', unsafe_allow_html=True)
-        if not is_employee_nav:
+        if not collapsed and not is_employee_nav:
             fm = st.toggle(
                 "Field Supervisor Mode",
                 value=field_mode,
@@ -177,7 +202,9 @@ def render_sidebar(active_slug: str) -> None:
                 f'<{_OT} class="ips-sidebar-user"><strong>{name}</strong><br>{role_lbl}<{_CT}>',
                 unsafe_allow_html=True,
             )
-        if st.button("Log out", use_container_width=True, key="ips_logout", help="Log out"):
+
+        logout_label = "⎋" if collapsed else "Log out"
+        if st.button(logout_label, use_container_width=True, key="ips_logout", help="Log out"):
             sign_out()
 
         if not collapsed:
@@ -185,3 +212,4 @@ def render_sidebar(active_slug: str) -> None:
                 f'<p class="ips-sidebar-version">App v{html.escape(APP_VERSION)}</p>',
                 unsafe_allow_html=True,
             )
+        st.markdown(f"<{_CT}>", unsafe_allow_html=True)

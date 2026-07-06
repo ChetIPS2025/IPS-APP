@@ -13248,19 +13248,20 @@ section[data-testid="stMain"] [data-testid="stExpander"] summary {{
   font-weight: 600 !important;
 }}
 
-/* Sidebar — fixed nav SaaS layout */
+/* Sidebar — layout chrome (width/collapse handled by sidebar_shell.py) */
 section[data-testid="stSidebar"] {{
-  min-width: 15.5rem !important;
-  max-width: 15.5rem !important;
-  width: 15.5rem !important;
+  background: {SIDEBAR_BG} !important;
+  border-right: 1px solid {BORDER} !important;
   z-index: 99995 !important;
-  overflow: visible !important;
 }}
 section[data-testid="stSidebar"] > div {{
-  min-width: 15.5rem !important;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  background: {SIDEBAR_BG} !important;
+}}
+.ips-sidebar-section-label {{
+  margin-top: 0.75rem !important;
 }}
 .ips-sidebar-logo-wrap {{
   padding: 0.45rem 0.65rem 0.55rem;
@@ -13340,11 +13341,15 @@ section[data-testid="stSidebar"] .stButton > button:hover {{
 }}
 section[data-testid="stSidebar"] .stButton > button[kind="primary"],
 section[data-testid="stSidebar"] .stButton > button[data-testid="baseButton-primary"] {{
-  background: {SELECTED_BG} !important;
-  color: {PRIMARY} !important;
+  background: {PRIMARY} !important;
+  color: #ffffff !important;
   font-weight: 600 !important;
-  border-left: 3px solid {PRIMARY} !important;
-  padding-left: calc(0.75rem - 3px) !important;
+  border: none !important;
+  box-shadow: none !important;
+}}
+section[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {{
+  background: {PRIMARY_HOVER} !important;
+  color: #ffffff !important;
 }}
 section[data-testid="stSidebar"] .stButton > button[kind="secondary"] {{
   background: transparent !important;

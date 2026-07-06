@@ -30,15 +30,22 @@ def test_store_sidebar_nav_fallback_keeps_slug_label_and_icon():
 
 
 def test_sidebar_collapse_session_helpers():
-    set_sidebar_collapsed(True)
-    assert is_sidebar_collapsed() is True
+    set_sidebar_collapsed(False)
+    assert is_sidebar_collapsed() is False
     request_sidebar_collapse_after_nav()
     apply_pending_sidebar_collapse()
-    assert is_sidebar_collapsed() is True
+    assert is_sidebar_collapsed() is False
     assert IPS_SIDEBAR_COLLAPSE_AFTER_NAV_KEY not in st.session_state
 
 
-def test_nav_icon_for_slug_defaults():
+def test_nav_button_label_collapsed_icon_only():
+    from app.components.sidebar import _nav_button_label
+
+    full = _nav_button_label("jobs", "Jobs", collapsed=False)
+    icon_only = _nav_button_label("jobs", "Jobs", collapsed=True)
+    assert "Jobs" in full
+    assert "Jobs" not in icon_only
+    assert icon_only == "💼"
     assert nav_icon_for_slug("jobs") == "💼"
     assert nav_icon_for_slug("unknown_slug") == "•"
 

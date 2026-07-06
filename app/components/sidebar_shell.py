@@ -16,8 +16,8 @@ IPS_SIDEBAR_COLLAPSED_SESSION_KEY = "ips_sidebar_collapsed"
 IPS_SIDEBAR_COLLAPSE_AFTER_NAV_KEY = "ips_sidebar_collapse_after_nav"
 IPS_SIDEBAR_COLLAPSED_STORAGE_KEY = "ips_sidebar_collapsed"
 IPS_SIDEBAR_DESKTOP_MIN_PX = 900
-IPS_SIDEBAR_EXPANDED_WIDTH_PX = 248
-IPS_SIDEBAR_COLLAPSED_WIDTH_PX = 72
+IPS_SIDEBAR_EXPANDED_WIDTH_PX = 232
+IPS_SIDEBAR_COLLAPSED_WIDTH_PX = 68
 
 
 def is_sidebar_collapsed() -> bool:
@@ -33,10 +33,9 @@ def request_sidebar_collapse_after_nav() -> None:
 
 
 def apply_pending_sidebar_collapse() -> None:
-    """Apply auto-collapse after navigation (desktop narrow / mobile drawer close)."""
+    """Close the mobile drawer after navigation; desktop collapse state is unchanged."""
     if not st.session_state.pop(IPS_SIDEBAR_COLLAPSE_AFTER_NAV_KEY, False):
         return
-    set_sidebar_collapsed(True)
     st.session_state[IPS_SIDEBAR_TOGGLE_REQUEST_KEY] = True
 
 
@@ -197,13 +196,16 @@ def request_sidebar_toggle() -> None:
 
 
 def _shell_css() -> str:
+    exp = IPS_SIDEBAR_EXPANDED_WIDTH_PX
+    col = IPS_SIDEBAR_COLLAPSED_WIDTH_PX
+    mobile_max = IPS_SIDEBAR_DESKTOP_MIN_PX - 1
     return f"""
-<style id="ips-sidebar-shell-v2">
+<style id="ips-sidebar-shell-v3">
 .ips-main-header-menu,
 button.ips-header-menu-btn {{
   display: none !important;
 }}
-@media (max-width: {IPS_SIDEBAR_DESKTOP_MIN_PX - 1}px) {{
+@media (max-width: {mobile_max}px) {{
   .ips-main-header-menu {{
     display: flex !important;
     align-items: center !important;
@@ -225,36 +227,14 @@ button.ips-header-menu-btn {{
     color: #2563eb !important;
     cursor: pointer !important;
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08) !important;
-    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease !important;
-    -webkit-tap-highlight-color: transparent !important;
-  }}
-  button.ips-header-menu-btn .ips-header-menu-icon {{
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    line-height: 0 !important;
-  }}
-  button.ips-header-menu-btn svg {{
-    display: block !important;
-    width: 1.25rem !important;
-    height: 1.25rem !important;
   }}
   button.ips-header-menu-btn:hover,
   button.ips-header-menu-btn:focus-visible {{
     background: #eff6ff !important;
     border-color: rgba(37, 99, 235, 0.32) !important;
     color: #1d4ed8 !important;
-    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.14) !important;
     outline: none !important;
   }}
-  button.ips-header-menu-btn:active {{
-    background: #dbeafe !important;
-    transform: scale(0.96) !important;
-  }}
-}}
-.ips-main-header {{
-  position: relative !important;
-  z-index: 2 !important;
 }}
 #ips-sidebar-backdrop {{
   display: none;
@@ -284,101 +264,57 @@ button.ips-header-menu-btn {{
 #ips-nav-fallback.is-open {{
   display: block;
 }}
-#ips-nav-fallback .ips-nav-fallback-title {{
-  margin: 0 0 0.45rem;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #64748b;
-}}
-#ips-nav-fallback a {{
-  display: block;
-  padding: 0.55rem 0.65rem;
-  border-radius: 8px;
-  color: #0f172a;
-  font-size: 0.875rem;
-  font-weight: 700;
-  text-decoration: none;
-}}
-#ips-nav-fallback a:hover {{
-  background: #eff6ff;
-  color: #1d4ed8;
-}}
 @media (min-width: {IPS_SIDEBAR_DESKTOP_MIN_PX}px) {{
+  .stApp [data-testid="stAppViewContainer"] {{
+    display: flex !important;
+    flex-direction: row !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: clip !important;
+  }}
   section[data-testid="stSidebar"],
   [data-testid="stSidebar"] {{
-    width: {IPS_SIDEBAR_EXPANDED_WIDTH_PX}px !important;
-    min-width: {IPS_SIDEBAR_EXPANDED_WIDTH_PX}px !important;
-    max-width: {IPS_SIDEBAR_EXPANDED_WIDTH_PX}px !important;
+    flex: 0 0 {exp}px !important;
+    width: {exp}px !important;
+    min-width: {exp}px !important;
+    max-width: {exp}px !important;
     transform: none !important;
     visibility: visible !important;
     opacity: 1 !important;
     position: relative !important;
     z-index: 99995 !important;
-    overflow: visible !important;
-    transition: width 0.18s ease, min-width 0.18s ease, max-width 0.18s ease !important;
+    overflow: hidden !important;
+    transition: flex-basis 0.18s ease, width 0.18s ease, min-width 0.18s ease, max-width 0.18s ease !important;
+  }}
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"],
+  body.ips-sidebar-collapsed [data-testid="stSidebar"] {{
+    flex-basis: {col}px !important;
+    width: {col}px !important;
+    min-width: {col}px !important;
+    max-width: {col}px !important;
+  }}
+  section[data-testid="stSidebar"] > div {{
+    width: 100% !important;
+    min-width: 0 !important;
+    max-height: 100dvh !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding-top: 0.35rem !important;
+    padding-bottom: 0.5rem !important;
+  }}
+  section[data-testid="stMain"] {{
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: 100% !important;
   }}
   section[data-testid="stSidebar"][aria-expanded="false"],
   [data-testid="stSidebar"][aria-expanded="false"] {{
     transform: none !important;
-    width: {IPS_SIDEBAR_EXPANDED_WIDTH_PX}px !important;
-    min-width: {IPS_SIDEBAR_EXPANDED_WIDTH_PX}px !important;
-    max-width: {IPS_SIDEBAR_EXPANDED_WIDTH_PX}px !important;
     margin-left: 0 !important;
-  }}
-  body.ips-sidebar-collapsed section[data-testid="stSidebar"],
-  body.ips-sidebar-collapsed [data-testid="stSidebar"] {{
-    width: {IPS_SIDEBAR_COLLAPSED_WIDTH_PX}px !important;
-    min-width: {IPS_SIDEBAR_COLLAPSED_WIDTH_PX}px !important;
-    max-width: {IPS_SIDEBAR_COLLAPSED_WIDTH_PX}px !important;
-  }}
-  section[data-testid="stSidebar"] > div {{
-    width: 100% !important;
-    min-width: {IPS_SIDEBAR_EXPANDED_WIDTH_PX}px !important;
-    overflow-x: hidden !important;
-    overflow-y: auto !important;
-    max-height: 100dvh !important;
-  }}
-  body.ips-sidebar-collapsed section[data-testid="stSidebar"] > div {{
-    min-width: {IPS_SIDEBAR_COLLAPSED_WIDTH_PX}px !important;
-  }}
-  body.ips-sidebar-collapsed .ips-sidebar-logo-wrap img {{
-    max-width: 2.25rem !important;
-    margin: 0 auto !important;
-  }}
-  body.ips-sidebar-collapsed .ips-sidebar-tagline,
-  body.ips-sidebar-collapsed .ips-sidebar-nav-label,
-  body.ips-sidebar-collapsed .ips-sidebar-user,
-  body.ips-sidebar-collapsed .ips-sidebar-version,
-  body.ips-sidebar-collapsed .ips-sidebar-field-toggle-label {{
-    display: none !important;
-  }}
-  body.ips-sidebar-collapsed .ips-sidebar-brand {{
-    font-size: 0.72rem !important;
-    text-align: center !important;
-  }}
-  body.ips-sidebar-collapsed section[data-testid="stSidebar"] div.stButton > button {{
-    min-height: 2.5rem !important;
-    padding-left: 0.35rem !important;
-    padding-right: 0.35rem !important;
-  }}
-  body.ips-sidebar-collapsed section[data-testid="stSidebar"] div.stButton > button p {{
-    max-width: 1.55rem !important;
-    overflow: hidden !important;
-    white-space: nowrap !important;
-    text-align: left !important;
-    font-size: 1.05rem !important;
-  }}
-  body.ips-sidebar-collapsed .ips-sidebar-collapse-row + div.stButton > button p {{
-    max-width: 1.35rem !important;
-    text-align: center !important;
-  }}
-  body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stToggle"] label span {{
-    display: none !important;
-  }}
-  body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stToggle"] {{
-    justify-content: center !important;
+    visibility: visible !important;
   }}
   [data-testid="stSidebarCollapsedControl"],
   button[data-testid="collapsedControl"] {{
@@ -387,8 +323,103 @@ button.ips-header-menu-btn {{
   #ips-sidebar-backdrop {{
     display: none !important;
   }}
+  .ips-sidebar-topbar {{
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    padding: 0.15rem 0.35rem 0.35rem !important;
+  }}
+  body.ips-sidebar-collapsed .ips-sidebar-topbar {{
+    justify-content: center !important;
+    padding: 0.2rem 0.15rem 0.35rem !important;
+  }}
+  section[data-testid="stSidebar"] [class*="st-key-ips_sidebar_collapse_toggle"] .stButton > button {{
+    width: 2rem !important;
+    min-width: 2rem !important;
+    max-width: 2rem !important;
+    height: 2rem !important;
+    min-height: 2rem !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    border-radius: 8px !important;
+    border: 1px solid #e2e8f0 !important;
+    background: #ffffff !important;
+    color: #2563eb !important;
+    font-size: 1.15rem !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    box-shadow: none !important;
+    justify-content: center !important;
+  }}
+  section[data-testid="stSidebar"] [class*="st-key-ips_sidebar_collapse_toggle"] .stButton > button:hover {{
+    background: #eff6ff !important;
+    border-color: #bfdbfe !important;
+  }}
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-ips_sidebar_collapse_toggle"] .stButton > button {{
+    width: 100% !important;
+    max-width: 100% !important;
+  }}
+  .ips-sidebar-nav-scroll {{
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 0 0.2rem !important;
+  }}
+  .ips-sidebar-footer {{
+    flex: 0 0 auto !important;
+    margin-top: auto !important;
+    padding-top: 0.35rem !important;
+    border-top: 1px solid #e5eaf2 !important;
+  }}
+  section[data-testid="stSidebar"] .stButton > button {{
+    width: calc(100% - 0.5rem) !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #0f172a !important;
+    font-weight: 600 !important;
+    font-size: 0.8125rem !important;
+    min-height: 2.35rem !important;
+    padding: 0.45rem 0.65rem !important;
+    margin: 0.06rem 0.25rem !important;
+    border-radius: 10px !important;
+    transition: background 0.12s ease, color 0.12s ease !important;
+  }}
+  section[data-testid="stSidebar"] .stButton > button:hover {{
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
+  }}
+  section[data-testid="stSidebar"] .stButton > button[kind="primary"],
+  section[data-testid="stSidebar"] .stButton > button[data-testid="baseButton-primary"] {{
+    background: #2563eb !important;
+    color: #ffffff !important;
+    border: none !important;
+    box-shadow: none !important;
+  }}
+  section[data-testid="stSidebar"] .stButton > button[kind="primary"]:hover {{
+    background: #1d4ed8 !important;
+    color: #ffffff !important;
+  }}
+  section[data-testid="stSidebar"] .stButton > button[kind="secondary"] {{
+    background: transparent !important;
+    color: #0f172a !important;
+  }}
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] .stButton > button {{
+    justify-content: center !important;
+    text-align: center !important;
+    padding: 0.4rem 0.2rem !important;
+    min-height: 2.5rem !important;
+    font-size: 1.05rem !important;
+  }}
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] .stButton > button p {{
+    margin: 0 auto !important;
+    text-align: center !important;
+  }}
 }}
-@media (max-width: {IPS_SIDEBAR_DESKTOP_MIN_PX - 1}px) {{
+@media (max-width: {mobile_max}px) {{
   section[data-testid="stSidebar"],
   [data-testid="stSidebar"] {{
     position: fixed !important;
@@ -397,11 +428,15 @@ button.ips-header-menu-btn {{
     height: 100dvh !important;
     max-height: 100dvh !important;
     z-index: 100002 !important;
-    width: 260px !important;
-    min-width: 260px !important;
-    max-width: min(260px, 92vw) !important;
+    width: min(240px, 92vw) !important;
+    min-width: min(240px, 92vw) !important;
+    max-width: min(240px, 92vw) !important;
     transition: transform 0.2s ease-out !important;
     box-shadow: 4px 0 24px rgba(15, 23, 42, 0.18) !important;
+    overflow-y: auto !important;
+  }}
+  section[data-testid="stSidebar"] > div {{
+    max-height: 100dvh !important;
     overflow-y: auto !important;
   }}
   section[data-testid="stSidebar"][aria-expanded="false"],
@@ -412,11 +447,14 @@ button.ips-header-menu-btn {{
   [data-testid="stSidebar"][aria-expanded="true"] {{
     transform: translateX(0) !important;
   }}
+  section[data-testid="stMain"] {{
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 1 1 100% !important;
+  }}
   [data-testid="stSidebarCollapsedControl"],
   button[data-testid="collapsedControl"] {{
-    z-index: 100004 !important;
-    min-width: 2.75rem !important;
-    min-height: 2.75rem !important;
+    display: none !important;
   }}
 }}
 section[data-testid="stMain"] {{
@@ -617,11 +655,10 @@ def _shell_script(nav_json: str) -> str:
   window.IPS.collapseAfterNav = function () {{
     var d = rootDoc();
     if (isDesktop()) {{
-      ensureDesktopVisible(d);
-      setBodyCollapsed(d, true);
-    }} else {{
-      closeMobileDrawer(d);
+      syncBackdrop(d);
+      return;
     }}
+    closeMobileDrawer(d);
   }};
   window.IPS.toggleSidebar = function () {{
     var d = rootDoc();
