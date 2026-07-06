@@ -52,6 +52,17 @@ def inventory_qr_subject(item: dict[str, Any]) -> str:
     return inventory_qr_embed_subject(item)
 
 
+def inventory_item_has_thumbnail(item: dict[str, Any]) -> bool:
+    """True when item has a stored image path (no network/local read)."""
+    try:
+        from app.services.inventory_images import inventory_display_record
+        from app.services.item_images import has_stored_item_image
+    except ImportError:
+        from services.inventory_images import inventory_display_record  # type: ignore
+        from services.item_images import has_stored_item_image  # type: ignore
+    return has_stored_item_image(inventory_display_record(item))
+
+
 def load_inventory_thumbnail_bytes(item: dict[str, Any]) -> bytes | None:
     """Load stored thumbnail bytes for label rendering."""
     try:
@@ -335,7 +346,7 @@ def build_inventory_labels_csv(items: list[dict[str, Any]]) -> str:
     for item in items:
         slug = inventory_label_download_basename(item)
         thumb_ext = ""
-        if load_inventory_thumbnail_bytes(item):
+        if inventory_item_has_thumbnail(item):
             thumb_ext = f"images/{slug}.jpg"
         writer.writerow(
             [

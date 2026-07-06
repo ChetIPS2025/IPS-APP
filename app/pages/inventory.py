@@ -178,6 +178,10 @@ SELECTED_INVENTORY_KEY = "selected_inventory_id"
 SHOW_INVENTORY_MODAL_KEY = "show_inventory_detail_modal"
 _ALL_INVENTORY_IDS_KEY = "_ips_inventory_visible_ids"
 _TABLE_KEY = "inventory_list"
+_EXPORT_CACHE_KEY = "inv_label_export_cache_key"
+_EXPORT_ZIP_BYTES_KEY = "inv_label_export_zip_bytes"
+_EXPORT_CSV_BYTES_KEY = "inv_label_export_csv_bytes"
+_EXPORT_COUNT_KEY = "inv_label_export_item_count"
 _INV_COLS = [0.42, 0.9, 4.28, 1.8, 1.6, 1.1, 0.8, 1.0, 1.3, 1.8]
 _INV_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
@@ -978,6 +982,27 @@ def _show_inventory_detail_modal() -> None:
     render_inventory_detail_dialog(item)
 
 
+def _inventory_export_cache_key(filtered: list[dict]) -> str:
+    """Fingerprint current filter + visible export rows; invalidates prepared downloads when stale."""
+    ids = ",".join(sorted(str(r.get("id") or "") for r in filtered))
+    q = str(st.session_state.get("inv_search") or "").strip()
+    stock_view = str(st.session_state.get("inv_stock_view") or "In stock")
+    return f"{q}|{stock_view}|{ids}"
+
+
+def _clear_prepared_inventory_exports() -> None:
+    for key in (_EXPORT_CACHE_KEY, _EXPORT_ZIP_BYTES_KEY, _EXPORT_CSV_BYTES_KEY, _EXPORT_COUNT_KEY):
+        st.session_state.pop(key, None)
+
+
+def _sync_inventory_export_cache(filtered: list[dict]) -> str:
+    cache_key = _inventory_export_cache_key(filtered)
+    if st.session_state.get(_EXPORT_CACHE_KEY) != cache_key:
+        _clear_prepared_inventory_exports()
+        st.session_state[_EXPORT_CACHE_KEY] = cache_key
+    return cache_key
+
+
 def render() -> None:
     try:
         from app.pages._core._access import begin_module
@@ -1014,6 +1039,7 @@ def render() -> None:
         q=str(st.session_state.get("inv_search") or "").strip(),
         stock_view=str(st.session_state.get("inv_stock_view") or "In stock"),
     )
+    export_cache_key = _sync_inventory_export_cache(filtered_export)
 
     def _inv_export() -> None:
         try:
@@ -1034,12 +1060,40 @@ def render() -> None:
         if not count:
             st.caption("No items match the current filters.")
             return
+
+        zip_bytes = st.session_state.get(_EXPORT_ZIP_BYTES_KEY)
+        csv_bytes = st.session_state.get(_EXPORT_CSV_BYTES_KEY)
+        prepared = (
+            zip_bytes
+            and csv_bytes
+            and st.session_state.get(_EXPORT_CACHE_KEY) == export_cache_key
+        )
+
+        if not prepared:
+            if st.button(
+                "Prepare Label Export",
+                key="inv_prepare_label_export",
+                use_container_width=True,
+                help="Build ZIP and CSV once for the current filters (can take a moment for large lists).",
+            ):
+                with st.spinner(f"Building labels for {count} item(s)…"):
+                    st.session_state[_EXPORT_ZIP_BYTES_KEY] = build_inventory_labels_zip(filtered_export)
+                    st.session_state[_EXPORT_CSV_BYTES_KEY] = build_inventory_labels_csv(filtered_export).encode(
+                        "utf-8"
+                    )
+                    st.session_state[_EXPORT_COUNT_KEY] = count
+                    st.session_state[_EXPORT_CACHE_KEY] = export_cache_key
+                st.rerun()
+            st.caption(f"{count} item(s) — prepare export before downloading.")
+            return
+
+        export_count = int(st.session_state.get(_EXPORT_COUNT_KEY) or count)
         c1, c2 = st.columns(2)
         with c1:
             st.download_button(
                 "Labels ZIP",
-                data=build_inventory_labels_zip(filtered_export),
-                file_name=inventory_labels_zip_filename(item_count=count),
+                data=zip_bytes,
+                file_name=inventory_labels_zip_filename(item_count=export_count),
                 mime="application/zip",
                 key="inv_export_zip_hdr",
                 use_container_width=True,
@@ -1048,13 +1102,17 @@ def render() -> None:
         with c2:
             st.download_button(
                 "Labels CSV",
-                data=build_inventory_labels_csv(filtered_export).encode("utf-8"),
-                file_name=inventory_labels_csv_filename(item_count=count),
+                data=csv_bytes,
+                file_name=inventory_labels_csv_filename(item_count=export_count),
                 mime="text/csv",
                 key="inv_export_csv_hdr",
                 use_container_width=True,
                 help="Variable data only — pair with ZIP for image and PDF paths.",
             )
+        if st.button("Rebuild export", key="inv_rebuild_label_export", use_container_width=True):
+            _clear_prepared_inventory_exports()
+            st.session_state[_EXPORT_CACHE_KEY] = export_cache_key
+            st.rerun()
 
     def _inv_new() -> None:
         if st.button("+ New Item", key="inv_new", type="primary", use_container_width=True):
