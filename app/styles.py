@@ -9989,7 +9989,7 @@ div[data-testid="stDialog"] [data-testid="stTabContent"] {{
 div[data-testid="stDialog"] [data-testid="stRadio"] {{
   display: none !important;
 }}
-div[data-testid="stDialog"] .ips-tabs-wrap [data-testid="stRadio"] {{
+div[data-testid="stDialog"] [class*="st-key-ips_tabs_wrap_"] [data-testid="stRadio"] {{
   display: block !important;
 }}
 div[data-testid="stDialog"]:has(.ips-estimate-detail-modal) > div,
@@ -9998,7 +9998,7 @@ div[data-testid="stDialog"]:has(.ips-estimate-detail-modal) div[role="dialog"] {
   overflow-y: auto !important;
   max-height: min(90vh, 920px) !important;
 }}
-div[data-testid="stDialog"]:has(.ips-estimate-detail-modal) .ips-tabs-wrap {{
+div[data-testid="stDialog"]:has(.ips-estimate-detail-modal) [class*="st-key-ips_tabs_wrap_est_detail_active_tab"] {{
   position: sticky;
   top: 0;
   z-index: 5;
@@ -10009,13 +10009,13 @@ div[data-testid="stDialog"]:has(.ips-estimate-detail-modal) .ips-tabs-wrap {{
   border-bottom: 1px solid #e2e8f0;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9);
 }}
-div[data-testid="stDialog"]:has(.ips-estimate-detail-modal) .ips-tabs-wrap [data-testid="stRadio"] {{
+div[data-testid="stDialog"]:has(.ips-estimate-detail-modal) [class*="st-key-ips_tabs_wrap_est_detail_active_tab"] [data-testid="stRadio"] {{
   display: block !important;
   width: 100%;
   max-width: 100%;
   overflow: visible !important;
 }}
-div[data-testid="stDialog"]:has(.ips-estimate-detail-modal) .ips-tabs-wrap [data-testid="stRadio"] > div {{
+div[data-testid="stDialog"]:has(.ips-estimate-detail-modal) [class*="st-key-ips_tabs_wrap_est_detail_active_tab"] [data-testid="stRadio"] > div {{
   display: flex !important;
   flex-direction: row !important;
   flex-wrap: nowrap !important;
@@ -10027,7 +10027,7 @@ div[data-testid="stDialog"]:has(.ips-estimate-detail-modal) .ips-tabs-wrap [data
   scrollbar-width: thin;
   -webkit-overflow-scrolling: touch;
 }}
-div[data-testid="stDialog"]:has(.ips-estimate-detail-modal) .ips-tabs-wrap [data-testid="stRadio"] label {{
+div[data-testid="stDialog"]:has(.ips-estimate-detail-modal) [class*="st-key-ips_tabs_wrap_est_detail_active_tab"] [data-testid="stRadio"] label {{
   flex: 0 0 auto !important;
   white-space: nowrap !important;
 }}
@@ -13356,17 +13356,17 @@ section[data-testid="stSidebar"] hr {{
 }}
 
 /* Tabs — underline style */
-.ips-tabs-wrap {{
+[class*="st-key-ips_tabs_wrap_"] {{
   margin-bottom: 0.65rem;
 }}
-.ips-tabs-wrap [data-testid="stRadio"] > div {{
+[class*="st-key-ips_tabs_wrap_"] [data-testid="stRadio"] > div {{
   flex-direction: row !important;
   flex-wrap: wrap !important;
   gap: 0.15rem !important;
   border-bottom: 1px solid {BORDER};
   padding-bottom: 0.15rem;
 }}
-.ips-tabs-wrap [data-testid="stRadio"] label {{
+[class*="st-key-ips_tabs_wrap_"] [data-testid="stRadio"] label {{
   background: transparent !important;
   border: none !important;
   border-radius: 0 !important;
@@ -13377,8 +13377,8 @@ section[data-testid="stSidebar"] hr {{
   color: {TEXT_MUTED} !important;
   box-shadow: none !important;
 }}
-.ips-tabs-wrap [data-testid="stRadio"] label[data-checked="true"],
-.ips-tabs-wrap [data-testid="stRadio"] label:has(input:checked) {{
+[class*="st-key-ips_tabs_wrap_"] [data-testid="stRadio"] label[data-checked="true"],
+[class*="st-key-ips_tabs_wrap_"] [data-testid="stRadio"] label:has(input:checked) {{
   color: {PRIMARY} !important;
   font-weight: 600 !important;
   border-bottom: 2px solid {PRIMARY} !important;
