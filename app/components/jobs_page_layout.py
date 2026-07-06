@@ -24,8 +24,8 @@ except ImportError:
     )
 
 _PAGE_SIZE_OPTIONS = (50, 75, 100, 150)
-_HIDE_IF_EMPTY_COLUMNS = frozenset({"estimated", "actual", "profit", "margin"})
-_JOB_COL_WEIGHTS = [0.72, 2.55, 1.15, 0.68, 0.72, 0.72, 0.72, 0.72, 0.58, 0.42]
+_HIDE_IF_EMPTY_COLUMNS = frozenset({"estimated", "actual", "profit"})
+_JOB_COL_WEIGHTS = [0.72, 2.75, 1.15, 0.68, 0.72, 0.72, 0.72, 0.72]
 _JOB_COL_MARKERS: tuple[str, ...] = (
     "num",
     "desc",
@@ -35,8 +35,6 @@ _JOB_COL_MARKERS: tuple[str, ...] = (
     "estimated",
     "actual",
     "profit",
-    "margin",
-    "subjobs",
 )
 _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("JOB #", None),
@@ -47,8 +45,6 @@ _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("ESTIMATED COST", None),
     ("ACTUAL COST", None),
     ("GROSS PROFIT", None),
-    ("MARGIN %", None),
-    ("OPEN TASKS / SUBJOBS", None),
 ]
 
 
@@ -942,7 +938,7 @@ def jobs_column_has_data(
             return True
         if marker == "actual" and bool(costs.get("has_actual")):
             return True
-        if marker in {"profit", "margin"} and bool(costs.get("has_contract")):
+        if marker in {"profit"} and bool(costs.get("has_contract")):
             return True
     return False
 

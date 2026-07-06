@@ -306,7 +306,7 @@ JOB_DOC_PENDING_DELETE_JOB_KEY = "job_detail_doc_pending_delete_job_id"
 JOB_DAILY_UPDATE_ADD_MODE_KEY = "job_detail_daily_update_add_job_id"
 _DAILY_UPDATE_STATUS_OPTS = ["Draft", "Open", "Submitted", "Closed"]
 _JOB_DOC_UPLOAD_TYPES = ["pdf", "doc", "docx", "xls", "xlsx", "csv", "png", "jpg", "jpeg"]
-_JOB_COLS = [0.55, 2.55, 1.15, 0.68, 0.72, 0.72, 0.72, 0.72, 0.58, 0.42]
+_JOB_COLS = [0.55, 2.75, 1.15, 0.68, 0.72, 0.72, 0.72, 0.72]
 _JOB_COL_MARKERS: tuple[str, ...] = (
     "num",
     "desc",
@@ -316,8 +316,6 @@ _JOB_COL_MARKERS: tuple[str, ...] = (
     "estimated",
     "actual",
     "profit",
-    "margin",
-    "subjobs",
 )
 _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("JOB #", None),
@@ -328,8 +326,6 @@ _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("ESTIMATED COST", None),
     ("ACTUAL COST", None),
     ("GROSS PROFIT", None),
-    ("MARGIN %", None),
-    ("OPEN TASKS / SUBJOBS", None),
 ]
 _JOBS_DEFAULT_VIEW = "Active Jobs"
 _JOBS_VIEW_OPTIONS = [
@@ -1153,8 +1149,6 @@ def _render_custom_jobs_table(
             contract_val = float(costs["contract_value"])
             estimated_val = float(costs["estimated_cost"])
             profit_val = float(costs["profit"])
-            margin_val = float(costs["margin_pct"])
-            open_subjobs = _job_open_subjobs_count(job, subjob_counts=subjob_counts)
             raw_summary = costs.get("raw_summary")
             health_html = ""
             if isinstance(raw_summary, dict) and raw_summary:
@@ -1266,23 +1260,6 @@ def _render_custom_jobs_table(
                         f"{html.escape(_money_cell(profit_val, available=has_profit_data))}</div>",
                         unsafe_allow_html=True,
                     )
-            if "margin" in col_map:
-                with cols[col_map["margin"]]:
-                    st.markdown(_jobs_col_marker("margin"), unsafe_allow_html=True)
-                    margin_display = _pct_cell(margin_val) if has_contract else "—"
-                    margin_cls = profit_cls if has_contract else " ips-jobs-money-empty"
-                    st.markdown(
-                        f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money{margin_cls}">'
-                        f"{html.escape(margin_display)}</div>",
-                        unsafe_allow_html=True,
-                    )
-            with cols[col_map["subjobs"]]:
-                st.markdown(_jobs_col_marker("subjobs"), unsafe_allow_html=True)
-                st.markdown(
-                    f'<div class="ips-jobs-cell job-cell jobs-table-cell ips-jobs-col-subjobs">'
-                    f"{open_subjobs:,}</div>",
-                    unsafe_allow_html=True,
-                )
 
             if expanded:
                 st.markdown('<div class="ips-field-row-expand">', unsafe_allow_html=True)
