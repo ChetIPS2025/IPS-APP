@@ -98,20 +98,24 @@ def render() -> None:
         return
 
     if tab == "Crew":
-        if not role_can_access_page(current_role(), "field_crew_time"):
-            st.info("Crew Time batch entry is not available for your role.")
-            return
         try:
-            from app.pages.field_crew_time import render_crew_time_for_job
+            from app.utils.permissions import can_submit_timekeeping
         except ImportError:
-            from pages.field_crew_time import render_crew_time_for_job  # type: ignore
-        render_crew_time_for_job(
-            jid,
-            admin=admin,
-            uid=uid,
-            sup_name=uname,
-            key_prefix="fday_fct",
-        )
+            from utils.permissions import can_submit_timekeeping  # type: ignore
+        if not can_submit_timekeeping(current_role()):
+            st.info(
+                "Crew time is entered by your supervisor in **Timekeeping**. "
+                "Use the **Time** tab to view your hours."
+            )
+            return
+        st.info("Enter crew hours in **Timekeeping** (Time tab or main Timekeeping module).")
+        if st.button("Open Timekeeping", type="primary", key="fday_crew_tk"):
+            try:
+                from app.navigation import navigate_to_timekeeping
+            except ImportError:
+                from navigation import navigate_to_timekeeping  # type: ignore
+            navigate_to_timekeeping(job_id=jid)
+            st.rerun()
         return
 
     if tab == "Time":

@@ -514,14 +514,15 @@ def _render_horizontal_week_grid(
     st.caption("Use **List** view for ST/OT split, notes, and per-day submit.")
 
 
-def _filter_summaries_for_field_user(summaries: list[dict]) -> list[dict]:
-    if not is_field_context():
-        return summaries
+def _filter_summaries_for_current_user(summaries: list[dict]) -> list[dict]:
+    """Supervisors see all crew; employees see only their own timecard."""
     try:
         from app.auth import current_profile, current_role
+        from app.utils.permissions import can_submit_timekeeping
     except ImportError:
         from auth import current_profile, current_role  # type: ignore
-    if str(current_role() or "").strip().lower() != "employee":
+        from utils.permissions import can_submit_timekeeping  # type: ignore
+    if can_submit_timekeeping(current_role()):
         return summaries
 
     prof = current_profile() or {}
@@ -539,7 +540,7 @@ def _filter_summaries_for_field_user(summaries: list[dict]) -> list[dict]:
     if not match_ids:
         name = str(prof.get("full_name") or prof.get("name") or "").strip().lower()
         if not name:
-            return summaries
+            return []
         return [
             row
             for row in summaries
@@ -551,7 +552,13 @@ def _filter_summaries_for_field_user(summaries: list[dict]) -> list[dict]:
         rid = str(row.get("id") or row.get("employee_id") or "").strip()
         if rid in match_ids:
             filtered.append(row)
-    return filtered or summaries
+    return filtered
+
+
+def _filter_summaries_for_field_user(summaries: list[dict]) -> list[dict]:
+    if not is_field_context():
+        return _filter_summaries_for_current_user(summaries)
+    return _filter_summaries_for_current_user(summaries)
 
 
 def _timecard_is_editable(status: str) -> bool:
@@ -578,6 +585,8 @@ def _can_admin_edit_approved_timekeeping() -> bool:
 
 def _day_hours_editable(day_status: str, week_status: str) -> bool:
     """Whether list-row / allocation hours may be edited for this day."""
+    if not _can_submit_timekeeping():
+        return False
     if _can_admin_edit_approved_timekeeping():
         return True
     day_norm = _normalize_timecard_status(day_status)
@@ -3482,6 +3491,17 @@ def render() -> None:
         unsafe_allow_html=True,
     )
 
+    try:
+        from app.navigation import TK_PREFILL_WEEK_KEY
+    except ImportError:
+        from navigation import TK_PREFILL_WEEK_KEY  # type: ignore
+    pre_week_raw = str(st.session_state.pop(TK_PREFILL_WEEK_KEY, "") or "").strip()[:10]
+    if pre_week_raw:
+        try:
+            st.session_state[_WEEK_KEY] = date.fromisoformat(pre_week_raw)
+        except ValueError:
+            pass
+
     ws = _current_week_start()
     we = week_end(ws)
     summaries = _filter_summaries_for_field_user(load_timekeeping_summaries(ws))
@@ -3491,11 +3511,35 @@ def render() -> None:
     def _tk_export() -> None:
         st.button("Export", key="tk_export", use_container_width=True)
 
+    can_enter = _can_submit_timekeeping()
     render_page_brand_header(
         "Timekeeping",
-        "View and edit employee weekly time entries.",
+        "Supervisors enter crew hours here. Employees can review their own time.",
         actions=[_tk_export],
     )
+
+    if not can_enter:
+        st.info(
+            "Your supervisor enters job time for the crew. You can view your weekly hours below; "
+            "contact a supervisor or admin if a correction is needed."
+        )
+
+    active_job_id = ""
+    try:
+        from app.utils.field_context import get_field_job_id
+    except ImportError:
+        from utils.field_context import get_field_job_id  # type: ignore
+    active_job_id = str(get_field_job_id() or "").strip()
+    if active_job_id:
+        try:
+            from app.db import fetch_by_match_admin
+        except ImportError:
+            from db import fetch_by_match_admin  # type: ignore
+        job_rows = fetch_by_match_admin("jobs", {"id": active_job_id}, limit=1) or []
+        if job_rows:
+            j = job_rows[0]
+            label = f"{j.get('job_number') or 'Job'} — {j.get('job_name') or ''}".strip(" —")
+            st.caption(f"Active job filter: **{label}** · week {fmt_date(ws)} – {fmt_date(we)}")
 
     if is_field_context():
         try:
@@ -3602,7 +3646,7 @@ def render() -> None:
 
 
 def render_field_time_panel(*, key_prefix: str = "ftp") -> None:
-    """Compact weekly hour entry for the field day shell."""
+    """Compact weekly time view for the field day shell (supervisors edit in Timekeeping module)."""
     inject_timekeeping_module_css()
     ws = _current_week_start()
     we = week_end(ws)
@@ -3610,6 +3654,12 @@ def render_field_time_panel(*, key_prefix: str = "ftp") -> None:
     rows = [_build_timecard_row(row, ws) for row in summaries]
     if not rows:
         st.info("No timecard loaded for this week yet.")
+        return
+    if not _can_submit_timekeeping():
+        st.caption(f"{fmt_date(ws)} – {fmt_date(we)} · your approved hours (read-only).")
+        for row in rows:
+            emp = _emp_from_timecard_row(row)
+            _render_weekly_grid_readonly(emp, ws)
         return
     st.caption(f"{fmt_date(ws)} – {fmt_date(we)} · job + hours for all seven days.")
     _render_horizontal_week_grid(rows, week_start_d=ws, key_prefix=key_prefix)

@@ -395,11 +395,20 @@ def _timekeeping_row_matches_job(job_id: str, job: dict[str, Any], row: dict[str
     return bool(friendly and label == friendly)
 
 
-def _build_labor_from_timekeeping_days(job_id: str, ws: date, we: date, emp_map: dict[str, dict]) -> list[TimesheetLine]:
+def _build_labor_from_timekeeping_days(
+    job_id: str,
+    ws: date,
+    we: date,
+    emp_map: dict[str, dict],
+    *,
+    approved_only: bool = True,
+) -> list[TimesheetLine]:
     job = _fetch_job(job_id)
     rows = fetch_table_admin("employee_timekeeping_days", limit=20000)
     buckets: dict[tuple[str, str], TimesheetLine] = {}
     for row in rows:
+        if approved_only and str(row.get("status") or "").strip().lower() != "approved":
+            continue
         if not _timekeeping_row_matches_job(job_id, job, row):
             continue
         wd = _parse_date(row.get("work_date"))
@@ -591,8 +600,9 @@ def build_timesheet_data(
     po_number: str = "",
     approved_by: str = "",
     work_performed: str = "",
+    approved_timekeeping_only: bool = True,
 ) -> WeeklyJobTimesheetData:
-    """Auto-populate weekly timesheet from jobs, timekeeping, materials, and notes."""
+    """Auto-populate weekly timesheet from jobs, approved timekeeping, materials, and notes."""
     job = _fetch_job(job_id)
     if not job:
         raise ValueError("Job not found.")
@@ -612,8 +622,14 @@ def build_timesheet_data(
         emp_map = {}
     labor: list[TimesheetLine] = []
     try:
-        labor = _build_labor_from_timekeeping_days(job_id, ws, we, emp_map)
-        if not labor:
+        labor = _build_labor_from_timekeeping_days(
+            job_id,
+            ws,
+            we,
+            emp_map,
+            approved_only=approved_timekeeping_only,
+        )
+        if not labor and not approved_timekeeping_only:
             labor = _build_labor_from_time_entries(job_id, ws, we, emp_map)
         labor.extend(_build_equipment_lines(job_id, ws, we))
     except Exception:

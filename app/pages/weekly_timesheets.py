@@ -26,7 +26,7 @@ def render() -> None:
 
     render_page_brand_header(
         "Weekly Timesheets",
-        "Build customer-facing weekly job timesheets from timekeeping, materials, and notes.",
+        "Build and export customer-facing weekly job timesheets from approved Timekeeping hours.",
     )
 
     pre_job = str(st.session_state.pop("wjt_prefill_job_id", "") or "").strip()

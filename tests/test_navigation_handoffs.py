@@ -11,10 +11,13 @@ from app.navigation import (
     INVENTORY_SCAN_EMBED_KEY,
     JC_FOCUS_JOB_KEY,
     JOBS_DETAIL_FOCUS_TAB_KEY,
+    TK_PREFILL_JOB_KEY,
+    TK_PREFILL_WEEK_KEY,
     WJT_PREFILL_JOB_KEY,
     WJT_PREFILL_WEEK_KEY,
     navigate_to_estimate_detail,
     navigate_to_estimate_materials,
+    navigate_to_timekeeping,
     navigate_to_weekly_timesheet,
     normalize_nav_slug,
     open_jobs_job_costing,
@@ -38,7 +41,7 @@ class TestNavigationHandoffs(unittest.TestCase):
     def test_navigate_to_estimate_materials(self) -> None:
         navigate_to_estimate_materials("est-9")
         self.assertEqual(st.session_state["ips_active_estimate_id"], "est-9")
-        self.assertEqual(st.session_state["ips_nav_page"], "estimate_materials")
+        self.assertEqual(st.session_state["ips_nav_page"], "estimates")
 
     def test_navigate_to_estimate_detail(self) -> None:
         navigate_to_estimate_detail("est-77")
@@ -52,6 +55,13 @@ class TestNavigationHandoffs(unittest.TestCase):
         self.assertEqual(st.session_state[WJT_PREFILL_JOB_KEY], "job-1")
         self.assertEqual(st.session_state[WJT_PREFILL_WEEK_KEY], "2026-05-26")
         self.assertEqual(st.session_state["ips_nav_page"], "weekly_timesheets")
+
+    def test_navigate_to_timekeeping_prefill(self) -> None:
+        navigate_to_timekeeping(job_id="job-9", week_start="2026-05-26")
+        self.assertEqual(st.session_state[TK_PREFILL_JOB_KEY], "job-9")
+        self.assertEqual(st.session_state[TK_PREFILL_WEEK_KEY], "2026-05-26")
+        self.assertEqual(st.session_state["ips_field_job_id"], "job-9")
+        self.assertEqual(st.session_state["ips_nav_page"], "timekeeping")
 
     def test_scan_inventory_uses_embedded_inventory_module(self) -> None:
         set_nav_slug("scan_inventory")

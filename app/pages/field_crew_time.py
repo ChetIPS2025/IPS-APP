@@ -223,30 +223,48 @@ def render() -> None:
         '<span class="ips-field-crew-time-page ips-page-shell-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
+
+    try:
+        from app.utils.permissions import can_submit_timekeeping
+    except ImportError:
+        from utils.permissions import can_submit_timekeeping  # type: ignore
+
+    if not can_submit_timekeeping(current_role()):
+        render_page_brand_header(
+            "Crew Time",
+            "Supervisors enter crew hours in Timekeeping.",
+        )
+        st.info(
+            "Crew time entry has moved to the **Timekeeping** module. "
+            "Your supervisor enters hours for the crew; you can view your own time there."
+        )
+        if st.button("Open Timekeeping", type="primary", key="fct_go_tk"):
+            try:
+                from app.navigation import navigate_to_timekeeping
+            except ImportError:
+                from navigation import navigate_to_timekeeping  # type: ignore
+            navigate_to_timekeeping()
+            st.rerun()
+        return
+
     render_page_brand_header(
         "Crew Time",
-        "Batch crew hours by job — ST, OT, DT, travel, and per diem.",
+        "Legacy batch entry — use Timekeeping for all crew hours.",
     )
-
-    admin = _admin()
-    prof = current_profile() or {}
-    uid = str(prof.get("id") or "").strip() or None
-    sup_name = str(prof.get("full_name") or prof.get("email") or "").strip()
-
-    jobs = sort_jobs_by_number_then_name(
-        list(fetch_jobs_with_order_fallback(limit=3000, use_admin=admin) or [])
+    st.warning(
+        "Enter crew hours in **Timekeeping** (single source of truth). "
+        "This page is retained for reference only."
     )
-    if not jobs:
-        st.warning("No jobs loaded.")
-        return
-
-    jid, _label, _job = render_field_job_bar(jobs, key_prefix="fct")
-    if not jid:
-        return
-    render_crew_time_for_job(
-        jid,
-        admin=admin,
-        uid=uid,
-        sup_name=sup_name,
-        key_prefix="fct",
-    )
+    if st.button("Open Timekeeping", type="primary", key="fct_go_tk_super"):
+        try:
+            from app.navigation import navigate_to_timekeeping
+        except ImportError:
+            from navigation import navigate_to_timekeeping  # type: ignore
+        jid = ""
+        try:
+            from app.utils.field_context import get_field_job_id
+        except ImportError:
+            from utils.field_context import get_field_job_id  # type: ignore
+        jid = str(get_field_job_id() or "").strip()
+        navigate_to_timekeeping(job_id=jid)
+        st.rerun()

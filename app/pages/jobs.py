@@ -51,7 +51,7 @@ try:
         cached_job_cost_summary,
         sync_all_sources_for_job,
     )
-    from app.components.weekly_timesheet_builder import render_weekly_timesheet_builder
+    from app.components.job_labor_readonly_panel import render_job_labor_and_timesheets_tab
     from app.components.headers import render_page_brand_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
@@ -144,7 +144,7 @@ except ImportError:
         jobs_visible_table_layout,
     )
     from components.job_actions import render_job_action_buttons  # type: ignore
-    from components.weekly_timesheet_builder import render_weekly_timesheet_builder  # type: ignore
+    from components.job_labor_readonly_panel import render_job_labor_and_timesheets_tab  # type: ignore
     from components.headers import render_page_brand_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
@@ -213,7 +213,7 @@ _JOB_TABS = [
     "Schedule",
     "Subjobs",
     "IPS Forms",
-    "Weekly Timesheets",
+    "Labor & Timesheets",
     "Documents",
     "Photos",
     "Daily Updates",
@@ -280,7 +280,7 @@ def _job_detail_tab_labels(job: dict) -> list[str]:
         "Overview",
         _count_label("Subjobs", open_subjobs),
         "Schedule",
-        _count_label("Weekly Timesheets", weekly_ts_count),
+        _count_label("Labor & Timesheets", weekly_ts_count),
         "Job Costing",
         "Materials",
         "Equipment",
@@ -2702,13 +2702,12 @@ def _render_job_detail_tabs(job: dict, *, cost_summary: dict | None = None) -> N
     with tab_weekly_ts:
         jid = str(job.get("id") or "").strip()
         if jid:
-            render_weekly_timesheet_builder(
-                fixed_job_id=jid,
-                embedded=True,
-                key_prefix=f"job_wjt_{_job_session_key(job)}",
+            render_job_labor_and_timesheets_tab(
+                job,
+                key_prefix=f"job_labor_{_job_session_key(job)}",
             )
         else:
-            _render_dialog_placeholder("Save this job before generating weekly timesheets.")
+            _render_dialog_placeholder("Save this job before viewing labor and timesheets.")
 
     with tab_documents:
         _render_job_documents_tab(job)

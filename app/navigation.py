@@ -59,6 +59,8 @@ _JOBS_SHOW_MODAL_KEY = "show_job_detail_modal"
 JC_FOCUS_JOB_KEY = "jc_focus_job_id"
 WJT_PREFILL_JOB_KEY = "wjt_prefill_job_id"
 WJT_PREFILL_WEEK_KEY = "wjt_prefill_week_start"
+TK_PREFILL_JOB_KEY = "tk_prefill_job_id"
+TK_PREFILL_WEEK_KEY = "tk_prefill_week_start"
 INVENTORY_SCAN_EMBED_KEY = "_ips_inventory_scan_embed"
 ASSET_SCAN_EMBED_KEY = "_ips_asset_scan_embed"
 
@@ -187,6 +189,22 @@ def navigate_to_weekly_timesheet(*, job_id: str = "", week_start: str | None = N
     if ws:
         st.session_state[WJT_PREFILL_WEEK_KEY] = ws
     set_nav_slug("weekly_timesheets")
+
+
+def navigate_to_timekeeping(*, job_id: str = "", week_start: str | None = None) -> None:
+    """Open Timekeeping with optional job and week prefill (single source of truth for hours)."""
+    jid = str(job_id or "").strip()
+    ws = str(week_start or "").strip()[:10]
+    if jid:
+        st.session_state[TK_PREFILL_JOB_KEY] = jid
+        try:
+            from app.utils.field_context import set_field_job_id
+        except ImportError:
+            from utils.field_context import set_field_job_id  # type: ignore
+        set_field_job_id(jid)
+    if ws:
+        st.session_state[TK_PREFILL_WEEK_KEY] = ws
+    set_nav_slug("timekeeping")
 
 _SCAN_INVENTORY_LABELS = frozenset({"Scan Inventory", "Inventory Scan"})
 _SCAN_ASSET_LABELS = frozenset({"Asset Scanner", "Scan Asset", "Asset Scan"})
@@ -344,12 +362,15 @@ __all__ = [
     "PENDING_NAV_ALIASES",
     "WJT_PREFILL_JOB_KEY",
     "WJT_PREFILL_WEEK_KEY",
+    "TK_PREFILL_JOB_KEY",
+    "TK_PREFILL_WEEK_KEY",
     "apply_pending_navigation",
     "current_nav_slug",
     "default_nav_slug",
     "ensure_nav_defaults",
     "navigate_to_estimate_detail",
     "navigate_to_estimate_materials",
+    "navigate_to_timekeeping",
     "navigate_to_weekly_timesheet",
     "normalize_nav_slug",
     "on_nav_change",
