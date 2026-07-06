@@ -49,7 +49,7 @@ def estimate_col_marker(name: str) -> str:
 def inject_estimates_page_layout_css() -> None:
     st.markdown(
         """
-<style id="ips-estimates-page-layout-v3">
+<style id="ips-estimates-page-layout-v4">
 section[data-testid="stMain"]:has(.ips-estimates-page) {
   background: #ffffff !important;
 }
@@ -535,6 +535,107 @@ section[data-testid="stMain"]:has(.ips-estimates-page) [data-testid="column"]:ha
   margin: 0 !important;
   white-space: nowrap !important;
   overflow: visible !important;
+}
+.st-key-estimates_table_wrap .ips-estimates-table-link {
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 100% !important;
+}
+.st-key-estimates_table_wrap .ips-estimates-table-link.ips-estimates-cell-truncate {
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+.st-key-estimates_table_wrap .ips-estimates-table-link [data-testid="stButton"],
+.st-key-estimates_table_wrap .ips-estimates-table-link .stButton {
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+}
+.st-key-estimates_table_wrap .ips-estimates-table-link button,
+.st-key-estimates_table_wrap .ips-estimates-number-link button,
+.st-key-estimates_table_wrap .ips-estimates-title-link button {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: #2563eb !important;
+  font-weight: 800 !important;
+  font-size: 14px !important;
+  line-height: 1.2 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  width: auto !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  text-align: left !important;
+  justify-content: flex-start !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  cursor: pointer !important;
+  transition: color 0.15s ease !important;
+}
+.st-key-estimates_table_wrap .ips-estimates-number-link button {
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  width: auto !important;
+  max-width: none !important;
+}
+.st-key-estimates_table_wrap .ips-estimates-number-link [data-testid="stButton"] {
+  width: auto !important;
+  max-width: none !important;
+}
+.st-key-estimates_table_wrap .ips-estimates-title-link button {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+.st-key-estimates_table_wrap .ips-estimates-table-link button:hover,
+.st-key-estimates_table_wrap .ips-estimates-table-link button:focus,
+.st-key-estimates_table_wrap .ips-estimates-number-link button:hover,
+.st-key-estimates_table_wrap .ips-estimates-number-link button:focus,
+.st-key-estimates_table_wrap .ips-estimates-title-link button:hover,
+.st-key-estimates_table_wrap .ips-estimates-title-link button:focus {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.st-key-estimates_table_wrap .ips-estimates-table-link button p,
+.st-key-estimates_table_wrap .ips-estimates-table-link button span,
+.st-key-estimates_table_wrap .ips-estimates-number-link button p,
+.st-key-estimates_table_wrap .ips-estimates-title-link button p {
+  color: inherit !important;
+  font-weight: inherit !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-num) .ips-estimates-table-link button,
+.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-desc) .ips-estimates-table-link button,
+.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-num) .ips-estimates-table-link button p,
+.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-desc) .ips-estimates-table-link button p,
+.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-num) button[kind="tertiary"],
+.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-desc) button[kind="tertiary"],
+.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-num) button[data-testid="stBaseButton-tertiary"],
+.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-desc) button[data-testid="stBaseButton-tertiary"] {
+  color: #2563eb !important;
+  font-weight: 800 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
 }
 .ips-est-revision-banner {
   background: #eff6ff;

@@ -2298,8 +2298,8 @@ def inject_estimates_module_css() -> None:
 }}
 .ips-estimates-title {{
   font-size: 14px;
-  font-weight: 700;
-  color: #0f172a;
+  font-weight: 800;
+  color: #2563eb;
   line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;

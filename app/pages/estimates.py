@@ -722,14 +722,63 @@ def _on_estimate_checkbox_change(estimate_id: str, all_estimate_ids: list[str]) 
         for eid in all_estimate_ids:
             if eid != estimate_id:
                 st.session_state[_estimate_select_key(eid)] = False
-        st.session_state[SELECTED_ESTIMATE_KEY] = estimate_id
-        st.session_state[SHOW_ESTIMATE_MODAL_KEY] = True
         cache = st.session_state.get(_ESTIMATES_CACHE_KEY) or {}
         estimate = cache.get(estimate_id) if isinstance(cache, dict) else None
-        _open_estimates_detail_modal(estimate_id, estimate)
+        _activate_estimate_detail_modal(estimate_id, estimate)
     elif st.session_state.get(SELECTED_ESTIMATE_KEY) == estimate_id:
         st.session_state[SELECTED_ESTIMATE_KEY] = None
         st.session_state[SHOW_ESTIMATE_MODAL_KEY] = False
+
+
+def _activate_estimate_detail_modal(estimate_id: str, estimate: dict | None = None) -> None:
+    """Open the estimate detail/editor modal (shared by checkbox and table links)."""
+    eid = str(estimate_id or "").strip()
+    if not eid:
+        return
+    st.session_state[SELECTED_ESTIMATE_KEY] = eid
+    st.session_state[SHOW_ESTIMATE_MODAL_KEY] = True
+    if not isinstance(estimate, dict):
+        cache = st.session_state.get(_ESTIMATES_CACHE_KEY) or {}
+        estimate = cache.get(eid) if isinstance(cache, dict) else None
+    _open_estimates_detail_modal(eid, estimate)
+
+
+def _open_estimate_from_list(est: dict) -> None:
+    eid = str(est.get("id") or "").strip()
+    if not eid:
+        return
+    _activate_estimate_detail_modal(eid, est)
+    st.rerun()
+
+
+def _render_estimate_list_link_button(
+    label: str,
+    *,
+    key: str,
+    est: dict,
+    extra_class: str = "",
+    help_text: str | None = None,
+    truncate: bool = False,
+) -> None:
+    link_class = extra_class
+    if truncate:
+        link_class = f"{link_class} ips-estimates-cell-truncate".strip()
+    title_text = help_text or label
+    title_attr = f' title="{html.escape(title_text, quote=True)}"' if title_text else ""
+    btn_width = not truncate
+    st.markdown(
+        f'<div class="ips-estimates-table-link {link_class}"{title_attr}>',
+        unsafe_allow_html=True,
+    )
+    if st.button(
+        label,
+        key=key,
+        type="tertiary",
+        help=help_text or "Open estimate",
+        use_container_width=btn_width,
+    ):
+        _open_estimate_from_list(est)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _render_custom_estimates_table(
@@ -801,16 +850,25 @@ def _render_custom_estimates_table(
 
             with cols[1]:
                 st.markdown(estimate_col_marker("num"), unsafe_allow_html=True)
-                st.markdown(
-                    f'<div class="ips-estimates-number">{html.escape(est_no)}</div>',
-                    unsafe_allow_html=True,
+                num_label = est_no if est_no and est_no != "—" else "Open estimate"
+                _render_estimate_list_link_button(
+                    num_label,
+                    key=f"est_row_num_{eid}",
+                    est=est,
+                    extra_class="ips-estimates-number-link",
+                    help_text=f"Open estimate {est_no}" if est_no and est_no != "—" else "Open estimate",
                 )
 
             with cols[2]:
                 st.markdown(estimate_col_marker("desc"), unsafe_allow_html=True)
-                st.markdown(
-                    f'<div class="ips-estimates-title">{html.escape(project)}</div>',
-                    unsafe_allow_html=True,
+                project_label = project if project and project != "—" else "Open estimate"
+                _render_estimate_list_link_button(
+                    project_label,
+                    key=f"est_row_desc_{eid}",
+                    est=est,
+                    extra_class="ips-estimates-title-link",
+                    help_text=f"Open estimate: {project}" if project and project != "—" else "Open estimate",
+                    truncate=True,
                 )
 
             with cols[3]:
