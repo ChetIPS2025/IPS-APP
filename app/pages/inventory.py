@@ -578,26 +578,108 @@ def _seed_inventory_edit_form(item: dict) -> None:
 
 
 def _render_inventory_qr_block(item: dict) -> None:
-    """Clickable QR + scan link for the mobile use form."""
+    """Clickable QR, scan link, and printable label downloads."""
+    try:
+        from app.services.inventory_qr_labels import (
+            inventory_label_2x1_sticker_download_filename,
+            inventory_label_2x1_sticker_pdf_bytes,
+            inventory_label_for_download,
+            inventory_qr_subject,
+        )
+    except ImportError:
+        from services.inventory_qr_labels import (  # type: ignore
+            inventory_label_2x1_sticker_download_filename,
+            inventory_label_2x1_sticker_pdf_bytes,
+            inventory_label_for_download,
+            inventory_qr_subject,
+        )
+
     scan_url = generate_inventory_qr_value(item)
+    subject = inventory_qr_subject(item)
     qr_png = inventory_qr_png_bytes(item)
-    if qr_png and scan_url:
-        b64 = base64.b64encode(qr_png).decode("ascii")
-        safe_url = html.escape(scan_url, quote=True)
+    iid = str(item.get("id") or "").strip() or "item"
+
+    with st.container(border=True):
         st.markdown(
-            f'<a href="{safe_url}" target="_self" title="Open use form">'
-            f'<img src="data:image/png;base64,{b64}" width="140" alt="Inventory QR code" '
-            f'style="display:block;border:1px solid #e2e8f0;border-radius:8px;" />'
-            f"</a>",
+            '<p style="margin:0 0 0.35rem;font-weight:700;font-size:0.9rem;">Inventory QR</p>',
             unsafe_allow_html=True,
         )
-    elif qr_png:
-        st.image(qr_png, width=140)
-    else:
-        st.caption(str(item.get("qr_code_value") or "—"))
-    if scan_url:
-        st.link_button("Open Use Form", scan_url, use_container_width=True)
-        st.caption("Scan with a phone or tap to record material use.")
+        if qr_png and scan_url:
+            b64 = base64.b64encode(qr_png).decode("ascii")
+            safe_url = html.escape(scan_url, quote=True)
+            st.markdown(
+                f'<a href="{safe_url}" target="_self" title="Open use form">'
+                f'<img src="data:image/png;base64,{b64}" width="132" alt="Inventory QR code" '
+                f'style="display:block;border:1px solid #e2e8f0;border-radius:8px;" />'
+                f"</a>",
+                unsafe_allow_html=True,
+            )
+        elif qr_png:
+            st.image(qr_png, width=132)
+        else:
+            st.caption(str(item.get("qr_code_value") or "—"))
+        sku = resolve_inventory_sku(item)
+        st.caption(f"SKU: **{html.escape(sku)}**", unsafe_allow_html=True)
+        if scan_url:
+            st.caption("Scan with a phone or tap to record material use.")
+            st.link_button("Open Use Form", scan_url, use_container_width=True)
+            if scan_url.startswith("http"):
+                st.caption("Scan URL")
+                st.code(scan_url, language=None)
+        act1, act2, act3 = st.columns(3)
+        with act1:
+            try:
+                dl_bytes, dl_mime, dl_name = inventory_label_for_download(item, subject)
+                st.download_button(
+                    "Print Label",
+                    data=dl_bytes,
+                    file_name=dl_name,
+                    mime=dl_mime,
+                    key=f"inv_qr_label_{iid}",
+                    use_container_width=True,
+                )
+            except Exception:
+                if qr_png:
+                    st.download_button(
+                        "Download QR (PNG)",
+                        data=qr_png,
+                        file_name=f"{sku}_qr.png",
+                        mime="image/png",
+                        key=f"inv_qr_png_{iid}",
+                        use_container_width=True,
+                    )
+        with act2:
+            try:
+                st.download_button(
+                    "2×1 sticker",
+                    data=inventory_label_2x1_sticker_pdf_bytes(item, subject),
+                    file_name=inventory_label_2x1_sticker_download_filename(item),
+                    mime="application/pdf",
+                    key=f"inv_qr_sticker_{iid}",
+                    use_container_width=True,
+                )
+            except Exception:
+                pass
+        with act3:
+            try:
+                from app.services.inventory_qr_labels import inventory_label_png_bytes
+            except ImportError:
+                from services.inventory_qr_labels import inventory_label_png_bytes  # type: ignore
+            try:
+                from app.services.inventory_qr_labels import inventory_label_download_basename
+            except ImportError:
+                from services.inventory_qr_labels import inventory_label_download_basename  # type: ignore
+            try:
+                st.download_button(
+                    "Label PNG",
+                    data=inventory_label_png_bytes(item, subject),
+                    file_name=f"{inventory_label_download_basename(item)}.png",
+                    mime="image/png",
+                    key=f"inv_qr_label_png_{iid}",
+                    use_container_width=True,
+                )
+            except Exception:
+                pass
 
 
 def _txn_action_label(txn_type: str) -> str:
@@ -927,8 +1009,52 @@ def render() -> None:
     if reorder_count:
         st.info(f"{reorder_count} mandatory item(s) need reorder — use the **Needs reorder** view.")
 
+    filtered_export = _filter_rows(
+        rows,
+        q=str(st.session_state.get("inv_search") or "").strip(),
+        stock_view=str(st.session_state.get("inv_stock_view") or "In stock"),
+    )
+
     def _inv_export() -> None:
-        st.button("Export", key="inv_export", use_container_width=True)
+        try:
+            from app.services.inventory_qr_labels import (
+                build_inventory_labels_csv,
+                build_inventory_labels_zip,
+                inventory_labels_csv_filename,
+                inventory_labels_zip_filename,
+            )
+        except ImportError:
+            from services.inventory_qr_labels import (  # type: ignore
+                build_inventory_labels_csv,
+                build_inventory_labels_zip,
+                inventory_labels_csv_filename,
+                inventory_labels_zip_filename,
+            )
+        count = len(filtered_export)
+        if not count:
+            st.caption("No items match the current filters.")
+            return
+        c1, c2 = st.columns(2)
+        with c1:
+            st.download_button(
+                "Labels ZIP",
+                data=build_inventory_labels_zip(filtered_export),
+                file_name=inventory_labels_zip_filename(item_count=count),
+                mime="application/zip",
+                key="inv_export_zip_hdr",
+                use_container_width=True,
+                help="DuraLabel bulk import: CSV plus PDF labels, QR PNGs, and thumbnails.",
+            )
+        with c2:
+            st.download_button(
+                "Labels CSV",
+                data=build_inventory_labels_csv(filtered_export).encode("utf-8"),
+                file_name=inventory_labels_csv_filename(item_count=count),
+                mime="text/csv",
+                key="inv_export_csv_hdr",
+                use_container_width=True,
+                help="Variable data only — pair with ZIP for image and PDF paths.",
+            )
 
     def _inv_new() -> None:
         if st.button("+ New Item", key="inv_new", type="primary", use_container_width=True):
