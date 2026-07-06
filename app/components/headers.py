@@ -247,21 +247,16 @@ def render_ops_quick_action_tiles(
             f'<p class="ips-ops-quick-toolbar-title">{html.escape(title)}</p>',
             unsafe_allow_html=True,
         )
-        row_size = 5
-        for row_start in range(0, len(actions), row_size):
-            cols = st.columns(row_size, gap="small")
-            for j, col in enumerate(cols):
-                idx = row_start + j
-                if idx >= len(actions):
-                    break
-                icon, label, slug = actions[idx]
-                with col:
-                    if st.button(
-                        f"{icon} {label}",
-                        key=f"{key_prefix}_{idx}",
-                        use_container_width=True,
-                    ):
-                        _navigate_ops_quick_action(slug)
+        cols = st.columns(len(actions), gap="small")
+        for idx, col in enumerate(cols):
+            icon, label, slug = actions[idx]
+            with col:
+                if st.button(
+                    f"{icon} {label}",
+                    key=f"{key_prefix}_{idx}",
+                    use_container_width=True,
+                ):
+                    _navigate_ops_quick_action(slug)
 
 
 def render_dashboard_quick_actions(

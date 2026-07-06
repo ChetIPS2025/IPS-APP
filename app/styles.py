@@ -14703,13 +14703,13 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   transform: none !important;
 }
 .st-key-dashboard_ops_quick_actions [data-testid="stHorizontalBlock"] {
-  flex-wrap: wrap !important;
+  flex-wrap: nowrap !important;
   gap: 10px !important;
   align-items: stretch !important;
 }
 .st-key-dashboard_ops_quick_actions [data-testid="stHorizontalBlock"] > [data-testid="column"] {
-  min-width: 130px !important;
-  flex: 1 1 130px !important;
+  min-width: 0 !important;
+  flex: 1 1 0 !important;
   width: auto !important;
 }
 .st-key-dashboard_ops_quick_actions .stButton {
