@@ -11479,7 +11479,7 @@ def inject_global_css() -> None:
     """Inject global IPS SaaS styles on every render."""
     st.markdown(
         f"""
-<style id="ips-global-styles-v6">
+<style id="ips-global-styles-v7">
 :root {{
   --ips-bg: {APP_BG};
   --ips-sidebar: {SIDEBAR_BG};
@@ -13341,8 +13341,117 @@ section[data-testid="stSidebar"] .ips-sidebar-logo-wrap [data-testid="stImage"] 
 .sidebar-footer-label {{
   padding-top: 0.15rem !important;
 }}
-.sidebar-nav-scroll {{
-  padding: 0.1rem 0.45rem;
+.sidebar-nav-scroll,
+.ips-sidebar-nav-scroll {{
+  padding: 0.1rem 0.5rem 0.25rem !important;
+}}
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item) {{
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}}
+section[data-testid="stSidebar"] [class*="st-key-nav_"] {{
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0.02rem 0 !important;
+  padding: 0 !important;
+}}
+section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton,
+section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] {{
+  width: 100% !important;
+  max-width: 100% !important;
+}}
+/* Flat nav rows — icon + label (Streamlit wraps marker and button separately) */
+section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton > button,
+section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button {{
+  width: 100% !important;
+  max-width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  color: #334155 !important;
+  font-weight: 500 !important;
+  font-size: 0.8125rem !important;
+  min-height: 2.35rem !important;
+  padding: 0.5rem 0.7rem !important;
+  margin: 0 !important;
+  border-radius: 9px !important;
+  transition: background 0.12s ease, color 0.12s ease !important;
+}}
+section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton > button p,
+section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button p {{
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.55rem !important;
+  width: 100% !important;
+  margin: 0 !important;
+  text-align: left !important;
+  font-weight: inherit !important;
+  color: inherit !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}}
+section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton > button[kind="secondary"],
+section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton > button[data-testid="baseButton-secondary"],
+section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button[kind="secondary"],
+section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button[data-testid="baseButton-secondary"] {{
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}}
+section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton > button:hover,
+section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button:hover {{
+  background: #eff6ff !important;
+  color: #1e3a8a !important;
+  border: none !important;
+  box-shadow: none !important;
+}}
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] .stButton > button,
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] [data-testid="stButton"] > button,
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] .stButton > button:hover,
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] [data-testid="stButton"] > button:hover {{
+  background: {PRIMARY} !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  border: none !important;
+  box-shadow: none !important;
+}}
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] .stButton > button p,
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] [data-testid="stButton"] > button p {{
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton > button,
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [class*="st-key-nav_"] .stButton > button,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [class*="st-key-nav_"] [data-testid="stButton"] > button {{
+  justify-content: center !important;
+  padding: 0.45rem 0.25rem !important;
+  min-height: 2.35rem !important;
+}}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton > button p,
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button p,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [class*="st-key-nav_"] .stButton > button p,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [class*="st-key-nav_"] [data-testid="stButton"] > button p {{
+  justify-content: center !important;
+  text-align: center !important;
+  font-size: 1rem !important;
+  width: auto !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+}}
+body.ips-sidebar-collapsed .sidebar-section-title,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) .sidebar-section-title {{
+  display: none !important;
 }}
 .ips-sidebar-spacer {{
   flex: 1 1 auto;
@@ -13373,89 +13482,9 @@ section[data-testid="stSidebar"] .ips-sidebar-logo-wrap [data-testid="stImage"] 
   border-top: 1px solid {BORDER};
   padding-top: 0.35rem;
 }}
-/* Flat nav rows — icon via marker + label in button */
-section[data-testid="stSidebar"] .sidebar-nav-item + div[class*="stButton"] {{
-  margin: 0.05rem 0 !important;
-}}
-section[data-testid="stSidebar"] .sidebar-nav-item + div[class*="stButton"] > button {{
-  width: 100% !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-  text-align: left !important;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  outline: none !important;
-  color: #1e293b !important;
-  font-weight: 500 !important;
-  font-size: 0.8125rem !important;
-  min-height: 2.25rem !important;
-  padding: 0.45rem 0.75rem !important;
-  margin: 0 !important;
-  border-radius: 9px !important;
-  transition: background 0.12s ease, color 0.12s ease !important;
-}}
-section[data-testid="stSidebar"] .sidebar-nav-item + div[class*="stButton"] > button p {{
-  display: flex !important;
-  align-items: center !important;
-  gap: 0.625rem !important;
-  width: 100% !important;
-  margin: 0 !important;
-  text-align: left !important;
-  font-weight: inherit !important;
-  color: inherit !important;
-}}
-section[data-testid="stSidebar"] .sidebar-nav-item + div[class*="stButton"] > button[kind="secondary"],
-section[data-testid="stSidebar"] .sidebar-nav-item + div[class*="stButton"] > button[data-testid="baseButton-secondary"] {{
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-}}
-section[data-testid="stSidebar"] .sidebar-nav-item.active + div[class*="stButton"] > button[kind="secondary"],
-section[data-testid="stSidebar"] .sidebar-nav-item.active + div[class*="stButton"] > button[data-testid="baseButton-secondary"] {{
-  background: {PRIMARY} !important;
-  color: #ffffff !important;
-}}
-section[data-testid="stSidebar"] .sidebar-nav-item + div[class*="stButton"] > button:hover {{
-  background: #eff6ff !important;
-  color: #1e3a8a !important;
-  border: none !important;
-  box-shadow: none !important;
-}}
-section[data-testid="stSidebar"] .sidebar-nav-item.active + div[class*="stButton"] > button,
-section[data-testid="stSidebar"] .sidebar-nav-item.active + div[class*="stButton"] > button:hover {{
-  background: {PRIMARY} !important;
-  color: #ffffff !important;
-  font-weight: 600 !important;
-  border: none !important;
-  box-shadow: none !important;
-}}
-section[data-testid="stSidebar"] .sidebar-nav-item.active + div[class*="stButton"] > button p {{
-  color: #ffffff !important;
-  font-weight: 600 !important;
-}}
-body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-nav-item + div[class*="stButton"] > button,
-section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) .sidebar-nav-item + div[class*="stButton"] > button {{
-  justify-content: center !important;
-  padding: 0.45rem 0.25rem !important;
-  min-height: 2.35rem !important;
-}}
-body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-nav-item + div[class*="stButton"] > button p,
-section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) .sidebar-nav-item + div[class*="stButton"] > button p {{
-  justify-content: center !important;
-  text-align: center !important;
-  font-size: 1rem !important;
-  width: auto !important;
-  max-width: 100% !important;
-  overflow: visible !important;
-}}
-body.ips-sidebar-collapsed .sidebar-section-title,
-section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) .sidebar-section-title {{
-  display: none !important;
-}}
 /* Footer actions — subtle, not primary nav rows */
-section[data-testid="stSidebar"] .sidebar-footer-action + div[class*="stButton"] > button {{
+section[data-testid="stSidebar"] [class*="st-key-ips_logout"] .stButton > button,
+section[data-testid="stSidebar"] [class*="st-key-ips_logout"] [data-testid="stButton"] > button {{
   width: 100% !important;
   background: transparent !important;
   border: none !important;
@@ -13468,14 +13497,24 @@ section[data-testid="stSidebar"] .sidebar-footer-action + div[class*="stButton"]
   margin: 0.15rem 0 0 !important;
   border-radius: 8px !important;
 }}
-section[data-testid="stSidebar"] .sidebar-footer-action + div[class*="stButton"] > button:hover {{
+section[data-testid="stSidebar"] [class*="st-key-ips_logout"] .stButton > button:hover,
+section[data-testid="stSidebar"] [class*="st-key-ips_logout"] [data-testid="stButton"] > button:hover {{
   background: #f8fafc !important;
   color: {TEXT} !important;
 }}
-body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-footer-action + div[class*="stButton"] > button,
-section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) .sidebar-footer-action + div[class*="stButton"] > button {{
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-ips_logout"] .stButton > button,
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-ips_logout"] [data-testid="stButton"] > button,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [class*="st-key-ips_logout"] .stButton > button,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [class*="st-key-ips_logout"] [data-testid="stButton"] > button {{
   justify-content: center !important;
   padding: 0.4rem 0.2rem !important;
+}}
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-footer-action) {{
+  display: none !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
 }}
 section[data-testid="stSidebar"] hr {{
   margin: 0.5rem 0.65rem !important;

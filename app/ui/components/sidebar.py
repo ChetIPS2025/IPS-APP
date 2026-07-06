@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_SIDEBAR_THEME_KEY = "ips_sidebar_theme_v3"
+IPS_SIDEBAR_THEME_KEY = "ips_sidebar_theme_v4"
 
 
 def inject_sidebar_theme() -> None:
@@ -28,8 +28,8 @@ def inject_sidebar_theme() -> None:
             min-height: 1.75rem !important;
             color: #64748b !important;
         }
-        section[data-testid="stSidebar"] .sidebar-nav-item + div.stButton > button,
-        section[data-testid="stSidebar"] .sidebar-nav-item + div.stButton > button[kind="secondary"] {
+        section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton > button,
+        section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button {
             background: transparent !important;
             border: none !important;
             box-shadow: none !important;
