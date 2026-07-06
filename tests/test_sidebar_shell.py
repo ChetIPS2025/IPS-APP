@@ -15,8 +15,8 @@ from app.components.sidebar_shell import (
     set_sidebar_collapsed,
     store_sidebar_nav_fallback,
 )
-from app.utils.constants import FIELD_NAV_PAGES
-from app.utils.permissions import filter_field_nav_for_role
+from app.utils.constants import EMPLOYEE_NAV_PAGES, FIELD_NAV_PAGES
+from app.utils.permissions import filter_employee_nav_for_role, filter_field_nav_for_role
 
 
 def test_store_sidebar_nav_fallback_keeps_slug_label_and_icon():
@@ -43,12 +43,16 @@ def test_nav_icon_for_slug_defaults():
     assert nav_icon_for_slug("unknown_slug") == "•"
 
 
-def test_employee_field_nav_excludes_company_updates():
+def test_employee_nav_is_simplified_portal_menu():
+    items = filter_employee_nav_for_role(EMPLOYEE_NAV_PAGES, "employee")
+    labels = [label for _slug, label in items]
+    assert labels == ["Home", "QR Scan", "Resources", "My Profile"]
+    assert "Dashboard" not in labels
+    assert "Jobs" not in labels
+
+
+def test_employee_field_nav_is_restricted_without_legacy_access():
     items = filter_field_nav_for_role(FIELD_NAV_PAGES, "employee")
     labels = [label for _slug, label in items]
-    assert "Field Home" in labels
-    assert "Today's Work" in labels
-    assert "My Jobs" in labels
-    assert "My To-Do" in labels
-    assert "Log Time" in labels
-    assert "Company Updates" not in labels
+    assert "Field Home" not in labels
+    assert "My Jobs" not in labels

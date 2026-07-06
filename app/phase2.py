@@ -18,6 +18,10 @@ try:
         documents,
         employee_certifications,
         employee_documents,
+        employee_portal,
+        employee_profile,
+        employee_qr_scan,
+        employee_resources,
         employees,
         estimate_materials,
         pricing_guide,
@@ -52,6 +56,10 @@ except ImportError:
         documents,
         employee_certifications,
         employee_documents,
+        employee_portal,
+        employee_profile,
+        employee_qr_scan,
+        employee_resources,
         employees,
         estimate_materials,
         pricing_guide,
@@ -91,6 +99,10 @@ BUILT_MODULES: dict[str, object] = {
     "users": employees.render,
     "employee_certifications": employee_certifications.render,
     "employee_documents": employee_documents.render,
+    "employee_portal": employee_portal.render,
+    "employee_profile": employee_profile.render,
+    "employee_qr_scan": employee_qr_scan.render,
+    "employee_resources": employee_resources.render,
     "company_updates": company_updates.render,
     "documents": documents.render,
     "tasks": tasks.render,
@@ -108,7 +120,14 @@ BUILT_MODULES: dict[str, object] = {
 
 
 def ensure_nav_defaults() -> None:
-    default = "field_dashboard" if st.session_state.get("ips_field_mode") else "dashboard"
+    try:
+        from app.utils.permissions import role_default_nav_slug
+    except ImportError:
+        from utils.permissions import role_default_nav_slug  # type: ignore
+    default = role_default_nav_slug(
+        current_role(),
+        field_mode=bool(st.session_state.get("ips_field_mode")),
+    )
     st.session_state.setdefault(SESSION_NAV_KEY, default)
 
 

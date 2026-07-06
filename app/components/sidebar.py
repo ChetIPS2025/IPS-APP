@@ -20,8 +20,9 @@ try:
     )
     from app.config import APP_VERSION, ROOT_DIR
     from app.navigation import set_nav_slug
-    from app.utils.constants import FIELD_NAV_PAGES, NAV_PAGES
+    from app.utils.constants import EMPLOYEE_NAV_PAGES, FIELD_NAV_PAGES, NAV_PAGES
     from app.utils.permissions import (
+        filter_employee_nav_for_role,
         filter_field_nav_for_role,
         filter_nav_for_role,
         normalize_role,
@@ -40,8 +41,9 @@ except ImportError:
     )
     from config import APP_VERSION, ROOT_DIR  # type: ignore
     from navigation import set_nav_slug  # type: ignore
-    from utils.constants import FIELD_NAV_PAGES, NAV_PAGES  # type: ignore
+    from utils.constants import EMPLOYEE_NAV_PAGES, FIELD_NAV_PAGES, NAV_PAGES  # type: ignore
     from utils.permissions import (  # type: ignore
+        filter_employee_nav_for_role,
         filter_field_nav_for_role,
         filter_nav_for_role,
         normalize_role,
@@ -68,11 +70,13 @@ def render_sidebar(active_slug: str) -> None:
     collapsed = is_sidebar_collapsed()
     role = normalize_role(current_role())
     field_mode = bool(st.session_state.get("ips_field_mode"))
-    nav_items = (
-        filter_field_nav_for_role(FIELD_NAV_PAGES, role)
-        if field_mode
-        else filter_nav_for_role(NAV_PAGES, role)
-    )
+    is_employee_nav = role == "employee"
+    if is_employee_nav:
+        nav_items = filter_employee_nav_for_role(EMPLOYEE_NAV_PAGES, role)
+    elif field_mode:
+        nav_items = filter_field_nav_for_role(FIELD_NAV_PAGES, role)
+    else:
+        nav_items = filter_nav_for_role(NAV_PAGES, role)
     store_sidebar_nav_fallback(nav_items)
     _ESTIMATING_SLUGS = frozenset({"estimates", "pricing_guide"})
     _OPERATIONS_SLUGS = frozenset({"inventory", "assets", "rental_equipment"})
@@ -132,6 +136,8 @@ def render_sidebar(active_slug: str) -> None:
                         _shown_sections.add(section_label)
                         break
             is_active = slug == active_slug or (slug in _SCAN_SLUGS and active_slug in {"inventory", "assets"})
+            if slug == "employee_qr_scan" and active_slug in {"inventory", "assets"}:
+                is_active = True
             btn_label = _nav_button_label(slug, label)
             if st.button(
                 btn_label,
@@ -147,20 +153,21 @@ def render_sidebar(active_slug: str) -> None:
 
         st.markdown(f'<{_OT} class="ips-sidebar-spacer"><{_CT}>', unsafe_allow_html=True)
 
-        if not collapsed:
+        if not collapsed and not is_employee_nav:
             st.markdown('<p class="ips-sidebar-field-toggle-label">View mode</p>', unsafe_allow_html=True)
-        fm = st.toggle(
-            "Field Supervisor Mode",
-            value=field_mode,
-            key="ips_field_mode_toggle",
-            help="Field Supervisor Mode",
-        )
-        if fm != field_mode:
-            st.session_state["ips_field_mode"] = fm
-            if fm and role_can_access_page(role, "field_dashboard"):
-                set_nav_slug("field_dashboard")
-            request_sidebar_collapse_after_nav()
-            st.rerun()
+        if not is_employee_nav:
+            fm = st.toggle(
+                "Field Supervisor Mode",
+                value=field_mode,
+                key="ips_field_mode_toggle",
+                help="Field Supervisor Mode",
+            )
+            if fm != field_mode:
+                st.session_state["ips_field_mode"] = fm
+                if fm and role_can_access_page(role, "field_dashboard"):
+                    set_nav_slug("field_dashboard")
+                request_sidebar_collapse_after_nav()
+                st.rerun()
 
         if not collapsed:
             prof = current_profile()

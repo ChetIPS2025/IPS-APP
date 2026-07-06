@@ -208,3 +208,10 @@ FIELD_NAV_PAGES: list[tuple[str, str]] = [
 SESSION_NAV_KEY = "ips_nav_page"
 SESSION_SELECTED_PREFIX = "ips_sel_"
 SESSION_DETAIL_TAB_PREFIX = "ips_tab_"
+
+EMPLOYEE_NAV_PAGES: list[tuple[str, str]] = [
+    ("employee_portal", "Home"),
+    ("employee_qr_scan", "QR Scan"),
+    ("employee_resources", "Resources"),
+    ("employee_profile", "My Profile"),
+]

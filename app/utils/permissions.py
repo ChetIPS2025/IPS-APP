@@ -25,6 +25,10 @@ _ROLE_PAGES: dict[str, frozenset[str]] = {
             ("employees",),
             ("employee_certifications",),
             ("employee_documents",),
+            ("employee_portal",),
+            ("employee_qr_scan",),
+            ("employee_resources",),
+            ("employee_profile",),
             ("company_updates",),
             ("tasks",),
             ("documents",),
@@ -56,6 +60,10 @@ _ROLE_PAGES: dict[str, frozenset[str]] = {
             "employees",
             "employee_certifications",
             "employee_documents",
+            "employee_portal",
+            "employee_qr_scan",
+            "employee_resources",
+            "employee_profile",
             "company_updates",
             "tasks",
             "documents",
@@ -86,6 +94,10 @@ _ROLE_PAGES: dict[str, frozenset[str]] = {
             "employees",
             "employee_certifications",
             "employee_documents",
+            "employee_portal",
+            "employee_qr_scan",
+            "employee_resources",
+            "employee_profile",
             "company_updates",
             "tasks",
             "documents",
@@ -100,19 +112,12 @@ _ROLE_PAGES: dict[str, frozenset[str]] = {
     ),
     "employee": frozenset(
         {
-            "dashboard",
-            "jobs",
-            "timekeeping",
-            "employee_certifications",
-            "company_updates",
-            "tasks",
-            "documents",
-            "field_dashboard",
-            "field_day",
-            "coupling_inspection",
-            "rental_equipment",
-            "rental_equipment_inspection",
-            "settings",
+            "employee_portal",
+            "employee_qr_scan",
+            "employee_resources",
+            "employee_profile",
+            "inventory",
+            "assets",
         }
     ),
     "viewer": frozenset({"dashboard", "company_updates", "reports", "settings"}),
@@ -193,3 +198,19 @@ def filter_nav_for_role(
     nav: Iterable[tuple[str, str, str]], role: str
 ) -> list[tuple[str, str, str]]:
     return [item for item in nav if role_can_access_page(role, item[0])]
+
+
+def role_default_nav_slug(role: str, *, field_mode: bool = False) -> str:
+    """Landing page after sign-in or when navigation cannot be resolved."""
+    norm = normalize_role(role)
+    if norm == "employee":
+        return "employee_portal"
+    if field_mode:
+        return "field_dashboard"
+    if norm == "supervisor":
+        return "field_dashboard"
+    return "dashboard"
+
+
+def filter_employee_nav_for_role(nav: Iterable[tuple[str, str]], role: str) -> list[tuple[str, str]]:
+    return [(slug, label) for slug, label in nav if role_can_access_page(role, slug)]

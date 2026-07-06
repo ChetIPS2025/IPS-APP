@@ -37,6 +37,10 @@ ACTIVE_MODULE_SLUGS: frozenset[str] = frozenset(
         "users",  # alias → employees
         "employee_certifications",
         "employee_documents",
+        "employee_portal",
+        "employee_profile",
+        "employee_qr_scan",
+        "employee_resources",
         "company_updates",
         "tasks",
         "documents",
@@ -268,9 +272,16 @@ def apply_pending_navigation() -> None:
 
 def default_nav_slug() -> str:
     """Safe fallback when ``ips_nav_page`` cannot be resolved to a built module."""
-    if st.session_state.get("ips_field_mode"):
-        return "field_dashboard"
-    return "dashboard"
+    try:
+        from app.auth import current_role
+        from app.utils.permissions import role_default_nav_slug
+    except ImportError:
+        from auth import current_role  # type: ignore
+        from utils.permissions import role_default_nav_slug  # type: ignore
+    return role_default_nav_slug(
+        current_role(),
+        field_mode=bool(st.session_state.get("ips_field_mode")),
+    )
 
 
 def normalize_nav_slug(raw: str | None) -> str:

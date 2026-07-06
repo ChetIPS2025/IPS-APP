@@ -15397,3 +15397,175 @@ def inject_coupling_inspection_css() -> None:
 """,
         unsafe_allow_html=True,
     )
+
+
+def inject_employee_portal_css() -> None:
+    """Mobile-first IPS Employee Portal styling."""
+    st.markdown(
+        """
+<style id="ips-employee-portal">
+.ips-employee-portal-page,
+.ips-employee-resources-page,
+.ips-employee-profile-page,
+.ips-employee-qr-page {
+  background: #ffffff;
+}
+.ips-ep-header {
+  background: linear-gradient(135deg, #0b1f3a 0%, #12325c 100%);
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.ips-ep-header-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ips-ep-logo {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 4px;
+}
+.ips-ep-greeting {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin: 0;
+}
+.ips-ep-date,
+.ips-ep-role {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  opacity: 0.92;
+}
+.ips-ep-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 16px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.ips-ep-page-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0b1f3a;
+  margin: 0 0 12px;
+}
+.ips-ep-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+.ips-ep-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.ips-ep-muted {
+  color: #64748b;
+  font-size: 0.88rem;
+  margin: 0 0 6px;
+}
+.ips-ep-meta {
+  color: #94a3b8;
+  font-size: 0.78rem;
+  margin: 0;
+}
+.ips-ep-empty {
+  color: #64748b;
+  font-size: 0.9rem;
+  margin: 0 0 8px;
+}
+.ips-ep-status {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.ips-ep-status-neutral { background: #f1f5f9; color: #475569; }
+.ips-ep-status-warn { background: #fef3c7; color: #b45309; }
+.ips-ep-status-info { background: #dbeafe; color: #1d4ed8; }
+.ips-ep-tag {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.ips-ep-list-row {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  background: #fafafa;
+}
+.ips-ep-list-main strong {
+  display: block;
+  color: #0f172a;
+  margin-bottom: 2px;
+}
+.ips-ep-list-main span {
+  display: block;
+  color: #64748b;
+  font-size: 0.84rem;
+}
+.ips-ep-list-meta {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+.ips-ep-cert-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 12px 14px;
+  margin-bottom: 6px;
+}
+.ips-ep-cert-name {
+  display: block;
+  font-weight: 700;
+  color: #0f172a;
+}
+.ips-ep-cert-exp {
+  display: block;
+  color: #64748b;
+  font-size: 0.84rem;
+  margin-top: 2px;
+}
+.ips-page-employee_portal [data-testid="stButton"] > button[kind="primary"],
+.ips-page-employee_qr_scan [data-testid="stButton"] > button[kind="primary"],
+.ips-page-employee_resources [data-testid="stButton"] > button[kind="primary"] {
+  background: #1d4ed8 !important;
+  border-color: #1d4ed8 !important;
+  min-height: 2.85rem !important;
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+}
+.ips-page-employee_portal [data-testid="stButton"] > button,
+.ips-page-employee_qr_scan [data-testid="stButton"] > button,
+.ips-page-employee_resources [data-testid="stButton"] > button {
+  min-height: 2.6rem !important;
+  border-radius: 10px !important;
+}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
