@@ -1039,44 +1039,48 @@ def inject_jobs_module_css() -> None:
   color: #1d4ed8;
 }}
 .ips-job-status-scheduled {{
-  background: #e0e7ff;
-  color: #4338ca;
+  background: #ffedd5;
+  color: #c2410c;
 }}
 .ips-job-status-active {{
-  background: #bfdbfe;
-  color: #1e3a8a;
+  background: #dcfce7;
+  color: #14532d;
 }}
 .ips-job-status-awarded {{
-  background: #bbf7d0;
+  background: #dcfce7;
   color: #14532d;
 }}
 .ips-job-status-on-hold {{
-  background: #fef3c7;
-  color: #92400e;
-}}
-.ips-job-status-completed {{
-  background: #166534;
-  color: #ffffff;
-}}
-.ips-job-status-closed {{
-  background: #14532d;
-  color: #ffffff;
-}}
-.ips-job-status-cancelled {{
-  background: #fed7aa;
-  color: #9a3412;
-}}
-.ips-job-status-archived {{
-  background: #f1f5f9;
-  color: #475569;
-}}
-.ips-job-status-deleted {{
   background: #fee2e2;
   color: #991b1b;
 }}
+.ips-job-status-completed {{
+  background: #dbeafe;
+  color: #1e40af;
+}}
+.ips-job-status-closed {{
+  background: #f1f5f9;
+  color: #64748b;
+}}
+.ips-job-status-cancelled {{
+  background: #f1f5f9;
+  color: #64748b;
+}}
+.ips-job-status-archived {{
+  background: #f1f5f9;
+  color: #64748b;
+}}
+.ips-job-status-deleted {{
+  background: #f1f5f9;
+  color: #64748b;
+}}
 .ips-job-status-estimate-pending {{
-  background: #fef3c7;
-  color: #92400e;
+  background: #fef9c3;
+  color: #854d0e;
+}}
+.ips-job-status-pending {{
+  background: #fef9c3;
+  color: #854d0e;
 }}
 .st-key-jobs_table_wrap [data-testid="stVerticalBlock"] {{
   gap: 0 !important;
@@ -1315,13 +1319,13 @@ def inject_jobs_module_css() -> None:
   overflow: visible !important;
   display: flex !important;
   flex-direction: column !important;
-  align-items: center !important;
+  align-items: flex-end !important;
   justify-content: center !important;
-  flex: 0 0 110px !important;
-  min-width: 110px !important;
-  width: 110px !important;
-  max-width: 110px !important;
-  padding-right: 8px !important;
+  flex: 0 0 44px !important;
+  min-width: 44px !important;
+  width: 44px !important;
+  max-width: 44px !important;
+  padding-right: 6px !important;
 }}
 .st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-actions-cell)
 [data-testid="column"]:has(.job-row-actions-menu) {{
@@ -1331,37 +1335,43 @@ def inject_jobs_module_css() -> None:
   max-width: none !important;
   display: flex !important;
   align-items: center !important;
-  justify-content: center !important;
+  justify-content: flex-end !important;
 }}
 .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"],
 .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) [data-testid="column"]:has(.job-row-actions-menu) button[data-testid="stBaseButton-popover"],
 .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-button) button[data-testid="stBaseButton-popover"],
-.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-primary"],
-.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) [data-testid="column"]:has(.job-row-actions-menu) button[data-testid="stBaseButton-primary"],
-.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-button) button[data-testid="stBaseButton-primary"] {{
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) [data-testid="column"]:has(.ips-jobs-row-menu-marker) button[data-testid="stBaseButton-popover"] {{
   display: inline-flex !important;
   flex-direction: row !important;
   flex-wrap: nowrap !important;
   align-items: center !important;
   justify-content: center !important;
-  min-height: 34px !important;
-  height: 34px !important;
-  min-width: 88px !important;
-  width: auto !important;
-  max-width: none !important;
-  padding: 0 12px !important;
-  border-radius: 8px !important;
-  background: {PRIMARY} !important;
-  border: 1px solid {PRIMARY} !important;
-  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.24) !important;
-  color: #ffffff !important;
-  font-size: 0.8125rem !important;
-  font-weight: 600 !important;
+  min-height: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  width: 28px !important;
+  max-width: 28px !important;
+  padding: 0 !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+  color: #64748b !important;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
   line-height: 1 !important;
   white-space: nowrap !important;
-  word-break: keep-all !important;
-  overflow-wrap: normal !important;
   overflow: visible !important;
+}}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"]:hover,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) [data-testid="column"]:has(.ips-jobs-row-menu-marker) button[data-testid="stBaseButton-popover"]:hover {{
+  background: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-primary"],
+.st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) [data-testid="column"]:has(.job-row-actions-menu) button[data-testid="stBaseButton-primary"] {{
+  display: none !important;
 }}
 .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) button[data-testid="stBaseButton-popover"] > div,
 .st-key-jobs_table_wrap [data-testid="column"]:has(.job-actions-cell) [data-testid="column"]:has(.job-row-actions-menu) button[data-testid="stBaseButton-popover"] > div,

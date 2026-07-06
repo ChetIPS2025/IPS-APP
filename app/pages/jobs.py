@@ -10,7 +10,12 @@ import streamlit as st
 
 try:
     from app.components.job_actions import render_job_action_buttons
-    from app.components.job_status_ui import job_status_pill_html, render_job_status_badge_editor
+    from app.components.job_row_actions_ui import render_job_row_actions
+    from app.components.job_status_ui import (
+        job_status_pill_html,
+        render_job_status_badge_editor,
+        render_job_status_table_pill,
+    )
     from app.components.jobs_page_layout import (
         close_jobs_filter_bar_shell,
         inject_jobs_page_layout_css,
@@ -131,7 +136,12 @@ except ImportError:
         cached_job_cost_summary,
         sync_all_sources_for_job,
     )
-    from components.job_status_ui import job_status_pill_html, render_job_status_badge_editor  # type: ignore
+    from components.job_row_actions_ui import render_job_row_actions  # type: ignore
+    from components.job_status_ui import (  # type: ignore
+        job_status_pill_html,
+        render_job_status_badge_editor,
+        render_job_status_table_pill,
+    )
     from components.jobs_page_layout import (  # type: ignore
         close_jobs_filter_bar_shell,
         inject_jobs_page_layout_css,
@@ -1019,6 +1029,30 @@ def _activate_job_detail_modal(job_id: str, job: dict | None = None) -> None:
         ] = False
 
 
+def _open_job_detail_with_tab(job: dict, tab: str) -> None:
+    jid = str(job.get("id") or "").strip()
+    if not jid:
+        return
+    try:
+        from app.navigation import JOBS_DETAIL_FOCUS_TAB_KEY
+    except ImportError:
+        from navigation import JOBS_DETAIL_FOCUS_TAB_KEY  # type: ignore
+    st.session_state[JOBS_DETAIL_FOCUS_TAB_KEY] = str(tab or "").strip()
+    _open_jobs_detail_modal(jid, job)
+    ips_app_rerun()
+
+
+def _assign_employees_for_job(job: dict) -> None:
+    jid = str(job.get("id") or "").strip()
+    if not jid:
+        return
+    try:
+        from app.navigation import navigate_to_timekeeping
+    except ImportError:
+        from navigation import navigate_to_timekeeping  # type: ignore
+    navigate_to_timekeeping(job_id=jid)
+
+
 def _open_job_from_list(job: dict) -> None:
     jid = str(job.get("id") or "").strip()
     if not jid:
@@ -1204,7 +1238,6 @@ def _render_custom_jobs_table(
             job_no = _job_number(job)
             project = _job_project(job)
             customer = _job_customer(job)
-            status = _normalize_job_status(job.get("status"))
             costs = _job_list_cost_fields(job, cost_cache=cost_cache)
             contract_val = float(costs["contract_value"])
             estimated_val = float(costs["estimated_cost"])
@@ -1271,10 +1304,13 @@ def _render_custom_jobs_table(
                     '<span class="job-status-cell ips-jobs-status-cell" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
-                status_html = _job_status_pill_html(status)
+                render_job_status_table_pill(
+                    job,
+                    key_prefix="job_table",
+                    on_updated=_on_job_status_updated,
+                )
                 if health_html:
-                    status_html = f'{status_html}{health_html}'
-                st.markdown(status_html, unsafe_allow_html=True)
+                    st.markdown(health_html, unsafe_allow_html=True)
 
             has_contract = bool(costs.get("has_contract"))
             has_estimated = bool(costs.get("has_estimated"))
@@ -1335,6 +1371,21 @@ def _render_custom_jobs_table(
                         f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money{margin_cls}">'
                         f"{html.escape(margin_display)}</div>",
                         unsafe_allow_html=True,
+                    )
+
+            if "actions" in col_map:
+                with cols[col_map["actions"]]:
+                    st.markdown(_jobs_col_marker("actions"), unsafe_allow_html=True)
+                    st.markdown(
+                        '<span class="job-actions-cell ips-jobs-actions-cell" aria-hidden="true"></span>',
+                        unsafe_allow_html=True,
+                    )
+                    render_job_row_actions(
+                        job,
+                        on_open=_activate_job_detail_modal,
+                        on_edit=_open_job_edit_from_list,
+                        on_open_tab=lambda jid, row, tab: _open_job_detail_with_tab(row, tab),
+                        on_assign_employees=_assign_employees_for_job,
                     )
 
             if expanded:

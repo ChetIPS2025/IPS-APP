@@ -24,20 +24,58 @@ except ImportError:
     )
 
 
+def job_status_table_label(raw: object) -> str:
+    """Display label for Jobs table status pills (preserves Pending/Scheduled when stored)."""
+    s = str(raw or "").strip().lower().replace("_", " ")
+    display = {
+        "pending": "Pending",
+        "scheduled": "Scheduled",
+        "on hold": "On Hold",
+        "active": "Active",
+        "awarded": "Active",
+        "draft": "Pending",
+        "planning": "Pending",
+        "estimate pending": "Pending",
+        "in progress": "Active",
+        "open": "Active",
+        "completed": "Complete",
+        "complete": "Complete",
+        "closed": "Closed",
+        "cancelled": "Closed",
+        "canceled": "Closed",
+        "archived": "Closed",
+        "deleted": "Closed",
+    }
+    if s in display:
+        return display[s]
+    normalized = normalize_job_status(raw)
+    if normalized == "Completed":
+        return "Complete"
+    if normalized == "Cancelled":
+        return "Closed"
+    if normalized in {"Archived", "Deleted"}:
+        return "Closed"
+    return normalized
+
+
 def job_status_pill_class(status: str) -> str:
     cls_map = {
         "Active": "ips-job-status-active",
+        "Pending": "ips-job-status-pending",
+        "Scheduled": "ips-job-status-scheduled",
         "On Hold": "ips-job-status-on-hold",
+        "Complete": "ips-job-status-completed",
         "Completed": "ips-job-status-completed",
-        "Cancelled": "ips-job-status-cancelled",
-        "Deleted": "ips-job-status-deleted",
-        "Archived": "ips-job-status-archived",
+        "Closed": "ips-job-status-closed",
+        "Cancelled": "ips-job-status-closed",
+        "Deleted": "ips-job-status-closed",
+        "Archived": "ips-job-status-closed",
     }
     return cls_map.get(status, "ips-job-status-active")
 
 
 def job_status_pill_html(status: str) -> str:
-    label = normalize_job_status(status)
+    label = job_status_table_label(status)
     cls = job_status_pill_class(label)
     return f'<span class="ips-job-status-pill {cls}">{html.escape(label)}</span>'
 
@@ -139,6 +177,60 @@ def render_job_status_change_select(
         on_change=_apply_status_change,
         args=(jid, widget_key),
     )
+
+
+def render_job_status_table_pill(
+    job: dict[str, Any],
+    *,
+    key_prefix: str = "job_table",
+    on_updated: Callable[[str, str], None] | None = None,
+) -> None:
+    """Read-only status pill in the Jobs table; managers click to change via popover."""
+    jid = str(job.get("id") or "").strip()
+    label = job_status_table_label(job.get("status"))
+    archived = _job_is_archived(job)
+    can_manage = can_manage_job_actions()
+
+    if not jid or archived or not can_manage:
+        st.markdown(
+            f'<div class="ips-job-status-table-pill">{job_status_pill_html(job.get("status"))}</div>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    job_key = _job_session_key(job)
+    widget_key = f"{key_prefix}_status_select_{job_key}"
+    _sync_status_widget(job, widget_key)
+    if on_updated is not None:
+        st.session_state[f"{widget_key}_on_updated"] = on_updated
+    options = manual_job_status_options(job.get("status"))
+    current = normalize_job_status(job.get("status"))
+    index = options.index(current) if current in options else 0
+
+    st.markdown(
+        '<span class="ips-job-status-table-editor-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    with st.popover(
+        label,
+        help="Change job status",
+        type="secondary",
+        key=f"{key_prefix}_status_pop_{job_key}",
+    ):
+        st.markdown(
+            '<span class="ips-job-status-change-panel ips-job-status-table-change-panel" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        st.caption("Select a new status — saves immediately.")
+        st.selectbox(
+            "Status",
+            options,
+            index=index,
+            key=widget_key,
+            label_visibility="collapsed",
+            on_change=_apply_status_change,
+            args=(jid, widget_key),
+        )
 
 
 def render_job_status_badge_editor(
