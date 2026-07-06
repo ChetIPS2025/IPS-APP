@@ -27,6 +27,8 @@ try:
     from app.utils.formatting import fmt_date
     from app.services.asset_kits_service import asset_is_kit
     from app.pages.trailer_dashboard import render_trailer_dashboard
+    from app.services.rental_equipment_inspection_service import is_rental_equipment
+    from app.pages.rental_equipment_dashboard import render_rental_equipment_dashboard
 except ImportError:
     from auth import current_profile, current_role, is_authenticated  # type: ignore
     from services.assets_service import (  # type: ignore
@@ -44,6 +46,8 @@ except ImportError:
     from utils.formatting import fmt_date  # type: ignore
     from services.asset_kits_service import asset_is_kit  # type: ignore
     from pages.trailer_dashboard import render_trailer_dashboard  # type: ignore
+    from services.rental_equipment_inspection_service import is_rental_equipment  # type: ignore
+    from pages.rental_equipment_dashboard import render_rental_equipment_dashboard  # type: ignore
 
 _SCAN_SESSION_KEY = "_ips_asset_scan_page"
 _SUCCESS_KEY = "asset_scan_success_payload"
@@ -609,6 +613,10 @@ def _render_asset_card(asset: dict[str, Any]) -> None:
         render_trailer_dashboard(asset)
         return
 
+    if is_rental_equipment(asset):
+        render_rental_equipment_dashboard(asset)
+        return
+
     _render_asset_hero(asset)
     st.markdown("---")
     if st.button("Start Inspection", type="primary", use_container_width=True, key="ast_scan_start_insp"):
@@ -687,6 +695,10 @@ def render_asset_scan_page() -> None:
 
     if asset_is_kit(asset):
         render_trailer_dashboard(asset)
+        return
+
+    if is_rental_equipment(asset):
+        render_rental_equipment_dashboard(asset)
         return
 
     st.markdown("## IPS Asset Card")

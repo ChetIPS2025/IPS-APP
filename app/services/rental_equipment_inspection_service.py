@@ -16,11 +16,11 @@ try:
         GENERAL_CONDITIONS,
         INSPECTION_TYPE_LABELS,
         PHOTO_SLOT_LABELS,
-        REQUIRED_PHOTO_SLOTS,
         SIGNATURE_ROLE_LABELS,
         SIGNATURE_ROLES,
         default_checklist,
         normalize_checklist,
+        required_photo_slots_for_checklist,
     )
     from app.services.repository import ServiceResult, fetch_by_id, fetch_rows
     from app.services.task_photos import compress_image_bytes
@@ -32,11 +32,11 @@ except ImportError:
         GENERAL_CONDITIONS,
         INSPECTION_TYPE_LABELS,
         PHOTO_SLOT_LABELS,
-        REQUIRED_PHOTO_SLOTS,
         SIGNATURE_ROLE_LABELS,
         SIGNATURE_ROLES,
         default_checklist,
         normalize_checklist,
+        required_photo_slots_for_checklist,
     )
     from services.repository import ServiceResult, fetch_by_id, fetch_rows  # type: ignore
     from services.task_photos import compress_image_bytes  # type: ignore
@@ -270,29 +270,45 @@ def upload_inspection_photo(
     return storage_path, url
 
 
+def _damage_validation_required(data: dict[str, Any]) -> bool:
+    itype = str(data.get("inspection_type") or "checkout").strip().lower()
+    if itype == "damage":
+        return True
+    if bool(data.get("damage_reported")):
+        return True
+    return str(data.get("general_condition") or "").strip() == "Damaged"
+
+
 def validate_for_complete(data: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     itype = str(data.get("inspection_type") or "checkout").strip().lower()
-    if str(data.get("general_condition") or "").strip() not in GENERAL_CONDITIONS:
-        errors.append("General condition is required.")
     checklist = normalize_checklist(data.get("checklist"))
+    photos = {str(p.get("slot") or ""): p for p in (data.get("photo_attachments") or []) if isinstance(p, dict)}
+
+    if itype == "damage":
+        if not str(data.get("damage_location") or "").strip():
+            errors.append("Damaged item is required.")
+        if not str(data.get("damage_description") or "").strip():
+            errors.append("Damage notes are required.")
+        dmg = photos.get("damage_photo") or {}
+        if not str(dmg.get("photo_path") or dmg.get("photo_url") or "").strip():
+            errors.append("Damage photo is required.")
+        return errors
+
+    if str(data.get("general_condition") or "").strip() not in GENERAL_CONDITIONS:
+        errors.append("Overall condition is required.")
     for key, label, _opts in CHECKLIST_ITEMS:
         if not checklist.get(key):
             errors.append(f"{label} is required.")
-    photos = {str(p.get("slot") or ""): p for p in (data.get("photo_attachments") or []) if isinstance(p, dict)}
     if itype in {"checkout", "return"}:
-        for slot in REQUIRED_PHOTO_SLOTS:
+        for slot in required_photo_slots_for_checklist(checklist):
             p = photos.get(slot) or {}
             if not str(p.get("photo_path") or p.get("photo_url") or "").strip():
                 label = PHOTO_SLOT_LABELS.get(slot, slot)
                 errors.append(f"Photo required: {label}.")
-    if bool(data.get("damage_reported")):
+    if _damage_validation_required(data):
         if not str(data.get("damage_description") or "").strip():
             errors.append("Damage description is required.")
-        if not str(data.get("damage_location") or "").strip():
-            errors.append("Damage location is required.")
-        if not str(data.get("repair_recommendation") or "").strip():
-            errors.append("Repair recommendation is required.")
         dmg = photos.get("damage_photo") or {}
         if not str(dmg.get("photo_path") or dmg.get("photo_url") or "").strip():
             errors.append("Damage photo is required.")
@@ -395,7 +411,16 @@ def save_rental_inspection(
                 )
             except Exception as exc:
                 _LOG.warning("rental inspection PDF export failed: %s", exc)
-            if payload["fail_inspection"]:
+            if payload["inspection_type"] == "damage":
+                try:
+                    update_row_admin(
+                        "assets",
+                        {"condition": "Needs Repair", "updated_at": _utc_now_iso()},
+                        {"id": str(data.get("asset_id") or "")},
+                    )
+                except Exception as exc:
+                    _LOG.warning("mark rental asset needs repair failed: %s", exc)
+            elif payload["fail_inspection"]:
                 try:
                     update_row_admin(
                         "assets",
@@ -419,14 +444,15 @@ def create_auto_inspection(
 ) -> ServiceResult:
     aid = str(asset_id or "").strip()
     itype = str(inspection_type or "").strip().lower()
-    if not aid or itype not in {"checkout", "daily", "return"}:
+    if not aid or itype not in {"checkout", "daily", "return", "damage"}:
         return ServiceResult(ok=False, error="Asset and inspection type are required.")
     asset = fetch_by_id("assets", aid)
     if not isinstance(asset, dict) or not is_rental_equipment(asset):
         return ServiceResult(ok=False, error="Not rental equipment.")
-    existing = list_open_inspection(aid, itype, job_id=job_id)
-    if existing:
-        return ServiceResult(ok=True, data={"id": existing.get("id"), "existing": True})
+    if itype != "damage":
+        existing = list_open_inspection(aid, itype, job_id=job_id)
+        if existing:
+            return ServiceResult(ok=True, data={"id": existing.get("id"), "existing": True})
     prof = current_profile() or {}
     payload = new_inspection_payload(
         asset_id=aid,
@@ -437,6 +463,80 @@ def create_auto_inspection(
         performed_by_user_id=str(prof.get("id") or "").strip() or None,
     )
     return save_rental_inspection(payload)
+
+
+def get_rental_equipment_dashboard_summary(asset: dict[str, Any]) -> dict[str, Any]:
+    """Summary card data for a single rental asset (QR landing page)."""
+    aid = str(asset.get("id") or "").strip()
+    job_id = str(asset.get("assigned_job_id") or "").strip() or None
+    job_label = "—"
+    customer_name = "—"
+    if job_id:
+        job = fetch_by_id("jobs", job_id)
+        if isinstance(job, dict):
+            num = str(job.get("job_number") or job.get("number") or "").strip()
+            name = str(job.get("job_name") or job.get("name") or "").strip()
+            job_label = f"{num} — {name}".strip(" —") if num or name else job_id
+            cid = str(job.get("customer_id") or "").strip()
+            if cid:
+                customer = fetch_by_id("customers", cid)
+                if isinstance(customer, dict):
+                    customer_name = str(
+                        customer.get("customer_name") or customer.get("company_name") or customer.get("name") or "—"
+                    ).strip() or "—"
+    inspections = list_rental_inspections_for_asset(aid) if aid else []
+    return {
+        "asset_id": aid,
+        "asset_name": str(asset.get("asset_name") or asset.get("name") or "Asset"),
+        "asset_number": str(asset.get("asset_number") or asset.get("asset_id") or "—"),
+        "asset_status": str(asset.get("status") or "—"),
+        "rental_status": rental_inspection_dashboard_status(asset, inspections),
+        "customer_name": customer_name,
+        "job_label": job_label,
+        "job_id": job_id,
+        "inspection_count": len(inspections),
+    }
+
+
+def create_damage_report(
+    *,
+    asset_id: str,
+    damaged_item: str,
+    notes: str,
+    job_id: str | None = None,
+) -> ServiceResult:
+    """Start a damage-report inspection draft."""
+    aid = str(asset_id or "").strip()
+    if not aid:
+        return ServiceResult(ok=False, error="Asset is required.")
+    asset = fetch_by_id("assets", aid)
+    if not isinstance(asset, dict) or not is_rental_equipment(asset):
+        return ServiceResult(ok=False, error="Not rental equipment.")
+    jid = str(job_id or asset.get("assigned_job_id") or "").strip() or None
+    prof = current_profile() or {}
+    payload = new_inspection_payload(
+        asset_id=aid,
+        inspection_type="damage",
+        job_id=jid,
+        customer_id=_customer_id_for_job(jid),
+        performed_by_name=str(prof.get("full_name") or prof.get("name") or "").strip(),
+        performed_by_user_id=str(prof.get("id") or "").strip() or None,
+    )
+    payload["damage_reported"] = True
+    payload["damage_location"] = str(damaged_item or "").strip()
+    payload["damage_description"] = str(notes or "").strip()
+    return save_rental_inspection(payload)
+
+
+def _customer_id_for_job(job_id: str | None) -> str | None:
+    jid = str(job_id or "").strip()
+    if not jid:
+        return None
+    job = fetch_by_id("jobs", jid)
+    if not isinstance(job, dict):
+        return None
+    cid = str(job.get("customer_id") or "").strip()
+    return cid or None
 
 
 def pdf_export_filename(record: dict[str, Any]) -> str:

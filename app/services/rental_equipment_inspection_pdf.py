@@ -16,7 +16,12 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 
 try:
     from app.branding import get_header_logo_path
-    from app.services.rental_equipment_inspection_service import inspection_type_label, photo_view_url
+    from app.services.rental_equipment_inspection_service import (
+        get_rental_equipment_dashboard_summary,
+        inspection_type_label,
+        photo_view_url,
+    )
+    from app.services.repository import fetch_by_id
     from app.services.rental_equipment_inspection_specs import (
         CHECKLIST_ITEMS,
         PHOTO_SLOT_LABELS,
@@ -25,7 +30,12 @@ try:
     )
 except ImportError:
     from branding import get_header_logo_path  # type: ignore
-    from services.rental_equipment_inspection_service import inspection_type_label, photo_view_url  # type: ignore
+    from services.rental_equipment_inspection_service import (  # type: ignore
+        get_rental_equipment_dashboard_summary,
+        inspection_type_label,
+        photo_view_url,
+    )
+    from services.repository import fetch_by_id  # type: ignore
     from services.rental_equipment_inspection_specs import (  # type: ignore
         CHECKLIST_ITEMS,
         PHOTO_SLOT_LABELS,
@@ -75,11 +85,32 @@ def build_rental_inspection_pdf_bytes(record: dict[str, Any]) -> bytes:
     itype = inspection_type_label(str(record.get("inspection_type") or ""))
     story.append(Paragraph(f"Rental Equipment {itype}", title_style))
     story.append(Paragraph(f"Status: {record.get('status') or 'draft'}", body))
-    story.append(Paragraph(f"Completed: {str(record.get('completed_at') or '—')[:19]}", body))
+    completed_at = str(record.get("completed_at") or record.get("signed_at") or "—")[:19]
+    story.append(Paragraph(f"Date/Time: {completed_at}", body))
+    story.append(Spacer(1, 0.1 * inch))
+
+    asset = fetch_by_id("assets", str(record.get("asset_id") or "")) if record.get("asset_id") else None
+    summary = get_rental_equipment_dashboard_summary(asset) if isinstance(asset, dict) else {}
+    equip_rows = [
+        ["Equipment", str(summary.get("asset_name") or "—")],
+        ["Asset Number", str(summary.get("asset_number") or "—")],
+        ["Customer", str(summary.get("customer_name") or "—")],
+        ["Job", str(summary.get("job_label") or "—")],
+    ]
+    etbl = Table(equip_rows, colWidths=[1.6 * inch, 4.6 * inch])
+    etbl.setStyle(
+        TableStyle(
+            [
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+                ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#e2e8f0")),
+            ]
+        )
+    )
+    story.append(etbl)
     story.append(Spacer(1, 0.15 * inch))
 
     info = [
-        ["General Condition", str(record.get("general_condition") or "—")],
+        ["Overall Condition", str(record.get("general_condition") or "—")],
         ["Notes", str(record.get("notes") or "—")],
     ]
     if record.get("damage_reported"):
@@ -143,18 +174,19 @@ def build_rental_inspection_pdf_bytes(record: dict[str, Any]) -> bytes:
         story.append(Spacer(1, 0.1 * inch))
 
     sigs = record.get("signatures") if isinstance(record.get("signatures"), dict) else {}
-    story.append(Paragraph("Signatures", styles["Heading3"]))
-    for role in SIGNATURE_ROLES:
-        entry = sigs.get(role) if isinstance(sigs.get(role), dict) else {}
-        name = str((entry or {}).get("signer_name") or "—")
-        signed = str((entry or {}).get("signed_at") or "—")[:19]
-        story.append(Paragraph(f"{SIGNATURE_ROLE_LABELS.get(role, role)}: {name} ({signed})", body))
-        sig_img = _sig_png_bytes(str((entry or {}).get("signature_data") or ""))
-        if sig_img:
-            try:
-                story.append(RLImage(BytesIO(sig_img), width=2.5 * inch, height=0.75 * inch))
-            except Exception:
-                pass
+    if str(record.get("inspection_type") or "") != "damage":
+        story.append(Paragraph("Signatures", styles["Heading3"]))
+        for role in SIGNATURE_ROLES:
+            entry = sigs.get(role) if isinstance(sigs.get(role), dict) else {}
+            name = str((entry or {}).get("signer_name") or "—")
+            signed = str((entry or {}).get("signed_at") or "—")[:19]
+            story.append(Paragraph(f"{SIGNATURE_ROLE_LABELS.get(role, role)}: {name} ({signed})", body))
+            sig_img = _sig_png_bytes(str((entry or {}).get("signature_data") or ""))
+            if sig_img:
+                try:
+                    story.append(RLImage(BytesIO(sig_img), width=2.5 * inch, height=0.75 * inch))
+                except Exception:
+                    pass
 
     doc.build(story)
     return buf.getvalue()

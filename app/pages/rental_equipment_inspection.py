@@ -30,10 +30,10 @@ try:
         CHECKLIST_ITEMS,
         GENERAL_CONDITIONS,
         PHOTO_SLOT_LABELS,
-        REQUIRED_PHOTO_SLOTS,
         SIGNATURE_ROLE_LABELS,
         SIGNATURE_ROLES,
         normalize_checklist,
+        required_photo_slots_for_checklist,
     )
 except ImportError:
     from auth import current_profile  # type: ignore
@@ -58,10 +58,10 @@ except ImportError:
         CHECKLIST_ITEMS,
         GENERAL_CONDITIONS,
         PHOTO_SLOT_LABELS,
-        REQUIRED_PHOTO_SLOTS,
         SIGNATURE_ROLE_LABELS,
         SIGNATURE_ROLES,
         normalize_checklist,
+        required_photo_slots_for_checklist,
     )
 
 _DRAFT_KEY = "rental_insp_draft"
@@ -199,7 +199,7 @@ def render() -> None:
     key_prefix = f"rei_{iid}"
     checklist = normalize_checklist(record.get("checklist"))
     general = st.selectbox(
-        "General Condition",
+        "Overall Condition",
         [""] + list(GENERAL_CONDITIONS),
         index=([""] + list(GENERAL_CONDITIONS)).index(str(record.get("general_condition") or ""))
         if str(record.get("general_condition") or "") in GENERAL_CONDITIONS
@@ -222,7 +222,7 @@ def render() -> None:
     st.divider()
     st.markdown("#### Required Photos")
     photo_required = itype in {"checkout", "return"}
-    photo_slots = list(REQUIRED_PHOTO_SLOTS)
+    photo_slots = list(required_photo_slots_for_checklist(updated_checklist))
     photo_rows: dict[str, dict[str, Any]] = _photo_map(record)
     for slot in photo_slots:
         slot_photo = _render_photo_slot(
@@ -236,13 +236,37 @@ def render() -> None:
             photo_rows[slot] = slot_photo
 
     st.divider()
-    st.markdown("#### Damage Report")
-    damage = st.checkbox("Damage reported?", value=bool(record.get("damage_reported")), key=f"{key_prefix}_dmg")
+    st.markdown("#### Damage")
+    if itype == "return":
+        show_damage = general == "Damaged"
+        if show_damage:
+            st.info("Overall condition is Damaged — damage description and photo are required.")
+    else:
+        show_damage = st.checkbox(
+            "Damage reported?",
+            value=bool(record.get("damage_reported")),
+            key=f"{key_prefix}_dmg",
+        )
     damage_description = damage_location = repair_recommendation = ""
-    if damage:
-        damage_description = st.text_area("Damage Description", key=f"{key_prefix}_dmg_desc", height=60)
-        damage_location = st.text_input("Damage Location", key=f"{key_prefix}_dmg_loc")
-        repair_recommendation = st.text_area("Repair Recommendation", key=f"{key_prefix}_dmg_rec", height=60)
+    if show_damage:
+        damage_description = st.text_area(
+            "Damage Description",
+            value=str(record.get("damage_description") or ""),
+            key=f"{key_prefix}_dmg_desc",
+            height=60,
+        )
+        if itype != "return":
+            damage_location = st.text_input(
+                "Damage Location",
+                value=str(record.get("damage_location") or ""),
+                key=f"{key_prefix}_dmg_loc",
+            )
+            repair_recommendation = st.text_area(
+                "Repair Recommendation",
+                value=str(record.get("repair_recommendation") or ""),
+                key=f"{key_prefix}_dmg_rec",
+                height=60,
+            )
         dmg_photo = _render_photo_slot(record, "damage_photo", required=True, key_prefix=key_prefix, user_id=user_id)
         if dmg_photo:
             photo_rows["damage_photo"] = dmg_photo
@@ -281,7 +305,7 @@ def render() -> None:
         "general_condition": general,
         "checklist": updated_checklist,
         "notes": notes,
-        "damage_reported": damage,
+        "damage_reported": show_damage,
         "damage_description": damage_description,
         "damage_location": damage_location,
         "repair_recommendation": repair_recommendation,
