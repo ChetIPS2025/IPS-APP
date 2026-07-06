@@ -13691,7 +13691,7 @@ def inject_ops_dashboard_css() -> None:
     """Compact operations dashboard layout — KPI row, news, quick actions, activity grid."""
     st.markdown(
         """
-<style id="ips-ops-dashboard-v20">
+<style id="ips-ops-dashboard-v21">
 /* ── App shell: flex main beside sidebar (desktop only) ── */
 .stApp:has(.ips-ops-dashboard-marker) [data-testid="stAppViewContainer"] {
   width: 100% !important;
@@ -14261,13 +14261,13 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   padding-left: 13px !important;
 }
 
-/* ── Quick actions: 2×3 CSS grid ── */
+/* ── Quick actions: single horizontal row ── */
 .quick-actions-card,
 .st-key-dashboard_ops_quick_actions {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
   border-radius: 11px !important;
-  padding: 22px 28px !important;
+  padding: 20px 24px !important;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05) !important;
   width: 100% !important;
   max-width: 100% !important;
@@ -14292,25 +14292,23 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   height: auto !important;
   overflow: visible !important;
 }
-.quick-actions-grid,
-.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlockBorderWrapper"] > [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker),
-.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker),
-section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker) {
-  display: grid !important;
-  grid-template-columns: repeat(2, minmax(170px, 1fr)) !important;
-  column-gap: 36px !important;
-  row-gap: 18px !important;
+.quick-actions-container,
+.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlockBorderWrapper"] > [data-testid="stVerticalBlock"]:has(.quick-actions-container-marker),
+.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-container-marker),
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-container-marker) {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 20px !important;
   width: 100% !important;
   box-sizing: border-box !important;
-  align-items: stretch !important;
-  justify-items: stretch !important;
   position: static !important;
   transform: none !important;
-  flex-direction: unset !important;
-  flex-wrap: unset !important;
 }
 .st-key-dashboard_ops_quick_actions [data-testid="stElementContainer"]:has(.quick-actions-card-marker),
-.st-key-dashboard_ops_quick_actions [data-testid="stElementContainer"]:has(.quick-actions-grid-marker) {
+.st-key-dashboard_ops_quick_actions [data-testid="stElementContainer"]:has(.quick-actions-container-marker) {
   display: none !important;
   height: 0 !important;
   min-height: 0 !important;
@@ -14319,15 +14317,17 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_o
   overflow: hidden !important;
 }
 .quick-actions-card-marker,
-.quick-actions-grid-marker {
+.quick-actions-container-marker {
   display: none !important;
 }
 .quick-actions-card h3,
+.quick-actions-title,
+.st-key-dashboard_ops_quick_actions [data-testid="stElementContainer"]:has(.quick-actions-title),
 .st-key-dashboard_ops_quick_actions [data-testid="stElementContainer"]:has(.ips-ops-qa-title) {
-  grid-column: 1 / -1 !important;
-  margin: 0 !important;
-  padding: 0 !important;
+  flex: 0 0 100% !important;
   width: 100% !important;
+  margin: 0 0 18px 0 !important;
+  padding: 0 !important;
   position: static !important;
   top: auto !important;
   bottom: auto !important;
@@ -14335,20 +14335,21 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_o
   right: auto !important;
   transform: none !important;
 }
-.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker) > [data-testid="stElementContainer"]:has(.stButton),
-.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker) > [data-testid="stElementContainer"]:has([data-testid="stButton"]) {
-  margin: 0 !important;
-  padding: 0 !important;
-  width: 100% !important;
+.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-container-marker) > [data-testid="stElementContainer"]:has(.stButton),
+.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-container-marker) > [data-testid="stElementContainer"]:has([data-testid="stButton"]) {
+  flex: 0 0 auto !important;
+  width: auto !important;
   min-width: 0 !important;
   min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
   position: static !important;
   top: auto !important;
   bottom: auto !important;
   left: auto !important;
   right: auto !important;
   transform: none !important;
-  align-self: stretch !important;
+  align-self: center !important;
 }
 .st-key-dashboard_ops_quick_actions [data-testid="stElementContainer"] {
   margin: 0 !important;
@@ -14360,9 +14361,8 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_o
   transform: none !important;
 }
 .quick-actions-card h3,
+.quick-actions-title,
 .ips-ops-qa-title {
-  margin: 0 0 18px 0 !important;
-  padding: 0 !important;
   font-size: 1.25rem;
   font-weight: 800;
   color: #0f172a;
@@ -14370,8 +14370,8 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_o
 }
 .st-key-dashboard_ops_quick_actions .stButton,
 .st-key-dashboard_ops_quick_actions [data-testid="stButton"] {
-  width: 100% !important;
-  max-width: 100% !important;
+  width: auto !important;
+  max-width: none !important;
   min-width: 0 !important;
   margin: 0 !important;
   padding: 0 !important;
@@ -14387,15 +14387,17 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_o
 .quick-action-btn,
 .quick-action-button,
 .quick-action-tile {
-  width: 100% !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 150px !important;
   height: 42px !important;
   min-height: 42px !important;
   max-height: 42px !important;
-  border-radius: 10px !important;
+  border-radius: 8px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 10px !important;
+  gap: 8px !important;
   white-space: nowrap !important;
   box-sizing: border-box !important;
   position: static !important;
@@ -14404,7 +14406,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_o
   bottom: auto !important;
   right: auto !important;
   margin: 0 !important;
-  padding: 0 16px !important;
+  padding: 0 18px !important;
   background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%) !important;
   border: 1px solid #1e40af !important;
   color: #ffffff !important;
@@ -14435,7 +14437,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_o
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 10px !important;
+  gap: 8px !important;
   color: #ffffff !important;
   letter-spacing: 0.01em !important;
 }
@@ -14760,25 +14762,18 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stExp
     grid-template-columns: 1fr;
   }
 }
-@media (max-width: 768px) {
-  .quick-actions-grid,
-  .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlockBorderWrapper"] > [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker),
-  .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker) {
-    grid-template-columns: repeat(2, minmax(150px, 1fr)) !important;
-    column-gap: 24px !important;
-    row-gap: 16px !important;
+@media (max-width: 1200px) {
+  .quick-actions-container,
+  .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlockBorderWrapper"] > [data-testid="stVerticalBlock"]:has(.quick-actions-container-marker),
+  .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-container-marker) {
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    gap: 20px !important;
   }
 }
 @media (max-width: 480px) {
   .ips-ops-kpi-grid {
     grid-template-columns: 1fr !important;
-  }
-  .quick-actions-grid,
-  .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlockBorderWrapper"] > [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker),
-  .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker) {
-    grid-template-columns: 1fr !important;
-    column-gap: 0 !important;
-    row-gap: 14px !important;
   }
 }
 </style>

@@ -201,18 +201,18 @@ def render_ops_quick_action_tiles(
     key_prefix: str = "ips_ops_qa",
     title: str = "Quick Actions",
 ) -> None:
-    """Two-column grid of primary action tiles for the operations dashboard."""
+    """Single horizontal row of primary action tiles for the operations dashboard."""
     with st.container(key="dashboard_ops_quick_actions"):
         st.markdown(
             '<span class="quick-actions-card-marker" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
         st.markdown(
-            f'<h3 class="ips-ops-qa-title">{html.escape(title)}</h3>',
+            f'<h3 class="quick-actions-title ips-ops-qa-title">{html.escape(title)}</h3>',
             unsafe_allow_html=True,
         )
         st.markdown(
-            '<span class="quick-actions-grid-marker" aria-hidden="true"></span>',
+            '<span class="quick-actions-container-marker" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
         for action_idx, (icon, label, slug) in enumerate(actions):
@@ -221,7 +221,6 @@ def render_ops_quick_action_tiles(
                 btn_label,
                 key=f"{key_prefix}_{action_idx}",
                 type="primary",
-                use_container_width=True,
             ):
                 if slug:
                     try:
