@@ -8,17 +8,21 @@ import streamlit as st
 
 try:
     from app.components.asset_actions import open_asset_action_confirm
+    from app.components.rental_equipment_inspection_launcher import open_rental_inspection
     from app.pages._core._crud import is_demo_id
     from app.services.asset_classification_service import tracking_type_label
     from app.services.asset_kits_service import get_tool_trailers
     from app.services.assets_service import can_manage_asset_actions
+    from app.services.rental_equipment_inspection_service import create_auto_inspection, is_rental_equipment
     from app.services.serialized_tool_service import assign_tool_to_trailer, is_serialized_tool_asset
 except ImportError:
     from components.asset_actions import open_asset_action_confirm  # type: ignore
+    from components.rental_equipment_inspection_launcher import open_rental_inspection  # type: ignore
     from pages._core._crud import is_demo_id  # type: ignore
     from services.asset_classification_service import tracking_type_label  # type: ignore
     from services.asset_kits_service import get_tool_trailers  # type: ignore
     from services.assets_service import can_manage_asset_actions  # type: ignore
+    from services.rental_equipment_inspection_service import create_auto_inspection, is_rental_equipment  # type: ignore
     from services.serialized_tool_service import assign_tool_to_trailer, is_serialized_tool_asset  # type: ignore
 
 ASSET_OPEN_ACTIVITY_KEY = "ast_open_activity_id"
@@ -55,24 +59,38 @@ def _action_button(
     return st.button(label, key=key, use_container_width=True)
 
 
+def _start_rental_inspection(asset: dict[str, Any], inspection_type: str) -> None:
+    aid = str(asset.get("id") or "").strip()
+    job_id = str(asset.get("assigned_job_id") or "").strip() or None
+    result = create_auto_inspection(asset_id=aid, inspection_type=inspection_type, job_id=job_id)
+    if result.ok:
+        open_rental_inspection(
+            inspection_id=str((result.data or {}).get("id") or ""),
+            asset_id=aid,
+            job_id=job_id,
+            inspection_type=inspection_type,
+        )
+    else:
+        st.error(result.error or f"Could not start {inspection_type} inspection.")
+
+
 def render_asset_row_actions(
     asset: dict[str, Any],
     *,
     key_prefix: str = "ast_row",
     on_view: Callable[[dict[str, Any]], None] | None = None,
     on_edit: Callable[[dict[str, Any]], None] | None = None,
-    on_change_type: Callable[[dict[str, Any]], None] | None = None,
-    on_history: Callable[[dict[str, Any]], None] | None = None,
+    on_open_tab: Callable[[dict[str, Any], str], None] | None = None,
     on_after_change: Callable[[], None] | None = None,
 ) -> None:
-    """Popover: view, edit, assign trailer, change type, history, and delete."""
+    """Popover: view, edit, assign, rental checkout, QR, history, and delete."""
     aid = str(asset.get("id") or "").strip()
     if not aid:
         return
 
     asset_key = "".join(ch if ch.isalnum() else "_" for ch in aid) or "asset"
     can_manage = can_manage_asset_actions()
-    show_manage = can_manage and (on_change_type is not None or not is_demo_id(aid))
+    rental_asset = is_rental_equipment(asset)
 
     st.markdown(
         '<span class="asset-row-actions-menu asset-actions-button" aria-hidden="true"></span>',
@@ -91,7 +109,7 @@ def render_asset_row_actions(
 
         if on_view and _action_button(
             marker="view",
-            label="View Asset Details",
+            label="View Asset",
             key=f"{key_prefix}_view_{asset_key}",
         ):
             on_view(asset)
@@ -105,34 +123,18 @@ def render_asset_row_actions(
             on_edit(asset)
             st.rerun()
 
-        if show_manage:
+        if can_manage and not is_demo_id(aid):
             _actions_divider()
-
-            if on_change_type and _action_button(
-                marker="change-type",
-                label="Change Type",
-                key=f"{key_prefix}_ctype_{asset_key}",
-            ):
-                on_change_type(asset)
-                st.rerun()
-
-            st.markdown(
-                '<div class="asset-row-actions-section">'
-                '<span class="asset-row-action-marker asset-row-action-assign-section" aria-hidden="true"></span>'
-                '<p class="asset-row-actions-section-title">Assign Asset</p>'
-                "</div>",
-                unsafe_allow_html=True,
-            )
             labels, mapping = _trailer_labels()
             st.markdown(
                 '<span class="asset-row-actions-trailer-select" aria-hidden="true"></span>',
                 unsafe_allow_html=True,
             )
             pick = st.selectbox(
-                "Select trailer",
+                "Trailer",
                 labels,
                 key=f"{key_prefix}_trailer_sel_{asset_key}",
-                label_visibility="visible",
+                label_visibility="collapsed",
             )
             if _action_button(
                 marker="assign",
@@ -153,23 +155,54 @@ def render_asset_row_actions(
                         st.error(result.error or "Could not assign trailer.")
                 else:
                     st.info(
-                        "Move to Trailer works for Serialized Tools. "
-                        "Use Change Type or Equipment kit contents for other items."
+                        "Trailer assignment works for Serialized Tools. "
+                        "Use the asset detail Assignments tab for other equipment."
                     )
 
-        if on_history and _action_button(
-            marker="history",
-            label="Activity History",
-            key=f"{key_prefix}_hist_{asset_key}",
-        ):
-            on_history(asset)
-            st.rerun()
+        if rental_asset and can_manage:
+            _actions_divider()
+            if _action_button(
+                marker="checkout",
+                label="Check Out",
+                key=f"{key_prefix}_checkout_{asset_key}",
+            ):
+                _start_rental_inspection(asset, "checkout")
+            if _action_button(
+                marker="checkin",
+                label="Check In",
+                key=f"{key_prefix}_checkin_{asset_key}",
+            ):
+                _start_rental_inspection(asset, "return")
+
+        if on_open_tab:
+            _actions_divider()
+            if _action_button(
+                marker="print-qr",
+                label="Print QR Label",
+                key=f"{key_prefix}_qr_{asset_key}",
+            ):
+                on_open_tab(asset, "Overview")
+                st.rerun()
+            if _action_button(
+                marker="inspection-history",
+                label="Inspection History",
+                key=f"{key_prefix}_insp_hist_{asset_key}",
+            ):
+                on_open_tab(asset, "Maintenance")
+                st.rerun()
+            if _action_button(
+                marker="maintenance-history",
+                label="Maintenance History",
+                key=f"{key_prefix}_maint_hist_{asset_key}",
+            ):
+                on_open_tab(asset, "Maintenance")
+                st.rerun()
 
         if can_manage and not is_demo_id(aid):
             _actions_divider()
             if _action_button(
                 marker="delete",
-                label="Delete Asset",
+                label="Delete",
                 key=f"{key_prefix}_del_{asset_key}",
                 tone="danger",
             ):

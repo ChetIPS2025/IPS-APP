@@ -294,6 +294,7 @@ _ASSETS_CACHE_KEY = "_ips_assets_modal_by_id"
 SELECTED_ASSET_KEY = "selected_asset_id"
 SELECTED_ASSET_IDS_KEY = "selected_asset_ids"
 SHOW_ASSET_MODAL_KEY = "show_asset_detail_modal"
+ASSET_DETAIL_TAB_FOCUS_KEY = "ast_detail_tab_focus"
 _SHOW_NEW_ASSET_FORM_KEY = "assets_show_new_asset_form"
 _ALL_ASSET_IDS_KEY = "_ips_assets_visible_ids"
 _ASSETS_EQUIPMENT_LAYOUT_KEY = "_ips_assets_equipment_layout_ready"
@@ -969,10 +970,13 @@ def _render_custom_assets_table(
                     f'<div class="ips-assets-name-badges">{rentable_badge}</div>' if rentable_badge else ""
                 )
                 st.markdown(
-                    f'<div class="ips-assets-name-cell-wrap asset-name-cell">'
+                    f'<div class="ips-assets-name-cell-wrap asset-name-cell ips-assets-name-cell-link" '
+                    f'data-row-id="{html.escape(aid, quote=True)}" '
+                    f'title="Open Asset Details" role="button" tabindex="0">'
                     f'<a href="#" class="ips-assets-name-text asset-name-link" '
                     f'data-row-id="{html.escape(aid, quote=True)}" '
-                    f'title="{html.escape(name_label, quote=True)}">{html.escape(name_label)}</a>'
+                    f'title="Open Asset Details" aria-label="Open Asset Details for '
+                    f'{html.escape(name_label, quote=True)}">{html.escape(name_label)}</a>'
                     f"{badges_html}"
                     f"</div>",
                     unsafe_allow_html=True,
@@ -1022,6 +1026,11 @@ def _render_custom_assets_table(
                             row,
                         ),
                         on_edit=_set_asset_edit_mode,
+                        on_open_tab=lambda row, tab: _open_assets_detail_modal(
+                            str(row.get("id") or "").strip(),
+                            row,
+                            tab_focus=tab,
+                        ),
                         on_after_change=clear_assets_cache,
                     )
 
@@ -1472,13 +1481,20 @@ def _put_asset_in_modal_cache(asset_id: str, asset: dict | None) -> None:
     st.session_state[_ASSETS_CACHE_KEY] = cache
 
 
-def _open_assets_detail_modal(asset_id: str, asset: dict | None = None) -> None:
+def _open_assets_detail_modal(
+    asset_id: str,
+    asset: dict | None = None,
+    *,
+    tab_focus: str | None = None,
+) -> None:
     aid = str(asset_id or "").strip()
     if not aid:
         return
     _put_asset_in_modal_cache(aid, asset)
     st.session_state[SELECTED_ASSET_KEY] = aid
     st.session_state[SHOW_ASSET_MODAL_KEY] = True
+    if tab_focus:
+        st.session_state[ASSET_DETAIL_TAB_FOCUS_KEY] = str(tab_focus).strip()
     open_record_modal(
         aid,
         asset,
@@ -2263,6 +2279,44 @@ def render_asset_detail_dialog(asset: dict) -> None:
         _render_asset_edit_form(asset)
     else:
         _render_asset_detail_tabs(asset)
+        _focus_asset_detail_tab_if_requested()
+
+
+def _focus_asset_detail_tab_if_requested() -> None:
+    """Select an Asset Detail tab when opened from table row actions."""
+    focus = str(st.session_state.pop(ASSET_DETAIL_TAB_FOCUS_KEY, "") or "").strip()
+    if not focus:
+        return
+    focus_lower = focus.lower()
+    try:
+        from app.ui.clean_table import _components_html
+    except ImportError:
+        from ui.clean_table import _components_html  # type: ignore
+    label_js = focus_lower.replace("\\", "\\\\").replace("'", "\\'")
+    _components_html(
+        f"""
+<script>
+(function () {{
+  const w = window.parent || window;
+  const doc = w.document;
+  const dialog = doc.querySelector('[data-testid="stDialog"]');
+  if (!dialog) return;
+  const want = '{label_js}';
+  const tabs = dialog.querySelectorAll('[data-testid="stTabs"] button[role="tab"]');
+  for (const tab of tabs) {{
+    const text = (tab.textContent || '').trim().toLowerCase();
+    const base = text.replace(/\\s*\\(\\d+\\)\\s*$/, '');
+    if (base === want || base.startsWith(want) || text.startsWith(want)) {{
+      tab.click();
+      return;
+    }}
+  }}
+}})();
+</script>
+        """,
+        component_key="ips_asset_detail_tab_focus",
+        height=0,
+    )
 
 
 @st.dialog("Asset Details", width="large", on_dismiss=_clear_assets_detail_modal)

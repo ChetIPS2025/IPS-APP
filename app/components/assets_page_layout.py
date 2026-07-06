@@ -317,6 +317,20 @@ section[data-testid="stMain"]:has(.ips-assets-page) [data-testid="column"]:has(.
 .ips-assets-name-badges {
   margin-top: 0.05rem;
 }
+.ips-assets-name-cell-wrap.ips-assets-name-cell-link,
+.asset-name-cell.ips-assets-name-cell-link {
+  cursor: pointer;
+  width: 100%;
+  min-height: 2.25rem;
+  padding: 0.12rem 0;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+.ips-assets-name-cell-link .ips-assets-name-badges,
+.ips-assets-name-cell-link .ips-asset-rental-badge {
+  cursor: default;
+  pointer-events: none;
+}
 .ips-assets-name-text,
 .asset-name-link.ips-assets-name-text,
 a.asset-name-link {
@@ -328,12 +342,17 @@ a.asset-name-link {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: inline-block;
+  display: block;
+  width: 100%;
   max-width: 100%;
   text-decoration: none;
 }
 .st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row):hover .ips-assets-name-text,
-.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row):hover a.asset-name-link {
+.st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-row):hover a.asset-name-link,
+.ips-assets-name-cell-link:hover .ips-assets-name-text,
+.ips-assets-name-cell-link:hover a.asset-name-link,
+.ips-assets-name-cell-link:focus-within .ips-assets-name-text,
+.ips-assets-name-cell-link:focus-within a.asset-name-link {
   color: #1d4ed8 !important;
   text-decoration: underline;
 }
@@ -519,7 +538,7 @@ def render_assets_equipment_row_click_bridge() -> str | None:
 
   function isInteractive(target) {
     return !!(target && target.closest && target.closest(
-      "button, input, select, textarea, label, a, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox'], .asset-actions-cell, .asset-actions-button"
+      "button, input, select, textarea, label, a, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox'], .asset-actions-cell, .asset-actions-button, .ips-assets-name-cell-link"
     ));
   }
 
@@ -532,14 +551,21 @@ def render_assets_equipment_row_click_bridge() -> str | None:
   function bindNameLinks() {
     const scope = tableScope();
     if (!scope) return;
-    scope.querySelectorAll(".asset-name-link[data-row-id]").forEach(function (link) {
-      if (link.dataset.ipsAssetsNameBound === "1") return;
-      link.dataset.ipsAssetsNameBound = "1";
-      link.addEventListener("click", function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        const id = link.getAttribute("data-row-id");
+    scope.querySelectorAll(".ips-assets-name-cell-link[data-row-id]").forEach(function (cell) {
+      if (cell.dataset.ipsAssetsNameBound === "1") return;
+      cell.dataset.ipsAssetsNameBound = "1";
+      function openAssetDetail(ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const id = cell.getAttribute("data-row-id");
         if (id) sendValue(id);
+      }
+      cell.addEventListener("click", openAssetDetail);
+      cell.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter" || ev.key === " ") openAssetDetail(ev);
+      });
+      cell.querySelectorAll("a.asset-name-link[data-row-id]").forEach(function (link) {
+        link.addEventListener("click", openAssetDetail);
       });
     });
   }

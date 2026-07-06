@@ -3878,6 +3878,18 @@ def inject_assets_module_css() -> None:
   max-width: 100%;
   overflow: hidden;
 }}
+.st-key-assets_table_wrap .ips-assets-name-cell-link {{
+  cursor: pointer;
+  min-height: 2.25rem;
+  padding: 0.12rem 0;
+  border-radius: 6px;
+  box-sizing: border-box;
+}}
+.st-key-assets_table_wrap .ips-assets-name-cell-link .ips-assets-name-badges,
+.st-key-assets_table_wrap .ips-assets-name-cell-link .ips-asset-rental-badge {{
+  pointer-events: none;
+  cursor: default;
+}}
 .st-key-assets_table_wrap a.asset-name-link,
 .st-key-assets_table_wrap .ips-assets-name-text {{
   font-weight: 600 !important;
@@ -3888,12 +3900,15 @@ def inject_assets_module_css() -> None:
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: inline-block;
+  display: block;
+  width: 100%;
   max-width: 100%;
   text-decoration: none;
 }}
 .st-key-assets_table_wrap a.asset-name-link:hover,
-.st-key-assets_table_wrap a.asset-name-link:focus {{
+.st-key-assets_table_wrap a.asset-name-link:focus,
+.st-key-assets_table_wrap .ips-assets-name-cell-link:hover a.asset-name-link,
+.st-key-assets_table_wrap .ips-assets-name-cell-link:focus-within a.asset-name-link {{
   color: {PRIMARY_HOVER} !important;
   text-decoration: underline;
 }}
