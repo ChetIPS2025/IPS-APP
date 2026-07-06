@@ -12,16 +12,69 @@ IPS_SIDEBAR_SHELL_KEY = "_ips_sidebar_shell_injected"
 IPS_SIDEBAR_NAV_FALLBACK_KEY = "_ips_sidebar_nav_fallback_items"
 IPS_SIDEBAR_TOGGLE_REQUEST_KEY = "ips_sidebar_toggle_request"
 IPS_SIDEBAR_OPEN_SESSION_KEY = "ips_sidebar_prefer_open"
+IPS_SIDEBAR_COLLAPSED_SESSION_KEY = "ips_sidebar_collapsed"
+IPS_SIDEBAR_COLLAPSE_AFTER_NAV_KEY = "ips_sidebar_collapse_after_nav"
+IPS_SIDEBAR_COLLAPSED_STORAGE_KEY = "ips_sidebar_collapsed"
 IPS_SIDEBAR_DESKTOP_MIN_PX = 900
+IPS_SIDEBAR_EXPANDED_WIDTH_PX = 248
+IPS_SIDEBAR_COLLAPSED_WIDTH_PX = 72
+
+
+def is_sidebar_collapsed() -> bool:
+    return bool(st.session_state.get(IPS_SIDEBAR_COLLAPSED_SESSION_KEY, False))
+
+
+def set_sidebar_collapsed(collapsed: bool) -> None:
+    st.session_state[IPS_SIDEBAR_COLLAPSED_SESSION_KEY] = bool(collapsed)
+
+
+def request_sidebar_collapse_after_nav() -> None:
+    st.session_state[IPS_SIDEBAR_COLLAPSE_AFTER_NAV_KEY] = True
+
+
+def apply_pending_sidebar_collapse() -> None:
+    """Apply auto-collapse after navigation (desktop narrow / mobile drawer close)."""
+    if not st.session_state.pop(IPS_SIDEBAR_COLLAPSE_AFTER_NAV_KEY, False):
+        return
+    set_sidebar_collapsed(True)
+    st.session_state[IPS_SIDEBAR_TOGGLE_REQUEST_KEY] = True
 
 
 def store_sidebar_nav_fallback(items: list[tuple[str, ...]]) -> None:
     """Persist current nav labels for client-side fallback menu."""
+    try:
+        from app.components.sidebar_nav_icons import nav_icon_for_slug
+    except ImportError:
+        from components.sidebar_nav_icons import nav_icon_for_slug  # type: ignore
     rows: list[dict[str, str]] = []
     for item in items:
         if len(item) >= 2:
-            rows.append({"slug": str(item[0]), "label": str(item[1])})
+            slug = str(item[0])
+            label = str(item[1])
+            icon = str(item[2]) if len(item) >= 3 else nav_icon_for_slug(slug)
+            rows.append({"slug": slug, "label": label, "icon": icon})
     st.session_state[IPS_SIDEBAR_NAV_FALLBACK_KEY] = rows
+
+
+def capture_sidebar_collapsed_from_query() -> None:
+    """Hydrate collapsed preference from ``?ips_sb=c|e`` (set once by sidebar shell JS)."""
+    try:
+        raw = st.query_params.get("ips_sb")
+    except Exception:
+        return
+    if not raw:
+        return
+    if isinstance(raw, list):
+        raw = raw[0] if raw else ""
+    flag = str(raw or "").strip().lower()
+    if flag == "c":
+        set_sidebar_collapsed(True)
+    elif flag == "e":
+        set_sidebar_collapsed(False)
+    try:
+        del st.query_params["ips_sb"]
+    except Exception:
+        pass
 
 
 def capture_nav_slug_from_query() -> None:
@@ -56,27 +109,58 @@ def _fallback_nav_json() -> str:
         if isinstance(row, dict):
             slug = str(row.get("slug") or "").strip()
             label = str(row.get("label") or "").strip()
+            icon = str(row.get("icon") or "").strip()
             if slug and label:
-                safe.append({"slug": slug, "label": label})
+                safe.append({"slug": slug, "label": label, "icon": icon or "•"})
     return json.dumps(safe)
 
 
 def inject_sidebar_shell() -> None:
     """Inject sidebar layout CSS/JS once per authenticated session."""
+    collapsed = is_sidebar_collapsed()
     if st.session_state.get(IPS_SIDEBAR_SHELL_KEY):
         inject_sidebar_menu_wire()
+        inject_sidebar_layout_state(collapsed)
         if st.session_state.pop(IPS_SIDEBAR_TOGGLE_REQUEST_KEY, False):
-            components.html(_toggle_script(), height=0)
+            components.html(_toggle_script(collapsed=collapsed, after_nav=True), height=0)
         return
     st.session_state[IPS_SIDEBAR_SHELL_KEY] = True
 
     if st.session_state.pop(IPS_SIDEBAR_TOGGLE_REQUEST_KEY, False):
-        components.html(_toggle_script(), height=0)
+        components.html(_toggle_script(collapsed=collapsed, after_nav=True), height=0)
 
     nav_json = _fallback_nav_json()
     components.html(_shell_script(nav_json), height=0)
     st.markdown(_shell_css(), unsafe_allow_html=True)
     inject_sidebar_menu_wire()
+    inject_sidebar_layout_state(collapsed)
+
+
+def inject_sidebar_layout_state(collapsed: bool) -> None:
+    """Sync collapsed body class + localStorage after each render."""
+    flag = "1" if collapsed else "0"
+    components.html(
+        f"""
+<script>
+(function () {{
+  function rootDoc() {{
+    try {{ return window.parent && window.parent.document ? window.parent.document : document; }}
+    catch (e) {{ return document; }}
+  }}
+  function apply() {{
+    var d = rootDoc();
+    if (!d || !d.body) return;
+    if ({flag} === '1') d.body.classList.add('ips-sidebar-collapsed');
+    else d.body.classList.remove('ips-sidebar-collapsed');
+    try {{ localStorage.setItem('{IPS_SIDEBAR_COLLAPSED_STORAGE_KEY}', '{flag}'); }} catch (e2) {{}}
+  }}
+  setTimeout(apply, 20);
+  setTimeout(apply, 180);
+}})();
+</script>
+        """,
+        height=0,
+    )
 
 
 def inject_sidebar_menu_wire() -> None:
@@ -224,33 +308,81 @@ button.ips-header-menu-btn {{
 @media (min-width: {IPS_SIDEBAR_DESKTOP_MIN_PX}px) {{
   section[data-testid="stSidebar"],
   [data-testid="stSidebar"] {{
-    width: 248px !important;
-    min-width: 248px !important;
-    max-width: 248px !important;
+    width: {IPS_SIDEBAR_EXPANDED_WIDTH_PX}px !important;
+    min-width: {IPS_SIDEBAR_EXPANDED_WIDTH_PX}px !important;
+    max-width: {IPS_SIDEBAR_EXPANDED_WIDTH_PX}px !important;
     transform: none !important;
     visibility: visible !important;
     opacity: 1 !important;
     position: relative !important;
     z-index: 99995 !important;
     overflow: visible !important;
+    transition: width 0.18s ease, min-width 0.18s ease, max-width 0.18s ease !important;
   }}
   section[data-testid="stSidebar"][aria-expanded="false"],
   [data-testid="stSidebar"][aria-expanded="false"] {{
     transform: none !important;
-    width: 248px !important;
-    min-width: 248px !important;
-    max-width: 248px !important;
+    width: {IPS_SIDEBAR_EXPANDED_WIDTH_PX}px !important;
+    min-width: {IPS_SIDEBAR_EXPANDED_WIDTH_PX}px !important;
+    max-width: {IPS_SIDEBAR_EXPANDED_WIDTH_PX}px !important;
     margin-left: 0 !important;
+  }}
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"],
+  body.ips-sidebar-collapsed [data-testid="stSidebar"] {{
+    width: {IPS_SIDEBAR_COLLAPSED_WIDTH_PX}px !important;
+    min-width: {IPS_SIDEBAR_COLLAPSED_WIDTH_PX}px !important;
+    max-width: {IPS_SIDEBAR_COLLAPSED_WIDTH_PX}px !important;
   }}
   section[data-testid="stSidebar"] > div {{
     width: 100% !important;
-    min-width: 248px !important;
+    min-width: {IPS_SIDEBAR_EXPANDED_WIDTH_PX}px !important;
     overflow-x: hidden !important;
     overflow-y: auto !important;
+    max-height: 100dvh !important;
+  }}
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] > div {{
+    min-width: {IPS_SIDEBAR_COLLAPSED_WIDTH_PX}px !important;
+  }}
+  body.ips-sidebar-collapsed .ips-sidebar-logo-wrap img {{
+    max-width: 2.25rem !important;
+    margin: 0 auto !important;
+  }}
+  body.ips-sidebar-collapsed .ips-sidebar-tagline,
+  body.ips-sidebar-collapsed .ips-sidebar-nav-label,
+  body.ips-sidebar-collapsed .ips-sidebar-user,
+  body.ips-sidebar-collapsed .ips-sidebar-version,
+  body.ips-sidebar-collapsed .ips-sidebar-field-toggle-label {{
+    display: none !important;
+  }}
+  body.ips-sidebar-collapsed .ips-sidebar-brand {{
+    font-size: 0.72rem !important;
+    text-align: center !important;
+  }}
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] div.stButton > button {{
+    min-height: 2.5rem !important;
+    padding-left: 0.35rem !important;
+    padding-right: 0.35rem !important;
+  }}
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] div.stButton > button p {{
+    max-width: 1.55rem !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    text-align: left !important;
+    font-size: 1.05rem !important;
+  }}
+  body.ips-sidebar-collapsed .ips-sidebar-collapse-row + div.stButton > button p {{
+    max-width: 1.35rem !important;
+    text-align: center !important;
+  }}
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stToggle"] label span {{
+    display: none !important;
+  }}
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stToggle"] {{
+    justify-content: center !important;
   }}
   [data-testid="stSidebarCollapsedControl"],
   button[data-testid="collapsedControl"] {{
-    z-index: 100000 !important;
+    display: none !important;
   }}
   #ips-sidebar-backdrop {{
     display: none !important;
@@ -298,15 +430,21 @@ section[data-testid="stMain"] {{
 """
 
 
-def _toggle_script() -> str:
-    return """
+def _toggle_script(*, collapsed: bool = False, after_nav: bool = False) -> str:
+    collapsed_flag = "true" if collapsed else "false"
+    after_nav_flag = "true" if after_nav else "false"
+    return f"""
 <script>
-(function () {
-  try {
+(function () {{
+  try {{
     var top = window.top || window.parent || window;
-    if (top.IPS && top.IPS.toggleSidebar) top.IPS.toggleSidebar(true);
-  } catch (e) {}
-})();
+    if (top.IPS && top.IPS.applySidebarLayout) {{
+      top.IPS.applySidebarLayout({{ collapsed: {collapsed_flag}, afterNav: {after_nav_flag} }});
+    }} else if (top.IPS && top.IPS.toggleSidebar) {{
+      top.IPS.toggleSidebar(true);
+    }}
+  }} catch (e) {{}}
+}})();
 </script>
 """
 
@@ -377,7 +515,19 @@ def _shell_script(nav_json: str) -> str:
     if (side.getAttribute('aria-expanded') === 'true') bd.classList.add('is-open');
     else bd.classList.remove('is-open');
   }}
-  function ensureDesktopOpen(d) {{
+  function readCollapsedPref() {{
+    try {{ return localStorage.getItem('{IPS_SIDEBAR_COLLAPSED_STORAGE_KEY}') === '1'; }} catch (e) {{ return false; }}
+  }}
+  function writeCollapsedPref(collapsed) {{
+    try {{ localStorage.setItem('{IPS_SIDEBAR_COLLAPSED_STORAGE_KEY}', collapsed ? '1' : '0'); }} catch (e2) {{}}
+  }}
+  function setBodyCollapsed(d, collapsed) {{
+    if (!d || !d.body) return;
+    if (collapsed) d.body.classList.add('ips-sidebar-collapsed');
+    else d.body.classList.remove('ips-sidebar-collapsed');
+    writeCollapsedPref(collapsed);
+  }}
+  function ensureDesktopVisible(d) {{
     if (!isDesktop()) return;
     var side = sidebarEl(d);
     if (!side) return;
@@ -385,17 +535,21 @@ def _shell_script(nav_json: str) -> str:
       var btn = toggleBtn(d);
       if (btn) btn.click();
     }}
-    try {{ localStorage.setItem('ips_sidebar_open', '1'); }} catch (e) {{}}
     syncBackdrop(d);
+  }}
+  function restoreDesktopCollapsed(d) {{
+    if (!isDesktop()) return;
+    ensureDesktopVisible(d);
+    setBodyCollapsed(d, readCollapsedPref());
   }}
   function restoreMobilePreference(d) {{
     if (isDesktop()) {{
-      ensureDesktopOpen(d);
+      restoreDesktopCollapsed(d);
       return;
     }}
     var side = sidebarEl(d);
     if (!side) return;
-    var pref = '1';
+    var pref = '0';
     try {{ pref = localStorage.getItem('ips_sidebar_open') || '0'; }} catch (e2) {{}}
     var expanded = side.getAttribute('aria-expanded') === 'true';
     var wantOpen = pref === '1';
@@ -403,6 +557,18 @@ def _shell_script(nav_json: str) -> str:
       var btn = toggleBtn(d);
       if (btn) btn.click();
     }}
+    syncBackdrop(d);
+  }}
+  function closeMobileDrawer(d) {{
+    if (isDesktop()) return;
+    var side = sidebarEl(d);
+    if (!side || side.getAttribute('aria-expanded') !== 'true') {{
+      syncBackdrop(d);
+      return;
+    }}
+    var btn = toggleBtn(d);
+    if (btn) btn.click();
+    try {{ localStorage.setItem('ips_sidebar_open', '0'); }} catch (e3) {{}}
     syncBackdrop(d);
   }}
   function wireMenuButtons(d) {{
@@ -415,13 +581,60 @@ def _shell_script(nav_json: str) -> str:
       }});
     }});
   }}
+  function wireNavAutoCollapse(d) {{
+    var side = sidebarEl(d);
+    if (!side || side.dataset.ipsNavAutoCollapse === '1') return;
+    side.dataset.ipsNavAutoCollapse = '1';
+    side.addEventListener('click', function (ev) {{
+      var btn = ev.target && ev.target.closest ? ev.target.closest('button') : null;
+      if (!btn || !side.contains(btn)) return;
+      if (btn.closest('.ips-sidebar-collapse-row')) return;
+      var txt = (btn.textContent || '').toLowerCase();
+      if (txt.indexOf('log out') >= 0 || txt.indexOf('logout') >= 0) return;
+      if (btn.getAttribute('data-testid') === 'collapsedControl') return;
+      setTimeout(function () {{ window.IPS.collapseAfterNav(); }}, 60);
+    }});
+  }}
   window.IPS = window.IPS || {{}};
+  window.IPS.applySidebarLayout = function (opts) {{
+    var d = rootDoc();
+    opts = opts || {{}};
+    if (isDesktop()) {{
+      ensureDesktopVisible(d);
+      if (typeof opts.collapsed === 'boolean') setBodyCollapsed(d, opts.collapsed);
+      else setBodyCollapsed(d, readCollapsedPref());
+    }} else if (opts.afterNav) {{
+      closeMobileDrawer(d);
+    }}
+    syncBackdrop(d);
+  }};
+  window.IPS.setSidebarCollapsed = function (collapsed) {{
+    var d = rootDoc();
+    if (!isDesktop()) return;
+    ensureDesktopVisible(d);
+    setBodyCollapsed(d, !!collapsed);
+  }};
+  window.IPS.collapseAfterNav = function () {{
+    var d = rootDoc();
+    if (isDesktop()) {{
+      ensureDesktopVisible(d);
+      setBodyCollapsed(d, true);
+    }} else {{
+      closeMobileDrawer(d);
+    }}
+  }};
   window.IPS.toggleSidebar = function () {{
     var d = rootDoc();
     var side = sidebarEl(d);
     if (!side) {{
       var fb = fallbackEl(d);
       fb.classList.toggle('is-open');
+      return;
+    }}
+    if (isDesktop()) {{
+      var collapsed = readCollapsedPref();
+      setBodyCollapsed(d, !collapsed);
+      ensureDesktopVisible(d);
       return;
     }}
     var btn = toggleBtn(d);
@@ -437,7 +650,21 @@ def _shell_script(nav_json: str) -> str:
   function boot() {{
     var d = rootDoc();
     wireMenuButtons(d);
-    if (isDesktop()) ensureDesktopOpen(d);
+    wireNavAutoCollapse(d);
+    if (!sessionStorage.getItem('ips_sb_session_sync')) {{
+      try {{
+        var collapsed = readCollapsedPref();
+        var url = new URL(window.location.href);
+        if (!url.searchParams.has('ips_sb')) {{
+          url.searchParams.set('ips_sb', collapsed ? 'c' : 'e');
+          sessionStorage.setItem('ips_sb_session_sync', '1');
+          window.location.replace(url.toString());
+          return;
+        }}
+      }} catch (syncErr) {{}}
+      sessionStorage.setItem('ips_sb_session_sync', '1');
+    }}
+    if (isDesktop()) restoreDesktopCollapsed(d);
     else restoreMobilePreference(d);
     syncBackdrop(d);
     if (!sidebarEl(d) && NAV.length) window.IPS.showFallbackNav();

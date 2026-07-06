@@ -9,6 +9,15 @@ import streamlit as st
 
 try:
     from app.auth import current_profile, current_role, sign_out
+    from app.components.sidebar_nav_icons import nav_icon_for_slug
+    from app.components.sidebar_shell import (
+        apply_pending_sidebar_collapse,
+        is_sidebar_collapsed,
+        request_sidebar_collapse_after_nav,
+        request_sidebar_toggle,
+        set_sidebar_collapsed,
+        store_sidebar_nav_fallback,
+    )
     from app.config import APP_VERSION, ROOT_DIR
     from app.navigation import set_nav_slug
     from app.utils.constants import FIELD_NAV_PAGES, NAV_PAGES
@@ -20,6 +29,15 @@ try:
     )
 except ImportError:
     from auth import current_profile, current_role, sign_out  # type: ignore
+    from components.sidebar_nav_icons import nav_icon_for_slug  # type: ignore
+    from components.sidebar_shell import (  # type: ignore
+        apply_pending_sidebar_collapse,
+        is_sidebar_collapsed,
+        request_sidebar_collapse_after_nav,
+        request_sidebar_toggle,
+        set_sidebar_collapsed,
+        store_sidebar_nav_fallback,
+    )
     from config import APP_VERSION, ROOT_DIR  # type: ignore
     from navigation import set_nav_slug  # type: ignore
     from utils.constants import FIELD_NAV_PAGES, NAV_PAGES  # type: ignore
@@ -41,7 +59,13 @@ def _logo_path() -> Path | None:
     return None
 
 
+def _nav_button_label(slug: str, label: str) -> str:
+    return f"{nav_icon_for_slug(slug)}  {label}"
+
+
 def render_sidebar(active_slug: str) -> None:
+    apply_pending_sidebar_collapse()
+    collapsed = is_sidebar_collapsed()
     role = normalize_role(current_role())
     field_mode = bool(st.session_state.get("ips_field_mode"))
     nav_items = (
@@ -49,13 +73,9 @@ def render_sidebar(active_slug: str) -> None:
         if field_mode
         else filter_nav_for_role(NAV_PAGES, role)
     )
-    try:
-        from app.components.sidebar_shell import store_sidebar_nav_fallback
-    except ImportError:
-        from components.sidebar_shell import store_sidebar_nav_fallback  # type: ignore
     store_sidebar_nav_fallback(nav_items)
     _ESTIMATING_SLUGS = frozenset({"estimates", "pricing_guide"})
-    _OPERATIONS_SLUGS = frozenset({"inventory", "assets"})
+    _OPERATIONS_SLUGS = frozenset({"inventory", "assets", "rental_equipment"})
     _LABOR_SLUGS = frozenset({"timekeeping"})
     _MANAGEMENT_SLUGS = frozenset({"tasks", "reports"})
     _ADMIN_SLUGS = frozenset({"employees", "admin", "settings"})
@@ -70,6 +90,20 @@ def render_sidebar(active_slug: str) -> None:
     _shown_sections: set[str] = set()
 
     with st.sidebar:
+        st.markdown(f'<{_OT} class="ips-sidebar-collapse-row">', unsafe_allow_html=True)
+        toggle_label = "Expand sidebar" if collapsed else "Collapse sidebar"
+        toggle_icon = "»" if collapsed else "«"
+        if st.button(
+            f"{toggle_icon}  {toggle_label}",
+            key="ips_sidebar_collapse_toggle",
+            help=toggle_label,
+            use_container_width=True,
+        ):
+            set_sidebar_collapsed(not collapsed)
+            request_sidebar_toggle()
+            st.rerun()
+        st.markdown(f"<{_CT}>", unsafe_allow_html=True)
+
         st.markdown(f'<{_OT} class="ips-sidebar-logo-wrap">', unsafe_allow_html=True)
         logo = _logo_path()
         if logo:
@@ -81,51 +115,66 @@ def render_sidebar(active_slug: str) -> None:
             unsafe_allow_html=True,
         )
 
-        st.markdown(f'<p class="ips-sidebar-nav-label">Navigation</p>', unsafe_allow_html=True)
+        if not collapsed:
+            st.markdown(f'<p class="ips-sidebar-nav-label">Navigation</p>', unsafe_allow_html=True)
         for item in nav_items:
             if len(item) == 3:
                 slug, label, _icon = item
             else:
                 slug, label = item  # type: ignore[misc]
-            for section_slugs, section_label in _SECTION_HEADERS:
-                if slug in section_slugs and section_label not in _shown_sections:
-                    st.markdown(
-                        f'<p class="ips-sidebar-nav-label" style="margin-top:0.75rem;">{html.escape(section_label)}</p>',
-                        unsafe_allow_html=True,
-                    )
-                    _shown_sections.add(section_label)
-                    break
+            if not collapsed:
+                for section_slugs, section_label in _SECTION_HEADERS:
+                    if slug in section_slugs and section_label not in _shown_sections:
+                        st.markdown(
+                            f'<p class="ips-sidebar-nav-label" style="margin-top:0.75rem;">{html.escape(section_label)}</p>',
+                            unsafe_allow_html=True,
+                        )
+                        _shown_sections.add(section_label)
+                        break
             is_active = slug == active_slug or (slug in _SCAN_SLUGS and active_slug in {"inventory", "assets"})
+            btn_label = _nav_button_label(slug, label)
             if st.button(
-                label,
+                btn_label,
                 key=f"nav_{slug}",
                 use_container_width=True,
                 type="primary" if is_active else "secondary",
+                help=label,
             ):
                 if not is_active or slug in _SCAN_SLUGS:
                     set_nav_slug(slug)
+                    request_sidebar_collapse_after_nav()
                     st.rerun()
 
         st.markdown(f'<{_OT} class="ips-sidebar-spacer"><{_CT}>', unsafe_allow_html=True)
 
-        fm = st.toggle("Field Supervisor Mode", value=field_mode, key="ips_field_mode_toggle")
+        if not collapsed:
+            st.markdown('<p class="ips-sidebar-field-toggle-label">View mode</p>', unsafe_allow_html=True)
+        fm = st.toggle(
+            "Field Supervisor Mode",
+            value=field_mode,
+            key="ips_field_mode_toggle",
+            help="Field Supervisor Mode",
+        )
         if fm != field_mode:
             st.session_state["ips_field_mode"] = fm
             if fm and role_can_access_page(role, "field_dashboard"):
                 set_nav_slug("field_dashboard")
+            request_sidebar_collapse_after_nav()
             st.rerun()
 
-        prof = current_profile()
-        name = html.escape(str(prof.get("full_name") or prof.get("email") or "User"))
-        role_lbl = html.escape(role.replace("_", " ").title())
-        st.markdown(
-            f'<{_OT} class="ips-sidebar-user"><strong>{name}</strong><br>{role_lbl}<{_CT}>',
-            unsafe_allow_html=True,
-        )
-        if st.button("Log out", use_container_width=True, key="ips_logout"):
+        if not collapsed:
+            prof = current_profile()
+            name = html.escape(str(prof.get("full_name") or prof.get("email") or "User"))
+            role_lbl = html.escape(role.replace("_", " ").title())
+            st.markdown(
+                f'<{_OT} class="ips-sidebar-user"><strong>{name}</strong><br>{role_lbl}<{_CT}>',
+                unsafe_allow_html=True,
+            )
+        if st.button("Log out", use_container_width=True, key="ips_logout", help="Log out"):
             sign_out()
 
-        st.markdown(
-            f'<p class="ips-sidebar-version">App v{html.escape(APP_VERSION)}</p>',
-            unsafe_allow_html=True,
-        )
+        if not collapsed:
+            st.markdown(
+                f'<p class="ips-sidebar-version">App v{html.escape(APP_VERSION)}</p>',
+                unsafe_allow_html=True,
+            )

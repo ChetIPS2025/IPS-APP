@@ -4,23 +4,43 @@ from __future__ import annotations
 
 import streamlit as st
 
+from app.components.sidebar_nav_icons import nav_icon_for_slug
 from app.components.sidebar_shell import (
+    IPS_SIDEBAR_COLLAPSE_AFTER_NAV_KEY,
     IPS_SIDEBAR_NAV_FALLBACK_KEY,
     _fallback_nav_json,
+    apply_pending_sidebar_collapse,
+    is_sidebar_collapsed,
+    request_sidebar_collapse_after_nav,
+    set_sidebar_collapsed,
     store_sidebar_nav_fallback,
 )
 from app.utils.constants import FIELD_NAV_PAGES
 from app.utils.permissions import filter_field_nav_for_role
 
 
-def test_store_sidebar_nav_fallback_keeps_slug_and_label():
+def test_store_sidebar_nav_fallback_keeps_slug_label_and_icon():
     store_sidebar_nav_fallback([("jobs", "My Jobs"), ("field_dashboard", "Field Home")])
     rows = st.session_state[IPS_SIDEBAR_NAV_FALLBACK_KEY]
     assert rows == [
-        {"slug": "jobs", "label": "My Jobs"},
-        {"slug": "field_dashboard", "label": "Field Home"},
+        {"slug": "jobs", "label": "My Jobs", "icon": "💼"},
+        {"slug": "field_dashboard", "label": "Field Home", "icon": "🏠"},
     ]
     assert '"My Jobs"' in _fallback_nav_json()
+
+
+def test_sidebar_collapse_session_helpers():
+    set_sidebar_collapsed(True)
+    assert is_sidebar_collapsed() is True
+    request_sidebar_collapse_after_nav()
+    apply_pending_sidebar_collapse()
+    assert is_sidebar_collapsed() is True
+    assert IPS_SIDEBAR_COLLAPSE_AFTER_NAV_KEY not in st.session_state
+
+
+def test_nav_icon_for_slug_defaults():
+    assert nav_icon_for_slug("jobs") == "💼"
+    assert nav_icon_for_slug("unknown_slug") == "•"
 
 
 def test_employee_field_nav_excludes_company_updates():

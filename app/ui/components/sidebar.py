@@ -32,8 +32,12 @@ def inject_sidebar_theme() -> None:
             border-color: #1d4ed8 !important;
             color: #fff !important;
         }
-        section[data-testid="stSidebar"] .ips-nav-expander-hint {
-            display: none !important;
+        section[data-testid="stSidebar"] .ips-sidebar-collapse-row + div.stButton > button {
+            font-weight: 700 !important;
+            margin-bottom: 0.35rem !important;
+        }
+        body.ips-sidebar-collapsed section[data-testid="stSidebar"] .ips-sidebar-collapse-row + div.stButton > button p {
+            font-size: 1.25rem !important;
         }
         </style>
         """,
