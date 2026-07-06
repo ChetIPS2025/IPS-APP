@@ -155,7 +155,30 @@ def _render_photo_slot(
     return (_photo_map(refreshed or record).get(slot) or existing)
 
 
+_RENTAL_DASH_VIEW_KEY = "_rental_dash_view"
+
+
+def _exit_inspection(*, embedded: bool) -> None:
+    clear_rental_inspection_context()
+    st.session_state.pop(_DRAFT_KEY, None)
+    if embedded:
+        st.session_state[_RENTAL_DASH_VIEW_KEY] = "home"
+    else:
+        try:
+            from app.navigation import set_nav_slug
+        except ImportError:
+            from navigation import set_nav_slug  # type: ignore
+        set_nav_slug("assets")
+    st.rerun()
+
+
 def render() -> None:
+    if not begin_module("rental_equipment_inspection"):
+        return
+    render_inspection_form(embedded=False)
+
+
+def render_inspection_form(*, embedded: bool = False) -> None:
     ctx = rental_inspection_context()
     record = _load_record(ctx)
     st.session_state[_DRAFT_KEY] = record
@@ -165,22 +188,19 @@ def render() -> None:
     user_id = str(prof.get("id") or "").strip() or None
     itype = str(record.get("inspection_type") or "checkout")
     title = inspection_type_label(itype)
-    if not begin_module("rental_equipment_inspection"):
-        return
+
+    if embedded:
+        aid = str(record.get("asset_id") or "")
+        if st.button("← Back", key=f"rei_embed_back_{aid or 'none'}", use_container_width=True):
+            _exit_inspection(embedded=True)
+
     st.markdown(f"### {title}")
     st.caption("Photo proof, checklist, damage report, and signatures required to complete.")
 
     if not str(record.get("asset_id") or "").strip():
         st.error("No rental asset selected.")
-        if st.button("Back to Assets"):
-            clear_rental_inspection_context()
-            st.session_state.pop(_DRAFT_KEY, None)
-            try:
-                from app.navigation import set_nav_slug
-            except ImportError:
-                from navigation import set_nav_slug  # type: ignore
-            set_nav_slug("assets")
-            st.rerun()
+        if st.button("Back to Assets", key="rei_no_asset_back"):
+            _exit_inspection(embedded=embedded)
         return
 
     st.markdown(f"**{asset.get('asset_name') if asset else 'Asset'}** · {asset.get('asset_number') if asset else '—'}")
@@ -339,14 +359,7 @@ def render() -> None:
                 result = save_rental_inspection(merged, inspection_id=iid, mark_complete=True)
                 if result.ok:
                     st.success("Inspection completed and PDF generated.")
-                    clear_rental_inspection_context()
-                    st.session_state.pop(_DRAFT_KEY, None)
-                    try:
-                        from app.navigation import set_nav_slug
-                    except ImportError:
-                        from navigation import set_nav_slug  # type: ignore
-                    set_nav_slug("assets")
-                    st.rerun()
+                    _exit_inspection(embedded=embedded)
                 else:
                     st.error(result.error or "Could not complete inspection.")
     with c3:

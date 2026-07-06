@@ -9,7 +9,11 @@ import streamlit as st
 
 try:
     from app.auth import current_profile
-    from app.components.rental_equipment_inspection_launcher import open_rental_inspection
+    from app.components.rental_equipment_inspection_launcher import (
+        clear_rental_inspection_context,
+        set_rental_inspection_context,
+    )
+    from app.pages.rental_equipment_inspection import render_inspection_form
     from app.services.assets_service import get_asset_image_url
     from app.services.rental_equipment_inspection_service import (
         create_auto_inspection,
@@ -27,7 +31,11 @@ try:
     from app.utils.formatting import fmt_date
 except ImportError:
     from auth import current_profile  # type: ignore
-    from components.rental_equipment_inspection_launcher import open_rental_inspection  # type: ignore
+    from components.rental_equipment_inspection_launcher import (  # type: ignore
+        clear_rental_inspection_context,
+        set_rental_inspection_context,
+    )
+    from pages.rental_equipment_inspection import render_inspection_form  # type: ignore
     from services.assets_service import get_asset_image_url  # type: ignore
     from services.rental_equipment_inspection_service import (  # type: ignore
         create_auto_inspection,
@@ -83,12 +91,14 @@ def _start_inspection(asset: dict[str, Any], inspection_type: str) -> None:
     job_id = str(asset.get("assigned_job_id") or "").strip() or None
     result = create_auto_inspection(asset_id=aid, inspection_type=inspection_type, job_id=job_id)
     if result.ok:
-        open_rental_inspection(
+        set_rental_inspection_context(
             inspection_id=str((result.data or {}).get("id") or ""),
             asset_id=aid,
             job_id=job_id,
             inspection_type=inspection_type,
         )
+        _set_view(aid, "inspection")
+        st.rerun()
     else:
         st.error(result.error or f"Could not start {inspection_type} inspection.")
 
@@ -135,6 +145,8 @@ def _clear_subviews(asset_id: str) -> None:
     st.session_state[_VIEW_KEY] = "home"
     st.session_state.pop("_rental_list_view", None)
     st.session_state.pop("_rental_list_asset_id", None)
+    clear_rental_inspection_context()
+    st.session_state.pop("rental_insp_draft", None)
 
 
 def _render_history(asset: dict[str, Any]) -> None:
@@ -235,6 +247,10 @@ def _render_damage_report(asset: dict[str, Any]) -> None:
             st.error(result.error or "Could not save damage report.")
 
 
+def _render_inspection(asset: dict[str, Any]) -> None:
+    render_inspection_form(embedded=True)
+
+
 def render_rental_equipment_dashboard(asset: dict[str, Any]) -> None:
     """Dedicated rental equipment landing page from QR scan."""
     inject_trailer_dashboard_css()
@@ -245,7 +261,9 @@ def render_rental_equipment_dashboard(asset: dict[str, Any]) -> None:
     view = str(st.session_state.get(_VIEW_KEY) or "home")
 
     st.markdown("## Rental Equipment")
-    if view == "history":
+    if view == "inspection":
+        _render_inspection(asset)
+    elif view == "history":
         _render_history(asset)
     elif view == "damage":
         _render_damage_report(asset)

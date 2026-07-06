@@ -23,7 +23,7 @@ def rental_inspection_context() -> dict[str, str | None]:
     return {k: str(st.session_state.get(k) or "").strip() or None for k in _CTX_KEYS}
 
 
-def open_rental_inspection(
+def set_rental_inspection_context(
     *,
     inspection_id: str | None = None,
     asset_id: str | None = None,
@@ -34,6 +34,21 @@ def open_rental_inspection(
     st.session_state["rental_insp_asset_id"] = str(asset_id or "").strip() or None
     st.session_state["rental_insp_job_id"] = str(job_id or "").strip() or None
     st.session_state["rental_insp_type"] = str(inspection_type or "").strip() or None
+
+
+def open_rental_inspection(
+    *,
+    inspection_id: str | None = None,
+    asset_id: str | None = None,
+    job_id: str | None = None,
+    inspection_type: str | None = None,
+) -> None:
+    set_rental_inspection_context(
+        inspection_id=inspection_id,
+        asset_id=asset_id,
+        job_id=job_id,
+        inspection_type=inspection_type,
+    )
     set_nav_slug("rental_equipment_inspection")
     st.rerun()
 
