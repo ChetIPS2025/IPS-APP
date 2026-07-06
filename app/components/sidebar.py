@@ -140,12 +140,12 @@ def render_sidebar(active_slug: str) -> None:
     _shown_sections: set[str] = set()
 
     shell_cls = "ips-sidebar-shell ips-sidebar-collapsed" if collapsed else "ips-sidebar-shell ips-sidebar-expanded"
-    st.markdown(
-        f'<span class="{shell_cls}" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
 
     with st.sidebar:
+        st.markdown(
+            f'<span class="{shell_cls}" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
         _render_sidebar_header(collapsed=collapsed)
 
         st.markdown(f'<{_OT} class="ips-sidebar-nav-scroll sidebar-nav-scroll">', unsafe_allow_html=True)

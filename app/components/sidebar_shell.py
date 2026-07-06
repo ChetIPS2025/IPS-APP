@@ -15,9 +15,20 @@ IPS_SIDEBAR_OPEN_SESSION_KEY = "ips_sidebar_prefer_open"
 IPS_SIDEBAR_COLLAPSED_SESSION_KEY = "ips_sidebar_collapsed"
 IPS_SIDEBAR_COLLAPSE_AFTER_NAV_KEY = "ips_sidebar_collapse_after_nav"
 IPS_SIDEBAR_COLLAPSED_STORAGE_KEY = "ips_sidebar_collapsed"
+IPS_SIDEBAR_COLLAPSED_HYDRATED_KEY = "_ips_sidebar_collapsed_hydrated"
 IPS_SIDEBAR_DESKTOP_MIN_PX = 900
 IPS_SIDEBAR_EXPANDED_WIDTH_PX = 240
 IPS_SIDEBAR_COLLAPSED_WIDTH_PX = 72
+
+
+def _collapsed_sidebar_selectors() -> str:
+    """Match collapsed layout via body class or in-sidebar shell marker."""
+    return (
+        'body.ips-sidebar-collapsed section[data-testid="stSidebar"], '
+        'body.ips-sidebar-collapsed [data-testid="stSidebar"], '
+        'section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed), '
+        '[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed)'
+    )
 
 
 def is_sidebar_collapsed() -> bool:
@@ -74,6 +85,32 @@ def capture_sidebar_collapsed_from_query() -> None:
         del st.query_params["ips_sb"]
     except Exception:
         pass
+
+
+def ensure_sidebar_collapsed_hydrated() -> None:
+    """Load collapsed preference from localStorage into session on fresh Streamlit sessions."""
+    capture_sidebar_collapsed_from_query()
+    if st.session_state.get(IPS_SIDEBAR_COLLAPSED_HYDRATED_KEY):
+        return
+    st.session_state[IPS_SIDEBAR_COLLAPSED_HYDRATED_KEY] = True
+    if IPS_SIDEBAR_COLLAPSED_SESSION_KEY in st.session_state:
+        return
+    components.html(
+        f"""
+<script>
+(function () {{
+  try {{
+    var url = new URL(window.location.href);
+    if (url.searchParams.has('ips_sb')) return;
+    var collapsed = localStorage.getItem('{IPS_SIDEBAR_COLLAPSED_STORAGE_KEY}') === '1';
+    url.searchParams.set('ips_sb', collapsed ? 'c' : 'e');
+    window.location.replace(url.toString());
+  }} catch (e) {{}}
+}})();
+</script>
+        """,
+        height=0,
+    )
 
 
 def capture_nav_slug_from_query() -> None:
@@ -153,7 +190,8 @@ def inject_sidebar_layout_state(collapsed: bool) -> None:
     else d.body.classList.remove('ips-sidebar-collapsed');
     try {{ localStorage.setItem('{IPS_SIDEBAR_COLLAPSED_STORAGE_KEY}', '{flag}'); }} catch (e2) {{}}
   }}
-  setTimeout(apply, 20);
+  apply();
+  setTimeout(apply, 40);
   setTimeout(apply, 180);
 }})();
 </script>
@@ -199,8 +237,9 @@ def _shell_css() -> str:
     exp = IPS_SIDEBAR_EXPANDED_WIDTH_PX
     col = IPS_SIDEBAR_COLLAPSED_WIDTH_PX
     mobile_max = IPS_SIDEBAR_DESKTOP_MIN_PX - 1
+    collapsed_sel = _collapsed_sidebar_selectors()
     return f"""
-<style id="ips-sidebar-shell-v4">
+<style id="ips-sidebar-shell-v5">
 .ips-main-header-menu,
 button.ips-header-menu-btn {{
   display: none !important;
@@ -286,8 +325,7 @@ button.ips-header-menu-btn {{
     overflow: hidden !important;
     transition: flex-basis 0.18s ease, width 0.18s ease, min-width 0.18s ease, max-width 0.18s ease !important;
   }}
-  body.ips-sidebar-collapsed section[data-testid="stSidebar"],
-  body.ips-sidebar-collapsed [data-testid="stSidebar"] {{
+  {collapsed_sel} {{
     flex-basis: {col}px !important;
     width: {col}px !important;
     min-width: {col}px !important;
@@ -351,7 +389,10 @@ button.ips-header-menu-btn {{
   }}
   body.ips-sidebar-collapsed .sidebar-section-title,
   body.ips-sidebar-collapsed .sidebar-logo-tagline,
-  body.ips-sidebar-collapsed .sidebar-divider {{
+  body.ips-sidebar-collapsed .sidebar-divider,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) .sidebar-section-title,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) .sidebar-logo-tagline,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) .sidebar-divider {{
     display: none !important;
   }}
   .ips-sidebar-nav-scroll,
@@ -563,14 +604,9 @@ def _shell_script(nav_json: str) -> str:
     }}
     syncBackdrop(d);
   }}
-  function restoreDesktopCollapsed(d) {{
-    if (!isDesktop()) return;
-    ensureDesktopVisible(d);
-    setBodyCollapsed(d, readCollapsedPref());
-  }}
   function restoreMobilePreference(d) {{
     if (isDesktop()) {{
-      restoreDesktopCollapsed(d);
+      ensureDesktopVisible(d);
       return;
     }}
     var side = sidebarEl(d);
@@ -657,9 +693,15 @@ def _shell_script(nav_json: str) -> str:
       return;
     }}
     if (isDesktop()) {{
-      var collapsed = readCollapsedPref();
-      setBodyCollapsed(d, !collapsed);
       ensureDesktopVisible(d);
+      try {{
+        var url = new URL(window.location.href);
+        var collapsed = readCollapsedPref();
+        url.searchParams.set('ips_sb', collapsed ? 'e' : 'c');
+        window.location.replace(url.toString());
+      }} catch (deskErr) {{
+        setBodyCollapsed(d, !readCollapsedPref());
+      }}
       return;
     }}
     var btn = toggleBtn(d);
@@ -676,20 +718,7 @@ def _shell_script(nav_json: str) -> str:
     var d = rootDoc();
     wireMenuButtons(d);
     wireNavAutoCollapse(d);
-    if (!sessionStorage.getItem('ips_sb_session_sync')) {{
-      try {{
-        var collapsed = readCollapsedPref();
-        var url = new URL(window.location.href);
-        if (!url.searchParams.has('ips_sb')) {{
-          url.searchParams.set('ips_sb', collapsed ? 'c' : 'e');
-          sessionStorage.setItem('ips_sb_session_sync', '1');
-          window.location.replace(url.toString());
-          return;
-        }}
-      }} catch (syncErr) {{}}
-      sessionStorage.setItem('ips_sb_session_sync', '1');
-    }}
-    if (isDesktop()) restoreDesktopCollapsed(d);
+    if (isDesktop()) ensureDesktopVisible(d);
     else restoreMobilePreference(d);
     syncBackdrop(d);
     if (!sidebarEl(d) && NAV.length) window.IPS.showFallbackNav();

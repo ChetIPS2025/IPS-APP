@@ -6,12 +6,16 @@ import streamlit as st
 
 from app.components.sidebar_nav_icons import nav_icon_for_slug
 from app.components.sidebar_shell import (
+    IPS_SIDEBAR_COLLAPSED_HYDRATED_KEY,
+    IPS_SIDEBAR_COLLAPSED_SESSION_KEY,
     IPS_SIDEBAR_COLLAPSED_WIDTH_PX,
     IPS_SIDEBAR_COLLAPSE_AFTER_NAV_KEY,
     IPS_SIDEBAR_EXPANDED_WIDTH_PX,
     IPS_SIDEBAR_NAV_FALLBACK_KEY,
     _fallback_nav_json,
     apply_pending_sidebar_collapse,
+    capture_sidebar_collapsed_from_query,
+    ensure_sidebar_collapsed_hydrated,
     is_sidebar_collapsed,
     request_sidebar_collapse_after_nav,
     set_sidebar_collapsed,
@@ -38,6 +42,21 @@ def test_sidebar_collapse_session_helpers():
     apply_pending_sidebar_collapse()
     assert is_sidebar_collapsed() is False
     assert IPS_SIDEBAR_COLLAPSE_AFTER_NAV_KEY not in st.session_state
+
+
+def test_capture_sidebar_collapsed_from_query():
+    st.session_state.pop(IPS_SIDEBAR_COLLAPSED_SESSION_KEY, None)
+    st.query_params["ips_sb"] = "c"
+    capture_sidebar_collapsed_from_query()
+    assert is_sidebar_collapsed() is True
+    assert "ips_sb" not in st.query_params
+
+
+def test_ensure_sidebar_collapsed_hydrated_skips_when_session_set():
+    st.session_state[IPS_SIDEBAR_COLLAPSED_HYDRATED_KEY] = True
+    st.session_state[IPS_SIDEBAR_COLLAPSED_SESSION_KEY] = False
+    ensure_sidebar_collapsed_hydrated()
+    assert is_sidebar_collapsed() is False
 
 
 def test_nav_button_label_collapsed_icon_only():

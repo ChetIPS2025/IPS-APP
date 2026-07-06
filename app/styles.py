@@ -13435,17 +13435,23 @@ section[data-testid="stSidebar"] .sidebar-nav-item.active + div[class*="stButton
   color: #ffffff !important;
   font-weight: 600 !important;
 }}
-body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-nav-item + div[class*="stButton"] > button {{
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-nav-item + div[class*="stButton"] > button,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) .sidebar-nav-item + div[class*="stButton"] > button {{
   justify-content: center !important;
   padding: 0.45rem 0.25rem !important;
   min-height: 2.35rem !important;
 }}
-body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-nav-item + div[class*="stButton"] > button p {{
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-nav-item + div[class*="stButton"] > button p,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) .sidebar-nav-item + div[class*="stButton"] > button p {{
   justify-content: center !important;
   text-align: center !important;
   font-size: 1rem !important;
+  width: auto !important;
+  max-width: 100% !important;
+  overflow: visible !important;
 }}
-body.ips-sidebar-collapsed .sidebar-section-title {{
+body.ips-sidebar-collapsed .sidebar-section-title,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) .sidebar-section-title {{
   display: none !important;
 }}
 /* Footer actions — subtle, not primary nav rows */
@@ -13466,7 +13472,8 @@ section[data-testid="stSidebar"] .sidebar-footer-action + div[class*="stButton"]
   background: #f8fafc !important;
   color: {TEXT} !important;
 }}
-body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-footer-action + div[class*="stButton"] > button {{
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-footer-action + div[class*="stButton"] > button,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) .sidebar-footer-action + div[class*="stButton"] > button {{
   justify-content: center !important;
   padding: 0.4rem 0.2rem !important;
 }}
