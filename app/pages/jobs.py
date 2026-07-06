@@ -9,7 +9,19 @@ from typing import Any
 import streamlit as st
 
 try:
-    from app.components.job_actions import render_job_action_buttons
+    from app.components.job_actions import render_job_lifecycle_confirmations
+    from app.components.job_detail_header_menu import render_job_detail_header_menu
+    from app.components.job_detail_layout import (
+        can_view_job_financial_tab,
+        gather_job_detail_stats,
+        inject_job_detail_layout_css,
+        render_job_detail_activity_timeline,
+        render_job_detail_financial_section,
+        render_job_detail_header,
+        render_job_detail_header_menu_slot,
+        render_job_detail_overview_section,
+        close_job_detail_header_menu_slot,
+    )
     from app.components.job_row_actions_ui import render_job_row_actions
     from app.components.job_status_ui import (
         job_status_pill_html,
@@ -31,18 +43,9 @@ try:
     from app.components.job_ips_forms import render_job_ips_forms_tab
     from app.components.job_materials_ui import render_job_materials_tab
     from app.components.job_costing_tab import render_job_costing_tab
-    from app.components.job_cost_summary_cards import render_job_cost_summary_cards
-    from app.components.job_detail_layout import (
-        close_job_detail_footer_shell,
-        gather_job_detail_stats,
-        inject_job_detail_layout_css,
-        render_job_detail_activity_sidebar,
-        render_job_detail_footer_shell,
-        render_job_detail_header,
-        render_job_detail_header_actions,
-        render_job_detail_health_section,
-        render_job_detail_metadata_row,
-        render_job_detail_quick_stats,
+    from app.components.job_cost_summary_cards import (
+        render_job_cost_breakdown,
+        render_job_cost_summary_cards,
     )
     from app.services.job_financial_ui import (
         BILLING_TYPE_OPTIONS,
@@ -109,22 +112,22 @@ try:
     )
     from app.ui.streamlit_perf import fragment, ips_app_rerun
 except ImportError:
+    from components.job_actions import render_job_lifecycle_confirmations  # type: ignore
+    from components.job_detail_header_menu import render_job_detail_header_menu  # type: ignore
+    from components.job_detail_layout import (  # type: ignore
+        can_view_job_financial_tab,
+        gather_job_detail_stats,
+        inject_job_detail_layout_css,
+        render_job_detail_activity_timeline,
+        render_job_detail_financial_section,
+        render_job_detail_header,
+        render_job_detail_header_menu_slot,
+        render_job_detail_overview_section,
+        close_job_detail_header_menu_slot,
+    )
     from components.job_ips_forms import render_job_ips_forms_tab  # type: ignore
     from components.job_materials_ui import render_job_materials_tab  # type: ignore
     from components.job_costing_tab import render_job_costing_tab  # type: ignore
-    from components.job_detail_layout import (  # type: ignore
-        close_job_detail_footer_shell,
-        gather_job_detail_stats,
-        inject_job_detail_layout_css,
-        render_job_detail_activity_sidebar,
-        render_job_detail_footer_shell,
-        render_job_detail_header,
-        render_job_detail_header_actions,
-        render_job_detail_health_section,
-        render_job_detail_metadata_row,
-        render_job_detail_quick_stats,
-    )
-    from components.job_cost_summary_cards import render_job_cost_summary_cards  # type: ignore
     from services.job_financial_ui import (  # type: ignore
         BILLING_TYPE_OPTIONS,
         billing_type_label,
@@ -154,7 +157,10 @@ except ImportError:
         render_jobs_table_pagination_header,
         jobs_visible_table_layout,
     )
-    from components.job_actions import render_job_action_buttons  # type: ignore
+    from components.job_cost_summary_cards import (  # type: ignore
+        render_job_cost_breakdown,
+        render_job_cost_summary_cards,
+    )
     from components.job_labor_readonly_panel import (  # type: ignore
         render_job_labor_summary_tab,
         render_job_weekly_timesheets_tab,
@@ -211,6 +217,7 @@ except ImportError:
 _SEL = select_key("jobs")
 _TABLE_KEY = "jobs_list"
 _JOBS_MODAL_KEY = "ips_jobs_detail_modal_id"
+_JOBS_DETAIL_AUX_PANEL_KEY = "jobs_detail_aux_panel"
 
 
 def _job_new_num_edited() -> None:
@@ -238,76 +245,7 @@ _FIELD_JOB_TABS = ["Overview", "Materials", "Subjobs", "Photos", "Daily Report"]
 
 
 def _job_detail_tab_labels(job: dict) -> list[str]:
-    """Dynamic tab labels with counts where existing data is available."""
-    jid = str(job.get("id") or "").strip()
-    open_subjobs = 0
-    document_count = 0
-    photo_count = 0
-    weekly_ts_count = 0
-    form_count = 0
-
-    if jid:
-        try:
-            from app.services.tasks_service import get_tasks_by_job
-        except ImportError:
-            from services.tasks_service import get_tasks_by_job  # type: ignore
-        try:
-            closed = {"complete", "completed", "closed", "cancelled", "canceled", "duplicate"}
-            open_subjobs = sum(
-                1
-                for task in get_tasks_by_job(jid, include_closed=True)
-                if str(task.get("status") or "").strip().lower() not in closed
-            )
-        except Exception:
-            open_subjobs = 0
-
-        try:
-            from app.services.job_documents import fetch_job_documents
-        except ImportError:
-            from services.job_documents import fetch_job_documents  # type: ignore
-        try:
-            document_count = len(fetch_job_documents(jid, admin=False, limit=500) or [])
-        except Exception:
-            document_count = 0
-
-        try:
-            from app.services.job_photos import fetch_job_photos
-        except ImportError:
-            from services.job_photos import fetch_job_photos  # type: ignore
-        try:
-            photo_count = len(fetch_job_photos(jid, admin=False, limit=500) or [])
-        except Exception:
-            photo_count = 0
-
-        try:
-            from app.services.weekly_job_timesheet_service import list_timesheets_for_job
-        except ImportError:
-            from services.weekly_job_timesheet_service import list_timesheets_for_job  # type: ignore
-        try:
-            weekly_ts_count = len(list_timesheets_for_job(jid) or [])
-        except Exception:
-            weekly_ts_count = 0
-
-    def _count_label(name: str, count: int) -> str:
-        return f"{name} ({count})" if count > 0 else name
-
-    return [
-        "Overview",
-        _count_label("Subjobs", open_subjobs),
-        "Schedule",
-        "Labor Summary",
-        _count_label("Weekly Timesheets", weekly_ts_count),
-        "Job Costing",
-        "Materials",
-        "Equipment",
-        _count_label("Documents", document_count),
-        _count_label("Photos", photo_count),
-        "IPS Forms" if form_count <= 0 else _count_label("IPS Forms", form_count),
-        "Scope",
-        "Estimates",
-        "Daily Updates",
-        "Notes",
-    ]
+    return build_job_detail_tab_labels(job)
 
 
 def _enrich_job_cost_summary(job: dict, cost_summary: dict) -> dict:
@@ -1029,15 +967,41 @@ def _activate_job_detail_modal(job_id: str, job: dict | None = None) -> None:
         ] = False
 
 
+def _open_job_detail_task_form(job: dict) -> None:
+    jid = str(job.get("id") or "").strip()
+    if not jid:
+        return
+    st.session_state[f"job_task_form_{jid}"] = True
+    try:
+        from app.navigation import JOBS_DETAIL_FOCUS_TAB_KEY
+    except ImportError:
+        from navigation import JOBS_DETAIL_FOCUS_TAB_KEY  # type: ignore
+    st.session_state[JOBS_DETAIL_FOCUS_TAB_KEY] = "Tasks"
+
+
+def _open_job_detail_print_packet(job: dict) -> None:
+    st.session_state[_JOBS_DETAIL_AUX_PANEL_KEY] = "ips_forms"
+
+
+def _clear_job_detail_aux_panel() -> None:
+    st.session_state.pop(_JOBS_DETAIL_AUX_PANEL_KEY, None)
+
+
 def _open_job_detail_with_tab(job: dict, tab: str) -> None:
     jid = str(job.get("id") or "").strip()
     if not jid:
+        return
+    tab_norm = str(tab or "").strip()
+    if tab_norm.lower() in {"ips forms", "print job packet"}:
+        _open_jobs_detail_modal(jid, job)
+        _open_job_detail_print_packet(job)
+        ips_app_rerun()
         return
     try:
         from app.navigation import JOBS_DETAIL_FOCUS_TAB_KEY
     except ImportError:
         from navigation import JOBS_DETAIL_FOCUS_TAB_KEY  # type: ignore
-    st.session_state[JOBS_DETAIL_FOCUS_TAB_KEY] = str(tab or "").strip()
+    st.session_state[JOBS_DETAIL_FOCUS_TAB_KEY] = tab_norm
     _open_jobs_detail_modal(jid, job)
     ips_app_rerun()
 
@@ -1051,6 +1015,7 @@ def _assign_employees_for_job(job: dict) -> None:
     except ImportError:
         from navigation import navigate_to_timekeeping  # type: ignore
     navigate_to_timekeeping(job_id=jid)
+    ips_app_rerun()
 
 
 def _open_job_from_list(job: dict) -> None:
@@ -1163,6 +1128,7 @@ def _clear_job_selection() -> None:
 def _clear_jobs_detail_modal() -> None:
     _clear_job_selection()
     clear_job_subjob_selection()
+    _clear_job_detail_aux_panel()
     for key in list(st.session_state.keys()):
         if isinstance(key, str) and key.startswith("job_edit_mode_"):
             st.session_state.pop(key, None)
@@ -2623,183 +2589,105 @@ def _render_job_detail_tabs_fragment(job: dict, *, cost_summary: dict | None = N
 
 
 def _render_job_detail_tabs(job: dict, *, cost_summary: dict | None = None) -> None:
-    jn = _safe_value(job.get("job_number"))
-    jname = _safe_value(job.get("job_name"))
-    status = _safe_value(job.get("status"))
     customer = _safe_value(job.get("customer"))
     supervisor = _safe_value(job.get("supervisor"))
+    project_manager = _safe_value(job.get("project_manager"))
     estimate_no = _safe_value(_resolve_job_estimate_number(job))
+    jid = str(job.get("id") or "").strip()
+    job_key = _job_session_key(job)
+    fin = _job_financial_snapshot(job, cost_summary=cost_summary)
+    summary = cost_summary if isinstance(cost_summary, dict) else {}
+    detail_stats = gather_job_detail_stats(job, summary) if summary else {}
+    progress_pct = float(
+        detail_stats.get("progress_pct")
+        or job.get("progress")
+        or summary.get("progress_pct")
+        or 0
+    )
+    show_financial = can_view_job_financial_tab()
 
-    (
-        tab_overview,
-        tab_tasks,
-        tab_schedule,
-        tab_labor,
-        tab_weekly_ts,
-        tab_costing,
-        tab_materials,
-        tab_equipment,
-        tab_documents,
-        tab_photos,
-        tab_ips_forms,
-        tab_scope,
-        tab_estimates,
-        tab_daily,
-        tab_notes,
-    ) = st.tabs(_job_detail_tab_labels(job))
+    tab_labels = _job_detail_tab_labels(job)
+    tabs = st.tabs(tab_labels)
+    idx = 0
+    tab_overview = tabs[idx]
+    idx += 1
+    tab_tasks = tabs[idx]
+    idx += 1
+    tab_schedule = tabs[idx]
+    idx += 1
+    tab_crew = tabs[idx]
+    idx += 1
+    tab_materials = tabs[idx]
+    idx += 1
+    tab_equipment = tabs[idx]
+    idx += 1
+    tab_documents = tabs[idx]
+    idx += 1
+    tab_photos = tabs[idx]
+    idx += 1
+    tab_financial = tabs[idx] if show_financial else None
+    if show_financial:
+        idx += 1
+    tab_activity = tabs[idx]
 
     with tab_overview:
-        left_html = (
-            f'<div class="ips-detail-grid">'
-            f"{_detail_field('Job Number', jn)}"
-            f"{_detail_field('Project', jname)}"
-            f"{_detail_field('Customer', customer)}"
-            f'{_detail_field("Status", status, html_value=_status_pill(status))}'
-            f"</div>"
+        render_job_detail_overview_section(
+            job,
+            customer=customer,
+            project_manager=project_manager,
+            supervisor=supervisor,
+            start_date=fmt_date(job.get("start_date")),
+            end_date=fmt_date(job.get("end_date")),
+            progress_pct=progress_pct,
         )
-        right_html = (
-            f'<div class="ips-detail-grid">'
-            f"{_detail_field('Supervisor', supervisor)}"
-            f"{_detail_field('Project Manager', job.get('project_manager'))}"
-            f"{_detail_field('Location', _job_location(job))}"
-            f"{_detail_field('Estimate #', estimate_no)}"
-            f"{_detail_field('Start Date', fmt_date(job.get('start_date')))}"
-            f"{_detail_field('End Date', fmt_date(job.get('end_date')))}"
-            f"</div>"
-        )
-        st.markdown(
-            f'<div class="ips-job-detail-overview-grid">'
-            f'{_dialog_card("Overview", left_html)}'
-            f'{_dialog_card("Schedule & Links", right_html)}'
-            f"</div>",
-            unsafe_allow_html=True,
-        )
-        _render_job_overview_financials(job, cost_summary=cost_summary)
-        _render_job_customer_po_overview(job)
-        if st.button(
-            "Edit Overview",
-            key=f"jobs_overview_edit_{_job_session_key(job)}",
-            type="secondary",
-        ):
+        if st.button("Edit Job", key=f"jobs_overview_edit_{job_key}", type="secondary"):
             _set_job_edit_mode(job)
             st.rerun()
-
-    with tab_scope:
-        scope_text = _safe_value(job.get("scope") or job.get("description"), "No scope defined.")
-        scope_html = (
-            f'<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
-            f"{html.escape(scope_text)}"
-            f"</p>"
-        )
-        st.markdown(_dialog_card("Scope of Work", scope_html), unsafe_allow_html=True)
-
-    with tab_estimates:
-        jid = str(job.get("id") or "")
-        job_est_id = str(job.get("estimate_id") or "").strip()
-        linked = [
-            e
-            for e in load_estimates()
-            if str(e.get("job_id") or "") == jid or (job_est_id and str(e.get("id") or "") == job_est_id)
-        ]
-        if not linked:
-            _render_dialog_placeholder("No estimates linked to this job yet.")
-        else:
-            for est in linked:
-                est_no = str(est.get("estimate_number") or "—")
-                project = str(est.get("project_name") or "—")
-                status_lbl = str(est.get("status") or "Draft")
-                total = est.get("customer_price") or est.get("total") or 0
-                approved_at = fmt_date(est.get("approved_at")) if est.get("approved_at") else "—"
-                try:
-                    from app.utils.formatting import fmt_currency
-                except ImportError:
-                    from utils.formatting import fmt_currency  # type: ignore
-                st.markdown(
-                    f'<div class="ips-detail-grid">'
-                    f"{_detail_field('Estimate #', est_no)}"
-                    f"{_detail_field('Project', project)}"
-                    f"{_detail_field('Status', status_lbl)}"
-                    f"{_detail_field('Estimate Date', fmt_date(est.get('estimate_date')))}"
-                    f"{_detail_field('Approved Date', approved_at)}"
-                    f"{_detail_field('Customer Price', fmt_currency(total))}"
-                    f"</div>",
-                    unsafe_allow_html=True,
-                )
-                bc1, bc2 = st.columns(2, gap="small")
-                with bc1:
-                    if st.button("View Estimate", key=f"job_est_view_{jid}_{est.get('id')}", use_container_width=True):
-                        st.session_state["selected_estimate_id"] = str(est.get("id") or "")
-                        st.session_state["show_estimate_detail_modal"] = True
-                        st.info("Open the **Estimates** page to view full estimate details.")
-                with bc2:
-                    if st.button("Proposal PDF", key=f"job_est_pdf_{jid}_{est.get('id')}", use_container_width=True):
-                        try:
-                            from app.services.proposal_pdf_service import generate_estimate_proposal_pdf_by_id
-                        except ImportError:
-                            from services.proposal_pdf_service import generate_estimate_proposal_pdf_by_id  # type: ignore
-                        pdf_bytes = generate_estimate_proposal_pdf_by_id(str(est.get("id") or ""), est)
-                        if pdf_bytes:
-                            st.download_button(
-                                "Download PDF",
-                                data=pdf_bytes,
-                                file_name=f"{est_no}_proposal.pdf",
-                                mime="application/pdf",
-                                key=f"job_est_pdf_dl_{jid}_{est.get('id')}",
-                                use_container_width=True,
-                            )
-                        else:
-                            st.caption("Proposal PDF is not available for this estimate yet.")
-
-    with tab_materials:
-        render_job_materials_tab(job, key_prefix=f"job_mat_{str(job.get('id') or '')}")
-
-    with tab_equipment:
-        _render_job_equipment_tab(job)
-
-    with tab_costing:
-        cached_summary = st.session_state.get(f"_job_cost_summary_{str(job.get('id') or '').strip()}")
-        render_job_costing_tab(
-            job,
-            key_prefix=f"job_cost_{str(job.get('id') or '')}",
-            cost_summary=cached_summary if isinstance(cached_summary, dict) else None,
-        )
-
-    with tab_schedule:
-        sched_html = (
-            f'<div class="ips-detail-grid">'
-            f"{_detail_field('Start Date', fmt_date(job.get('start_date')))}"
-            f"{_detail_field('End Date', fmt_date(job.get('end_date')))}"
-            f"{_detail_field('Location', _job_location(job))}"
-            f"</div>"
-        )
-        st.markdown(_dialog_card("Schedule", sched_html), unsafe_allow_html=True)
 
     with tab_tasks:
         inject_tasks_module_css()
         render_job_linked_tasks_tab(job)
 
-    with tab_ips_forms:
-        _render_job_ips_forms_tab(job)
+    with tab_schedule:
+        sched_fields = [
+            ("Start Date", fmt_date(job.get("start_date"))),
+            ("End Date", fmt_date(job.get("end_date"))),
+            ("Location", _job_location(job)),
+            ("Schedule", _schedule_summary(job)),
+        ]
+        visible = [(label, value) for label, value in sched_fields if _has_useful_detail_value(value)]
+        if visible:
+            sched_html = "".join(
+                _detail_field(label, value) for label, value in visible
+            )
+            st.markdown(
+                f'<div class="ips-detail-grid">{sched_html}</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.caption("Add start and end dates in Edit Job.")
 
-    with tab_labor:
-        jid = str(job.get("id") or "").strip()
+    with tab_crew:
         if jid:
+            st.markdown("#### Labor Summary")
             render_job_labor_summary_tab(
                 job,
-                key_prefix=f"job_labor_{_job_session_key(job)}",
+                key_prefix=f"job_labor_{job_key}",
             )
-        else:
-            _render_dialog_placeholder("Save this job before viewing labor summary.")
-
-    with tab_weekly_ts:
-        jid = str(job.get("id") or "").strip()
-        if jid:
+            st.divider()
+            st.markdown("#### Weekly Timesheets")
             render_job_weekly_timesheets_tab(
                 job,
-                key_prefix=f"job_wts_{_job_session_key(job)}",
+                key_prefix=f"job_wts_{job_key}",
             )
         else:
-            _render_dialog_placeholder("Save this job before viewing weekly timesheets.")
+            _render_dialog_placeholder("Save this job before viewing crew and time data.")
+
+    with tab_materials:
+        render_job_materials_tab(job, key_prefix=f"job_mat_{jid}")
+
+    with tab_equipment:
+        _render_job_equipment_tab(job)
 
     with tab_documents:
         _render_job_documents_tab(job)
@@ -2807,17 +2695,93 @@ def _render_job_detail_tabs(job: dict, *, cost_summary: dict | None = None) -> N
     with tab_photos:
         _render_job_photos_tab(job)
 
-    with tab_daily:
-        _render_job_daily_updates_tab(job)
+    if tab_financial is not None:
+        with tab_financial:
+            render_job_detail_financial_section(job, summary, fin)
+            _render_job_customer_po_overview(job)
+            st.divider()
+            render_job_cost_breakdown(summary)
+            st.divider()
+            cached_summary = st.session_state.get(f"_job_cost_summary_{jid}")
+            render_job_costing_tab(
+                job,
+                key_prefix=f"job_cost_{jid}",
+                cost_summary=cached_summary if isinstance(cached_summary, dict) else summary,
+            )
+            st.divider()
+            _render_job_estimates_section(job)
 
-    with tab_notes:
-        notes_text = _safe_value(job.get("notes") or job.get("description"), "No notes entered.")
-        notes_html = (
-            f'<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
-            f"{html.escape(notes_text)}"
-            f"</p>"
+    with tab_activity:
+        render_job_detail_activity_timeline(job)
+        st.divider()
+        _render_job_daily_updates_tab(job)
+        notes_text = _safe_value(job.get("notes") or job.get("description"), "")
+        if notes_text and notes_text != "—":
+            st.markdown("#### Notes")
+            st.markdown(notes_text)
+
+
+def _has_useful_detail_value(value: object) -> bool:
+    text = str(value or "").strip()
+    return bool(text) and text not in {"—", "None", "null"}
+
+
+def _render_job_estimates_section(job: dict) -> None:
+    jid = str(job.get("id") or "")
+    job_est_id = str(job.get("estimate_id") or "").strip()
+    linked = [
+        e
+        for e in load_estimates()
+        if str(e.get("job_id") or "") == jid or (job_est_id and str(e.get("id") or "") == job_est_id)
+    ]
+    if not linked:
+        return
+    st.markdown("#### Linked Estimates")
+    for est in linked:
+        est_no = str(est.get("estimate_number") or "—")
+        project = str(est.get("project_name") or "—")
+        status_lbl = str(est.get("status") or "Draft")
+        total = est.get("customer_price") or est.get("total") or 0
+        approved_at = fmt_date(est.get("approved_at")) if est.get("approved_at") else "—"
+        try:
+            from app.utils.formatting import fmt_currency
+        except ImportError:
+            from utils.formatting import fmt_currency  # type: ignore
+        st.markdown(
+            f'<div class="ips-detail-grid">'
+            f"{_detail_field('Estimate #', est_no)}"
+            f"{_detail_field('Project', project)}"
+            f"{_detail_field('Status', status_lbl)}"
+            f"{_detail_field('Estimate Date', fmt_date(est.get('estimate_date')))}"
+            f"{_detail_field('Approved Date', approved_at)}"
+            f"{_detail_field('Customer Price', fmt_currency(total))}"
+            f"</div>",
+            unsafe_allow_html=True,
         )
-        st.markdown(_dialog_card("Notes", notes_html), unsafe_allow_html=True)
+        bc1, bc2 = st.columns(2, gap="small")
+        with bc1:
+            if st.button("View Estimate", key=f"job_est_view_{jid}_{est.get('id')}", use_container_width=True):
+                st.session_state["selected_estimate_id"] = str(est.get("id") or "")
+                st.session_state["show_estimate_detail_modal"] = True
+                st.info("Open the **Estimates** page to view full estimate details.")
+        with bc2:
+            if st.button("Proposal PDF", key=f"job_est_pdf_{jid}_{est.get('id')}", use_container_width=True):
+                try:
+                    from app.services.proposal_pdf_service import generate_estimate_proposal_pdf_by_id
+                except ImportError:
+                    from services.proposal_pdf_service import generate_estimate_proposal_pdf_by_id  # type: ignore
+                pdf_bytes = generate_estimate_proposal_pdf_by_id(str(est.get("id") or ""), est)
+                if pdf_bytes:
+                    st.download_button(
+                        "Download PDF",
+                        data=pdf_bytes,
+                        file_name=f"{est_no}_proposal.pdf",
+                        mime="application/pdf",
+                        key=f"job_est_pdf_dl_{jid}_{est.get('id')}",
+                        use_container_width=True,
+                    )
+                else:
+                    st.caption("Proposal PDF is not available for this estimate yet.")
 
 
 def _render_job_edit_form(job: dict) -> None:
@@ -2958,10 +2922,7 @@ def _render_job_edit_form(job: dict) -> None:
         _render_job_customer_po_upload(job)
 
 
-def _render_job_actions_panel(job: dict) -> None:
-    """Complete, cancel, or archive a job from the detail modal."""
-    if bool(st.session_state.get(_job_edit_mode_key(job))):
-        return
+def _render_job_detail_confirmations(job: dict) -> None:
     jid = str(job.get("id") or "").strip()
     if not jid or is_demo_id(jid):
         return
@@ -2969,10 +2930,8 @@ def _render_job_actions_panel(job: dict) -> None:
     def _after_complete_or_delete() -> None:
         _clear_jobs_detail_modal()
 
-    render_job_action_buttons(
+    render_job_lifecycle_confirmations(
         job,
-        on_edit=_set_job_edit_mode,
-        edit_key=f"jobs_modal_edit_{_job_session_key(job)}",
         on_complete=_after_complete_or_delete,
         on_delete=_after_complete_or_delete,
     )
@@ -2989,10 +2948,6 @@ def render_job_detail_dialog(job: dict) -> None:
     jname = _safe_value(job.get("job_name"))
     status = _safe_value(job.get("status"))
     customer = _safe_value(job.get("customer"))
-    supervisor = _safe_value(job.get("supervisor"))
-    project_manager = _safe_value(job.get("project_manager"))
-    estimate_no = _safe_value(_resolve_job_estimate_number(job))
-    schedule = _schedule_summary(job)
 
     inject_job_detail_layout_css()
     st.markdown(
@@ -3000,14 +2955,16 @@ def render_job_detail_dialog(job: dict) -> None:
         unsafe_allow_html=True,
     )
 
-    header_cols = st.columns([1, 0.28], gap="small")
-    with header_cols[0]:
+    st.markdown('<div class="ips-job-detail-header-shell">', unsafe_allow_html=True)
+    header_main, header_actions = st.columns([1, 0.24], gap="small")
+    with header_main:
         render_job_detail_header(
             job_number=jn,
             job_name=jname,
             customer=customer,
         )
-    with header_cols[1]:
+    with header_actions:
+        render_job_detail_header_menu_slot()
         if not edit_mode:
             render_job_status_badge_editor(
                 job,
@@ -3016,56 +2973,52 @@ def render_job_detail_dialog(job: dict) -> None:
             )
         else:
             st.markdown(
-                f'<div class="ips-job-detail-header-actions">{_status_pill(status)}</div>',
+                f'<div class="ips-job-detail-header-actions">{job_status_pill_html(status)}</div>',
                 unsafe_allow_html=True,
             )
         if not edit_mode:
-            render_job_detail_header_actions(
+            render_job_detail_header_menu(
                 job,
                 on_edit=_set_job_edit_mode,
-                edit_key=f"jobs_modal_edit_{job_key}",
+                on_add_task=_open_job_detail_task_form,
+                on_assign_crew=_assign_employees_for_job,
+                on_print_packet=_open_job_detail_print_packet,
             )
+        close_job_detail_header_menu_slot()
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    render_job_detail_metadata_row(
-        customer=customer,
-        project_manager=project_manager,
-        supervisor=supervisor,
-        estimate_no=estimate_no,
-        schedule=schedule,
-    )
+    if not edit_mode:
+        _render_job_detail_confirmations(job)
 
     jid = str(job.get("id") or "").strip()
     cost_summary: dict = {}
-    detail_stats: dict = {}
     if jid and not edit_mode:
         cost_summary = _enrich_job_cost_summary(job, cached_job_cost_summary(job))
         st.session_state[f"_job_cost_summary_{jid}"] = cost_summary
-        detail_stats = gather_job_detail_stats(job, cost_summary)
-        render_job_cost_summary_cards(cost_summary, compact=True)
-        render_job_detail_health_section(job, cost_summary, detail_stats)
-        render_job_detail_quick_stats(detail_stats)
 
     if edit_mode:
         _render_job_edit_form(job)
     else:
-        body_left, body_right = st.columns([2.35, 1], gap="medium")
-        with body_left:
+        aux_panel = str(st.session_state.get(_JOBS_DETAIL_AUX_PANEL_KEY) or "").strip()
+        if aux_panel == "ips_forms":
+            st.markdown('<div class="ips-job-detail-aux-panel">', unsafe_allow_html=True)
+            if st.button("← Back to job", key=f"jobs_aux_back_{job_key}", type="secondary"):
+                _clear_job_detail_aux_panel()
+                st.rerun()
+            st.markdown("#### Job Packet / IPS Forms")
+            _render_job_ips_forms_tab(job)
+            st.markdown("</div>", unsafe_allow_html=True)
+        else:
             if is_field_context():
                 _render_field_job_detail_tabs(job)
             else:
                 _render_job_detail_tabs_fragment(job, cost_summary=cost_summary if cost_summary else None)
-        with body_right:
-            render_job_detail_activity_sidebar(job)
-
-        render_job_detail_footer_shell()
-        _render_job_actions_panel(job)
-        close_job_detail_footer_shell()
 
     _focus_job_detail_tab_if_requested()
 
 
 def _focus_job_detail_tab_if_requested() -> None:
-    """Select a Job Detail tab when opened via deep-link (Job Costing, Weekly Timesheets, etc.)."""
+    """Select a Job Detail tab when opened via deep-link (Financial, Crew & Time, etc.)."""
     try:
         from app.navigation import JOBS_DETAIL_FOCUS_TAB_KEY
     except ImportError:
@@ -3073,11 +3026,22 @@ def _focus_job_detail_tab_if_requested() -> None:
     focus = str(st.session_state.pop(JOBS_DETAIL_FOCUS_TAB_KEY, "") or "").strip()
     if not focus:
         return
+    focus_lower = focus.lower()
+    if focus_lower in {"ips forms", "print job packet"}:
+        st.session_state[_JOBS_DETAIL_AUX_PANEL_KEY] = "ips_forms"
+        return
+    alias_map = {
+        "job costing": "financial",
+        "labor summary": "crew & time",
+        "weekly timesheets": "crew & time",
+        "subjobs": "tasks",
+    }
+    resolved = alias_map.get(focus_lower, focus_lower)
     try:
         from app.ui.clean_table import _components_html
     except ImportError:
         from ui.clean_table import _components_html  # type: ignore
-    label_js = focus.replace("\\", "\\\\").replace("'", "\\'")
+    label_js = resolved.replace("\\", "\\\\").replace("'", "\\'")
     _components_html(
         f"""
 <script>
@@ -3090,7 +3054,8 @@ def _focus_job_detail_tab_if_requested() -> None:
   const tabs = dialog.querySelectorAll('[data-testid="stTabs"] button[role="tab"]');
   for (const tab of tabs) {{
     const text = (tab.textContent || '').trim().toLowerCase();
-    if (text === want || text.startsWith(want)) {{
+    const base = text.replace(/\\s*\\(\\d+\\)\\s*$/, '');
+    if (base === want || base.startsWith(want) || text.startsWith(want)) {{
       tab.click();
       return;
     }}

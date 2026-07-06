@@ -18,38 +18,38 @@ except ImportError:
 def inject_job_detail_layout_css() -> None:
     st.markdown(
         """
-<style id="ips-job-detail-layout-v1">
+<style id="ips-job-detail-layout-v2">
 .ips-job-detail-control-page {
   width: 100%;
 }
-.ips-job-detail-header {
+.ips-job-detail-header-shell {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.75rem;
   flex-wrap: wrap;
-  margin: 0 0 1rem 0;
-  padding: 0 0 1rem 0;
+  margin: 0 0 0.65rem 0;
+  padding: 0 0 0.65rem 0;
   border-bottom: 1px solid #e8edf3;
 }
 .ips-job-detail-header-main {
-  flex: 1 1 320px;
+  flex: 1 1 280px;
   min-width: 0;
 }
 .ips-job-detail-title-line {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 0.45rem 0.65rem;
+  gap: 0.4rem 0.55rem;
   margin: 0;
-  font-size: 1.35rem;
+  font-size: 1.45rem;
   font-weight: 800;
   color: #0f172a;
-  line-height: 1.25;
+  line-height: 1.2;
   letter-spacing: -0.02em;
 }
 .ips-job-detail-number {
-  color: #4361EE;
+  color: #2563eb;
   white-space: nowrap;
 }
 .ips-job-detail-sep {
@@ -60,103 +60,52 @@ def inject_job_detail_layout_css() -> None:
   min-width: 0;
 }
 .ips-job-detail-customer {
-  margin: 0.35rem 0 0 0;
-  font-size: 0.92rem;
+  margin: 0.25rem 0 0 0;
+  font-size: 0.875rem;
   color: #64748b;
   font-weight: 500;
 }
 .ips-job-detail-header-actions {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  justify-content: flex-end;
+  gap: 0.45rem;
   flex: 0 0 auto;
 }
-.ips-job-detail-meta-row {
+.ips-job-detail-overview-list {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.65rem;
-  margin-bottom: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem 1.25rem;
+  margin: 0;
 }
-@media (max-width: 1100px) {
-  .ips-job-detail-meta-row {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+@media (max-width: 760px) {
+  .ips-job-detail-overview-list {
+    grid-template-columns: 1fr;
   }
 }
-@media (max-width: 720px) {
-  .ips-job-detail-meta-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-.ips-job-detail-meta-item {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 0.65rem 0.8rem;
+.ips-job-detail-overview-item {
   min-width: 0;
+  padding: 0.15rem 0;
 }
-.ips-job-detail-meta-label {
+.ips-job-detail-overview-label {
   font-size: 0.68rem;
   font-weight: 700;
   color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  margin-bottom: 0.2rem;
+  margin-bottom: 0.12rem;
 }
-.ips-job-detail-meta-value {
-  font-size: 0.84rem;
+.ips-job-detail-overview-value {
+  font-size: 0.9rem;
   font-weight: 700;
   color: #0f172a;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.3;
 }
-.ips-job-detail-meta-value.is-link {
-  color: #4361EE;
-}
-.ips-job-detail-health-grid {
-  display: grid;
-  grid-template-columns: 1.1fr 1fr 1.2fr;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-@media (max-width: 960px) {
-  .ips-job-detail-health-grid {
-    grid-template-columns: 1fr;
-  }
-}
-.ips-job-detail-panel {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 0.85rem 1rem;
-  min-height: 118px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-}
-.ips-job-detail-panel-title {
-  font-size: 0.72rem;
-  font-weight: 800;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 0.55rem;
-}
-.ips-job-detail-health-status {
-  font-size: 1.05rem;
-  font-weight: 800;
-  margin-bottom: 0.25rem;
-}
-.ips-job-detail-health-status.is-healthy { color: #15803d; }
-.ips-job-detail-health-status.is-warning { color: #b45309; }
-.ips-job-detail-health-status.is-danger { color: #dc2626; }
-.ips-job-detail-health-status.is-neutral { color: #64748b; }
-.ips-job-detail-health-copy {
-  font-size: 0.78rem;
-  color: #64748b;
-  line-height: 1.35;
-  margin: 0;
+.ips-job-detail-progress-block {
+  margin-top: 0.35rem;
 }
 .ips-job-detail-progress-main {
-  height: 12px;
+  height: 10px;
   background: #e2e8f0;
   border-radius: 999px;
   overflow: hidden;
@@ -165,100 +114,63 @@ def inject_job_detail_layout_css() -> None:
 .ips-job-detail-progress-main > span {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #4361EE, #2563eb);
+  background: linear-gradient(90deg, #2563eb, #4361EE);
   border-radius: 999px;
 }
 .ips-job-detail-progress-pct {
-  font-size: 1.35rem;
+  font-size: 1.1rem;
   font-weight: 800;
-  color: #4361EE;
+  color: #2563eb;
   line-height: 1;
 }
-.ips-job-detail-sub-progress {
+.ips-job-detail-section-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 0.55rem 0;
+}
+.ips-job-detail-financial-grid {
   display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.55rem;
+  margin-bottom: 0.75rem;
 }
-.ips-job-detail-sub-row {
-  display: grid;
-  grid-template-columns: 5.5rem 1fr 2.5rem;
-  gap: 0.45rem;
-  align-items: center;
-  font-size: 0.75rem;
-  color: #475569;
-  font-weight: 600;
-}
-.ips-job-detail-sub-bar {
-  height: 7px;
-  background: #eef2f7;
-  border-radius: 999px;
-  overflow: hidden;
-}
-.ips-job-detail-sub-bar > span {
-  display: block;
-  height: 100%;
-  background: #4361EE;
-  border-radius: 999px;
-}
-.ips-job-detail-quick-stats {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 0.65rem;
-  margin-bottom: 1rem;
-}
-@media (max-width: 1100px) {
-  .ips-job-detail-quick-stats {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-@media (max-width: 640px) {
-  .ips-job-detail-quick-stats {
+@media (max-width: 960px) {
+  .ips-job-detail-financial-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-.ips-job-detail-stat-card {
+.ips-job-detail-fin-metric {
   background: #ffffff;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #dbe3ef;
   border-radius: 10px;
-  padding: 0.7rem 0.75rem;
+  padding: 0.65rem 0.75rem;
   min-width: 0;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
-.ips-job-detail-stat-label {
-  font-size: 0.68rem;
+.ips-job-detail-fin-label {
+  font-size: 0.65rem;
   font-weight: 700;
   color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  margin-bottom: 0.25rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  margin-bottom: 0.18rem;
 }
-.ips-job-detail-stat-value {
-  font-size: 0.95rem;
+.ips-job-detail-fin-value {
+  font-size: 1rem;
   font-weight: 800;
   color: #0f172a;
-  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
-.ips-job-detail-stat-value.is-blue { color: #2563eb; }
-.ips-job-detail-stat-value.is-green { color: #15803d; }
-.ips-job-detail-body-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
-  gap: 1rem;
-  align-items: start;
-}
-@media (max-width: 980px) {
-  .ips-job-detail-body-grid {
-    grid-template-columns: 1fr;
-  }
-}
+.ips-job-detail-fin-value.is-positive { color: #15803d; }
+.ips-job-detail-fin-value.is-negative { color: #dc2626; }
+.ips-job-detail-fin-value.is-blue { color: #2563eb; }
 .ips-job-detail-activity-panel {
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 0.85rem 0.95rem;
-  position: sticky;
-  top: 0.5rem;
+  border-radius: 10px;
+  padding: 0.75rem 0.85rem;
+  margin-bottom: 0.75rem;
 }
 .ips-job-detail-activity-title {
   font-size: 0.72rem;
@@ -266,13 +178,13 @@ def inject_job_detail_layout_css() -> None:
   color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin: 0 0 0.65rem 0;
+  margin: 0 0 0.55rem 0;
 }
 .ips-job-detail-activity-item {
   display: flex;
   gap: 0.55rem;
   align-items: flex-start;
-  padding: 0.45rem 0;
+  padding: 0.4rem 0;
   border-bottom: 1px solid #f1f5f9;
 }
 .ips-job-detail-activity-item:last-child {
@@ -294,50 +206,60 @@ def inject_job_detail_layout_css() -> None:
 .ips-job-detail-activity-ts {
   font-size: 0.68rem;
   color: #94a3b8;
-  margin-top: 0.15rem;
+  margin-top: 0.12rem;
 }
-.ips-job-detail-footer-actions {
-  margin-top: 1rem;
-  padding-top: 0.85rem;
-  border-top: 1px solid #e8edf3;
-}
-.ips-job-detail-overview-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.85rem;
-}
-@media (max-width: 760px) {
-  .ips-job-detail-overview-grid {
-    grid-template-columns: 1fr;
-  }
-}
-.ips-jc-card-contract .ips-jc-summary-value { color: #2563eb; }
-.ips-jc-card-actual .ips-jc-summary-value { color: #2563eb; }
-.ips-jc-card-negative .ips-jc-summary-value { color: #dc2626; }
-div[data-testid="stDialog"]:has(.ips-job-detail-control-page) .ips-jc-summary-card {
-  min-height: 64px;
-  padding: 10px 12px;
-}
-div[data-testid="stDialog"]:has(.ips-job-detail-control-page) .ips-jc-summary-value {
-  font-size: 0.98rem;
+.ips-job-detail-health-status.is-healthy { color: #15803d; font-weight: 800; }
+.ips-job-detail-health-status.is-warning { color: #b45309; font-weight: 800; }
+.ips-job-detail-health-status.is-danger { color: #dc2626; font-weight: 800; }
+.ips-job-detail-health-status.is-neutral { color: #64748b; font-weight: 800; }
+.ips-job-detail-aux-panel {
+  margin-bottom: 0.65rem;
 }
 div[data-testid="stDialog"]:has(.ips-job-detail-control-page) {
-  max-width: min(1240px, 97vw) !important;
-  width: min(1240px, 97vw) !important;
+  max-width: min(1180px, 96vw) !important;
+  width: min(1180px, 96vw) !important;
 }
-div[data-testid="stDialog"]:has(.ips-job-detail-control-page) [data-testid="stPopover"] button {
-  white-space: nowrap !important;
-  min-width: fit-content !important;
+div[data-testid="stDialog"]:has(.ips-job-detail-control-page) [data-testid="stTabs"] {
+  margin-top: 0 !important;
 }
-div[data-testid="stDialog"]:has(.ips-job-detail-control-page) .ips-job-detail-footer-actions [data-testid="stHorizontalBlock"] {
-  flex-wrap: nowrap !important;
-  justify-content: flex-end !important;
-  gap: 0.5rem !important;
+div[data-testid="stDialog"]:has(.ips-job-detail-control-page) [data-testid="stTabs"] [data-baseweb="tab-list"] {
+  gap: 0.15rem !important;
 }
-div[data-testid="stDialog"]:has(.ips-job-detail-control-page) .ips-job-detail-footer-actions [data-testid="column"] {
-  flex: 0 0 auto !important;
-  width: auto !important;
-  min-width: 0 !important;
+div[data-testid="stDialog"]:has(.ips-job-detail-control-page) [data-testid="stTabs"] button[role="tab"] {
+  font-size: 0.8125rem !important;
+  font-weight: 700 !important;
+  padding: 0.45rem 0.75rem !important;
+}
+div[data-testid="stDialog"]:has(.ips-job-detail-control-page) .ips-jc-summary-card {
+  min-height: 58px;
+  padding: 8px 10px;
+}
+div[data-testid="stDialog"]:has(.ips-job-detail-header-menu-marker) [data-testid="stPopover"] > button {
+  min-width: 28px !important;
+  width: 28px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  padding: 0 !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: #64748b !important;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+}
+div[data-testid="stDialog"]:has(.ips-job-detail-header-menu-marker) [data-testid="stPopover"] > button:hover {
+  background: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+div[data-testid="stPopoverBody"]:has(.job-detail-header-menu-panel) {
+  min-width: 210px !important;
+}
+div[data-testid="stPopoverBody"]:has(.job-detail-header-menu-panel) .stButton > button {
+  justify-content: flex-start !important;
+  min-height: 34px !important;
+  border-radius: 8px !important;
+  font-size: 0.8125rem !important;
 }
 </style>
         """,
@@ -459,6 +381,73 @@ def gather_job_detail_stats(job: dict[str, Any], cost_summary: dict[str, Any]) -
     }
 
 
+def build_job_detail_tab_labels(job: dict[str, Any]) -> list[str]:
+    """Tab labels for the redesigned Job Details modal."""
+    jid = str(job.get("id") or "").strip()
+    open_subjobs = 0
+    document_count = 0
+    photo_count = 0
+
+    if jid:
+        try:
+            from app.services.tasks_service import get_tasks_by_job
+        except ImportError:
+            from services.tasks_service import get_tasks_by_job  # type: ignore
+        try:
+            closed = {"complete", "completed", "closed", "cancelled", "canceled", "duplicate"}
+            open_subjobs = sum(
+                1
+                for task in get_tasks_by_job(jid, include_closed=True)
+                if str(task.get("status") or "").strip().lower() not in closed
+            )
+        except Exception:
+            open_subjobs = 0
+
+        fetch_job_documents = None
+        fetch_job_photos = None
+        try:
+            from app.services.job_documents import fetch_job_documents as _fetch_job_documents
+
+            fetch_job_documents = _fetch_job_documents
+        except Exception:
+            pass
+        try:
+            if fetch_job_documents:
+                document_count = len(fetch_job_documents(jid, admin=False, limit=500) or [])
+        except Exception:
+            document_count = 0
+
+        try:
+            from app.services.job_photos import fetch_job_photos as _fetch_job_photos
+
+            fetch_job_photos = _fetch_job_photos
+        except Exception:
+            pass
+        try:
+            if fetch_job_photos:
+                photo_count = len(fetch_job_photos(jid, admin=False, limit=500) or [])
+        except Exception:
+            photo_count = 0
+
+    def _count_label(name: str, count: int) -> str:
+        return f"{name} ({count})" if count > 0 else name
+
+    labels = [
+        "Overview",
+        _count_label("Tasks", open_subjobs),
+        "Schedule",
+        "Crew & Time",
+        "Materials",
+        "Equipment",
+        _count_label("Documents", document_count),
+        _count_label("Photos", photo_count),
+    ]
+    if can_view_job_financial_tab():
+        labels.append("Financial")
+    labels.append("Activity")
+    return labels
+
+
 def render_job_detail_header(
     *,
     job_number: str,
@@ -478,6 +467,126 @@ def render_job_detail_header(
         """,
         unsafe_allow_html=True,
     )
+
+
+def can_view_job_financial_tab() -> bool:
+    return can_manage_job_actions()
+
+
+def _has_useful_value(value: object) -> bool:
+    text = str(value or "").strip()
+    return bool(text) and text not in {"—", "None", "null", "0", "0.0"}
+
+
+def render_job_detail_overview_section(
+    job: dict[str, Any],
+    *,
+    customer: str,
+    project_manager: str,
+    supervisor: str,
+    start_date: str,
+    end_date: str,
+    progress_pct: float,
+) -> None:
+    """Operational overview — only fields with useful data, plus progress."""
+    rows: list[tuple[str, str]] = []
+    for label, value in (
+        ("Customer", customer),
+        ("Project Manager", project_manager),
+        ("Supervisor", supervisor),
+        ("Start Date", start_date),
+        ("End Date", end_date),
+    ):
+        if _has_useful_value(value):
+            rows.append((label, str(value).strip()))
+
+    st.markdown('<h3 class="ips-job-detail-section-title">Overview</h3>', unsafe_allow_html=True)
+    if rows:
+        cells = []
+        for label, value in rows:
+            cells.append(
+                f'<div class="ips-job-detail-overview-item">'
+                f'<div class="ips-job-detail-overview-label">{html.escape(label)}</div>'
+                f'<div class="ips-job-detail-overview-value">{html.escape(value)}</div>'
+                f"</div>"
+            )
+        st.markdown(
+            f'<div class="ips-job-detail-overview-list">{"".join(cells)}</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.caption("Add customer, schedule, and team details in Edit Job.")
+
+    progress = max(0.0, min(100.0, float(progress_pct or job.get("progress") or 0)))
+    if progress > 0 or job.get("progress") is not None:
+        st.markdown(
+            f'<div class="ips-job-detail-overview-item ips-job-detail-progress-block">'
+            f'<div class="ips-job-detail-overview-label">Progress</div>'
+            f'<div class="ips-job-detail-progress-pct">{progress:g}%</div>'
+            f"{_progress_bar_html(progress)}"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+    scope_text = str(job.get("scope") or job.get("description") or "").strip()
+    if scope_text:
+        st.markdown("**Scope**")
+        st.markdown(scope_text)
+
+
+def render_job_detail_financial_section(
+    job: dict[str, Any],
+    cost_summary: dict[str, Any],
+    fin: dict[str, Any],
+) -> None:
+    """Dedicated financial metrics grid for the Financial tab."""
+    has_contract = bool(fin.get("has_contract"))
+    has_estimated = bool(fin.get("has_estimated"))
+    has_actual = bool(fin.get("has_actual"))
+    remaining = fin.get("remaining_budget")
+    remaining_display = "—"
+    if remaining is not None and (has_contract or has_estimated):
+        remaining_display = _money(float(remaining or 0))
+
+    profit = float(fin.get("gross_profit") or cost_summary.get("profit") or 0)
+    margin = float(fin.get("margin_pct") or cost_summary.get("margin_pct") or 0)
+    profit_cls = "is-positive" if profit > 0 else ("is-negative" if profit < 0 else "")
+    margin_cls = profit_cls if has_contract else ""
+
+    metrics = [
+        ("Contract Value", _money(fin.get("contract_value", 0)) if has_contract else "—", "is-blue"),
+        ("Estimated Cost", _money(fin.get("estimated_cost", 0)) if has_estimated else "—", ""),
+        ("Actual Cost", _money(fin.get("actual_cost", 0)) if has_actual else "—", "is-blue"),
+        ("Labor Cost", _money(fin.get("labor_cost", 0)) if has_actual else "—", ""),
+        ("Material Cost", _money(fin.get("material_cost", 0)) if has_actual else "—", ""),
+        ("Equipment Cost", _money(fin.get("equipment_cost", 0)) if has_actual else "—", ""),
+        ("Remaining Budget", remaining_display, profit_cls if remaining_display != "—" else ""),
+        ("Profit", _money(profit) if has_contract or has_actual else "—", profit_cls),
+        ("Margin %", f"{margin:,.1f}%" if has_contract else "—", margin_cls),
+    ]
+    cells = []
+    for label, value, tone in metrics:
+        cells.append(
+            f'<div class="ips-job-detail-fin-metric">'
+            f'<div class="ips-job-detail-fin-label">{html.escape(label)}</div>'
+            f'<div class="ips-job-detail-fin-value {tone}">{html.escape(value)}</div>'
+            f"</div>"
+        )
+    st.markdown(
+        f'<div class="ips-job-detail-financial-grid">{"".join(cells)}</div>',
+        unsafe_allow_html=True,
+    )
+
+    health, tone, copy = _health_from_summary(cost_summary)
+    if health != "—":
+        st.markdown(
+            f'<p style="margin:0 0 0.75rem;font-size:0.8125rem;color:#64748b;">'
+            f"<strong style=\"color:#0f172a;\">Job health:</strong> "
+            f'<span class="ips-job-detail-health-status is-{html.escape(tone)}">{html.escape(health)}</span>'
+            f" — {html.escape(copy)}"
+            f"</p>",
+            unsafe_allow_html=True,
+        )
 
 
 def render_job_detail_metadata_row(
@@ -576,7 +685,7 @@ def render_job_detail_quick_stats(stats: dict[str, Any]) -> None:
     )
 
 
-def render_job_detail_activity_sidebar(job: dict) -> None:
+def render_job_detail_activity_timeline(job: dict) -> None:
     created = str(job.get("created_at") or "").strip()
     updated = str(job.get("updated_at") or "").strip()
     status = str(job.get("status") or "").strip()
@@ -609,47 +718,26 @@ def render_job_detail_activity_sidebar(job: dict) -> None:
     st.markdown("</div>", unsafe_allow_html=True)
 
 
+def render_job_detail_header_menu_slot() -> None:
+    """Marker wrapper for header actions column styling."""
+    st.markdown(
+        '<div class="ips-job-detail-header-actions"><span class="ips-job-detail-header-actions-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+
+
+def close_job_detail_header_menu_slot() -> None:
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
 def render_job_detail_header_actions(
     job: dict,
     *,
     on_edit: Callable[[dict], None],
     edit_key: str,
 ) -> None:
-    """Actions popover in header — mirrors existing footer action triggers."""
-    jid = str(job.get("id") or "").strip()
-    if not jid:
-        return
-    job_key = "".join(ch if ch.isalnum() else "_" for ch in jid) or "job"
-    archived = _job_is_archived(job)
-    can_manage = can_manage_job_actions()
-    status = _normalize_status(job)
-
-    with st.popover("Actions ▾", help="Job actions"):
-        st.markdown(
-            '<span class="ips-job-detail-actions-popover-marker" aria-hidden="true"></span>',
-            unsafe_allow_html=True,
-        )
-        if on_edit is not None and st.button("Edit Job", key=f"job_hdr_edit_{job_key}", use_container_width=True):
-            on_edit(job)
-            st.rerun()
-        if not archived and can_manage:
-            if status not in {"Completed", "Closed"} and st.button(
-                "Job Complete",
-                key=f"job_hdr_complete_{job_key}",
-                use_container_width=True,
-            ):
-                st.session_state[_confirm_state_key(jid, "complete")] = True
-                st.rerun()
-            if status != "Cancelled" and st.button(
-                "Cancel Job",
-                key=f"job_hdr_cancel_{job_key}",
-                use_container_width=True,
-            ):
-                st.session_state[_confirm_state_key(jid, "cancel")] = True
-                st.rerun()
-            if st.button("Delete Job", key=f"job_hdr_delete_{job_key}", use_container_width=True):
-                st.session_state[_confirm_state_key(jid, "delete")] = True
-                st.rerun()
+    """Deprecated — use job_detail_header_menu.render_job_detail_header_menu."""
+    _ = (job, on_edit, edit_key)
 
 
 def render_job_detail_footer_shell() -> None:

@@ -35,7 +35,7 @@ class TestNavigationHandoffs(unittest.TestCase):
         self.assertEqual(st.session_state[JC_FOCUS_JOB_KEY], "job-42")
         self.assertEqual(st.session_state["selected_job_id"], "job-42")
         self.assertTrue(st.session_state["show_job_detail_modal"])
-        self.assertEqual(st.session_state[JOBS_DETAIL_FOCUS_TAB_KEY], "Job Costing")
+        self.assertEqual(st.session_state[JOBS_DETAIL_FOCUS_TAB_KEY], "Financial")
         nav_mock.assert_called_once_with("jobs")
 
     def test_navigate_to_estimate_materials(self) -> None:
@@ -55,7 +55,7 @@ class TestNavigationHandoffs(unittest.TestCase):
         self.assertEqual(st.session_state["selected_job_id"], "job-1")
         self.assertTrue(st.session_state["show_job_detail_modal"])
         self.assertEqual(st.session_state[WJT_PREFILL_WEEK_KEY], "2026-05-26")
-        self.assertEqual(st.session_state[JOBS_DETAIL_FOCUS_TAB_KEY], "Weekly Timesheets")
+        self.assertEqual(st.session_state[JOBS_DETAIL_FOCUS_TAB_KEY], "Crew & Time")
         self.assertEqual(st.session_state["ips_nav_page"], "jobs")
 
     def test_navigate_to_timekeeping_prefill(self) -> None:

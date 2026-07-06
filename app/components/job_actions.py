@@ -91,6 +91,60 @@ def _render_confirm_card(
             st.rerun()
 
 
+def render_job_lifecycle_confirmations(
+    job: dict,
+    *,
+    on_complete: Callable[[], None] | None = None,
+    on_cancel: Callable[[], None] | None = None,
+    on_delete: Callable[[], None] | None = None,
+) -> bool:
+    """Render confirm cards when triggered from the header menu. Returns True if a confirm is showing."""
+    jid = str(job.get("id") or "").strip()
+    if not jid:
+        return False
+
+    job_key = "".join(ch if ch.isalnum() else "_" for ch in jid) or "job"
+
+    for action in ("complete", "cancel", "delete"):
+        if st.session_state.get(_confirm_state_key(jid, action)):
+            if action == "complete":
+                _render_confirm_card(
+                    job_id=jid,
+                    action=action,
+                    title="Complete Job",
+                    message="Are you sure you want to mark this job as complete?",
+                    confirm_label="Confirm Complete",
+                    confirm_fn=lambda reason: _handle_complete(jid, on_complete),
+                )
+            elif action == "cancel":
+                _render_confirm_card(
+                    job_id=jid,
+                    action=action,
+                    title="Cancel Job",
+                    message="Are you sure you want to cancel this job?",
+                    confirm_label="Confirm Cancel Job",
+                    confirm_fn=lambda reason: _handle_cancel(jid, on_cancel, reason=reason),
+                    reason_key=f"job_cancel_reason_{job_key}",
+                    reason_label="Cancellation reason (optional)",
+                )
+            else:
+                _render_confirm_card(
+                    job_id=jid,
+                    action=action,
+                    title="Archive Job",
+                    message=(
+                        "Are you sure you want to archive this job? "
+                        "Historical records will be preserved."
+                    ),
+                    confirm_label="Confirm Archive",
+                    confirm_fn=lambda reason: _handle_delete(jid, on_delete, reason=reason),
+                    reason_key=f"job_delete_reason_{job_key}",
+                    reason_label="Archive reason (optional)",
+                )
+            return True
+    return False
+
+
 def render_job_action_buttons(
     job: dict,
     *,

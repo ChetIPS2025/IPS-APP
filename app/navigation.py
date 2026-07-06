@@ -150,19 +150,19 @@ PENDING_NAV_ALIASES: dict[str, str] = {
 
 
 def open_jobs_job_costing(*, job_id: str = "") -> None:
-    """Open Jobs module with Job Details on the Job Costing tab."""
+    """Open Jobs module with Job Details on the Financial tab."""
     jid = str(job_id or "").strip()
     if jid:
         st.session_state[JC_FOCUS_JOB_KEY] = jid
         st.session_state[_JOBS_SELECTED_KEY] = jid
         st.session_state[_JOBS_SHOW_MODAL_KEY] = True
         st.session_state[_JOBS_MODAL_SESSION_KEY] = jid
-    st.session_state[JOBS_DETAIL_FOCUS_TAB_KEY] = "Job Costing"
+    st.session_state[JOBS_DETAIL_FOCUS_TAB_KEY] = "Financial"
     set_nav_slug("jobs")
 
 
 def open_jobs_weekly_timesheets(*, job_id: str = "", week_start: str | None = None) -> None:
-    """Open Jobs module with Job Details on the Weekly Timesheets tab."""
+    """Open Jobs module with Job Details on the Crew & Time tab."""
     jid = str(job_id or "").strip()
     ws = str(week_start or "").strip()[:10]
     if ws:
@@ -171,7 +171,7 @@ def open_jobs_weekly_timesheets(*, job_id: str = "", week_start: str | None = No
         st.session_state[_JOBS_SELECTED_KEY] = jid
         st.session_state[_JOBS_SHOW_MODAL_KEY] = True
         st.session_state[_JOBS_MODAL_SESSION_KEY] = jid
-    st.session_state[JOBS_DETAIL_FOCUS_TAB_KEY] = "Weekly Timesheets"
+    st.session_state[JOBS_DETAIL_FOCUS_TAB_KEY] = "Crew & Time"
     set_nav_slug("jobs")
 
 
