@@ -13691,7 +13691,7 @@ def inject_ops_dashboard_css() -> None:
     """Compact operations dashboard layout — KPI row, news, quick actions, activity grid."""
     st.markdown(
         """
-<style id="ips-ops-dashboard-v22">
+<style id="ips-ops-dashboard-v23">
 /* ── App shell: flex main beside sidebar (desktop only) ── */
 .stApp:has(.ips-ops-dashboard-marker) [data-testid="stAppViewContainer"] {
   width: 100% !important;
@@ -14316,20 +14316,18 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   padding: 0;
 }
 .quick-actions-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  align-items: center;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 14px;
   width: 100%;
   margin: 0;
   padding: 0;
 }
 .quick-actions-toolbar button,
 .quick-actions-toolbar .quick-action-btn {
-  flex: 0 0 auto;
+  width: 100%;
   height: 40px;
-  min-width: 150px;
+  min-width: 0;
   padding: 0 16px;
   margin: 0;
   border-radius: 8px;

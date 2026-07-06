@@ -209,6 +209,12 @@ def render() -> None:
                         ("📝", "Daily Report", "field_daily_reports"),
                         ("🕒", "Time Entry", "timekeeping"),
                         ("📦", "Inventory", "inventory"),
+                        ("✅", "Create Task", "tasks"),
+                        ("📎", "Upload Document", "documents"),
+                        ("📦", "Add Inventory", "inventory"),
+                        ("🚛", "Add Asset", "assets"),
+                        ("📝", "Start Daily Report", "field_daily_reports"),
+                        ("📊", "Run Job Cost Report", "job_costing"),
                     ],
                     key_prefix="ips_ops_qa",
                 )

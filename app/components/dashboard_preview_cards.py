@@ -178,37 +178,6 @@ def _render_preview_card_shell(
         on_view_all()
 
 
-def _render_extra_quick_actions(*, key_prefix: str = "ips_dash_preview_qa") -> None:
-    actions: list[tuple[str, str, str | None]] = [
-        ("✅", "Create Task", "tasks"),
-        ("📎", "Upload Document", "documents"),
-        ("📦", "Add Inventory", "inventory"),
-        ("🚛", "Add Asset", "assets"),
-        ("📝", "Start Daily Report", "field_daily_reports"),
-        ("📊", "Run Job Cost Report", "job_costing"),
-    ]
-    st.markdown('<div class="ips-dash-preview-qa-grid-marker" aria-hidden="true"></div>', unsafe_allow_html=True)
-    row_size = 2
-    for row_start in range(0, len(actions), row_size):
-        cols = st.columns(row_size, gap="small")
-        for col_idx, col in enumerate(cols):
-            idx = row_start + col_idx
-            if idx >= len(actions):
-                continue
-            icon, label, slug = actions[idx]
-            with col:
-                if st.button(
-                    f"{icon}\u2002{label}",
-                    key=f"{key_prefix}_{idx}",
-                    type="primary",
-                    use_container_width=True,
-                ):
-                    if slug == "job_costing":
-                        _nav_job_costing()
-                    elif slug:
-                        _nav_slug(slug)
-
-
 def render_dashboard_preview_sections() -> None:
     """Two-column grid of always-visible preview cards."""
     inject_qr_scan_history_css()
@@ -267,12 +236,3 @@ def render_dashboard_preview_sections() -> None:
                 if st.button("View All Reports", key="ips_dash_preview_an_all", use_container_width=True):
                     _nav_slug("reports")
 
-            with st.container(key="dashboard_preview_extra_qa"):
-                st.markdown(
-                    '<div class="ips-dash-preview-card-head">'
-                    '<span class="ips-dash-preview-card-icon">⚡</span>'
-                    '<p class="ips-dash-preview-card-title">Additional Quick Actions</p>'
-                    "</div>",
-                    unsafe_allow_html=True,
-                )
-                _render_extra_quick_actions()

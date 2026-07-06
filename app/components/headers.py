@@ -315,8 +315,19 @@ def render_ops_quick_action_tiles(
             from auth import current_role  # type: ignore
             from navigation import normalize_nav_slug, set_nav_slug  # type: ignore
             from utils.permissions import role_can_access_page  # type: ignore
-        target = normalize_nav_slug(picked)
         st.session_state[_OPS_QA_LAST_NAV_KEY] = picked
+        if picked == "job_costing":
+            if not role_can_access_page(current_role(), "jobs"):
+                st.warning("You do not have access to that page.")
+                return
+            try:
+                from app.navigation import open_jobs_job_costing
+            except ImportError:
+                from navigation import open_jobs_job_costing  # type: ignore
+            open_jobs_job_costing()
+            st.rerun()
+            return
+        target = normalize_nav_slug(picked)
         if not role_can_access_page(current_role(), target):
             st.warning("You do not have access to that page.")
             return
