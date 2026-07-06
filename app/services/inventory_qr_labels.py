@@ -111,17 +111,123 @@ def load_inventory_thumbnail_bytes(item: dict[str, Any]) -> bytes | None:
     return None
 
 
-def _label_fonts():
+def _fit_label_text_layout(
+    description: str,
+    sku: str,
+    text_w: float,
+    text_h: float,
+    *,
+    unit_scale: float = 1.0,
+) -> dict[str, Any]:
+    """Pick the largest description/SKU fonts that fit the text region."""
+    sku_pt = 10.0
+    sku_line_h = (sku_pt + 2.5) * unit_scale
+    best: dict[str, Any] | None = None
+
+    for desc_pt in (14.0, 13.0, 12.0, 11.0, 10.0, 9.0, 8.0):
+        line_h = (desc_pt + 2.5) * unit_scale
+        char_w = max(desc_pt * 0.5 * unit_scale, 1.0)
+        wrap_chars = max(6, min(48, int(text_w / char_w)))
+        lines = textwrap.wrap(description, width=wrap_chars)[:3]
+        if not lines:
+            lines = [(description or "—")[:wrap_chars]]
+        block_h = len(lines) * line_h + sku_line_h
+        if block_h <= text_h:
+            best = {
+                "desc_pt": desc_pt,
+                "desc_size": desc_pt * unit_scale,
+                "sku_pt": sku_pt,
+                "sku_size": sku_pt * unit_scale,
+                "line_h": line_h,
+                "sku_line_h": sku_line_h,
+                "lines": lines,
+                "block_h": block_h,
+            }
+            break
+
+    if best is None:
+        desc_pt = 8.0
+        line_h = (desc_pt + 2.5) * unit_scale
+        wrap_chars = max(6, int(text_w / max(desc_pt * 0.5 * unit_scale, 1.0)))
+        lines = textwrap.wrap(description, width=wrap_chars)[:3] or [(description or "—")[:wrap_chars]]
+        block_h = len(lines) * line_h + sku_line_h
+        best = {
+            "desc_pt": desc_pt,
+            "desc_size": desc_pt * unit_scale,
+            "sku_pt": sku_pt,
+            "sku_size": sku_pt * unit_scale,
+            "line_h": line_h,
+            "sku_line_h": sku_line_h,
+            "lines": lines,
+            "block_h": min(block_h, text_h),
+        }
+    best["sku_text"] = f"SKU: {sku}"[:120]
+    return best
+
+
+def _pil_font(size_px: int, *, bold: bool = False):
     from PIL import ImageFont
 
-    try:
-        return ImageFont.truetype("arial.ttf", 14), ImageFont.truetype("arial.ttf", 11)
-    except OSError:
+    size_px = max(8, int(size_px))
+    names = ("arialbd.ttf", "arial.ttf") if bold else ("arial.ttf", "DejaVuSans.ttf")
+    for name in names:
         try:
-            return ImageFont.truetype("DejaVuSans.ttf", 14), ImageFont.truetype("DejaVuSans.ttf", 11)
+            return ImageFont.truetype(name, size_px)
         except OSError:
-            default = ImageFont.load_default()
-            return default, default
+            continue
+    try:
+        return ImageFont.truetype("DejaVuSans.ttf", size_px)
+    except OSError:
+        return ImageFont.load_default()
+
+
+def _draw_pdf_label_text(
+    c,
+    *,
+    text_x: float,
+    y_bottom: float,
+    text_w: float,
+    text_h: float,
+    description: str,
+    sku: str,
+) -> None:
+    layout = _fit_label_text_layout(description, sku, text_w, text_h, unit_scale=1.0)
+    padding = max(0.0, (text_h - layout["block_h"]) / 2)
+    y = y_bottom + padding + layout["block_h"] - layout["desc_pt"] * 0.85
+
+    c.setFillColorRGB(0, 0, 0)
+    c.setFont("Helvetica-Bold", layout["desc_pt"])
+    for line in layout["lines"]:
+        c.drawString(text_x, y, str(line)[:120])
+        y -= layout["line_h"]
+
+    y -= layout["line_h"] * 0.12
+    c.setFont("Helvetica-Bold", layout["sku_pt"])
+    c.drawString(text_x, max(y_bottom + 2, y), layout["sku_text"])
+
+
+def _draw_png_label_text(
+    draw,
+    *,
+    text_x: int,
+    y_top: int,
+    text_w: int,
+    text_h: int,
+    description: str,
+    sku: str,
+) -> None:
+    unit_scale = text_h / 64.0
+    layout = _fit_label_text_layout(description, sku, float(text_w), float(text_h), unit_scale=unit_scale)
+    desc_font = _pil_font(int(layout["desc_size"]), bold=True)
+    sku_font = _pil_font(int(layout["sku_size"]), bold=True)
+
+    y = int(y_top + (text_h - layout["block_h"]) / 2)
+    for line in layout["lines"]:
+        draw.text((text_x, y), str(line)[:120], fill=(0, 0, 0), font=desc_font)
+        y += int(layout["line_h"])
+
+    y += int(layout["line_h"] * 0.1)
+    draw.text((text_x, min(y_top + text_h - int(layout["sku_size"]) - 2, y)), layout["sku_text"], fill=(0, 0, 0), font=sku_font)
 
 
 def _square_image_bytes(image_bytes: bytes, size_px: int) -> bytes:
@@ -190,20 +296,17 @@ def inventory_label_pdf_bytes(item: dict[str, Any], qr_text: str) -> bytes:
 
     text_x = x
     text_right = w_pt - margin
-    wrap_chars = max(10, min(32, int((text_right - text_x) / 4.2)))
-    y = y_square + square_sz - 4
-    line_h = 8.5
-
-    c.setFillColorRGB(0, 0, 0)
-    c.setFont("Helvetica-Bold", 7)
-    for line in textwrap.wrap(description, width=wrap_chars)[:2]:
-        if y < margin:
-            break
-        c.drawString(text_x, y, line[:120])
-        y -= line_h
-
-    c.setFont("Helvetica", 6.5)
-    c.drawString(text_x, max(margin, y - 1), f"SKU: {sku}"[:120])
+    text_w = text_right - text_x
+    text_h = square_sz
+    _draw_pdf_label_text(
+        c,
+        text_x=text_x,
+        y_bottom=margin,
+        text_w=text_w,
+        text_h=text_h,
+        description=description,
+        sku=sku,
+    )
 
     c.save()
     return buf.getvalue()
@@ -230,7 +333,6 @@ def inventory_label_png_bytes(item: dict[str, Any], qr_text: str) -> bytes:
 
     im = Image.new("RGB", (w_px, h_px), "white")
     draw = ImageDraw.Draw(im)
-    font_title, font_meta = _label_fonts()
 
     x = margin
     y_square = margin
@@ -254,15 +356,17 @@ def inventory_label_png_bytes(item: dict[str, Any], qr_text: str) -> bytes:
     sku = resolve_inventory_sku(item)
     description = inventory_item_description(item)
     text_x = x
-    y = margin + 8
-    line_gap = 22
-    for line in textwrap.wrap(description, width=28)[:2]:
-        if y > h_px - margin - 10:
-            break
-        draw.text((text_x, y), line[:120], fill=(0, 0, 0), font=font_title)
-        y += line_gap
-
-    draw.text((text_x, h_px - margin - 18), f"SKU: {sku}"[:120], fill=(0, 0, 0), font=font_meta)
+    text_w = w_px - margin - text_x
+    text_h = square_px
+    _draw_png_label_text(
+        draw,
+        text_x=text_x,
+        y_top=y_square,
+        text_w=text_w,
+        text_h=text_h,
+        description=description,
+        sku=sku,
+    )
 
     out = io.BytesIO()
     im.save(out, format="PNG")
