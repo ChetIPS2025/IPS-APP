@@ -411,22 +411,125 @@ def _asset_number_display(asset: dict[str, Any]) -> str:
     return ""
 
 
-def _asset_label_meta_lines(asset: dict[str, Any], *, size_key: str) -> list[str]:
-    lines: list[str] = []
+def _asset_label_meta_fields(asset: dict[str, Any]) -> list[tuple[str, str]]:
+    """Non-blank asset info rows as (label, value) pairs for the label text column."""
+    fields: list[tuple[str, str]] = []
     num = _asset_number_display(asset)
     if num:
-        lines.append(num)
+        fields.append(("Asset ID", num))
     category = str(asset.get("category") or asset.get("asset_category") or "").strip()
     if category:
-        lines.append(category)
-    if size_key == "2x6":
-        serial = str(asset.get("serial_number") or "").strip()
-        if serial:
-            lines.append(f"S/N {serial}")
-        location = str(asset.get("location") or asset.get("current_location") or "").strip()
-        if location:
-            lines.append(location)
-    return lines
+        fields.append(("Category", category))
+    serial = str(asset.get("serial_number") or "").strip()
+    if serial:
+        fields.append(("Serial", serial))
+    location = str(asset.get("location") or asset.get("current_location") or "").strip()
+    if location:
+        fields.append(("Location", location))
+    return fields
+
+
+def _text_width(draw: "Any", text: str, font: "Any") -> int:
+    bbox = draw.textbbox((0, 0), text, font=font)
+    return max(0, bbox[2] - bbox[0])
+
+
+def _wrap_text_lines(
+    draw: "Any",
+    text: str,
+    font: "Any",
+    *,
+    max_w: int,
+    max_lines: int,
+) -> list[str]:
+    words = text.split()
+    if not words:
+        return [text[:80] or ""]
+    lines: list[str] = []
+    current: list[str] = []
+    for word in words:
+        trial = " ".join(current + [word]) if current else word
+        if current and _text_width(draw, trial, font) > max_w:
+            lines.append(" ".join(current))
+            current = [word]
+        else:
+            current.append(word)
+        if len(lines) >= max_lines:
+            break
+    if len(lines) < max_lines and current:
+        lines.append(" ".join(current))
+    lines = lines[:max_lines]
+    if lines:
+        shown = " ".join(lines)
+        if len(shown) < len(text):
+            last = lines[-1]
+            while last and _text_width(draw, f"{last}…", font) > max_w:
+                last = last[:-1].rstrip()
+            lines[-1] = f"{last}…" if last else "…"
+    return lines or [text[: max(1, max_w // 8)]]
+
+
+def _meta_line_fits(
+    draw: "Any",
+    label: str,
+    value: str,
+    *,
+    label_font: "Any",
+    value_font: "Any",
+    text_w: int,
+) -> bool:
+    prefix = f"{label}: "
+    total_w = _text_width(draw, prefix, label_font) + _text_width(draw, value, value_font)
+    return total_w <= text_w
+
+
+def _fit_meta_font_size(
+    draw: "Any",
+    fields: list[tuple[str, str]],
+    *,
+    text_w: int,
+    scale: float,
+) -> int:
+    if not fields:
+        return max(8, int(20 * scale))
+    meta_max = max(10, int(24 * scale))
+    meta_min = max(8, int(20 * scale))
+    for size_px in range(meta_max, meta_min - 1, -1):
+        label_font = _asset_label_pil_font(size_px, bold=True)
+        value_font = _asset_label_pil_font(size_px, bold=False)
+        if all(
+            _meta_line_fits(draw, label, value, label_font=label_font, value_font=value_font, text_w=text_w)
+            for label, value in fields
+        ):
+            return size_px
+    return meta_min
+
+
+def _draw_meta_line(
+    draw: "Any",
+    *,
+    x: int,
+    y: int,
+    label: str,
+    value: str,
+    label_font: "Any",
+    value_font: "Any",
+    text_w: int,
+) -> None:
+    prefix = f"{label}: "
+    val = str(value or "")
+    prefix_w = _text_width(draw, prefix, label_font)
+    val_w = _text_width(draw, val, value_font)
+    if prefix_w + val_w > text_w and val:
+        max_val_w = max(0, text_w - prefix_w)
+        while val and _text_width(draw, val, value_font) > max_val_w:
+            val = val[:-1]
+        if len(val) < len(str(value or "")):
+            while val and _text_width(draw, f"{val}…", value_font) > max_val_w:
+                val = val[:-1]
+            val = f"{val}…" if val else "…"
+    draw.text((x, y), prefix, fill=(0, 0, 0), font=label_font)
+    draw.text((x + prefix_w, y), val, fill=(40, 40, 40), font=value_font)
 
 
 def load_asset_primary_photo_bytes(asset: dict[str, Any]) -> bytes | None:
@@ -539,37 +642,43 @@ def _asset_label_paste_rounded_photo(
 
 def _fit_asset_name_layout(
     name: str,
+    draw: "Any",
     *,
     text_w: int,
-    text_h: int,
+    name_area_h: int,
     scale: float,
     max_lines: int = 2,
 ) -> dict[str, Any]:
     title = str(name or "").strip() or "(no name)"
-    meta_reserve = int(12 * scale)
-    available_h = max(16, text_h - meta_reserve)
-    best: dict[str, Any] | None = None
+    single_max = max(12, int(60 * scale))
+    single_min = max(10, int(48 * scale))
+    multi_max = max(10, int(44 * scale))
+    multi_min = max(8, int(36 * scale))
 
-    for pt in (22.0, 20.0, 18.0, 16.0, 14.0, 12.0, 11.0, 10.0, 9.0, 8.0):
-        size_px = max(8, int(pt * scale))
-        line_h = int(size_px * 1.15)
-        char_w = max(size_px * 0.52, 4.0)
-        wrap_chars = max(6, min(40, int(text_w / char_w)))
-        lines = textwrap.wrap(title, width=wrap_chars)[:max_lines]
-        if not lines:
-            lines = [title[:wrap_chars]]
-        if len(lines) == max_lines and len(title) > sum(len(x) for x in lines):
-            lines[-1] = lines[-1][: max(0, wrap_chars - 1)] + "…"
-        block_h = len(lines) * line_h
-        if block_h <= available_h:
-            best = {"size_px": size_px, "line_h": line_h, "lines": lines}
+    best: dict[str, Any] | None = None
+    for size_px in range(single_max, single_min - 1, -1):
+        font = _asset_label_pil_font(size_px, bold=True)
+        line_h = max(1, int(size_px * 1.12))
+        if _text_width(draw, title, font) <= text_w and line_h <= name_area_h:
+            best = {"size_px": size_px, "line_h": line_h, "lines": [title]}
             break
 
     if best is None:
-        size_px = max(8, int(8 * scale))
-        wrap_chars = max(6, int(text_w / max(size_px * 0.52, 4.0)))
-        lines = textwrap.wrap(title, width=wrap_chars)[:max_lines] or [title[:wrap_chars]]
-        best = {"size_px": size_px, "line_h": int(size_px * 1.15), "lines": lines}
+        for size_px in range(min(single_max, multi_max), multi_min - 1, -1):
+            font = _asset_label_pil_font(size_px, bold=True)
+            line_h = max(1, int(size_px * 1.12))
+            lines = _wrap_text_lines(draw, title, font, max_w=text_w, max_lines=max_lines)
+            block_h = len(lines) * line_h
+            if block_h <= name_area_h and all(_text_width(draw, line, font) <= text_w for line in lines):
+                best = {"size_px": size_px, "line_h": line_h, "lines": lines}
+                break
+
+    if best is None:
+        size_px = multi_min
+        font = _asset_label_pil_font(size_px, bold=True)
+        line_h = max(1, int(size_px * 1.12))
+        lines = _wrap_text_lines(draw, title, font, max_w=text_w, max_lines=max_lines)
+        best = {"size_px": size_px, "line_h": line_h, "lines": lines}
     return best
 
 
@@ -582,30 +691,47 @@ def _draw_asset_label_info(
     text_w: int,
     text_h: int,
     scale: float,
-    size_key: str,
 ) -> None:
     name = str(asset.get("asset_name") or asset.get("name") or "").strip()
-    name_layout = _fit_asset_name_layout(name, text_w=text_w, text_h=text_h, scale=scale, max_lines=2)
-    name_font = _asset_label_pil_font(name_layout["size_px"], bold=True)
-    meta_lines = _asset_label_meta_lines(asset, size_key=size_key)
-    meta_pt = max(8, int((11 if size_key == "2x6" else 10) * scale))
-    meta_font = _asset_label_pil_font(meta_pt, bold=False)
-    meta_line_h = int(meta_pt * 1.2)
+    meta_fields = _asset_label_meta_fields(asset)
+    meta_pt = _fit_meta_font_size(draw, meta_fields, text_w=text_w, scale=scale)
+    label_font = _asset_label_pil_font(meta_pt, bold=True)
+    value_font = _asset_label_pil_font(meta_pt, bold=False)
+    meta_line_h = max(1, int(meta_pt * 1.22))
+    name_meta_gap = max(2, int(4 * scale)) if meta_fields else 0
+    meta_block_h = len(meta_fields) * meta_line_h
+    name_area_h = max(16, text_h - meta_block_h - name_meta_gap)
 
+    name_layout = _fit_asset_name_layout(
+        name,
+        draw,
+        text_w=text_w,
+        name_area_h=name_area_h,
+        scale=scale,
+        max_lines=2,
+    )
+    name_font = _asset_label_pil_font(name_layout["size_px"], bold=True)
     name_block_h = len(name_layout["lines"]) * name_layout["line_h"]
-    meta_block_h = len(meta_lines) * meta_line_h
-    gap = max(2, int(4 * scale))
-    block_h = name_block_h + (gap if meta_lines else 0) + meta_block_h
+    block_h = name_block_h + name_meta_gap + meta_block_h
     y = int(y_top + max(0, (text_h - block_h) / 2))
 
     for line in name_layout["lines"]:
         draw.text((text_x, y), str(line)[:120], fill=(0, 0, 0), font=name_font)
         y += name_layout["line_h"]
 
-    if meta_lines:
-        y += gap
-        for line in meta_lines:
-            draw.text((text_x, y), str(line)[:120], fill=(40, 40, 40), font=meta_font)
+    if meta_fields:
+        y += name_meta_gap
+        for label, value in meta_fields:
+            _draw_meta_line(
+                draw,
+                x=text_x,
+                y=y,
+                label=label,
+                value=value,
+                label_font=label_font,
+                value_font=value_font,
+                text_w=text_w,
+            )
             y += meta_line_h
 
 
@@ -621,7 +747,7 @@ def _draw_asset_label_company_footer(
     text = str(company or "").strip()
     if not text:
         return
-    font_size = max(7, int(company_h * 0.42))
+    font_size = max(6, int(company_h * 0.38))
     font = _asset_label_pil_font(font_size, bold=False)
     bbox = draw.textbbox((0, 0), text, font=font)
     text_w = bbox[2] - bbox[0]
@@ -655,15 +781,16 @@ def qr_label_png_bytes(
 
     size_key = normalize_label_png_size(size)
     w_px, h_px = label_png_pixel_size(size_key)
-    margin = max(8, int(h_px * 0.04))
-    gap = max(5, int(margin * 0.45))
-    company_h = max(16, int(h_px * 0.12))
-    content_h = max(48, h_px - 2 * margin - company_h)
     scale = h_px / 300.0
+    margin = max(6, int(h_px * 0.03))
+    col_gap = max(4, int(5 * scale))
+    text_gap = max(2, int(3 * scale))
+    company_h = max(10, int(h_px * 0.075))
+    content_h = max(48, h_px - 2 * margin - company_h)
 
     qr_col_w = max(int(content_h), int(w_px * 0.27))
     photo_sz = content_h
-    qr_sz = min(content_h, qr_col_w - gap)
+    qr_sz = min(content_h, qr_col_w - col_gap)
 
     im = Image.new("RGB", (w_px, h_px), "white")
     draw = ImageDraw.Draw(im)
@@ -674,12 +801,12 @@ def qr_label_png_bytes(
     qr_img = Image.open(io.BytesIO(qr_raw)).convert("RGB")
     qr_img = qr_img.resize((qr_sz, qr_sz), Image.Resampling.LANCZOS)
     im.paste(qr_img, (x, y_content))
-    x += qr_col_w + gap
+    x += qr_col_w + col_gap
 
     photo_y = margin + max(0, (content_h - photo_sz) // 2)
     photo_bytes = load_asset_primary_photo_bytes(asset)
     _asset_label_paste_rounded_photo(im, x=x, y=photo_y, size_px=photo_sz, photo_bytes=photo_bytes)
-    x += photo_sz + gap
+    x += photo_sz + text_gap
 
     text_x = x
     text_w = max(48, w_px - margin - text_x)
@@ -691,7 +818,6 @@ def qr_label_png_bytes(
         text_w=text_w,
         text_h=content_h,
         scale=scale,
-        size_key=size_key,
     )
     _draw_asset_label_company_footer(
         draw,
