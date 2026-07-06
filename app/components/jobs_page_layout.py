@@ -24,8 +24,8 @@ except ImportError:
     )
 
 _PAGE_SIZE_OPTIONS = (50, 75, 100, 150)
-_HIDE_IF_EMPTY_COLUMNS = frozenset({"estimated", "actual"})
-_JOB_COL_WEIGHTS = [0.72, 2.75, 1.15, 0.68, 0.72, 0.72, 0.42, 0.9]
+_HIDE_IF_EMPTY_COLUMNS: frozenset[str] = frozenset()
+_JOB_COL_WEIGHTS = [0.72, 2.75, 1.15, 0.68, 0.95, 0.95]
 _JOB_COL_MARKERS: tuple[str, ...] = (
     "num",
     "desc",
@@ -33,8 +33,6 @@ _JOB_COL_MARKERS: tuple[str, ...] = (
     "status",
     "estimated",
     "actual",
-    "subjobs",
-    "actions",
 )
 _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("JOB #", None),
@@ -43,8 +41,6 @@ _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("STATUS", "status"),
     ("ESTIMATED COST", None),
     ("ACTUAL COST", None),
-    ("OPEN TASKS / SUBJOBS", None),
-    ("ACTIONS", None),
 ]
 
 
