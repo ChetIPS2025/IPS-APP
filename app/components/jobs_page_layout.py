@@ -69,7 +69,7 @@ def _summary_money(value: float, *, has_data: bool) -> str:
 def inject_jobs_page_layout_css() -> None:
     st.markdown(
         """
-<style id="ips-jobs-page-layout-v10">
+<style id="ips-jobs-page-layout-v11">
 section[data-testid="stMain"]:has(.ips-jobs-page) {
   background: #ffffff !important;
 }
@@ -562,6 +562,36 @@ section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="column"]:has(.ip
   min-width: 0 !important;
   height: 100% !important;
   pointer-events: auto !important;
+}
+.st-key-jobs_table_wrap .ips-jobs-list-link {
+  color: #2563eb !important;
+  font-weight: 800 !important;
+  font-size: 14px !important;
+  line-height: 1.2 !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  display: inline !important;
+  max-width: 100% !important;
+  transition: color 0.15s ease !important;
+}
+.st-key-jobs_table_wrap .ips-jobs-list-link:hover,
+.st-key-jobs_table_wrap .ips-jobs-list-link:focus {
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
+}
+.st-key-jobs_table_wrap .ips-jobs-number-link.ips-jobs-list-link {
+  white-space: nowrap !important;
+}
+.st-key-jobs_table_wrap .ips-jobs-title-link.ips-jobs-list-link {
+  display: inline-block !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 100% !important;
 }
 .st-key-jobs_table_wrap .ips-jobs-table-link.ips-jobs-cell-truncate {
   max-width: 100% !important;
@@ -1101,6 +1131,7 @@ def render_jobs_row_click_bridge() -> str | None:
   const hookKey = "ipsJobsRowClick::list";
   const tblSel = ".st-key-jobs_table_wrap";
   const rowSel = '[data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row)';
+  const linkSel = ".ips-jobs-list-link[data-job-id]";
 
   function sendValue(id) {
     const payload = { type: "streamlit:setComponentValue", value: id };
@@ -1150,9 +1181,29 @@ def render_jobs_row_click_bridge() -> str | None:
     });
   }
 
+  function bindLinks() {
+    const scope = tableScope();
+    if (!scope) return;
+    scope.querySelectorAll(linkSel).forEach(function (link) {
+      if (link.dataset.ipsJobsLinkBound === "1") return;
+      link.dataset.ipsJobsLinkBound = "1";
+      link.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = link.getAttribute("data-job-id");
+        if (id) sendValue(id);
+      });
+    });
+  }
+
+  function bindAll() {
+    bindRows();
+    bindLinks();
+  }
+
   if (!doc.ipsJobsRowClickRegistry) doc.ipsJobsRowClickRegistry = {};
-  doc.ipsJobsRowClickRegistry[hookKey] = { bind: bindRows };
-  bindRows();
+  doc.ipsJobsRowClickRegistry[hookKey] = { bind: bindAll };
+  bindAll();
   if (!doc.ipsJobsRowBindObserver) {
     doc.ipsJobsRowBindObserver = new MutationObserver(function () {
       Object.values(doc.ipsJobsRowClickRegistry || {}).forEach(function (cfg) {

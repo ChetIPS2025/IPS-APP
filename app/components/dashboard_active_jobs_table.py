@@ -99,12 +99,29 @@ def _job_cost_fields(job: dict[str, Any]) -> dict[str, float | bool]:
     }
 
 
+_DASH_JOB_LINK_LAST_KEY = "_ips_dash_job_link_last"
+
+
 def _open_job_nav(job_id: str, job: dict[str, Any]) -> None:
     jid = str(job_id or "").strip()
     if not jid:
         return
     st.session_state["selected_job_id"] = jid
     st.session_state["show_job_detail_modal"] = True
+    st.session_state["ips_jobs_detail_modal_id"] = jid
+    try:
+        from app.pages._core._session import select_key
+    except ImportError:
+        from pages._core._session import select_key  # type: ignore
+    st.session_state[select_key("jobs")] = jid
+    try:
+        from app.pages.tasks import on_job_detail_modal_open
+    except ImportError:
+        from pages.tasks import on_job_detail_modal_open  # type: ignore
+    try:
+        on_job_detail_modal_open(jid)
+    except Exception:
+        pass
     try:
         from app.navigation import set_nav_slug
     except ImportError:
@@ -360,6 +377,9 @@ def _render_dashboard_job_link_bridge(jobs_by_id: dict[str, dict[str, Any]]) -> 
     )
     open_id = str(picked or "").strip()
     if open_id and open_id in jobs_by_id:
+        if open_id == str(st.session_state.get(_DASH_JOB_LINK_LAST_KEY) or ""):
+            return
+        st.session_state[_DASH_JOB_LINK_LAST_KEY] = open_id
         _open_job_nav(open_id, jobs_by_id[open_id])
 
 

@@ -197,6 +197,7 @@ except ImportError:
 _SEL = select_key("jobs")
 _TABLE_KEY = "jobs_list"
 _JOBS_MODAL_KEY = "ips_jobs_detail_modal_id"
+_JOB_LIST_OPEN_LAST_KEY = "_ips_jobs_list_open_last"
 
 
 def _job_new_num_edited() -> None:
@@ -986,35 +987,33 @@ def _jobs_col_marker(name: str) -> str:
     )
 
 
-def _render_job_list_link_button(
+def _job_list_link_html(job_id: str, label: str, *, extra_class: str = "") -> str:
+    jid = html.escape(str(job_id or "").strip(), quote=True)
+    text = html.escape(label)
+    title = html.escape(label, quote=True)
+    cls = f"ips-jobs-list-link {extra_class}".strip()
+    return (
+        f'<a href="#" class="{html.escape(cls)}" data-job-id="{jid}" '
+        f'title="{title}">{text}</a>'
+    )
+
+
+def _render_job_list_link_cell(
+    job_id: str,
     label: str,
     *,
-    key: str,
-    job: dict,
     extra_class: str = "",
-    help_text: str | None = None,
     truncate: bool = False,
-    use_container_width: bool | None = None,
 ) -> None:
-    link_class = extra_class
+    wrapper_class = f"ips-jobs-table-link {extra_class}".strip()
     if truncate:
-        link_class = f"{link_class} ips-jobs-cell-truncate".strip()
-    title_text = help_text or label
-    title_attr = f' title="{html.escape(title_text, quote=True)}"' if title_text else ""
-    btn_width = use_container_width if use_container_width is not None else (not truncate)
+        wrapper_class = f"{wrapper_class} ips-jobs-cell-truncate".strip()
     st.markdown(
-        f'<div class="ips-jobs-table-link {link_class}"{title_attr}>',
+        f'<div class="{html.escape(wrapper_class)}">'
+        f"{_job_list_link_html(job_id, label, extra_class=extra_class)}"
+        f"</div>",
         unsafe_allow_html=True,
     )
-    if st.button(
-        label,
-        key=key,
-        type="tertiary",
-        help=help_text or "Open job details",
-        use_container_width=btn_width,
-    ):
-        _open_job_from_list(job)
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _on_job_status_updated(job_id: str, new_status: str) -> None:
@@ -1092,6 +1091,7 @@ def _clear_jobs_detail_modal() -> None:
     st.session_state.pop(JOB_DOC_UPLOAD_MODE_KEY, None)
     st.session_state.pop(JOB_DOC_PENDING_DELETE_ID_KEY, None)
     st.session_state.pop(JOB_DOC_PENDING_DELETE_JOB_KEY, None)
+    st.session_state.pop(_JOB_LIST_OPEN_LAST_KEY, None)
 
 
 @fragment
@@ -1195,24 +1195,19 @@ def _render_custom_jobs_table(
                         set_field_job_id(jid)
                         st.rerun()
                 num_label = job_no if job_no and job_no != "—" else "View job"
-                _render_job_list_link_button(
+                _render_job_list_link_cell(
+                    jid,
                     num_label,
-                    key=f"job_open_num_{jid}",
-                    job=job,
                     extra_class="ips-jobs-number-link job-number-link",
-                    help_text=f"Open job {job_no}" if job_no and job_no != "—" else "Open job details",
-                    use_container_width=False,
                 )
 
             with cols[col_map["desc"]]:
                 st.markdown(_jobs_col_marker("desc"), unsafe_allow_html=True)
                 title_label = project if project and project != "—" else "View job"
-                _render_job_list_link_button(
+                _render_job_list_link_cell(
+                    jid,
                     title_label,
-                    key=f"job_open_title_{jid}",
-                    job=job,
                     extra_class="ips-jobs-title-link job-project-link",
-                    help_text=project if project and project != "—" else "Open job details",
                     truncate=True,
                 )
 
@@ -1331,10 +1326,13 @@ def _render_custom_jobs_table(
         picked = render_jobs_row_click_bridge()
         if picked:
             open_id = str(picked).strip()
-            open_job = jobs_by_id.get(open_id)
-            if open_job:
-                _activate_job_detail_modal(open_id, open_job)
-                ips_app_rerun()
+            last_open = str(st.session_state.get(_JOB_LIST_OPEN_LAST_KEY) or "")
+            if open_id and open_id != last_open:
+                open_job = jobs_by_id.get(open_id)
+                if open_job:
+                    st.session_state[_JOB_LIST_OPEN_LAST_KEY] = open_id
+                    _activate_job_detail_modal(open_id, open_job)
+                    ips_app_rerun()
 
     return all_job_ids
 
@@ -3011,7 +3009,12 @@ def _focus_job_costing_tab_if_requested() -> None:
 
 @st.dialog("Job Details", width="large", on_dismiss=_clear_jobs_detail_modal)
 def _show_jobs_detail_modal() -> None:
-    sel = str(st.session_state.get(_JOBS_MODAL_KEY) or st.session_state.get(_SEL) or "").strip()
+    sel = str(
+        st.session_state.get(_JOBS_MODAL_KEY)
+        or st.session_state.get(_SEL)
+        or st.session_state.get(SELECTED_JOB_KEY)
+        or ""
+    ).strip()
     jobs_by_id = st.session_state.get("_ips_jobs_modal_by_id")
     job = jobs_by_id.get(sel) if isinstance(jobs_by_id, dict) and sel else None
     if not job:
