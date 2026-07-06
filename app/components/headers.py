@@ -23,7 +23,13 @@ def render_main_brand_bar(*, brand_actions: list[_ActionFn] | None = None, show_
     logo = wording_logo_html(height=40)
     menu_html = (
         '<button type="button" class="ips-header-menu-btn" aria-label="Open navigation menu">'
-        "☰ Menu</button>"
+        '<span class="ips-header-menu-icon" aria-hidden="true">'
+        '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" '
+        'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">'
+        '<line x1="4" y1="7" x2="20" y2="7"/>'
+        '<line x1="4" y1="12" x2="20" y2="12"/>'
+        '<line x1="4" y1="17" x2="20" y2="17"/>'
+        "</svg></span></button>"
         if show_menu
         else ""
     )

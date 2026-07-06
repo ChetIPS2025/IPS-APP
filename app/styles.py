@@ -11586,10 +11586,15 @@ section[data-testid="stSidebar"] .block-container {{
   flex: 1 1 auto;
 }}
 .ips-main-header-menu {{
-  display: flex;
+  display: none;
   align-items: center;
   flex: 0 0 auto;
   margin-right: 0.65rem;
+}}
+@media (max-width: 899px) {{
+  .ips-main-header-menu {{
+    display: flex;
+  }}
 }}
 .ips-main-header-logo {{
   height: 40px;

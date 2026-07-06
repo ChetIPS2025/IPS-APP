@@ -114,29 +114,59 @@ def request_sidebar_toggle() -> None:
 
 def _shell_css() -> str:
     return f"""
-<style id="ips-sidebar-shell-v1">
+<style id="ips-sidebar-shell-v2">
+.ips-main-header-menu,
 button.ips-header-menu-btn {{
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 0.35rem !important;
-  min-height: 2.35rem !important;
-  padding: 0.35rem 0.85rem !important;
-  border-radius: 10px !important;
-  border: 1px solid #cbd5e1 !important;
-  background: #ffffff !important;
-  color: #0f172a !important;
-  font-size: 0.875rem !important;
-  font-weight: 700 !important;
-  line-height: 1 !important;
-  cursor: pointer !important;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
-  white-space: nowrap !important;
+  display: none !important;
 }}
-button.ips-header-menu-btn:hover {{
-  background: #f8fafc !important;
-  border-color: #94a3b8 !important;
-  color: #1d4ed8 !important;
+@media (max-width: {IPS_SIDEBAR_DESKTOP_MIN_PX - 1}px) {{
+  .ips-main-header-menu {{
+    display: flex !important;
+    align-items: center !important;
+    flex: 0 0 auto !important;
+    margin-right: 0.5rem !important;
+  }}
+  button.ips-header-menu-btn {{
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 2.75rem !important;
+    height: 2.75rem !important;
+    min-width: 2.75rem !important;
+    min-height: 2.75rem !important;
+    padding: 0 !important;
+    border-radius: 10px !important;
+    border: 1px solid rgba(37, 99, 235, 0.16) !important;
+    background: rgba(255, 255, 255, 0.96) !important;
+    color: #2563eb !important;
+    cursor: pointer !important;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08) !important;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }}
+  button.ips-header-menu-btn .ips-header-menu-icon {{
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    line-height: 0 !important;
+  }}
+  button.ips-header-menu-btn svg {{
+    display: block !important;
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+  }}
+  button.ips-header-menu-btn:hover,
+  button.ips-header-menu-btn:focus-visible {{
+    background: #eff6ff !important;
+    border-color: rgba(37, 99, 235, 0.32) !important;
+    color: #1d4ed8 !important;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.14) !important;
+    outline: none !important;
+  }}
+  button.ips-header-menu-btn:active {{
+    background: #dbeafe !important;
+    transform: scale(0.96) !important;
+  }}
 }}
 .ips-main-header {{
   position: relative !important;
