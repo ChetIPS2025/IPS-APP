@@ -1,4 +1,4 @@
-"""Estimate Materials module (Phase 2B)."""
+﻿"""Estimate Materials module (Phase 2B)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ import streamlit as st
 
 try:
     from app.components.clickable_table import render_clickable_table
-    from app.components.headers import render_page_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.record_modal import (
         build_modal_cache,
@@ -39,7 +38,6 @@ try:
         ACTIVE_ESTIMATE_KEY,
         get_estimate,
         load_estimate_materials,
-        load_estimates,
         load_inventory,
         lookup_options,
         materials_summary,
@@ -47,12 +45,9 @@ try:
     )
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._session import select_key
-    from app.styles import inject_global_css
-    from app.utils.constants import SESSION_NAV_KEY
     from app.utils.formatting import fmt_currency
 except ImportError:
     from components.clickable_table import render_clickable_table  # type: ignore
-    from components.headers import render_page_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.record_modal import (  # type: ignore
         build_modal_cache,
@@ -81,7 +76,6 @@ except ImportError:
         ACTIVE_ESTIMATE_KEY,
         get_estimate,
         load_estimate_materials,
-        load_estimates,
         load_inventory,
         lookup_options,
         materials_summary,
@@ -89,8 +83,6 @@ except ImportError:
     )
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
-    from styles import inject_global_css  # type: ignore
-    from utils.constants import SESSION_NAV_KEY  # type: ignore
     from utils.formatting import fmt_currency  # type: ignore
 
 _SEL = select_key("estimate_materials")
@@ -341,62 +333,33 @@ def _persist_inventory_material_line(*, estimate_id: str, inv: dict, qty: float)
     )
 
 
-def render() -> None:
-    try:
-        from app.pages._core._access import begin_module
-    except ImportError:
-        from pages._core._access import begin_module  # type: ignore
-    if not begin_module("estimate_materials"):
+def render_estimate_materials_panel(
+    *,
+    estimate_id: str,
+    est: dict,
+    materials: list[dict] | None = None,
+    summary: dict | None = None,
+) -> None:
+    """Materials takeoff UI — embedded in estimate detail or standalone page."""
+    pick = str(estimate_id or "").strip()
+    if not pick:
+        st.warning("No estimate selected.")
         return
-    estimates = load_estimates()
-    est_opts = {str(e.get("id")): f"{e.get('estimate_number')} — {e.get('project_name')}" for e in estimates}
-    if not est_opts:
-        st.warning("No estimates available.")
-        return
+    if materials is None:
+        materials = load_estimate_materials(pick)
+    summ = summary if summary is not None else materials_summary(materials)
 
-    default_id = str(st.session_state.get(ACTIVE_ESTIMATE_KEY) or list(est_opts.keys())[0])
-    if default_id not in est_opts:
-        default_id = list(est_opts.keys())[0]
-
-    pick = st.selectbox(
-        "Estimate",
-        options=list(est_opts.keys()),
-        format_func=lambda k: est_opts[k],
-        index=list(est_opts.keys()).index(default_id),
-        key="mat_estimate_pick",
-        label_visibility="collapsed",
-    )
-    st.session_state[ACTIVE_ESTIMATE_KEY] = pick
-    est = get_estimate(pick) or estimates[0]
-    materials = load_estimate_materials(pick)
-    summ = materials_summary(materials)
-
-    hdr_l, hdr_r = st.columns([3, 1])
-    with hdr_l:
-        render_page_header(
-            f"Estimate {est.get('estimate_number')} — Materials",
-            str(est.get("project_name") or ""),
-        )
-        if st.button("← Back to Estimates", key="mat_back_est"):
-            st.session_state[SESSION_NAV_KEY] = "estimates"
-            st.rerun()
-    with hdr_r:
+    export_col, _ = st.columns([1, 3], gap="small")
+    with export_col:
         export_name = f"estimate_{est.get('estimate_number') or pick}_materials.csv"
         st.download_button(
-            "Export",
+            "Export Materials",
             data=_materials_csv_bytes(materials, estimate_number=str(est.get("estimate_number") or "")),
             file_name=export_name,
             mime="text/csv",
-            key="mat_export",
+            key=f"mat_export_{pick}",
             use_container_width=True,
         )
-        if st.button("Edit Estimate", key="mat_edit", type="primary", use_container_width=True):
-            try:
-                from app.navigation import navigate_to_estimate_detail
-            except ImportError:
-                from navigation import navigate_to_estimate_detail  # type: ignore
-            navigate_to_estimate_detail(pick)
-            st.rerun()
 
     _render_summary_card(est)
 
@@ -553,3 +516,30 @@ def render() -> None:
             unsafe_allow_html=True,
         )
         st.markdown(f"</{ot}>", unsafe_allow_html=True)
+
+
+def render() -> None:
+    try:
+        from app.pages._core._access import begin_module
+    except ImportError:
+        from pages._core._access import begin_module  # type: ignore
+    if not begin_module("estimate_materials"):
+        return
+
+    eid = str(st.session_state.get(ACTIVE_ESTIMATE_KEY) or "").strip()
+    try:
+        from app.navigation import ESTIMATE_DETAIL_TAB_KEY, navigate_to_estimate_detail, set_nav_slug
+    except ImportError:
+        from navigation import ESTIMATE_DETAIL_TAB_KEY, navigate_to_estimate_detail, set_nav_slug  # type: ignore
+
+    if eid:
+        navigate_to_estimate_detail(eid, tab="Materials")
+        st.rerun()
+        return
+
+    st.info("Materials are managed inside each estimate. Open an estimate from the Estimates list.")
+    if st.button("Go to Estimates", key="mat_redirect_estimates"):
+        st.session_state.pop(ESTIMATE_DETAIL_TAB_KEY, None)
+        set_nav_slug("estimates")
+        st.rerun()
+

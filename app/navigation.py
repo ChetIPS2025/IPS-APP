@@ -77,7 +77,7 @@ LEGACY_PAGE_LABEL_TO_SLUG: dict[str, str] = {
     "Pricing Guide": "pricing_guide",
     "Materials Catalog": "pricing_guide",
     "Material Catalog": "pricing_guide",
-    "Estimate Materials": "estimate_materials",
+    "Estimate Materials": "estimates",
     "Materials": "pricing_guide",
     "Inventory": "inventory",
     "Scan Inventory": "inventory",
@@ -117,6 +117,7 @@ LEGACY_PAGE_LABEL_TO_SLUG: dict[str, str] = {
 
 # Deferred cross-page jumps (legacy labels + slugs). Consumed in ``apply_pending_navigation()``.
 IPS_NAV_PENDING_KEY = "ips_nav_pending"
+ESTIMATE_DETAIL_TAB_KEY = "est_detail_active_tab"
 _INVENTORY_SCAN_SESSION_KEY = "_ips_inventory_scan_page"
 _ASSET_SCAN_SESSION_KEY = "_ips_asset_scan_page"
 
@@ -157,18 +158,11 @@ def redirect_to_jobs_job_costing(*, job_id: str = "") -> None:
 
 
 def navigate_to_estimate_materials(estimate_id: str) -> None:
-    """Open Estimate Materials for the given estimate."""
-    eid = str(estimate_id or "").strip()
-    try:
-        from app.pages._core._data import ACTIVE_ESTIMATE_KEY
-    except ImportError:
-        from pages._core._data import ACTIVE_ESTIMATE_KEY  # type: ignore
-    if eid:
-        st.session_state[ACTIVE_ESTIMATE_KEY] = eid
-    set_nav_slug("estimate_materials")
+    """Open estimate detail on the Materials tab (legacy entry point)."""
+    navigate_to_estimate_detail(estimate_id, tab="Materials")
 
 
-def navigate_to_estimate_detail(estimate_id: str) -> None:
+def navigate_to_estimate_detail(estimate_id: str, *, tab: str = "Details") -> None:
     """Open Estimates module with the estimate detail modal focused."""
     eid = str(estimate_id or "").strip()
     if not eid:
@@ -180,6 +174,7 @@ def navigate_to_estimate_detail(estimate_id: str) -> None:
     st.session_state[ACTIVE_ESTIMATE_KEY] = eid
     st.session_state["selected_estimate_id"] = eid
     st.session_state["show_estimate_detail_modal"] = True
+    st.session_state[ESTIMATE_DETAIL_TAB_KEY] = str(tab or "Details").strip() or "Details"
     set_nav_slug("estimates")
 
 
@@ -260,6 +255,8 @@ def normalize_nav_slug(raw: str | None) -> str:
         return default_nav_slug()
     if s in {"scan_inventory", "scan_asset"}:
         return "inventory" if s == "scan_inventory" else "assets"
+    if s == "estimate_materials":
+        return "estimates"
     if s in ACTIVE_MODULE_SLUGS:
         return "employees" if s == "users" else s
     if s == "job_costing":
@@ -272,6 +269,8 @@ def normalize_nav_slug(raw: str | None) -> str:
         return "jobs"
     if slug in {"scan_inventory", "scan_asset"}:
         return "inventory" if slug == "scan_inventory" else "assets"
+    if slug == "estimate_materials":
+        return "estimates"
     if slug in ACTIVE_MODULE_SLUGS:
         return "employees" if slug == "users" else slug
     return default_nav_slug()
@@ -337,6 +336,7 @@ __all__ = [
     "ASSET_SCAN_EMBED_KEY",
     "BUILT_MODULES",
     "INVENTORY_SCAN_EMBED_KEY",
+    "ESTIMATE_DETAIL_TAB_KEY",
     "IPS_NAV_PENDING_KEY",
     "JC_FOCUS_JOB_KEY",
     "JOBS_DETAIL_FOCUS_TAB_KEY",

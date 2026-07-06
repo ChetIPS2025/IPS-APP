@@ -30,13 +30,17 @@ try:
         set_view_mode,
         status_pill_html as modal_status_pill_html,
     )
+    from app.components.tabs import render_tabs
     from app.pages.estimate_builder_ui import (
-        render_cost_builder_tab,
-        render_markups_tab,
-        render_proposal_preview_tab,
-        render_scope_of_work_tab,
+        render_equipment_tab,
+        render_labor_tab,
+        render_other_costs_tab,
+        render_subcontractors_tab,
         render_summary_tab,
+        render_travel_tab,
     )
+    from app.pages.estimate_materials import render_estimate_materials_panel
+    from app.navigation import ESTIMATE_DETAIL_TAB_KEY
     from app.pages._core._data import (
         ACTIVE_ESTIMATE_KEY,
         customer_contact_select_options,
@@ -126,13 +130,17 @@ except ImportError:
         set_view_mode,
         status_pill_html as modal_status_pill_html,
     )
+    from components.tabs import render_tabs  # type: ignore
     from pages.estimate_builder_ui import (  # type: ignore
-        render_cost_builder_tab,
-        render_markups_tab,
-        render_proposal_preview_tab,
-        render_scope_of_work_tab,
+        render_equipment_tab,
+        render_labor_tab,
+        render_other_costs_tab,
+        render_subcontractors_tab,
         render_summary_tab,
+        render_travel_tab,
     )
+    from pages.estimate_materials import render_estimate_materials_panel  # type: ignore
+    from navigation import ESTIMATE_DETAIL_TAB_KEY  # type: ignore
     from pages._core._data import (  # type: ignore
         ACTIVE_ESTIMATE_KEY,
         customer_contact_select_options,
@@ -217,16 +225,16 @@ def _est_new_num_edited() -> None:
     st.session_state["est_new_num_manual"] = True
 
 
-_ESTIMATE_TABS = [
-    "Overview",
-    "Scope of Work",
-    "Cost Builder",
-    "Markups",
+_ESTIMATE_DETAIL_TABS = [
+    "Details",
+    "Materials",
+    "Labor",
+    "Equipment",
+    "Rentals",
+    "Subcontractors",
+    "Other Costs",
     "Summary",
-    "Proposal Preview",
-    "Attachments",
-    "Notes",
-    "Activity",
+    "Documents",
 ]
 _ESTIMATE_COLS = [0.35, 1.05, 2.2, 1.55, 1.05, 1.05, 1.15, 0.95, 1.15]
 _ESTIMATE_COL_MARKERS = ("sel", "num", "desc", "customer", "job", "status", "date", "total", "actions")
@@ -619,6 +627,7 @@ def _set_estimate_build_mode(est: dict) -> None:
     if _approved_estimate_editing_locked(est):
         return
     st.session_state[_build_mode_key(est)] = True
+    st.session_state[ESTIMATE_DETAIL_TAB_KEY] = "Labor"
     rk = record_session_key(est, "id", "estimate_number")
     set_view_mode(_MOD, rk)
 
@@ -1168,7 +1177,12 @@ def _clear_estimates_detail_modal() -> None:
     )
 
 
-def _open_estimates_detail_modal(estimate_id: str, estimate: dict | None = None) -> None:
+def _open_estimates_detail_modal(
+    estimate_id: str,
+    estimate: dict | None = None,
+    *,
+    tab: str = "Details",
+) -> None:
     open_record_modal(
         estimate_id,
         estimate,
@@ -1179,6 +1193,7 @@ def _open_estimates_detail_modal(estimate_id: str, estimate: dict | None = None)
     )
     if estimate:
         st.session_state[ACTIVE_ESTIMATE_KEY] = str(estimate.get("id") or "")
+    st.session_state[ESTIMATE_DETAIL_TAB_KEY] = str(tab or "Details").strip() or "Details"
 
 
 def _refresh_estimate_modal_cache(estimate_id: str) -> None:
@@ -1407,23 +1422,31 @@ def _render_estimate_detail_tabs(est: dict) -> None:
     customer = safe_value(est.get("customer"))
 
     if st.session_state.get(_build_mode_key(est)):
-        st.info("Build mode — add lines and review totals in Cost Builder.")
+        st.info("Build mode — use the cost tabs below to add lines and review totals.")
 
     editing_locked = _approved_estimate_editing_locked(est)
+    if eid and not is_demo_id(eid):
+        _sync_estimate_rollups_if_stale(eid)
+        fresh = get_estimate(eid)
+        if fresh:
+            est = fresh
 
-    (
-        tab_overview,
-        tab_scope,
-        tab_cost_builder,
-        tab_markups,
-        tab_summary,
-        tab_proposal,
-        tab_attachments,
-        tab_notes,
-        tab_activity,
-    ) = st.tabs(_ESTIMATE_TABS)
+    active_tab = render_tabs(
+        _ESTIMATE_DETAIL_TABS,
+        session_key=ESTIMATE_DETAIL_TAB_KEY,
+        default="Details",
+    )
 
-    with tab_overview:
+    pg_opts, inv_opts, asset_opts, vendor_opts = (
+        _cost_builder_option_lists() if eid and not is_demo_id(eid) else ([], [], [], [])
+    )
+
+    def _locked_msg(action: str) -> None:
+        placeholder_html(
+            f"This estimate is approved. Use **Revise Approved Estimate** to {action}."
+        )
+
+    if active_tab == "Details":
         overview_html = (
             f'<div class="ips-detail-grid">'
             f"{detail_field_html('Estimate #', en)}"
@@ -1456,80 +1479,59 @@ def _render_estimate_detail_tabs(est: dict) -> None:
             f"</div>"
         )
         st.markdown(dialog_card_html("Financial Summary", fin_html), unsafe_allow_html=True)
-        mat_c1, mat_c2 = st.columns(2, gap="small")
-        with mat_c1:
-            if st.button(
-                "Open Estimate Materials",
-                key=f"est_open_materials_{eid}",
-                use_container_width=True,
-                disabled=not eid or is_demo_id(eid),
-            ):
-                try:
-                    from app.navigation import navigate_to_estimate_materials
-                except ImportError:
-                    from navigation import navigate_to_estimate_materials  # type: ignore
-                navigate_to_estimate_materials(eid)
-                st.rerun()
-        with mat_c2:
-            st.caption("Material takeoff and pricing lines for this estimate.")
-        st.caption("Open the **Scope of Work** tab to view or edit the full project scope.")
+        st.caption("Use the **Materials**, **Labor**, and other cost tabs to build this estimate.")
 
-    with tab_scope:
-        if editing_locked:
-            placeholder_html("This estimate is approved. Use **Revise Approved Estimate** to edit scope.")
-        elif eid and not is_demo_id(eid):
-            render_scope_of_work_tab(
-                est,
-                persist_fn=_persist_scope_of_work,
-                on_saved=lambda: _on_estimate_scope_saved(eid),
-            )
+    elif active_tab == "Materials":
+        if eid and not is_demo_id(eid):
+            render_estimate_materials_panel(estimate_id=eid, est=est)
         else:
-            placeholder_html("Save this estimate to edit scope of work.")
+            placeholder_html("Save this estimate to add materials.")
 
-    with tab_cost_builder:
+    elif active_tab == "Labor":
         if editing_locked:
-            placeholder_html("This estimate is approved. Use **Revise Approved Estimate** to adjust pricing lines.")
+            _locked_msg("edit labor")
         elif eid and not is_demo_id(eid):
-            _sync_estimate_rollups_if_stale(eid)
-            fresh = get_estimate(eid)
-            if fresh:
-                est = fresh
-            pg_opts, inv_opts, asset_opts, vendor_opts = _cost_builder_option_lists()
-            render_cost_builder_tab(
-                est,
-                pricing_guide_options=pg_opts,
-                inventory_options=inv_opts,
-                asset_options=asset_opts,
-                vendor_options=vendor_opts,
-                on_saved=lambda: _on_estimate_cost_builder_saved(eid),
-            )
-
-    with tab_markups:
-        if editing_locked:
-            placeholder_html("This estimate is approved. Use **Revise Approved Estimate** to change markups.")
+            render_labor_tab(est)
         else:
-            render_markups_tab(est)
+            placeholder_html("Save this estimate to add labor.")
 
-    with tab_summary:
+    elif active_tab == "Equipment":
+        if editing_locked:
+            _locked_msg("edit equipment")
+        elif eid and not is_demo_id(eid):
+            render_equipment_tab(est, asset_options=asset_opts)
+        else:
+            placeholder_html("Save this estimate to add equipment.")
+
+    elif active_tab == "Rentals":
+        if editing_locked:
+            _locked_msg("edit rentals")
+        elif eid and not is_demo_id(eid):
+            render_travel_tab(est)
+        else:
+            placeholder_html("Save this estimate to add rental and travel costs.")
+
+    elif active_tab == "Subcontractors":
+        if editing_locked:
+            _locked_msg("edit subcontractors")
+        elif eid and not is_demo_id(eid):
+            render_subcontractors_tab(est, vendor_options=vendor_opts)
+        else:
+            placeholder_html("Save this estimate to add subcontractors.")
+
+    elif active_tab == "Other Costs":
+        if editing_locked:
+            _locked_msg("edit other costs")
+        elif eid and not is_demo_id(eid):
+            render_other_costs_tab(est)
+        else:
+            placeholder_html("Save this estimate to add other costs.")
+
+    elif active_tab == "Summary":
         render_summary_tab(est)
 
-    with tab_proposal:
-        render_proposal_preview_tab(est)
-
-    with tab_attachments:
+    elif active_tab == "Documents":
         placeholder_html("Estimate attachments will appear here when connected to document storage.")
-
-    with tab_notes:
-        notes_text = safe_value(est.get("notes"), "No notes entered.")
-        notes_html = (
-            f'<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
-            f"{html.escape(notes_text)}"
-            f"</p>"
-        )
-        st.markdown(dialog_card_html("Notes", notes_html), unsafe_allow_html=True)
-
-    with tab_activity:
-        placeholder_html("Estimate activity history will appear here when connected to Supabase.")
 
 
 def _render_estimate_revision_panel(est: dict) -> None:
