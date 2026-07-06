@@ -12,20 +12,21 @@ where
   or coalesce(quantity_checked_out, 0) <> round(coalesce(quantity_checked_out, 0))
   or coalesce(quantity_allocated, 0) <> round(coalesce(quantity_allocated, 0));
 
+-- Round existing inventory transaction quantity fields to whole numbers.
+-- Schema note: live inventory_transactions uses qty (signed), quantity, previous_quantity,
+-- and new_quantity (027/073). quantity_delta exists only in legacy 004_inventory.sql.
+
 update public.inventory_transactions
 set
   qty = round(qty),
   quantity = round(quantity),
-  quantity_delta = round(quantity_delta),
   previous_quantity = round(previous_quantity),
   new_quantity = round(new_quantity)
 where
   qty <> round(qty)
-  or quantity <> round(quantity)
-  or coalesce(quantity_delta, 0) <> round(coalesce(quantity_delta, 0))
+  or coalesce(quantity, 0) <> round(coalesce(quantity, 0))
   or coalesce(previous_quantity, 0) <> round(coalesce(previous_quantity, 0))
   or coalesce(new_quantity, 0) <> round(coalesce(new_quantity, 0));
-
 update public.pricing_guide_items
 set
   default_reorder_point = round(default_reorder_point),
