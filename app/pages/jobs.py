@@ -2640,9 +2640,6 @@ def _render_job_detail_tabs(job: dict, *, cost_summary: dict | None = None) -> N
             end_date=fmt_date(job.get("end_date")),
             progress_pct=progress_pct,
         )
-        if st.button("Edit Job", key=f"jobs_overview_edit_{job_key}", type="secondary"):
-            _set_job_edit_mode(job)
-            st.rerun()
 
     with tab_tasks:
         inject_tasks_module_css()

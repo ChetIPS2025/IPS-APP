@@ -18,7 +18,7 @@ except ImportError:
 def inject_job_detail_layout_css() -> None:
     st.markdown(
         """
-<style id="ips-job-detail-layout-v2">
+<style id="ips-job-detail-layout-v3">
 .ips-job-detail-control-page {
   width: 100%;
 }
@@ -260,6 +260,56 @@ div[data-testid="stPopoverBody"]:has(.job-detail-header-menu-panel) .stButton > 
   min-height: 34px !important;
   border-radius: 8px !important;
   font-size: 0.8125rem !important;
+}
+div[data-testid="stDialog"]:has(.ips-job-status-badge-editor-marker) [data-testid="stPopover"] > button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 0 !important;
+  width: auto !important;
+  height: 26px !important;
+  min-height: 26px !important;
+  padding: 0 12px !important;
+  border-radius: 999px !important;
+  border: none !important;
+  box-shadow: none !important;
+  font-size: 0.75rem !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  letter-spacing: 0.01em !important;
+}
+div[data-testid="stDialog"]:has(.ips-job-status-active) [data-testid="stPopover"] > button,
+div[data-testid="stDialog"]:has(.ips-job-status-badge-editor-marker.ips-job-status-active) [data-testid="stPopover"] > button {
+  background: #dcfce7 !important;
+  color: #14532d !important;
+}
+div[data-testid="stDialog"]:has(.ips-job-status-pending) [data-testid="stPopover"] > button,
+div[data-testid="stDialog"]:has(.ips-job-status-badge-editor-marker.ips-job-status-pending) [data-testid="stPopover"] > button {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+}
+div[data-testid="stDialog"]:has(.ips-job-status-scheduled) [data-testid="stPopover"] > button,
+div[data-testid="stDialog"]:has(.ips-job-status-badge-editor-marker.ips-job-status-scheduled) [data-testid="stPopover"] > button {
+  background: #ffedd5 !important;
+  color: #c2410c !important;
+}
+div[data-testid="stDialog"]:has(.ips-job-status-on-hold) [data-testid="stPopover"] > button,
+div[data-testid="stDialog"]:has(.ips-job-status-badge-editor-marker.ips-job-status-on-hold) [data-testid="stPopover"] > button {
+  background: #fee2e2 !important;
+  color: #b91c1c !important;
+}
+div[data-testid="stDialog"]:has(.ips-job-status-completed) [data-testid="stPopover"] > button,
+div[data-testid="stDialog"]:has(.ips-job-status-badge-editor-marker.ips-job-status-completed) [data-testid="stPopover"] > button {
+  background: #dbeafe !important;
+  color: #1d4ed8 !important;
+}
+div[data-testid="stDialog"]:has(.ips-job-status-closed) [data-testid="stPopover"] > button,
+div[data-testid="stDialog"]:has(.ips-job-status-badge-editor-marker.ips-job-status-closed) [data-testid="stPopover"] > button {
+  background: #e2e8f0 !important;
+  color: #475569 !important;
+}
+div[data-testid="stDialog"]:has(.ips-job-status-badge-editor-marker) [data-testid="stPopover"] > button:hover {
+  filter: brightness(0.96) !important;
 }
 </style>
         """,

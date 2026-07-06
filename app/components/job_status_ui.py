@@ -242,12 +242,14 @@ def render_job_status_badge_editor(
     """Clickable status badge that opens a dropdown and saves immediately."""
     jid = str(job.get("id") or "").strip()
     current = normalize_job_status(job.get("status"))
+    display = job_status_table_label(job.get("status"))
+    pill_cls = job_status_pill_class(display)
     archived = _job_is_archived(job)
     can_manage = can_manage_job_actions()
 
     if not jid or archived or not can_manage:
         st.markdown(
-            f'<div class="ips-job-detail-header-actions">{job_status_pill_html(current)}</div>',
+            f'<div class="ips-job-detail-header-actions">{job_status_pill_html(job.get("status"))}</div>',
             unsafe_allow_html=True,
         )
         return
@@ -261,11 +263,12 @@ def render_job_status_badge_editor(
     index = options.index(current) if current in options else 0
 
     st.markdown(
-        '<span class="ips-job-status-badge-editor-marker ips-job-detail-header-actions" aria-hidden="true"></span>',
+        f'<span class="ips-job-status-badge-editor-marker ips-job-detail-header-actions '
+        f'{pill_cls}" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
     with st.popover(
-        current,
+        display,
         help="Change job status",
         type="secondary",
         key=f"{key_prefix}_status_pop_{job_key}",
