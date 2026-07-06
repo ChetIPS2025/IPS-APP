@@ -10001,15 +10001,35 @@ div[data-testid="stDialog"]:has(.ips-estimate-detail-modal) div[role="dialog"] {
 div[data-testid="stDialog"]:has(.ips-estimate-detail-modal) .ips-tabs-wrap {{
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: 5;
   background: #ffffff;
   padding-top: 0.15rem;
-  margin-bottom: 0.45rem;
+  padding-bottom: 0.35rem;
+  margin-bottom: 0.65rem;
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9);
+}}
+div[data-testid="stDialog"]:has(.ips-estimate-detail-modal) .ips-tabs-wrap [data-testid="stRadio"] {{
+  display: block !important;
+  width: 100%;
+  max-width: 100%;
+  overflow: visible !important;
 }}
 div[data-testid="stDialog"]:has(.ips-estimate-detail-modal) .ips-tabs-wrap [data-testid="stRadio"] > div {{
+  display: flex !important;
+  flex-direction: row !important;
   flex-wrap: nowrap !important;
   overflow-x: auto !important;
+  overflow-y: hidden !important;
+  gap: 0.15rem !important;
+  width: 100%;
+  max-width: 100%;
   scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}}
+div[data-testid="stDialog"]:has(.ips-estimate-detail-modal) .ips-tabs-wrap [data-testid="stRadio"] label {{
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
 }}
 
 .ips-dialog-header {{
