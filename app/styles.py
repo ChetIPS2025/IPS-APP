@@ -13691,7 +13691,7 @@ def inject_ops_dashboard_css() -> None:
     """Compact operations dashboard layout — KPI row, news, quick actions, activity grid."""
     st.markdown(
         """
-<style id="ips-ops-dashboard-v24">
+<style id="ips-ops-dashboard-v25">
 /* ── App shell: flex main beside sidebar (desktop only) ── */
 .stApp:has(.ips-ops-dashboard-marker) [data-testid="stAppViewContainer"] {
   width: 100% !important;
@@ -13774,6 +13774,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stEle
 }
 .st-key-dashboard_ops_kpis,
 .st-key-dashboard_ops_row2,
+.st-key-dashboard_estimates_waiting_table,
 .st-key-dashboard_active_jobs_table {
   margin-bottom: 20px !important;
   width: 100% !important;
@@ -13783,6 +13784,219 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stEle
 }
 .st-key-dashboard_active_jobs_table {
   margin-top: 0 !important;
+}
+.st-key-dashboard_estimates_waiting_table {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 11px !important;
+  padding: 0.75rem !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06) !important;
+  box-sizing: border-box !important;
+}
+.st-key-dashboard_estimates_waiting_table [data-testid="stMarkdownContainer"],
+.st-key-dashboard_estimates_waiting_table [data-testid="stMarkdownContainer"] p {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+.ips-dash-est-waiting-head {
+  margin: 0 0 4px 0 !important;
+}
+.ips-dash-est-waiting-title {
+  margin: 0 !important;
+}
+.ips-dash-est-waiting-subtitle {
+  margin: 4px 0 0 0 !important;
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  color: #64748b !important;
+  line-height: 1.3 !important;
+}
+.ips-dash-est-waiting-empty {
+  margin: 8px 0 0 0 !important;
+  font-size: 0.8125rem !important;
+  color: #94a3b8 !important;
+  font-style: italic !important;
+}
+.ips-dash-est-table-scroll {
+  width: 100% !important;
+  overflow-x: auto !important;
+  margin-top: 12px !important;
+}
+.ips-dash-est-html-table {
+  width: 100% !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  table-layout: fixed !important;
+}
+.ips-dash-est-html-table thead {
+  display: table-header-group !important;
+}
+.ips-dash-est-html-table tbody {
+  display: table-row-group !important;
+}
+.ips-dash-est-html-table tr {
+  display: table-row !important;
+  height: 46px !important;
+}
+.ips-dash-est-html-table thead tr {
+  height: 44px !important;
+}
+.ips-dash-est-html-table th,
+.ips-dash-est-html-table td {
+  display: table-cell !important;
+  vertical-align: middle !important;
+  padding: 0 10px !important;
+  border-bottom: 1px solid #e8edf4 !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+.ips-dash-est-html-table thead th {
+  background: #eef2f7 !important;
+  color: #64748b !important;
+  font-size: 0.68rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+  white-space: nowrap !important;
+}
+.ips-dash-est-html-table tbody tr:hover {
+  background: #f8fbff !important;
+}
+.ips-dash-est-html-table .cell-wrapper {
+  display: flex !important;
+  align-items: center !important;
+  min-height: 46px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+.ips-dash-est-cell-right {
+  justify-content: flex-end !important;
+  text-align: right !important;
+}
+.ips-dash-est-cell-center {
+  justify-content: center !important;
+  text-align: center !important;
+}
+.ips-dash-est-link {
+  color: #2563eb !important;
+  font-weight: 800 !important;
+  font-size: 0.8125rem !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  transition: color 0.15s ease !important;
+  white-space: nowrap !important;
+}
+.ips-dash-est-desc-link {
+  display: inline-block !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+.ips-dash-est-link:hover,
+.ips-dash-est-link:focus {
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
+}
+.ips-dash-est-customer-cell,
+.ips-dash-est-date-cell {
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  color: #0f172a !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+.ips-dash-est-total-cell {
+  font-size: 0.8125rem !important;
+  font-weight: 800 !important;
+  color: #2563eb !important;
+  font-variant-numeric: tabular-nums !important;
+}
+.st-key-dashboard_estimates_waiting_table .ips-estimate-status-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 22px !important;
+  min-height: 22px !important;
+  max-height: 22px !important;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+}
+.st-key-dashboard_estimates_waiting_table .ips-estimate-status-draft {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+}
+.st-key-dashboard_estimates_waiting_table .ips-estimate-status-pending {
+  background: #fef3c7 !important;
+  color: #92400e !important;
+}
+.st-key-dashboard_estimates_waiting_table .ips-estimate-status-sent {
+  background: #dbeafe !important;
+  color: #1d4ed8 !important;
+}
+.ips-dash-est-actions {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 6px !important;
+  flex-wrap: nowrap !important;
+}
+.ips-dash-est-action {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 30px !important;
+  min-width: 58px !important;
+  padding: 0 10px !important;
+  border-radius: 8px !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  white-space: nowrap !important;
+  box-sizing: border-box !important;
+}
+.ips-dash-est-approve {
+  background: #ffffff !important;
+  color: #2563eb !important;
+  border: 1px solid #bfdbfe !important;
+}
+.ips-dash-est-approve:hover,
+.ips-dash-est-approve:focus {
+  background: #eff6ff !important;
+  border-color: #93c5fd !important;
+  color: #1d4ed8 !important;
+}
+.ips-dash-est-view {
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid #1e40af !important;
+}
+.ips-dash-est-view:hover,
+.ips-dash-est-view:focus {
+  filter: brightness(1.05) !important;
+}
+.st-key-dashboard_estimates_waiting_table .stButton > button {
+  min-height: 34px !important;
+  height: 34px !important;
+  border-radius: 8px !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  background: #ffffff !important;
+  color: #2563eb !important;
+  border: 1px solid #bfdbfe !important;
+  box-shadow: none !important;
+}
+.st-key-dashboard_estimates_waiting_table .stButton > button:hover {
+  background: #eff6ff !important;
+  border-color: #93c5fd !important;
+  color: #1d4ed8 !important;
 }
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stHorizontalBlock"]:has(.ips-page-title-block):has(.ips-page-actions-marker) {
   display: flex !important;

@@ -11,6 +11,7 @@ try:
     from app.auth import current_profile
     from app.components.cards import render_ops_kpi_row
     from app.components.dashboard_active_jobs_table import render_dashboard_active_jobs_table
+    from app.components.dashboard_estimates_waiting_table import render_dashboard_estimates_waiting_table
     from app.components.company_updates_feed import render_dashboard_company_updates_section
     from app.components.dashboard_preview_cards import render_dashboard_preview_sections
     from app.components.headers import (
@@ -20,6 +21,7 @@ try:
     from app.pages._core._data import (
         load_awarded_jobs,
         load_dashboard_kpis,
+        load_estimates,
         load_recent_company_updates,
         load_tasks,
         load_timekeeping_summaries,
@@ -30,6 +32,7 @@ except ImportError:
     from auth import current_profile  # type: ignore
     from components.cards import render_ops_kpi_row  # type: ignore
     from components.dashboard_active_jobs_table import render_dashboard_active_jobs_table  # type: ignore
+    from components.dashboard_estimates_waiting_table import render_dashboard_estimates_waiting_table  # type: ignore
     from components.company_updates_feed import render_dashboard_company_updates_section  # type: ignore
     from components.dashboard_preview_cards import render_dashboard_preview_sections  # type: ignore
     from components.headers import (  # type: ignore
@@ -39,6 +42,7 @@ except ImportError:
     from pages._core._data import (  # type: ignore
         load_awarded_jobs,
         load_dashboard_kpis,
+        load_estimates,
         load_recent_company_updates,
         load_tasks,
         load_timekeeping_summaries,
@@ -218,6 +222,8 @@ def render() -> None:
                     ],
                     key_prefix="ips_ops_qa",
                 )
+
+        render_dashboard_estimates_waiting_table(load_estimates(), limit=5)
 
         render_dashboard_active_jobs_table(load_awarded_jobs(), limit=12)
 
