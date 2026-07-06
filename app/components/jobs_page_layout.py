@@ -1191,7 +1191,7 @@ def inject_dashboard_active_jobs_table_css() -> None:
     """Scope real HTML table styling to the dashboard Active Jobs panel."""
     st.markdown(
         """
-<style id="ips-dashboard-active-jobs-table-v9">
+<style id="ips-dashboard-active-jobs-table-v10">
 .st-key-dashboard_active_jobs_table {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
@@ -1219,20 +1219,6 @@ def inject_dashboard_active_jobs_table_css() -> None:
   margin: 0 !important;
   font-size: 1.25rem !important;
   font-weight: 800 !important;
-}
-.st-key-dashboard_active_jobs_table [data-testid="stHorizontalBlock"]:has(.ips-dash-jobs-split-marker) {
-  gap: 0 !important;
-  align-items: stretch !important;
-}
-.st-key-dashboard_active_jobs_table [data-testid="stHorizontalBlock"]:has(.ips-dash-jobs-split-marker) > [data-testid="column"]:first-child {
-  flex: 1 1 auto !important;
-  min-width: 0 !important;
-}
-.st-key-dashboard_active_jobs_table [data-testid="stHorizontalBlock"]:has(.ips-dash-jobs-split-marker) > [data-testid="column"]:last-child {
-  flex: 0 0 110px !important;
-  width: 110px !important;
-  max-width: 110px !important;
-  min-width: 110px !important;
 }
 .ips-dash-jobs-table-scroll {
   width: 100%;
@@ -1389,79 +1375,6 @@ def inject_dashboard_active_jobs_table_css() -> None:
   white-space: nowrap;
   margin: 0 auto;
 }
-.ips-dash-actions-head {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 44px;
-  min-height: 44px;
-  max-height: 44px;
-  margin-bottom: 0;
-  padding: 0 6px;
-  background: #eef2f7;
-  color: #64748b;
-  font-size: 0.58rem;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  border: 1px solid #dbe3ef;
-  border-radius: 10px 10px 0 0;
-  box-sizing: border-box;
-}
-.ips-dash-action-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 46px;
-  min-height: 46px;
-  max-height: 46px;
-  padding: 0 4px;
-  border-bottom: 1px solid #eef2f7;
-  box-sizing: border-box;
-}
-.st-key-dashboard_active_jobs_table [data-testid="column"]:last-child [data-testid="stVerticalBlock"] {
-  gap: 0 !important;
-}
-.st-key-dashboard_active_jobs_table [data-testid="column"]:last-child [data-testid="stElementContainer"] {
-  margin: 0 !important;
-  padding: 0 !important;
-}
-.st-key-dashboard_active_jobs_table [data-testid="column"]:last-child .stButton,
-.st-key-dashboard_active_jobs_table [data-testid="column"]:last-child [data-testid="stButton"] {
-  width: 100% !important;
-  margin: 0 !important;
-}
-.st-key-dashboard_active_jobs_table [data-testid="column"]:last-child button[data-testid="stBaseButton-popover"],
-.st-key-dashboard_active_jobs_table [data-testid="column"]:last-child button[data-testid="stBaseButton-primary"] {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  min-height: 32px !important;
-  height: 32px !important;
-  max-height: 32px !important;
-  min-width: 88px !important;
-  width: auto !important;
-  max-width: 100% !important;
-  padding: 0 12px !important;
-  border-radius: 8px !important;
-  background: #2563eb !important;
-  border: 1px solid #2563eb !important;
-  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.24) !important;
-  color: #ffffff !important;
-  font-size: 0.72rem !important;
-  font-weight: 600 !important;
-  line-height: 1 !important;
-  white-space: nowrap !important;
-  margin: 0 auto !important;
-}
-.st-key-dashboard_active_jobs_table [data-testid="column"]:last-child button[data-testid="stBaseButton-popover"] p,
-.st-key-dashboard_active_jobs_table [data-testid="column"]:last-child button[data-testid="stBaseButton-popover"] span,
-.st-key-dashboard_active_jobs_table [data-testid="column"]:last-child button[data-testid="stBaseButton-primary"] p,
-.st-key-dashboard_active_jobs_table [data-testid="column"]:last-child button[data-testid="stBaseButton-primary"] span {
-  color: #ffffff !important;
-  white-space: nowrap !important;
-}
-.ips-dash-jobs-split-marker,
 .ips-dash-job-link-bridge-marker {
   display: none !important;
 }

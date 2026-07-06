@@ -8,13 +8,11 @@ from typing import Any
 import streamlit as st
 
 try:
-    from app.components.job_row_actions_ui import render_job_row_actions
     from app.components.job_status_ui import job_status_pill_html
     from app.services.job_financial_ui import job_list_financials_from_row
     from app.services.jobs_service import normalize_job_status
     from app.services.tasks_service import count_open_subjobs_by_job_id
 except ImportError:
-    from components.job_row_actions_ui import render_job_row_actions  # type: ignore
     from components.job_status_ui import job_status_pill_html  # type: ignore
     from services.job_financial_ui import job_list_financials_from_row  # type: ignore
     from services.jobs_service import normalize_job_status  # type: ignore
@@ -113,12 +111,6 @@ def _open_job_nav(job_id: str, job: dict[str, Any]) -> None:
         from navigation import set_nav_slug  # type: ignore
     set_nav_slug("jobs")
     st.rerun()
-
-
-def _open_job_edit(job: dict[str, Any]) -> None:
-    jid = str(job.get("id") or "").strip()
-    if jid:
-        st.session_state[f"job_edit_mode_{jid}"] = True
 
 
 def _job_link_html(job_id: str, label: str, *, extra_class: str = "") -> str:
@@ -423,33 +415,7 @@ def render_dashboard_active_jobs_table(
         }
 
         st.markdown(
-            '<span class="ips-dash-jobs-split-marker" aria-hidden="true"></span>',
+            _build_active_jobs_table_html(rows, subjob_counts=subjob_counts),
             unsafe_allow_html=True,
         )
-        table_col, actions_col = st.columns([12.73, 1], gap="small")
-
-        with table_col:
-            st.markdown(
-                _build_active_jobs_table_html(rows, subjob_counts=subjob_counts),
-                unsafe_allow_html=True,
-            )
-
-        with actions_col:
-            st.markdown(
-                '<div class="ips-dash-actions-head">ACTIONS</div>',
-                unsafe_allow_html=True,
-            )
-            for job in rows:
-                jid = str(job.get("id") or "").strip()
-                if not jid:
-                    continue
-                st.markdown('<div class="ips-dash-action-row">', unsafe_allow_html=True)
-                render_job_row_actions(
-                    job,
-                    on_open=_open_job_nav,
-                    on_edit=_open_job_edit,
-                    on_status_updated=lambda _jid, _status: None,
-                )
-                st.markdown("</div>", unsafe_allow_html=True)
-
         _render_dashboard_job_link_bridge(jobs_by_id)
