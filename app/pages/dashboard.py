@@ -199,31 +199,24 @@ def render() -> None:
                 limit=5,
             )
 
-        with st.container(key="dashboard_ops_row2"):
-            st.markdown(
-                '<span class="ips-ops-row2-grid-marker" aria-hidden="true"></span>',
-                unsafe_allow_html=True,
-            )
-            render_ops_quick_action_tiles(
-                [
-                    ("📁", "New Job", "jobs"),
-                    ("📄", "New Estimate", "estimates"),
-                    ("👤", "New Customer", "customers"),
-                    ("📝", "Daily Report", "field_daily_reports"),
-                    ("🕒", "Time Entry", "timekeeping"),
-                    ("📦", "Inventory", "inventory"),
-                    ("✅", "Create Task", "tasks"),
-                    ("📎", "Upload Document", "documents"),
-                    ("📦", "Add Inventory", "inventory"),
-                    ("🚛", "Add Asset", "assets"),
-                    ("📝", "Start Daily Report", "field_daily_reports"),
-                    ("📊", "Run Job Cost Report", "job_costing"),
-                ],
-                key_prefix="ips_ops_qa",
-            )
-
         render_dashboard_estimates_waiting_table(load_estimates(), limit=5)
 
         render_dashboard_active_jobs_table(load_awarded_jobs(), limit=12)
+
+        render_ops_quick_action_tiles(
+            [
+                ("📁", "New Job", "jobs"),
+                ("📄", "New Estimate", "estimates"),
+                ("👤", "New Customer", "customers"),
+                ("🕒", "Timekeeping", "timekeeping"),
+                ("📝", "Daily Report", "field_daily_reports"),
+                ("📦", "Inventory", "inventory"),
+                ("✅", "Create Task", "tasks"),
+                ("📎", "Upload Document", "documents"),
+                ("🚛", "Add Asset", "assets"),
+                ("📊", "Run Job Cost Report", "job_costing"),
+            ],
+            key_prefix="ips_ops_qa",
+        )
 
         render_dashboard_preview_sections()

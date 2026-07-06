@@ -14579,7 +14579,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   padding-left: 13px !important;
 }
 
-/* ── Quick actions card ── */
+/* ── Quick actions compact toolbar ── */
 .st-key-dashboard_ops_quick_actions {
   width: 100% !important;
   max-width: 100% !important;
@@ -14587,7 +14587,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   background: transparent !important;
   border: none !important;
   padding: 0 !important;
-  margin: 0 !important;
+  margin: 18px 0 8px !important;
   box-shadow: none !important;
   overflow: visible !important;
   box-sizing: border-box !important;
@@ -14605,71 +14605,73 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   position: static !important;
   transform: none !important;
 }
-.quick-actions-card {
-  display: flex;
-  flex-direction: column;
+.ips-ops-quick-toolbar {
   width: 100%;
   box-sizing: border-box;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 11px;
-  padding: 20px 24px;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
 }
-.quick-actions-card-header {
-  width: 100%;
-  margin: 0;
+.ips-ops-quick-toolbar-title {
+  margin: 0 0 10px;
   padding: 0;
-}
-.quick-actions-title {
-  margin: 0 0 18px 0;
-  padding: 0;
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: #0f172a;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
   line-height: 1.2;
 }
-.quick-actions-card-content {
-  width: 100%;
-  margin: 0;
-  padding: 0;
-}
 .quick-actions-toolbar {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px 14px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 10px;
   width: 100%;
   margin: 0;
   padding: 0;
 }
 .quick-actions-toolbar button,
 .quick-actions-toolbar .quick-action-btn {
-  width: 100%;
-  height: 40px;
-  min-width: 0;
-  padding: 0 16px;
+  width: auto;
+  height: 32px;
+  min-width: 130px;
+  padding: 0 12px;
   margin: 0;
-  border-radius: 8px;
+  border-radius: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   box-sizing: border-box;
   white-space: nowrap;
   cursor: pointer;
-  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
-  border: 1px solid #1e40af;
-  color: #ffffff;
+  background: #ffffff;
+  border: 1px solid #2563eb;
+  color: #0f172a;
   font-weight: 600;
+  font-size: 13px;
+  line-height: 1;
+  box-shadow: none;
+  transition: background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.quick-actions-toolbar .quick-action-icon {
   font-size: 14px;
   line-height: 1;
-  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.24);
-  transition: background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  flex-shrink: 0;
+}
+.quick-actions-toolbar .quick-action-label {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
 }
 .quick-actions-toolbar button:hover,
 .quick-actions-toolbar .quick-action-btn:hover {
-  background: linear-gradient(180deg, #1d4ed8 0%, #1e3a8a 100%);
-  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.34);
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.22);
+}
+.quick-actions-toolbar button:hover .quick-action-label,
+.quick-actions-toolbar .quick-action-btn:hover .quick-action-label {
+  color: #ffffff;
 }
 .ips-ops-section-title {
   margin: 0 0 12px;

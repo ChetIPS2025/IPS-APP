@@ -209,18 +209,18 @@ def _build_ops_quick_actions_html(
     buttons: list[str] = []
     for icon, label, slug in actions:
         slug_attr = html.escape(str(slug or "").strip(), quote=True)
-        text = html.escape(f"{icon}\u2002{label}")
+        icon_esc = html.escape(str(icon or "").strip())
+        label_esc = html.escape(str(label or "").strip())
         buttons.append(
-            f'<button type="button" class="quick-action-btn" data-nav-slug="{slug_attr}">{text}</button>'
+            f'<button type="button" class="quick-action-btn" data-nav-slug="{slug_attr}">'
+            f'<span class="quick-action-icon" aria-hidden="true">{icon_esc}</span>'
+            f'<span class="quick-action-label">{label_esc}</span>'
+            f"</button>"
         )
     return (
-        '<div class="quick-actions-card">'
-        '<div class="quick-actions-card-header">'
-        f'<h3 class="quick-actions-title">{html.escape(title)}</h3>'
-        "</div>"
-        '<div class="quick-actions-card-content">'
+        '<div class="ips-ops-quick-toolbar">'
+        f'<p class="ips-ops-quick-toolbar-title">{html.escape(title)}</p>'
         f'<div class="quick-actions-toolbar">{"".join(buttons)}</div>'
-        "</div>"
         "</div>"
     )
 
@@ -301,7 +301,7 @@ def render_ops_quick_action_tiles(
     key_prefix: str = "ips_ops_qa",
     title: str = "Quick Actions",
 ) -> None:
-    """Quick Actions card with toolbar buttons rendered inside the card shell."""
+    """Compact Quick Actions toolbar for the operations dashboard."""
     _ = key_prefix  # retained for call-site compatibility
     with st.container(key="dashboard_ops_quick_actions"):
         st.markdown(_build_ops_quick_actions_html(actions, title=title), unsafe_allow_html=True)
