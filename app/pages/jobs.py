@@ -197,7 +197,6 @@ except ImportError:
 _SEL = select_key("jobs")
 _TABLE_KEY = "jobs_list"
 _JOBS_MODAL_KEY = "ips_jobs_detail_modal_id"
-_JOB_LIST_OPEN_LAST_KEY = "_ips_jobs_list_open_last"
 
 
 def _job_new_num_edited() -> None:
@@ -976,7 +975,7 @@ def _open_job_from_list(job: dict) -> None:
     jid = str(job.get("id") or "").strip()
     if not jid:
         return
-    _activate_job_detail_modal(jid, job)
+    _open_jobs_detail_modal(jid, job)
     ips_app_rerun()
 
 
@@ -987,33 +986,30 @@ def _jobs_col_marker(name: str) -> str:
     )
 
 
-def _job_list_link_html(job_id: str, label: str, *, extra_class: str = "") -> str:
-    jid = html.escape(str(job_id or "").strip(), quote=True)
-    text = html.escape(label)
-    title = html.escape(label, quote=True)
-    cls = f"ips-jobs-list-link {extra_class}".strip()
-    return (
-        f'<a href="#" class="{html.escape(cls)}" data-job-id="{jid}" '
-        f'title="{title}">{text}</a>'
-    )
-
-
 def _render_job_list_link_cell(
-    job_id: str,
+    job: dict,
     label: str,
     *,
+    key: str,
     extra_class: str = "",
     truncate: bool = False,
 ) -> None:
-    wrapper_class = f"ips-jobs-table-link {extra_class}".strip()
+    wrapper_class = f"ips-jobs-table-link job-link-wrap {extra_class}".strip()
     if truncate:
         wrapper_class = f"{wrapper_class} ips-jobs-cell-truncate".strip()
     st.markdown(
-        f'<div class="{html.escape(wrapper_class)}">'
-        f"{_job_list_link_html(job_id, label, extra_class=extra_class)}"
-        f"</div>",
+        f'<div class="{html.escape(wrapper_class)}">',
         unsafe_allow_html=True,
     )
+    if st.button(
+        label,
+        key=key,
+        type="tertiary",
+        help="Open job details",
+        use_container_width=truncate,
+    ):
+        _open_job_from_list(job)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _on_job_status_updated(job_id: str, new_status: str) -> None:
@@ -1091,7 +1087,6 @@ def _clear_jobs_detail_modal() -> None:
     st.session_state.pop(JOB_DOC_UPLOAD_MODE_KEY, None)
     st.session_state.pop(JOB_DOC_PENDING_DELETE_ID_KEY, None)
     st.session_state.pop(JOB_DOC_PENDING_DELETE_JOB_KEY, None)
-    st.session_state.pop(_JOB_LIST_OPEN_LAST_KEY, None)
 
 
 @fragment
@@ -1196,18 +1191,20 @@ def _render_custom_jobs_table(
                         st.rerun()
                 num_label = job_no if job_no and job_no != "—" else "View job"
                 _render_job_list_link_cell(
-                    jid,
+                    job,
                     num_label,
-                    extra_class="ips-jobs-number-link job-number-link",
+                    key=f"job_open_num_{jid}",
+                    extra_class="ips-jobs-number-link job-number-link job-link",
                 )
 
             with cols[col_map["desc"]]:
                 st.markdown(_jobs_col_marker("desc"), unsafe_allow_html=True)
                 title_label = project if project and project != "—" else "View job"
                 _render_job_list_link_cell(
-                    jid,
+                    job,
                     title_label,
-                    extra_class="ips-jobs-title-link job-project-link",
+                    key=f"job_open_title_{jid}",
+                    extra_class="ips-jobs-title-link job-project-link job-link",
                     truncate=True,
                 )
 
@@ -1326,13 +1323,10 @@ def _render_custom_jobs_table(
         picked = render_jobs_row_click_bridge()
         if picked:
             open_id = str(picked).strip()
-            last_open = str(st.session_state.get(_JOB_LIST_OPEN_LAST_KEY) or "")
-            if open_id and open_id != last_open:
-                open_job = jobs_by_id.get(open_id)
-                if open_job:
-                    st.session_state[_JOB_LIST_OPEN_LAST_KEY] = open_id
-                    _activate_job_detail_modal(open_id, open_job)
-                    ips_app_rerun()
+            open_job = jobs_by_id.get(open_id)
+            if open_job:
+                _open_jobs_detail_modal(open_id, open_job)
+                ips_app_rerun()
 
     return all_job_ids
 
