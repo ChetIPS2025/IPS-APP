@@ -195,40 +195,115 @@ def render_person_profile_header(
     )
 
 
+def _build_ops_quick_actions_html(
+    actions: list[tuple[str, str, str]],
+    *,
+    title: str,
+) -> str:
+    buttons: list[str] = []
+    for icon, label, slug in actions:
+        slug_attr = html.escape(str(slug or "").strip(), quote=True)
+        text = html.escape(f"{icon}\u2002{label}")
+        buttons.append(
+            f'<button type="button" class="quick-action-btn" data-nav-slug="{slug_attr}">{text}</button>'
+        )
+    return (
+        '<div class="quick-actions-card">'
+        '<div class="quick-actions-card-header">'
+        f'<h3 class="quick-actions-title">{html.escape(title)}</h3>'
+        "</div>"
+        '<div class="quick-actions-card-content">'
+        f'<div class="quick-actions-toolbar">{"".join(buttons)}</div>'
+        "</div>"
+        "</div>"
+    )
+
+
+def _render_ops_quick_actions_nav_bridge() -> str | None:
+    try:
+        from app.ui.clean_table import _components_html
+    except ImportError:
+        from ui.clean_table import _components_html  # type: ignore
+
+    picked = _components_html(
+        """
+<script>
+(function () {
+  const w = window.parent || window;
+  const doc = w.document;
+  const hookKey = "ipsOpsQuickActions::nav";
+  const btnSel = ".quick-actions-toolbar .quick-action-btn[data-nav-slug]";
+
+  function sendValue(slug) {
+    const payload = { type: "streamlit:setComponentValue", value: slug };
+    const frames = [window, window.parent, w].filter(function (f, i, arr) {
+      return f && arr.indexOf(f) === i;
+    });
+    for (var i = 0; i < frames.length; i++) {
+      try {
+        if (frames[i].Streamlit && typeof frames[i].Streamlit.setComponentValue === "function") {
+          frames[i].Streamlit.setComponentValue(slug);
+          return;
+        }
+      } catch (err) {}
+    }
+    for (var j = 0; j < frames.length; j++) {
+      try { frames[j].postMessage(payload, "*"); } catch (err) {}
+    }
+  }
+
+  function bindButtons() {
+    doc.querySelectorAll(btnSel).forEach(function (btn) {
+      if (btn.dataset.ipsOpsQaBound === "1") return;
+      btn.dataset.ipsOpsQaBound = "1";
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const slug = btn.getAttribute("data-nav-slug");
+        if (slug) sendValue(slug);
+      });
+    });
+  }
+
+  if (!doc.ipsOpsQuickActionsRegistry) doc.ipsOpsQuickActionsRegistry = {};
+  doc.ipsOpsQuickActionsRegistry[hookKey] = { bind: bindButtons };
+  bindButtons();
+  if (!doc.ipsOpsQuickActionsBindObserver) {
+    doc.ipsOpsQuickActionsBindObserver = new MutationObserver(function () {
+      Object.values(doc.ipsOpsQuickActionsRegistry || {}).forEach(function (cfg) {
+        if (cfg && typeof cfg.bind === "function") cfg.bind();
+      });
+    });
+    doc.ipsOpsQuickActionsBindObserver.observe(doc.body, { childList: true, subtree: true });
+  }
+})();
+</script>
+        """,
+        component_key="ips_ops_quick_actions_nav",
+        height=0,
+    )
+    slug = str(picked or "").strip()
+    return slug or None
+
+
 def render_ops_quick_action_tiles(
     actions: list[tuple[str, str, str]],
     *,
     key_prefix: str = "ips_ops_qa",
     title: str = "Quick Actions",
 ) -> None:
-    """Single horizontal row of primary action tiles for the operations dashboard."""
+    """Quick Actions card with toolbar buttons rendered inside the card shell."""
+    _ = key_prefix  # retained for call-site compatibility
     with st.container(key="dashboard_ops_quick_actions"):
-        st.markdown(
-            '<span class="quick-actions-card-marker" aria-hidden="true"></span>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            f'<h3 class="quick-actions-title ips-ops-qa-title">{html.escape(title)}</h3>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            '<span class="quick-actions-container-marker" aria-hidden="true"></span>',
-            unsafe_allow_html=True,
-        )
-        for action_idx, (icon, label, slug) in enumerate(actions):
-            btn_label = f"{icon}\u2002{label}"
-            if st.button(
-                btn_label,
-                key=f"{key_prefix}_{action_idx}",
-                type="primary",
-            ):
-                if slug:
-                    try:
-                        from app.navigation import set_nav_slug
-                    except ImportError:
-                        from navigation import set_nav_slug  # type: ignore
-                    set_nav_slug(slug)
-                    st.rerun()
+        st.markdown(_build_ops_quick_actions_html(actions, title=title), unsafe_allow_html=True)
+        slug = _render_ops_quick_actions_nav_bridge()
+        if slug:
+            try:
+                from app.navigation import set_nav_slug
+            except ImportError:
+                from navigation import set_nav_slug  # type: ignore
+            set_nav_slug(slug)
+            st.rerun()
 
 
 def render_dashboard_quick_actions(

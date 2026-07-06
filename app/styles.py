@@ -13691,7 +13691,7 @@ def inject_ops_dashboard_css() -> None:
     """Compact operations dashboard layout — KPI row, news, quick actions, activity grid."""
     st.markdown(
         """
-<style id="ips-ops-dashboard-v21">
+<style id="ips-ops-dashboard-v22">
 /* ── App shell: flex main beside sidebar (desktop only) ── */
 .stApp:has(.ips-ops-dashboard-marker) [data-testid="stAppViewContainer"] {
   width: 100% !important;
@@ -14261,185 +14261,99 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   padding-left: 13px !important;
 }
 
-/* ── Quick actions: single horizontal row ── */
-.quick-actions-card,
+/* ── Quick actions card ── */
 .st-key-dashboard_ops_quick_actions {
-  background: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
-  border-radius: 11px !important;
-  padding: 20px 24px !important;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05) !important;
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
-  height: auto !important;
-  overflow: visible !important;
-  box-sizing: border-box !important;
-}
-.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlockBorderWrapper"] {
+  background: transparent !important;
+  border: none !important;
   padding: 0 !important;
   margin: 0 !important;
-  border: none !important;
-  background: transparent !important;
   box-shadow: none !important;
   overflow: visible !important;
+  box-sizing: border-box !important;
 }
 .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlockBorderWrapper"],
-.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"] {
-  width: 100% !important;
-  max-width: 100% !important;
-  min-width: 0 !important;
-  height: auto !important;
-  overflow: visible !important;
-}
-.quick-actions-container,
-.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlockBorderWrapper"] > [data-testid="stVerticalBlock"]:has(.quick-actions-container-marker),
-.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-container-marker),
-section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-container-marker) {
-  display: flex !important;
-  flex-direction: row !important;
-  flex-wrap: nowrap !important;
-  justify-content: center !important;
-  align-items: center !important;
-  gap: 20px !important;
-  width: 100% !important;
-  box-sizing: border-box !important;
-  position: static !important;
-  transform: none !important;
-}
-.st-key-dashboard_ops_quick_actions [data-testid="stElementContainer"]:has(.quick-actions-card-marker),
-.st-key-dashboard_ops_quick_actions [data-testid="stElementContainer"]:has(.quick-actions-container-marker) {
-  display: none !important;
-  height: 0 !important;
-  min-height: 0 !important;
+.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"],
+.st-key-dashboard_ops_quick_actions [data-testid="stElementContainer"],
+.st-key-dashboard_ops_quick_actions [data-testid="stMarkdownContainer"],
+.st-key-dashboard_ops_quick_actions [data-testid="stMarkdownContainer"] p {
   margin: 0 !important;
   padding: 0 !important;
-  overflow: hidden !important;
-}
-.quick-actions-card-marker,
-.quick-actions-container-marker {
-  display: none !important;
-}
-.quick-actions-card h3,
-.quick-actions-title,
-.st-key-dashboard_ops_quick_actions [data-testid="stElementContainer"]:has(.quick-actions-title),
-.st-key-dashboard_ops_quick_actions [data-testid="stElementContainer"]:has(.ips-ops-qa-title) {
-  flex: 0 0 100% !important;
-  width: 100% !important;
-  margin: 0 0 18px 0 !important;
-  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
   position: static !important;
-  top: auto !important;
-  bottom: auto !important;
-  left: auto !important;
-  right: auto !important;
   transform: none !important;
 }
-.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-container-marker) > [data-testid="stElementContainer"]:has(.stButton),
-.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-container-marker) > [data-testid="stElementContainer"]:has([data-testid="stButton"]) {
-  flex: 0 0 auto !important;
-  width: auto !important;
-  min-width: 0 !important;
-  min-height: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  position: static !important;
-  top: auto !important;
-  bottom: auto !important;
-  left: auto !important;
-  right: auto !important;
-  transform: none !important;
-  align-self: center !important;
+.quick-actions-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 11px;
+  padding: 20px 24px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
 }
-.st-key-dashboard_ops_quick_actions [data-testid="stElementContainer"] {
-  margin: 0 !important;
-  padding: 0 !important;
-  position: static !important;
-  top: auto !important;
-  bottom: auto !important;
-  left: auto !important;
-  transform: none !important;
+.quick-actions-card-header {
+  width: 100%;
+  margin: 0;
+  padding: 0;
 }
-.quick-actions-card h3,
-.quick-actions-title,
-.ips-ops-qa-title {
+.quick-actions-title {
+  margin: 0 0 18px 0;
+  padding: 0;
   font-size: 1.25rem;
   font-weight: 800;
   color: #0f172a;
   line-height: 1.2;
 }
-.st-key-dashboard_ops_quick_actions .stButton,
-.st-key-dashboard_ops_quick_actions [data-testid="stButton"] {
-  width: auto !important;
-  max-width: none !important;
-  min-width: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  position: static !important;
-  top: auto !important;
-  bottom: auto !important;
-  left: auto !important;
-  right: auto !important;
-  transform: none !important;
+.quick-actions-card-content {
+  width: 100%;
+  margin: 0;
+  padding: 0;
 }
-.st-key-dashboard_ops_quick_actions .stButton > button,
-.st-key-dashboard_ops_quick_actions [data-testid="stButton"] > button,
-.quick-action-btn,
-.quick-action-button,
-.quick-action-tile {
-  flex: 0 0 auto !important;
-  width: auto !important;
-  min-width: 150px !important;
-  height: 42px !important;
-  min-height: 42px !important;
-  max-height: 42px !important;
-  border-radius: 8px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 8px !important;
-  white-space: nowrap !important;
-  box-sizing: border-box !important;
-  position: static !important;
-  top: auto !important;
-  left: auto !important;
-  bottom: auto !important;
-  right: auto !important;
-  margin: 0 !important;
-  padding: 0 18px !important;
-  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%) !important;
-  border: 1px solid #1e40af !important;
-  color: #ffffff !important;
-  font-weight: 600 !important;
-  font-size: 14px !important;
-  line-height: 1 !important;
-  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.24) !important;
-  transition: background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease !important;
+.quick-actions-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
 }
-.st-key-dashboard_ops_quick_actions .stButton > button:hover,
-.st-key-dashboard_ops_quick_actions [data-testid="stButton"] > button:hover,
-.quick-action-btn:hover {
-  background: linear-gradient(180deg, #1d4ed8 0%, #1e3a8a 100%) !important;
-  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.34) !important;
-  transform: none !important;
+.quick-actions-toolbar button,
+.quick-actions-toolbar .quick-action-btn {
+  flex: 0 0 auto;
+  height: 40px;
+  min-width: 150px;
+  padding: 0 16px;
+  margin: 0;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-sizing: border-box;
+  white-space: nowrap;
+  cursor: pointer;
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+  border: 1px solid #1e40af;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.24);
+  transition: background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
-.st-key-dashboard_ops_quick_actions .stButton > button p,
-.st-key-dashboard_ops_quick_actions [data-testid="stButton"] > button p {
-  font-size: 14px !important;
-  font-weight: 600 !important;
-  white-space: nowrap !important;
-  line-height: 1 !important;
-  text-align: center !important;
-  width: auto !important;
-  max-width: 100% !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 8px !important;
-  color: #ffffff !important;
-  letter-spacing: 0.01em !important;
+.quick-actions-toolbar button:hover,
+.quick-actions-toolbar .quick-action-btn:hover {
+  background: linear-gradient(180deg, #1d4ed8 0%, #1e3a8a 100%);
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.34);
 }
 
 /* ── Today's activity grid ── */
@@ -14760,15 +14674,6 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stExp
   }
   .ips-ops-activity-grid {
     grid-template-columns: 1fr;
-  }
-}
-@media (max-width: 1200px) {
-  .quick-actions-container,
-  .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlockBorderWrapper"] > [data-testid="stVerticalBlock"]:has(.quick-actions-container-marker),
-  .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-container-marker) {
-    flex-wrap: wrap !important;
-    justify-content: center !important;
-    gap: 20px !important;
   }
 }
 @media (max-width: 480px) {
