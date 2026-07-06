@@ -112,6 +112,7 @@ try:
     from app.components.asset_row_actions_ui import (
         ASSET_OPEN_ACTIVITY_KEY,
         render_asset_activity_snippet,
+        render_asset_row_actions,
     )
     from app.components.assets_page_layout import (
         close_assets_filter_bar_shell,
@@ -249,6 +250,7 @@ except ImportError:
     from components.asset_row_actions_ui import (  # type: ignore
         ASSET_OPEN_ACTIVITY_KEY,
         render_asset_activity_snippet,
+        render_asset_row_actions,
     )
     from components.assets_page_layout import (  # type: ignore
         close_assets_filter_bar_shell,
@@ -299,7 +301,7 @@ _ASSETS_EQUIPMENT_LAYOUT_BUMP_KEY = "_ips_assets_equipment_layout_bump"
 _ALL_SMALL_TOOL_IDS_KEY = "_ips_small_tools_visible_ids"
 _TABLE_KEY = "assets_list"
 _SMALL_TOOLS_TABLE_KEY = "assets_small_tools_list"
-_ASSET_COLS = [0.42, 0.85, 4.5, 1.45, 1.55, 1.35, 1.65, 1.25]
+_ASSET_COLS = [0.42, 0.85, 3.0, 1.0, 1.15, 1.2, 1.05, 1.3, 1.05, 0.85]
 _SMALL_TOOL_COLS = [0.4, 0.8, 1.85, 0.95, 0.95, 1.25, 1.1, 0.9, 0.75]
 _SMALL_TOOL_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
@@ -323,11 +325,13 @@ _ASSET_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
     ("IMAGE", None),
     ("ASSET NAME", None),
+    ("ASSET #", None),
     ("CATEGORY", "category"),
     ("LOCATION", "location"),
     ("STATUS", "status"),
     ("ASSIGNED TO", None),
     ("NEXT SERVICE DUE", None),
+    ("ACTIONS", None),
 ]
 _COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
     ("category", lambda r: _asset_category(r)),
@@ -378,7 +382,7 @@ def _asset_category(row: dict) -> str:
 def _asset_rentable_badge_html(row: dict) -> str:
     if not asset_is_rentable(row):
         return ""
-    return '<span class="ips-asset-rentable-badge" title="Available on estimate equipment">Rentable</span>'
+    return '<span class="ips-asset-rental-badge" title="Rental equipment">RENTAL</span>'
 
 
 def _is_serialized_tab_asset(row: dict) -> bool:
@@ -998,30 +1002,50 @@ def _render_custom_assets_table(
 
             with cols[3]:
                 st.markdown(
-                    f'<div class="ips-assets-cell asset-category-cell">{html.escape(category)}</div>',
+                    f'<div class="ips-assets-cell ips-assets-muted">{html.escape(_asset_number(asset))}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[4]:
                 st.markdown(
-                    f'<div class="ips-assets-cell">{html.escape(location)}</div>',
+                    f'<div class="ips-assets-cell asset-category-cell">{html.escape(category)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[5]:
-                st.markdown(_asset_status_pill_html(status), unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="ips-assets-cell">{html.escape(location)}</div>',
+                    unsafe_allow_html=True,
+                )
 
             with cols[6]:
+                st.markdown(_asset_status_pill_html(status), unsafe_allow_html=True)
+
+            with cols[7]:
                 st.markdown(
                     f'<div class="ips-assets-muted ips-assets-cell">{html.escape(assigned)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[7]:
+            with cols[8]:
                 st.markdown(
                     f'<div class="ips-assets-muted ips-assets-cell">{html.escape(next_service)}</div>',
                     unsafe_allow_html=True,
                 )
+
+            with cols[9]:
+                if not is_field_context():
+                    st.markdown('<span class="asset-actions-cell" aria-hidden="true"></span>', unsafe_allow_html=True)
+                    render_asset_row_actions(
+                        asset,
+                        key_prefix=f"ast_eq_{aid}",
+                        on_view=lambda row: _open_assets_detail_modal(
+                            str(row.get("id") or "").strip(),
+                            row,
+                        ),
+                        on_edit=_set_asset_edit_mode,
+                        on_after_change=clear_assets_cache,
+                    )
 
             if expanded:
                 st.markdown('<div class="ips-field-row-expand">', unsafe_allow_html=True)
@@ -1204,7 +1228,7 @@ def _render_equipment_list(
     )
 
     def _filters() -> None:
-        c1, c2, c3, c4, c5, c6, c7 = st.columns([2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.6])
+        c1, c2, c3, c4, c5, c6 = st.columns([2.2, 1.0, 1.0, 1.0, 1.0, 0.6])
         with c1:
             st.text_input(
                 "Search",
@@ -1241,13 +1265,6 @@ def _render_equipment_list(
                 label_visibility="collapsed",
             )
         with c6:
-            st.selectbox(
-                "Rentable",
-                ["All", "Rentable only", "Not rentable"],
-                key="ast_bar_rentable",
-                label_visibility="collapsed",
-            )
-        with c7:
             if st.button("Clear", key="ast_clear", use_container_width=True):
                 clear_table_filters(
                     _TABLE_KEY,
@@ -1258,14 +1275,12 @@ def _render_equipment_list(
                         "ast_bar_location",
                         "ast_bar_status",
                         "ast_bar_department",
-                        "ast_bar_rentable",
                     ],
                 )
                 st.session_state["ast_bar_category"] = "All Categories"
                 st.session_state["ast_bar_location"] = "All Locations"
                 st.session_state["ast_bar_status"] = "All Statuses"
                 st.session_state["ast_bar_department"] = "All Departments"
-                st.session_state["ast_bar_rentable"] = "All"
                 reset_table_page(_TABLE_KEY)
                 _clear_asset_selection(st.session_state.get(_ALL_ASSET_IDS_KEY))
                 clear_field_expanded(FIELD_EXPANDED_ASSET_KEY)
@@ -1292,7 +1307,6 @@ def _render_equipment_list(
         location=str(st.session_state.get("ast_bar_location") or "All Locations"),
         status=str(st.session_state.get("ast_bar_status") or "All Statuses"),
         department=str(st.session_state.get("ast_bar_department") or "All Departments"),
-        rentable=str(st.session_state.get("ast_bar_rentable") or "All"),
     )
 
     summary = _equipment_summary_counts(filtered)
@@ -1417,7 +1431,6 @@ def _apply_assets_bar_filters(
     location: str,
     status: str,
     department: str,
-    rentable: str = "All",
 ) -> list[dict]:
     out = rows
     category_val = str(category or "All Categories").strip()
@@ -1432,11 +1445,6 @@ def _apply_assets_bar_filters(
     department_val = str(department or "All Departments").strip()
     if department_val and department_val != "All Departments":
         out = [r for r in out if _asset_department(r) == department_val]
-    rentable_val = str(rentable or "All").strip()
-    if rentable_val == "Rentable only":
-        out = [r for r in out if asset_is_rentable(r)]
-    elif rentable_val == "Not rentable":
-        out = [r for r in out if not asset_is_rentable(r)]
     return out
 
 
@@ -1448,7 +1456,6 @@ def _filter_rows(
     location: str = "All Locations",
     status: str = "All Statuses",
     department: str = "All Departments",
-    rentable: str = "All",
 ) -> list[dict]:
     out = _apply_assets_search_filter(rows, q)
     out = _apply_assets_bar_filters(
@@ -1457,7 +1464,6 @@ def _filter_rows(
         location=location,
         status=status,
         department=department,
-        rentable=rentable,
     )
     return apply_column_filters(out, _TABLE_KEY, _COLUMN_FILTER_SPECS)
 

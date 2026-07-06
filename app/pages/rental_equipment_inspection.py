@@ -172,14 +172,14 @@ def render() -> None:
 
     if not str(record.get("asset_id") or "").strip():
         st.error("No rental asset selected.")
-        if st.button("Back to Rental Equipment"):
+        if st.button("Back to Assets"):
             clear_rental_inspection_context()
             st.session_state.pop(_DRAFT_KEY, None)
             try:
                 from app.navigation import set_nav_slug
             except ImportError:
                 from navigation import set_nav_slug  # type: ignore
-            set_nav_slug("rental_equipment")
+            set_nav_slug("assets")
             st.rerun()
         return
 
@@ -345,7 +345,7 @@ def render() -> None:
                         from app.navigation import set_nav_slug
                     except ImportError:
                         from navigation import set_nav_slug  # type: ignore
-                    set_nav_slug("rental_equipment")
+                    set_nav_slug("assets")
                     st.rerun()
                 else:
                     st.error(result.error or "Could not complete inspection.")

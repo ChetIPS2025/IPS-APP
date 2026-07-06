@@ -122,6 +122,7 @@ LEGACY_PAGE_LABEL_TO_SLUG: dict[str, str] = {
     "Tool Trailer Audits": "assets",
     "Asset Scanner": "assets",
     "Scan Asset": "assets",
+    "Rental Equipment": "assets",
     "Certifications": "employee_certifications",
     "Employee Documents": "employee_documents",
 }

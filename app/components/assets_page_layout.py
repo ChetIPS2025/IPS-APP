@@ -296,23 +296,26 @@ section[data-testid="stMain"]:has(.ips-assets-page) [data-testid="column"]:has(.
   opacity: 0 !important;
   pointer-events: none !important;
 }
+.ips-asset-rental-badge,
 .ips-asset-rentable-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-left: 0.45rem;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  font-size: 0.65rem;
+  margin: 0.12rem 0 0;
+  padding: 0.12rem 0.42rem;
+  border-radius: 4px;
+  font-size: 0.58rem;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: #ffffff;
-  background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
-  border: 1px solid #0f766e;
-  box-shadow: 0 1px 3px rgba(15, 118, 110, 0.35);
+  color: #0f766e;
+  background: #ecfdf5;
+  border: 1px solid #99f6e4;
   vertical-align: middle;
   white-space: nowrap;
+}
+.ips-assets-name-badges {
+  margin-top: 0.05rem;
 }
 .ips-assets-name-text,
 .asset-name-link.ips-assets-name-text {

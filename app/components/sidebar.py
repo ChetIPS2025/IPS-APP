@@ -125,7 +125,7 @@ def render_sidebar(active_slug: str) -> None:
     store_sidebar_nav_fallback(nav_items)
 
     _ESTIMATING_SLUGS = frozenset({"estimates", "pricing_guide"})
-    _OPERATIONS_SLUGS = frozenset({"inventory", "assets", "rental_equipment"})
+    _OPERATIONS_SLUGS = frozenset({"inventory", "assets"})
     _LABOR_SLUGS = frozenset({"timekeeping"})
     _MANAGEMENT_SLUGS = frozenset({"tasks", "reports"})
     _ADMIN_SLUGS = frozenset({"employees", "admin", "settings"})
