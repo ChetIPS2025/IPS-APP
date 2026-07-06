@@ -106,6 +106,42 @@ def job_list_financials_from_row(job: dict[str, Any]) -> dict[str, float | bool]
     }
 
 
+def _linked_estimate_for_jobs_table(job: dict[str, Any]) -> dict[str, Any] | None:
+    """Resolve estimate linked by ``jobs.estimate_id`` or ``estimates.job_id``."""
+    try:
+        from app.services.estimate_job_workflow_service import _linked_estimate_row_for_job
+    except ImportError:
+        from services.estimate_job_workflow_service import _linked_estimate_row_for_job  # type: ignore
+    row = _linked_estimate_row_for_job(job)
+    return row if row else None
+
+
+def estimate_total_from_record(row: dict[str, Any]) -> float:
+    """Estimate selling total from stored estimate fields (not job ledger costing)."""
+    for key in ("customer_price", "total", "grand_total", "proposal_total", "final_bid", "amount"):
+        amount = parse_money(row.get(key))
+        if amount is not None and amount > 0:
+            return amount
+    return 0.0
+
+
+def job_table_list_financials_from_row(job: dict[str, Any]) -> dict[str, float | bool]:
+    """
+    Jobs list table snapshot: Estimated Cost from linked estimate total;
+    Actual Cost from accumulated job cost on the job row.
+    """
+    fin = job_list_financials_from_row(job)
+    est = _linked_estimate_for_jobs_table(job)
+    if not est:
+        fin["estimated_cost"] = 0.0
+        fin["has_estimated"] = False
+        return fin
+    est_total = estimate_total_from_record(est)
+    fin["estimated_cost"] = est_total
+    fin["has_estimated"] = est_total > 0.005
+    return fin
+
+
 def _fetch_estimate_for_financial_lock(estimate_id: str) -> dict[str, Any]:
     eid = str(estimate_id or "").strip()
     if not eid:

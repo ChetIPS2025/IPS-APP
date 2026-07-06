@@ -913,12 +913,16 @@ def _compute_job_list_cost_fields(job: dict, *, sync_if_empty: bool = False) -> 
 
 
 def _build_jobs_list_cost_cache(jobs: list[dict]) -> dict[str, dict[str, float | dict | bool]]:
+    try:
+        from app.services.job_financial_ui import job_table_list_financials_from_row
+    except ImportError:
+        from services.job_financial_ui import job_table_list_financials_from_row  # type: ignore
     cache: dict[str, dict[str, float | dict | bool]] = {}
     for job in jobs:
         jid = str(job.get("id") or "").strip()
         if not jid or jid in cache:
             continue
-        cache[jid] = _job_list_financials_from_row(job)
+        cache[jid] = job_table_list_financials_from_row(job)
     return cache
 
 
@@ -930,7 +934,11 @@ def _job_list_cost_fields(
     jid = str(job.get("id") or "").strip()
     if cost_cache is not None and jid and jid in cost_cache:
         return cost_cache[jid]
-    return _job_list_financials_from_row(job)
+    try:
+        from app.services.job_financial_ui import job_table_list_financials_from_row
+    except ImportError:
+        from services.job_financial_ui import job_table_list_financials_from_row  # type: ignore
+    return job_table_list_financials_from_row(job)
 
 
 def _jobs_summary_counts(
