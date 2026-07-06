@@ -5,12 +5,14 @@ from __future__ import annotations
 import csv
 import html
 import io
+from uuid import uuid4
 
 import streamlit as st
 
 try:
     from app.components.clickable_table import render_clickable_table
     from app.components.layout import render_filter_bar as layout_filter_bar
+    from app.components.searchable_select import render_searchable_selectbox
     from app.components.record_modal import (
         build_modal_cache,
         clear_record_modal,
@@ -45,9 +47,10 @@ try:
     )
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._session import select_key
+    from app.services.estimate_costing_service import delete_estimate_material
     from app.utils.formatting import fmt_currency
 except ImportError:
-    from components.clickable_table import render_clickable_table  # type: ignore
+    from components.searchable_select import render_searchable_selectbox  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.record_modal import (  # type: ignore
         build_modal_cache,
@@ -83,6 +86,7 @@ except ImportError:
     )
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._session import select_key  # type: ignore
+    from services.estimate_costing_service import delete_estimate_material  # type: ignore
     from utils.formatting import fmt_currency  # type: ignore
 
 _SEL = select_key("estimate_materials")
@@ -90,6 +94,8 @@ _MODULE = "estimate_materials"
 _TABLE_KEY = "mat_list"
 _MODAL_KEY = "ips_mat_detail_modal_id"
 _CACHE_KEY = "_ips_mat_modal_by_id"
+_TAKEOFF_DRAFT_COUNT = 5
+_CUSTOM_TAKEOFF_ITEM = "— Custom item —"
 
 
 def _estimate_materials_date(est: dict) -> str:
@@ -318,6 +324,279 @@ def _inventory_picker_options(items: list[dict]) -> tuple[list[str], dict[str, d
     return labels, by_id
 
 
+def _mat_takeoff_draft_key(estimate_id: str) -> str:
+    return f"mat_takeoff_batch_{estimate_id}"
+
+
+def _mat_takeoff_key(estimate_id: str, field: str, rid: str) -> str:
+    return f"mat_to_{estimate_id}_{field}_{rid}"
+
+
+def _inventory_search_options(items: list[dict]) -> tuple[list[str], list[tuple[str, dict]], dict[str, dict]]:
+    labels: list[str] = []
+    searchable: list[tuple[str, dict]] = []
+    by_label: dict[str, dict] = {}
+    for item in items:
+        iid = str(item.get("id") or "").strip()
+        if not iid or is_demo_id(iid):
+            continue
+        sku = str(item.get("sku") or "—").strip()
+        name = str(item.get("name") or "Item").strip()
+        label = f"{sku} — {name}"
+        labels.append(label)
+        searchable.append((label, item))
+        by_label[label] = item
+    pick_labels = [*labels, _CUSTOM_TAKEOFF_ITEM] if labels else [_CUSTOM_TAKEOFF_ITEM]
+    return pick_labels, searchable, by_label
+
+
+def _new_takeoff_row() -> dict[str, str]:
+    return {"rid": uuid4().hex[:8], "pick": _CUSTOM_TAKEOFF_ITEM}
+
+
+def _initial_takeoff_rows() -> list[dict[str, str]]:
+    return [_new_takeoff_row() for _ in range(_TAKEOFF_DRAFT_COUNT)]
+
+
+def _ensure_takeoff_draft(estimate_id: str) -> list[dict[str, str]]:
+    draft_key = _mat_takeoff_draft_key(estimate_id)
+    rows = list(st.session_state.get(draft_key) or [])
+    if len(rows) < _TAKEOFF_DRAFT_COUNT:
+        st.session_state[draft_key] = _initial_takeoff_rows()
+        rows = list(st.session_state.get(draft_key) or [])
+    return rows
+
+
+def _sync_takeoff_inventory_pick(
+    estimate_id: str,
+    rid: str,
+    pick: str,
+    inv_by_label: dict[str, dict],
+    *,
+    categories: list[str],
+    units: list[str],
+) -> None:
+    last_key = _mat_takeoff_key(estimate_id, f"last_pick_{rid}", rid)
+    if st.session_state.get(last_key) == pick:
+        return
+    if pick and pick != _CUSTOM_TAKEOFF_ITEM and pick in inv_by_label:
+        inv = inv_by_label[pick]
+        st.session_state[_mat_takeoff_key(estimate_id, "item", rid)] = str(inv.get("sku") or "")
+        st.session_state[_mat_takeoff_key(estimate_id, "desc", rid)] = str(inv.get("name") or "")
+        cat = str(inv.get("category") or "").strip()
+        if cat and cat in categories:
+            st.session_state[_mat_takeoff_key(estimate_id, "cat", rid)] = cat
+        unit = str(inv.get("unit") or "EA").strip()
+        if unit and unit in units:
+            st.session_state[_mat_takeoff_key(estimate_id, "unit", rid)] = unit
+        st.session_state[_mat_takeoff_key(estimate_id, "cost", rid)] = float(
+            inv.get("unit_cost") or inv.get("average_cost") or 0
+        )
+    elif pick == _CUSTOM_TAKEOFF_ITEM:
+        st.session_state.setdefault(_mat_takeoff_key(estimate_id, "item", rid), "")
+        st.session_state.setdefault(_mat_takeoff_key(estimate_id, "desc", rid), "")
+    st.session_state[last_key] = pick
+
+
+def _takeoff_row_has_data(estimate_id: str, rid: str) -> bool:
+    item_no = str(st.session_state.get(_mat_takeoff_key(estimate_id, "item", rid)) or "").strip()
+    desc = str(st.session_state.get(_mat_takeoff_key(estimate_id, "desc", rid)) or "").strip()
+    qty = float(st.session_state.get(_mat_takeoff_key(estimate_id, "qty", rid)) or 0)
+    return qty > 0 and bool(item_no or desc)
+
+
+def _first_empty_takeoff_rid(estimate_id: str) -> str | None:
+    for row in _ensure_takeoff_draft(estimate_id):
+        rid = str(row.get("rid") or "")
+        if rid and not _takeoff_row_has_data(estimate_id, rid):
+            return rid
+    return None
+
+
+def _populate_takeoff_row_from_inventory(estimate_id: str, rid: str, inv: dict, *, categories: list[str], units: list[str]) -> None:
+    st.session_state[_mat_takeoff_key(estimate_id, "item", rid)] = str(inv.get("sku") or "")
+    st.session_state[_mat_takeoff_key(estimate_id, "desc", rid)] = str(inv.get("name") or "")
+    cat = str(inv.get("category") or categories[0] if categories else "General")
+    st.session_state[_mat_takeoff_key(estimate_id, "cat", rid)] = cat if cat in categories else categories[0]
+    unit = str(inv.get("unit") or "EA")
+    st.session_state[_mat_takeoff_key(estimate_id, "unit", rid)] = unit if unit in units else units[0]
+    st.session_state[_mat_takeoff_key(estimate_id, "qty", rid)] = float(st.session_state.get("mat_inv_qty") or 1)
+    st.session_state[_mat_takeoff_key(estimate_id, "cost", rid)] = float(
+        inv.get("unit_cost") or inv.get("average_cost") or 0
+    )
+    st.session_state[_mat_takeoff_key(estimate_id, f"last_pick_{rid}", rid)] = _CUSTOM_TAKEOFF_ITEM
+
+
+def _render_saved_materials_list(estimate_id: str, materials: list[dict]) -> None:
+    if not materials:
+        return
+    st.caption("Saved material lines — remove with ✕, or add more lines below.")
+    for row in materials:
+        mid = str(row.get("id") or "").strip()
+        if not mid:
+            continue
+        c0, c1 = st.columns([10, 1], gap="small")
+        with c0:
+            st.markdown(
+                f"**{html.escape(str(row.get('item_number') or '—'))}** · "
+                f"{html.escape(str(row.get('description') or '—'))} · "
+                f"Qty {html.escape(str(row.get('qty') or ''))} · "
+                f"{html.escape(fmt_currency(row.get('total_cost')))}"
+            )
+        with c1:
+            if st.button("✕", key=f"mat_saved_del_{mid}", help="Delete material line"):
+                ok, err = delete_estimate_material(mid, estimate_id=estimate_id)
+                if ok:
+                    st.rerun()
+                else:
+                    st.error(str(err or "Could not delete line."))
+
+
+def _render_materials_takeoff_grid(estimate_id: str) -> None:
+    pick = str(estimate_id or "").strip()
+    categories = lookup_options("inventory_categories")
+    units = lookup_options("units")
+    inv_items = load_inventory()
+    pick_labels, searchable, inv_by_label = _inventory_search_options(inv_items)
+    draft_key = _mat_takeoff_draft_key(pick)
+    draft_rows = _ensure_takeoff_draft(pick)
+
+    st.caption(
+        f"{_TAKEOFF_DRAFT_COUNT} blank rows ready — type in Item # to search inventory, "
+        "then save. A new blank row appears when you fill the last one."
+    )
+    hdr = st.columns([1.2, 2.0, 1.0, 0.65, 0.65, 0.85, 0.85, 0.45], gap="small")
+    for col, label in zip(
+        hdr,
+        ("Item #", "Description", "Category", "Qty", "Unit", "Unit Cost", "Extended", ""),
+    ):
+        with col:
+            st.markdown(
+                f'<div style="font-size:0.72rem;font-weight:700;color:#64748b;">{html.escape(label)}</div>',
+                unsafe_allow_html=True,
+            )
+
+    remove_rid = ""
+    for row in draft_rows:
+        rid = str(row.get("rid") or "")
+        if not rid:
+            continue
+        st.session_state.setdefault(_mat_takeoff_key(pick, "qty", rid), 1.0)
+        st.session_state.setdefault(_mat_takeoff_key(pick, "cost", rid), 0.0)
+        st.session_state.setdefault(_mat_takeoff_key(pick, "cat", rid), categories[0] if categories else "General")
+        st.session_state.setdefault(_mat_takeoff_key(pick, "unit", rid), units[0] if units else "EA")
+        if _mat_takeoff_key(pick, f"pick_{rid}", rid) not in st.session_state:
+            st.session_state[_mat_takeoff_key(pick, f"pick_{rid}", rid)] = _CUSTOM_TAKEOFF_ITEM
+
+        cols = st.columns([1.2, 2.0, 1.0, 0.65, 0.65, 0.85, 0.85, 0.45], gap="small")
+        with cols[0]:
+            item_pick = render_searchable_selectbox(
+                "Item #",
+                pick_labels,
+                key=_mat_takeoff_key(pick, f"pick_{rid}", rid),
+                placeholder="Search item #…",
+                searchable_options=searchable,
+            )
+            _sync_takeoff_inventory_pick(pick, rid, item_pick, inv_by_label, categories=categories, units=units)
+            if item_pick == _CUSTOM_TAKEOFF_ITEM:
+                st.text_input(
+                    "Item #",
+                    key=_mat_takeoff_key(pick, "item", rid),
+                    label_visibility="collapsed",
+                    placeholder="Item #",
+                )
+        with cols[1]:
+            st.text_input(
+                "Description",
+                key=_mat_takeoff_key(pick, "desc", rid),
+                label_visibility="collapsed",
+                placeholder="Description",
+            )
+        with cols[2]:
+            st.selectbox(
+                "Category",
+                categories,
+                key=_mat_takeoff_key(pick, "cat", rid),
+                label_visibility="collapsed",
+            )
+        with cols[3]:
+            qty = st.number_input(
+                "Qty",
+                min_value=0.0,
+                step=1.0,
+                key=_mat_takeoff_key(pick, "qty", rid),
+                label_visibility="collapsed",
+            )
+        with cols[4]:
+            st.selectbox(
+                "Unit",
+                units,
+                key=_mat_takeoff_key(pick, "unit", rid),
+                label_visibility="collapsed",
+            )
+        with cols[5]:
+            unit_cost = st.number_input(
+                "Unit cost",
+                min_value=0.0,
+                step=1.0,
+                format="%.2f",
+                key=_mat_takeoff_key(pick, "cost", rid),
+                label_visibility="collapsed",
+            )
+        with cols[6]:
+            extended = float(qty or 0) * float(unit_cost or 0)
+            st.markdown(
+                f'<div style="padding-top:0.45rem;font-weight:700;font-size:0.82rem;">'
+                f"{html.escape(fmt_currency(extended))}</div>",
+                unsafe_allow_html=True,
+            )
+        with cols[7]:
+            if st.button("✕", key=_mat_takeoff_key(pick, "rm", rid), help="Remove row"):
+                remove_rid = rid
+
+    if draft_rows and _takeoff_row_has_data(pick, str(draft_rows[-1].get("rid") or "")):
+        extended_rows = list(draft_rows)
+        extended_rows.append(_new_takeoff_row())
+        st.session_state[draft_key] = extended_rows
+        st.rerun()
+
+    if remove_rid:
+        remaining = [r for r in draft_rows if str(r.get("rid")) != remove_rid]
+        st.session_state[draft_key] = remaining or _initial_takeoff_rows()
+        st.rerun()
+
+    if st.button("Save Material Lines", key=f"mat_takeoff_save_{pick}", type="primary", use_container_width=True):
+        saved = 0
+        errors: list[str] = []
+        for row in list(st.session_state.get(draft_key) or []):
+            rid = str(row.get("rid") or "")
+            if not rid or not _takeoff_row_has_data(pick, rid):
+                continue
+            ok, msg = persist_estimate_material(
+                {
+                    "estimate_id": pick,
+                    "item_number": st.session_state.get(_mat_takeoff_key(pick, "item", rid)),
+                    "description": st.session_state.get(_mat_takeoff_key(pick, "desc", rid)),
+                    "category": st.session_state.get(_mat_takeoff_key(pick, "cat", rid)),
+                    "qty": st.session_state.get(_mat_takeoff_key(pick, "qty", rid)),
+                    "unit": st.session_state.get(_mat_takeoff_key(pick, "unit", rid)),
+                    "unit_cost": st.session_state.get(_mat_takeoff_key(pick, "cost", rid)),
+                }
+            )
+            if ok:
+                saved += 1
+            elif msg:
+                errors.append(str(msg))
+        if saved:
+            st.session_state[draft_key] = _initial_takeoff_rows()
+            st.success(f"Saved {saved} material line{'s' if saved != 1 else ''}.")
+            st.rerun()
+        if errors:
+            st.error(errors[0])
+        else:
+            st.error("Enter at least one material line with item/description and quantity.")
+
+
 def _persist_inventory_material_line(*, estimate_id: str, inv: dict, qty: float) -> tuple[bool, str]:
     unit_cost = float(inv.get("unit_cost") or inv.get("average_cost") or 0)
     return persist_estimate_material(
@@ -370,29 +649,27 @@ def render_estimate_materials_panel(
     )
 
     def _mat_filters() -> None:
-        c1, c2, c3, c4 = st.columns([2, 1, 1, 1])
+        c1, c2, c3 = st.columns([2, 1, 1])
         with c1:
             st.text_input("Search", placeholder="Search materials…", key="mat_search", label_visibility="collapsed")
         with c2:
             if st.button("Add from Inventory", key="mat_add_inv", use_container_width=True):
                 st.session_state["ips_mat_inv_panel"] = True
-                st.session_state.pop("ips_mat_form", None)
         with c3:
             if st.button("Add Custom Item", key="mat_add_custom", use_container_width=True):
-                st.session_state["ips_mat_form"] = True
                 st.session_state.pop("ips_mat_inv_panel", None)
-        with c4:
-            if st.button("+ Add Material", key="mat_add", type="primary", use_container_width=True):
-                st.session_state["ips_mat_form"] = True
+                _ensure_takeoff_draft(pick)
 
     layout_filter_bar(_mat_filters)
 
     if mat_tab == "Add Items":
-        st.caption("Add lines using **Add from Inventory**, **Add Custom Item**, or **+ Add Material** above.")
+        st.caption("Use **Add from Inventory** or type directly in the blank rows on the **Materials** tab.")
 
     if st.session_state.get("ips_mat_inv_panel"):
         with st.expander("Add from inventory", expanded=True):
             inv_labels, inv_by_label = _inventory_picker_options(load_inventory())
+            categories = lookup_options("inventory_categories")
+            units = lookup_options("units")
             if not inv_labels:
                 st.warning("No live inventory items available.")
             else:
@@ -405,44 +682,27 @@ def render_estimate_materials_panel(
                         if not inv:
                             st.error("Select an inventory item.")
                         else:
-                            ok, msg = _persist_inventory_material_line(
-                                estimate_id=pick,
-                                inv=inv,
-                                qty=float(st.session_state.get("mat_inv_qty") or 1),
+                            draft_key = _mat_takeoff_draft_key(pick)
+                            draft_rows = _ensure_takeoff_draft(pick)
+                            target_rid = _first_empty_takeoff_rid(pick)
+                            if not target_rid:
+                                new_row = _new_takeoff_row()
+                                draft_rows = list(draft_rows) + [new_row]
+                                st.session_state[draft_key] = draft_rows
+                                target_rid = str(new_row.get("rid") or "")
+                            _populate_takeoff_row_from_inventory(
+                                pick,
+                                target_rid,
+                                inv,
+                                categories=categories,
+                                units=units,
                             )
-                            if apply_persist_feedback(ok, msg, clear_keys=("ips_mat_inv_panel",)):
-                                st.rerun()
+                            st.session_state.pop("ips_mat_inv_panel", None)
+                            st.rerun()
                 with cancel_col:
                     if st.button("Cancel", key="mat_inv_cancel", use_container_width=True):
                         st.session_state.pop("ips_mat_inv_panel", None)
                         st.rerun()
-
-    if st.session_state.get("ips_mat_form"):
-        with st.expander("Add material line", expanded=True):
-            st.text_input("Item #", key="mat_new_item")
-            st.text_input("Description", key="mat_new_desc")
-            st.selectbox("Category", lookup_options("inventory_categories"), key="mat_new_cat")
-            mc1, mc2, mc3 = st.columns(3)
-            with mc1:
-                st.number_input("Qty", value=1.0, key="mat_new_qty")
-            with mc2:
-                st.selectbox("Unit", lookup_options("units"), key="mat_new_unit")
-            with mc3:
-                st.number_input("Unit cost", value=0.0, key="mat_new_cost")
-            if st.button("Save line", key="mat_save_new", type="primary"):
-                ok, msg = persist_estimate_material(
-                    {
-                        "estimate_id": pick,
-                        "item_number": st.session_state.get("mat_new_item"),
-                        "description": st.session_state.get("mat_new_desc"),
-                        "category": st.session_state.get("mat_new_cat"),
-                        "qty": st.session_state.get("mat_new_qty"),
-                        "unit": st.session_state.get("mat_new_unit"),
-                        "unit_cost": st.session_state.get("mat_new_cost"),
-                    }
-                )
-                if apply_persist_feedback(ok, msg, clear_keys=("ips_mat_form",)):
-                    st.rerun()
 
     q = str(st.session_state.get("mat_search") or "").strip().lower()
     filtered = materials
@@ -469,27 +729,9 @@ def render_estimate_materials_panel(
             ]:
                 st.markdown(f"**{lbl}:** {fmt_currency(summ[key])}")
             st.markdown(f"</{ot}>", unsafe_allow_html=True)
-        else:
-            build_modal_cache(filtered, cache_key=_CACHE_KEY)
-            render_clickable_table(
-                filtered,
-                [
-                    ("item_number", "ITEM #"),
-                    ("description", "DESCRIPTION"),
-                    ("category", "CATEGORY"),
-                    ("qty", "QTY"),
-                    ("unit", "UNIT"),
-                    ("unit_cost", "UNIT COST"),
-                    ("total_cost", "TOTAL COST"),
-                ],
-                _TABLE_KEY,
-                row_id_key="id",
-                session_select_key=_SEL,
-                format_cell=_mat_display_cell,
-                click_caption="Click a row to open material details.",
-                on_row_selected=_open_mat_modal,
-            )
-            show_modal_if_pending(_MODAL_KEY, _show_mat_detail_modal)
+        elif mat_tab in ("Materials", "Add Items"):
+            _render_saved_materials_list(pick, filtered)
+            _render_materials_takeoff_grid(pick)
 
     with main_r:
         ot = "d" + "iv"
