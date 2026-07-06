@@ -445,11 +445,11 @@ def _render_saved_materials_list(estimate_id: str, materials: list[dict]) -> Non
             )
         with c1:
             if st.button("✕", key=f"mat_saved_del_{mid}", help="Delete material line"):
-                ok, err = delete_estimate_material(mid, estimate_id=estimate_id)
-                if ok:
+                result = delete_estimate_material(mid, estimate_id=estimate_id)
+                if result.ok:
                     st.rerun()
                 else:
-                    st.error(str(err or "Could not delete line."))
+                    st.error(str(result.error or "Could not delete line."))
 
 
 def _render_materials_takeoff_grid(estimate_id: str) -> None:
