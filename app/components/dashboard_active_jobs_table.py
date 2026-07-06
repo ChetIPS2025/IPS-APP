@@ -20,40 +20,31 @@ except ImportError:
     from services.jobs_service import normalize_job_status  # type: ignore
     from services.tasks_service import count_open_subjobs_by_job_id  # type: ignore
 
-_DASH_JOB_COLS = [0.55, 2.35, 1.15, 0.68, 0.72, 0.72, 0.72, 0.72, 0.58, 0.42, 0.85]
-_DASH_JOB_COL_MARKERS = (
-    "num",
-    "desc",
-    "customer",
-    "status",
-    "contract",
-    "estimated",
-    "actual",
-    "profit",
-    "margin",
-    "subjobs",
-    "actions",
+_DASH_HEADERS: tuple[tuple[str, str], ...] = (
+    ("num", "JOB #"),
+    ("desc", "PROJECT / DESCRIPTION"),
+    ("customer", "CUSTOMER"),
+    ("status", "STATUS"),
+    ("contract", "CONTRACT VALUE"),
+    ("estimated", "ESTIMATED COST"),
+    ("actual", "ACTUAL COST"),
+    ("profit", "GROSS PROFIT"),
+    ("margin", "MARGIN %"),
+    ("subjobs", "OPEN TASKS / SUBJOBS"),
 )
-_DASH_JOB_HEADERS: list[tuple[str, str | None]] = [
-    ("JOB #", None),
-    ("PROJECT / DESCRIPTION", None),
-    ("CUSTOMER", None),
-    ("STATUS", None),
-    ("CONTRACT VALUE", None),
-    ("ESTIMATED COST", None),
-    ("ACTUAL COST", None),
-    ("GROSS PROFIT", None),
-    ("MARGIN %", None),
-    ("OPEN TASKS / SUBJOBS", None),
-    ("ACTIONS", None),
-]
 
-
-def _col_marker(name: str) -> str:
-    return (
-        f'<span class="ips-jobs-col-marker ips-jobs-col-{html.escape(name)}" '
-        f'aria-hidden="true"></span>'
-    )
+_COL_WIDTHS_PX: dict[str, int] = {
+    "num": 90,
+    "desc": 320,
+    "customer": 220,
+    "status": 110,
+    "contract": 120,
+    "estimated": 120,
+    "actual": 120,
+    "profit": 120,
+    "margin": 90,
+    "subjobs": 90,
+}
 
 
 def _money_cell(value: float, *, available: bool = True) -> str:
@@ -130,33 +121,245 @@ def _open_job_edit(job: dict[str, Any]) -> None:
         st.session_state[f"job_edit_mode_{jid}"] = True
 
 
-def _render_job_link(
-    label: str,
+def _job_link_html(job_id: str, label: str, *, extra_class: str = "") -> str:
+    jid = html.escape(str(job_id or "").strip(), quote=True)
+    text = html.escape(label)
+    title = html.escape(label, quote=True)
+    cls = f"ips-dash-job-link {extra_class}".strip()
+    return (
+        f'<a href="#" class="{html.escape(cls)}" data-job-id="{jid}" '
+        f'title="{title}">{text}</a>'
+    )
+
+
+def _cell_wrapper(inner: str, *, extra_class: str = "", align: str = "left") -> str:
+    cls = f"cell-wrapper ips-dash-cell ips-dash-cell-{align} {extra_class}".strip()
+    return f'<div class="{html.escape(cls)}">{inner}</div>'
+
+
+def _build_active_jobs_table_html(
+    rows: list[dict[str, Any]],
     *,
-    key: str,
-    job: dict[str, Any],
-    extra_class: str = "",
-    truncate: bool = False,
-    use_container_width: bool | None = None,
-) -> None:
-    link_class = extra_class
-    if truncate:
-        link_class = f"{link_class} ips-jobs-cell-truncate".strip()
-    title_attr = f' title="{html.escape(label, quote=True)}"' if label else ""
-    btn_width = use_container_width if use_container_width is not None else (not truncate)
+    subjob_counts: dict[str, int],
+) -> str:
+    col_parts = [
+        f'<col class="ips-dash-col-{html.escape(key)}" style="width:{px}px;" />'
+        for key, px in _COL_WIDTHS_PX.items()
+    ]
+    head_parts = [
+        f'<th scope="col" class="ips-dash-th ips-dash-th-{html.escape(key)}">{html.escape(label)}</th>'
+        for key, label in _DASH_HEADERS
+    ]
+
+    body_rows: list[str] = []
+    for row_idx, job in enumerate(rows):
+        jid = str(job.get("id") or "").strip()
+        if not jid:
+            continue
+
+        job_no = _job_number(job)
+        project = _job_project(job)
+        customer = _job_customer(job)
+        status = normalize_job_status(job.get("status"))
+        costs = _job_cost_fields(job)
+        contract_val = float(costs["contract_value"])
+        estimated_val = float(costs["estimated_cost"])
+        actual_val = float(costs["actual_cost"])
+        profit_val = float(costs["profit"])
+        margin_val = float(costs["margin_pct"])
+        open_subjobs = int(subjob_counts.get(jid, 0))
+        has_contract = bool(costs["has_contract"])
+        has_estimated = bool(costs["has_estimated"])
+        has_actual = bool(costs["has_actual"])
+        has_profit_data = has_contract
+
+        profit_cls = ""
+        if has_profit_data:
+            if profit_val > 0:
+                profit_cls = " ips-jobs-money-positive"
+            elif profit_val < 0:
+                profit_cls = " ips-jobs-money-negative"
+
+        num_label = job_no if job_no and job_no != "—" else "View job"
+        title_label = project if project and project != "—" else "View job"
+        row_parity = "even" if row_idx % 2 else "odd"
+
+        cells = [
+            (
+                "num",
+                "left",
+                _cell_wrapper(
+                    _job_link_html(jid, num_label, extra_class="ips-dash-job-num-link"),
+                    extra_class="ips-dash-job-num-cell",
+                ),
+            ),
+            (
+                "desc",
+                "left",
+                _cell_wrapper(
+                    _job_link_html(jid, title_label, extra_class="ips-dash-job-desc-link"),
+                    extra_class="ips-dash-job-desc-cell",
+                ),
+            ),
+            (
+                "customer",
+                "left",
+                _cell_wrapper(
+                    html.escape(customer),
+                    extra_class="ips-dash-customer-cell",
+                ),
+            ),
+            (
+                "status",
+                "center",
+                _cell_wrapper(job_status_pill_html(status), extra_class="ips-dash-status-cell"),
+            ),
+            (
+                "contract",
+                "right",
+                _cell_wrapper(
+                    html.escape(_money_cell(contract_val, available=has_contract)),
+                    extra_class=f"ips-dash-money-cell{_money_cell_class(contract_val, available=has_contract)}",
+                    align="right",
+                ),
+            ),
+            (
+                "estimated",
+                "right",
+                _cell_wrapper(
+                    html.escape(_money_cell(estimated_val, available=has_estimated)),
+                    extra_class=f"ips-dash-money-cell{_money_cell_class(estimated_val, available=has_estimated)}",
+                    align="right",
+                ),
+            ),
+            (
+                "actual",
+                "right",
+                _cell_wrapper(
+                    html.escape(_money_cell(actual_val, available=has_actual)),
+                    extra_class=f"ips-dash-money-cell{_money_cell_class(actual_val, available=has_actual)}",
+                    align="right",
+                ),
+            ),
+            (
+                "profit",
+                "right",
+                _cell_wrapper(
+                    html.escape(_money_cell(profit_val, available=has_profit_data)),
+                    extra_class=(
+                        f"ips-dash-money-cell{profit_cls}"
+                        f"{_money_cell_class(profit_val, available=has_profit_data)}"
+                    ),
+                    align="right",
+                ),
+            ),
+            (
+                "margin",
+                "right",
+                _cell_wrapper(
+                    html.escape(_pct_cell(margin_val) if has_contract else "—"),
+                    extra_class=f"ips-dash-money-cell{profit_cls if has_contract else ' ips-jobs-money-empty'}",
+                    align="right",
+                ),
+            ),
+            (
+                "subjobs",
+                "center",
+                _cell_wrapper(f"{open_subjobs:,}", extra_class="ips-dash-subjobs-cell", align="center"),
+            ),
+        ]
+
+        tds = "".join(
+            f'<td class="ips-dash-td ips-dash-td-{html.escape(key)}">{content}</td>'
+            for key, _align, content in cells
+        )
+        body_rows.append(
+            f'<tr class="ips-dash-tr ips-dash-row-{row_parity}" data-job-id="{html.escape(jid, quote=True)}">'
+            f"{tds}"
+            f"</tr>"
+        )
+
+    return (
+        '<div class="ips-dash-jobs-table-scroll">'
+        '<table class="ips-dash-jobs-html-table">'
+        f"<colgroup>{''.join(col_parts)}</colgroup>"
+        f"<thead><tr class=\"ips-dash-tr ips-dash-head-row\">{''.join(head_parts)}</tr></thead>"
+        f"<tbody>{''.join(body_rows)}</tbody>"
+        "</table>"
+        "</div>"
+    )
+
+
+def _render_dashboard_job_link_bridge(jobs_by_id: dict[str, dict[str, Any]]) -> None:
+    try:
+        from app.ui.clean_table import _components_html
+    except ImportError:
+        from ui.clean_table import _components_html  # type: ignore
+
     st.markdown(
-        f'<div class="ips-jobs-cell-content ips-jobs-table-link {link_class}"{title_attr}>',
+        '<span class="ips-dash-job-link-bridge-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
-    if st.button(
-        label,
-        key=key,
-        type="tertiary",
-        help="Open job details",
-        use_container_width=btn_width,
-    ):
-        _open_job_nav(str(job.get("id") or ""), job)
-    st.markdown("</div>", unsafe_allow_html=True)
+    picked = _components_html(
+        """
+<script>
+(function () {
+  const w = window.parent || window;
+  const doc = w.document;
+  const hookKey = "ipsDashJobLink::active";
+  const tblSel = ".ips-dash-jobs-html-table";
+  const linkSel = ".ips-dash-job-link[data-job-id]";
+
+  function sendValue(id) {
+    const payload = { type: "streamlit:setComponentValue", value: id };
+    const frames = [window, window.parent, w].filter(function (f, i, arr) {
+      return f && arr.indexOf(f) === i;
+    });
+    for (var i = 0; i < frames.length; i++) {
+      try {
+        if (frames[i].Streamlit && typeof frames[i].Streamlit.setComponentValue === "function") {
+          frames[i].Streamlit.setComponentValue(id);
+          return;
+        }
+      } catch (err) {}
+    }
+    for (var j = 0; j < frames.length; j++) {
+      try { frames[j].postMessage(payload, "*"); } catch (err) {}
+    }
+  }
+
+  function bindLinks() {
+    doc.querySelectorAll(linkSel).forEach(function (link) {
+      if (link.dataset.ipsDashJobBound === "1") return;
+      link.dataset.ipsDashJobBound = "1";
+      link.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = link.getAttribute("data-job-id");
+        if (id) sendValue(id);
+      });
+    });
+  }
+
+  if (!doc.ipsDashJobLinkRegistry) doc.ipsDashJobLinkRegistry = {};
+  doc.ipsDashJobLinkRegistry[hookKey] = { bind: bindLinks };
+  bindLinks();
+  if (!doc.ipsDashJobLinkBindObserver) {
+    doc.ipsDashJobLinkBindObserver = new MutationObserver(function () {
+      Object.values(doc.ipsDashJobLinkRegistry || {}).forEach(function (cfg) {
+        if (cfg && typeof cfg.bind === "function") cfg.bind();
+      });
+    });
+    doc.ipsDashJobLinkBindObserver.observe(doc.body, { childList: true, subtree: true });
+  }
+})();
+</script>
+        """,
+        height=0,
+    )
+    open_id = str(picked or "").strip()
+    if open_id and open_id in jobs_by_id:
+        _open_job_nav(open_id, jobs_by_id[open_id])
 
 
 def render_dashboard_active_jobs_table(
@@ -164,7 +367,7 @@ def render_dashboard_active_jobs_table(
     *,
     limit: int = 10,
 ) -> None:
-    """Render the jobs-page-style Active Jobs table on the dashboard."""
+    """Render the Active Jobs table on the dashboard using a real HTML table."""
     try:
         from app.components.jobs_page_layout import inject_dashboard_active_jobs_table_css
     except ImportError:
@@ -204,157 +407,35 @@ def render_dashboard_active_jobs_table(
         except Exception:
             subjob_counts = {}
 
-        st.markdown('<div class="ips-jobs-table-wrap jobs-table ips-dash-jobs-table">', unsafe_allow_html=True)
+        jobs_by_id = {
+            str(job.get("id") or "").strip(): job
+            for job in rows
+            if str(job.get("id") or "").strip()
+        }
 
-        header_cols = st.columns(_DASH_JOB_COLS, gap="small", vertical_alignment="center")
-        for col, (label, _field), marker in zip(header_cols, _DASH_JOB_HEADERS, _DASH_JOB_COL_MARKERS):
-            with col:
-                st.markdown(_col_marker(marker), unsafe_allow_html=True)
-                st.markdown(
-                    f'<div class="ips-jobs-cell-content ips-jobs-header-row ips-jobs-cell">'
-                    f"{html.escape(label)}</div>",
-                    unsafe_allow_html=True,
-                )
+        st.markdown(
+            '<span class="ips-dash-jobs-split-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        table_col, actions_col = st.columns([12.73, 1], gap="small")
 
-        for row_idx, job in enumerate(rows):
-            jid = str(job.get("id") or "").strip()
-            if not jid:
-                continue
+        with table_col:
+            st.markdown(
+                _build_active_jobs_table_html(rows, subjob_counts=subjob_counts),
+                unsafe_allow_html=True,
+            )
+            _render_dashboard_job_link_bridge(jobs_by_id)
 
-            job_no = _job_number(job)
-            project = _job_project(job)
-            customer = _job_customer(job)
-            status = normalize_job_status(job.get("status"))
-            costs = _job_cost_fields(job)
-            contract_val = float(costs["contract_value"])
-            estimated_val = float(costs["estimated_cost"])
-            actual_val = float(costs["actual_cost"])
-            profit_val = float(costs["profit"])
-            margin_val = float(costs["margin_pct"])
-            open_subjobs = int(subjob_counts.get(jid, 0))
-            has_contract = bool(costs["has_contract"])
-            has_estimated = bool(costs["has_estimated"])
-            has_actual = bool(costs["has_actual"])
-            has_profit_data = has_contract
-
-            profit_cls = ""
-            if has_profit_data:
-                if profit_val > 0:
-                    profit_cls = " ips-jobs-money-positive"
-                elif profit_val < 0:
-                    profit_cls = " ips-jobs-money-negative"
-
-            row_parity = "even" if row_idx % 2 else "odd"
-            cols = st.columns(_DASH_JOB_COLS, gap="small", vertical_alignment="center")
-
-            with cols[0]:
-                st.markdown(
-                    f'<span class="ips-jobs-row-marker ips-jobs-table-row job-row jobs-table-row '
-                    f'ips-jobs-row-{row_parity}" data-row-id="{html.escape(jid, quote=True)}" '
-                    f'aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                st.markdown(_col_marker("num"), unsafe_allow_html=True)
-                num_label = job_no if job_no and job_no != "—" else "View job"
-                _render_job_link(
-                    num_label,
-                    key=f"dash_job_num_{jid}",
-                    job=job,
-                    extra_class="ips-jobs-number-link job-number-link",
-                    use_container_width=False,
-                )
-
-            with cols[1]:
-                st.markdown(_col_marker("desc"), unsafe_allow_html=True)
-                title_label = project if project and project != "—" else "View job"
-                _render_job_link(
-                    title_label,
-                    key=f"dash_job_title_{jid}",
-                    job=job,
-                    extra_class="ips-jobs-title-link job-project-link",
-                    truncate=True,
-                )
-
-            with cols[2]:
-                st.markdown(_col_marker("customer"), unsafe_allow_html=True)
-                customer_title = html.escape(customer, quote=True)
-                st.markdown(
-                    f'<div class="ips-jobs-cell-content ips-jobs-cell ips-jobs-customer-cell '
-                    f'ips-jobs-cell-truncate" title="{customer_title}">{html.escape(customer)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[3]:
-                st.markdown(_col_marker("status"), unsafe_allow_html=True)
-                st.markdown(
-                    '<span class="job-status-cell ips-jobs-status-cell" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    f'<div class="ips-jobs-cell-content ips-jobs-status-wrap">'
-                    f"{job_status_pill_html(status)}</div>",
-                    unsafe_allow_html=True,
-                )
-
-            with cols[4]:
-                st.markdown(_col_marker("contract"), unsafe_allow_html=True)
-                contract_cls = _money_cell_class(contract_val, available=has_contract)
-                st.markdown(
-                    f'<div class="ips-jobs-cell-content ips-jobs-money ips-jobs-cell ips-jobs-col-money{contract_cls}">'
-                    f"{html.escape(_money_cell(contract_val, available=has_contract))}</div>",
-                    unsafe_allow_html=True,
-                )
-            with cols[5]:
-                st.markdown(_col_marker("estimated"), unsafe_allow_html=True)
-                estimated_cls = _money_cell_class(estimated_val, available=has_estimated)
-                st.markdown(
-                    f'<div class="ips-jobs-cell-content ips-jobs-money ips-jobs-cell ips-jobs-col-money{estimated_cls}">'
-                    f"{html.escape(_money_cell(estimated_val, available=has_estimated))}</div>",
-                    unsafe_allow_html=True,
-                )
-            with cols[6]:
-                st.markdown(_col_marker("actual"), unsafe_allow_html=True)
-                actual_cls = _money_cell_class(actual_val, available=has_actual)
-                st.markdown(
-                    f'<div class="ips-jobs-cell-content ips-jobs-money ips-jobs-cell ips-jobs-col-money ips-jobs-money-actual{actual_cls}">'
-                    f"{html.escape(_money_cell(actual_val, available=has_actual))}</div>",
-                    unsafe_allow_html=True,
-                )
-            with cols[7]:
-                st.markdown(_col_marker("profit"), unsafe_allow_html=True)
-                profit_display_cls = _money_cell_class(profit_val, available=has_profit_data)
-                st.markdown(
-                    f'<div class="ips-jobs-cell-content ips-jobs-money ips-jobs-cell ips-jobs-col-money{profit_cls}{profit_display_cls}">'
-                    f"{html.escape(_money_cell(profit_val, available=has_profit_data))}</div>",
-                    unsafe_allow_html=True,
-                )
-            with cols[8]:
-                st.markdown(_col_marker("margin"), unsafe_allow_html=True)
-                margin_display = _pct_cell(margin_val) if has_contract else "—"
-                margin_cls = profit_cls if has_contract else " ips-jobs-money-empty"
-                st.markdown(
-                    f'<div class="ips-jobs-cell-content ips-jobs-money ips-jobs-cell ips-jobs-col-money{margin_cls}">'
-                    f"{html.escape(margin_display)}</div>",
-                    unsafe_allow_html=True,
-                )
-            with cols[9]:
-                st.markdown(_col_marker("subjobs"), unsafe_allow_html=True)
-                st.markdown(
-                    f'<div class="ips-jobs-cell-content ips-jobs-cell ips-jobs-col-subjobs">'
-                    f"{open_subjobs:,}</div>",
-                    unsafe_allow_html=True,
-                )
-            with cols[10]:
-                st.markdown(_col_marker("actions"), unsafe_allow_html=True)
-                st.markdown(
-                    '<span class="ips-jobs-actions-cell ips-jobs-actions-toolbar job-actions-cell" '
-                    'aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    '<div class="ips-jobs-cell-content ips-jobs-actions-wrap">',
-                    unsafe_allow_html=True,
-                )
+        with actions_col:
+            st.markdown(
+                '<div class="ips-dash-actions-head">ACTIONS</div>',
+                unsafe_allow_html=True,
+            )
+            for job in rows:
+                jid = str(job.get("id") or "").strip()
+                if not jid:
+                    continue
+                st.markdown('<div class="ips-dash-action-row">', unsafe_allow_html=True)
                 render_job_row_actions(
                     job,
                     on_open=_open_job_nav,
@@ -362,5 +443,3 @@ def render_dashboard_active_jobs_table(
                     on_status_updated=lambda _jid, _status: None,
                 )
                 st.markdown("</div>", unsafe_allow_html=True)
-
-        st.markdown("</div>", unsafe_allow_html=True)
