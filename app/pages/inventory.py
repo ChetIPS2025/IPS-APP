@@ -570,6 +570,21 @@ def _open_inventory_modal(record_id: str, record: dict | None) -> None:
     )
 
 
+def _inventory_select_options(slug: str, current: str) -> list[str]:
+    """Lookup dropdown values with constants fallback and the record's current value."""
+    opts = list(lookup_options(slug))
+    if not opts:
+        try:
+            from app.utils.constants import INVENTORY_CATEGORIES, INVENTORY_STATUSES
+        except ImportError:
+            from utils.constants import INVENTORY_CATEGORIES, INVENTORY_STATUSES  # type: ignore
+        opts = list(INVENTORY_CATEGORIES if slug == "inventory_categories" else INVENTORY_STATUSES)
+    cur = str(current or "").strip()
+    if cur and cur not in opts and cur != "—":
+        opts = [cur, *opts]
+    return opts
+
+
 def _seed_inventory_edit_form(item: dict) -> None:
     iid = str(item.get("id") or "")
     st.session_state[f"inv_edit_sku_{iid}"] = str(item.get("sku") or "")
@@ -826,8 +841,16 @@ def _render_inventory_edit_form(item: dict) -> None:
     with ic1:
         st.text_input("SKU", key=f"inv_edit_sku_{iid}")
         st.text_input("Name", key=f"inv_edit_name_{iid}")
-        st.selectbox("Category", lookup_options("inventory_categories"), key=f"inv_edit_cat_{iid}")
-        st.selectbox("Status", lookup_options("inventory_statuses"), key=f"inv_edit_status_{iid}")
+        st.selectbox(
+            "Category",
+            _inventory_select_options("inventory_categories", str(item.get("category") or "")),
+            key=f"inv_edit_cat_{iid}",
+        )
+        st.selectbox(
+            "Status",
+            _inventory_select_options("inventory_statuses", str(item.get("status") or "")),
+            key=f"inv_edit_status_{iid}",
+        )
     with ic2:
         st.text_input("Location", key=f"inv_edit_loc_{iid}")
         st.number_input("Qty on hand", key=f"inv_edit_qty_{iid}", min_value=0, step=1, format="%d")
@@ -1079,8 +1102,8 @@ def render() -> None:
         with st.expander("New Item", expanded=True):
             st.text_input("SKU", key="inv_new_sku")
             st.text_input("Item name", key="inv_new_name")
-            st.selectbox("Category", lookup_options("inventory_categories"), key="inv_new_cat")
-            st.selectbox("Status", lookup_options("inventory_statuses"), key="inv_new_status")
+            st.selectbox("Category", _inventory_select_options("inventory_categories", ""), key="inv_new_cat")
+            st.selectbox("Status", _inventory_select_options("inventory_statuses", "In Stock"), key="inv_new_status")
             st.file_uploader(
                 "Upload item image",
                 type=list(ITEM_IMAGE_UPLOAD_TYPES),

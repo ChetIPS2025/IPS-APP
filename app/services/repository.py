@@ -55,6 +55,25 @@ TABLE_COLUMN_CORE: dict[str, frozenset[str]] = {
             "sort_order",
         }
     ),
+    "inventory_items": frozenset(
+        {
+            "item_name",
+            "sku",
+            "category",
+            "storage_location",
+            "unit_cost",
+            "vendor",
+            "quantity_on_hand",
+            "reorder_point",
+            "qr_code_value",
+            "image_path",
+            "image_url",
+            "image_file_name",
+            "image_mime_type",
+            "image_uploaded_at",
+            "image_uploaded_by",
+        }
+    ),
 }
 
 
@@ -406,6 +425,48 @@ def insert_row_admin(table: str, payload: dict[str, Any]) -> ServiceResult:
     return _insert_with_optional_columns(table, payload, use_admin=True, action="save to")
 
 
+def _update_with_optional_columns(
+    table: str,
+    payload: dict[str, Any],
+    match: dict[str, Any],
+    *,
+    use_admin: bool,
+    action: str,
+) -> ServiceResult:
+    """
+    Update while dropping columns the remote schema does not recognize (PGRST204).
+
+    Mirrors :func:`_insert_with_optional_columns` for lagging Supabase migrations.
+    """
+    working = dict(payload)
+    last_exc: Exception | None = None
+
+    for _ in range(24):
+        filtered = filter_payload_to_table(table, working)
+        if not filtered:
+            break
+        try:
+            if use_admin:
+                rows = _db().update_rows_admin(table, filtered, match)
+            else:
+                rows = _db().update_rows(table, filtered, match)
+            clear_data_cache_for_table(table)
+            return ServiceResult(ok=True, data=rows[0] if rows else None)
+        except Exception as exc:
+            last_exc = exc
+            match_col = _PGRST204_COLUMN_RE.search(str(exc))
+            if match_col:
+                col = match_col.group(1)
+                if col in working:
+                    working.pop(col)
+                    continue
+            break
+
+    msg = _friendly_repo_error(last_exc or RuntimeError("Update failed"), table=table, action=action)
+    _LOG.warning("update %s (%s) failed: %s", table, "admin" if use_admin else "user", last_exc)
+    return ServiceResult(ok=False, error=msg)
+
+
 def update_row(table: str, payload: dict[str, Any], match: dict[str, Any]) -> ServiceResult:
     try:
         from app.perf_debug import perf_span
@@ -413,28 +474,12 @@ def update_row(table: str, payload: dict[str, Any], match: dict[str, Any]) -> Se
         from perf_debug import perf_span  # type: ignore
 
     with perf_span(f"repo.update_row:{table}"):
-        payload = filter_payload_to_table(table, payload)
-        try:
-            rows = _db().update_rows(table, payload, match)
-            clear_data_cache_for_table(table)
-            return ServiceResult(ok=True, data=rows[0] if rows else None)
-        except Exception as exc:
-            msg = _friendly_repo_error(exc, table=table, action="update")
-            _LOG.warning("update_row %s failed: %s", table, exc)
-            return ServiceResult(ok=False, error=msg)
+        return _update_with_optional_columns(table, payload, match, use_admin=False, action="update")
 
 
 def update_row_admin(table: str, payload: dict[str, Any], match: dict[str, Any]) -> ServiceResult:
     """Server-side update using service role (Streamlit writes when user JWT may be stale)."""
-    payload = filter_payload_to_table(table, payload)
-    try:
-        rows = _db().update_rows_admin(table, payload, match)
-        clear_data_cache_for_table(table)
-        return ServiceResult(ok=True, data=rows[0] if rows else None)
-    except Exception as exc:
-        msg = _friendly_repo_error(exc, table=table, action="update")
-        _LOG.warning("update_row_admin %s failed: %s", table, exc)
-        return ServiceResult(ok=False, error=msg)
+    return _update_with_optional_columns(table, payload, match, use_admin=True, action="update")
 
 
 def delete_row(table: str, match: dict[str, Any]) -> ServiceResult:

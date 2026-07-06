@@ -1682,21 +1682,34 @@ def save_estimate_line_item(ui: dict[str, Any], *, row_id: str | None = None) ->
     return insert_row("estimate_line_items", payload)
 
 
+def _inventory_save_text(value: Any, *, default: str = "") -> str:
+    """Coerce inventory text fields — Postgres NOT NULL text columns reject explicit null."""
+    if value is None:
+        return default
+    s = str(value).strip()
+    if s == "—":
+        return default
+    return s
+
+
 def save_inventory_item(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
     try:
         from app.services.inventory_display_helpers import resolve_inventory_qr_value, resolve_inventory_sku
     except ImportError:
         from services.inventory_display_helpers import resolve_inventory_qr_value, resolve_inventory_sku  # type: ignore
     sku = str(ui.get("sku") or ui.get("item_number") or "").strip()
+    item_name = _inventory_save_text(ui.get("name") or ui.get("item_name"))
+    if not item_name:
+        return ServiceResult(ok=False, error="Item name is required.")
     payload: dict[str, Any] = {
-        "item_name": ui.get("name") or ui.get("item_name"),
+        "item_name": item_name,
         "sku": sku or None,
-        "category": ui.get("category"),
-        "storage_location": ui.get("location"),
-        "department": ui.get("department") or "",
+        "category": _inventory_save_text(ui.get("category")),
+        "storage_location": _inventory_save_text(ui.get("location")),
+        "department": _inventory_save_text(ui.get("department")),
         "unit_cost": ui.get("unit_cost"),
-        "vendor": ui.get("vendor"),
-        "status": ui.get("status") or "In Stock",
+        "vendor": _inventory_save_text(ui.get("vendor")),
+        "status": _inventory_save_text(ui.get("status"), default="In Stock"),
     }
     try:
         from app.utils.inventory_quantity import try_parse_inventory_quantity
