@@ -147,7 +147,11 @@ def _build_active_jobs_table_html(
         for key, px in _COL_WIDTHS_PX.items()
     ]
     head_parts = [
-        f'<th scope="col" class="ips-dash-th ips-dash-th-{html.escape(key)}">{html.escape(label)}</th>'
+        (
+            f'<th scope="col" class="ips-dash-th ips-dash-th-{html.escape(key)}" '
+            f'style="width:{_COL_WIDTHS_PX[key]}px;max-width:{_COL_WIDTHS_PX[key]}px;">'
+            f"{html.escape(label)}</th>"
+        )
         for key, label in _DASH_HEADERS
     ]
 
@@ -270,7 +274,11 @@ def _build_active_jobs_table_html(
         ]
 
         tds = "".join(
-            f'<td class="ips-dash-td ips-dash-td-{html.escape(key)}">{content}</td>'
+            (
+                f'<td class="ips-dash-td ips-dash-td-{html.escape(key)}" '
+                f'style="width:{_COL_WIDTHS_PX[key]}px;max-width:{_COL_WIDTHS_PX[key]}px;">'
+                f"{content}</td>"
+            )
             for key, _align, content in cells
         )
         body_rows.append(
@@ -355,6 +363,7 @@ def _render_dashboard_job_link_bridge(jobs_by_id: dict[str, dict[str, Any]]) -> 
 })();
 </script>
         """,
+        component_key="ips_dash_active_jobs_link_bridge",
         height=0,
     )
     open_id = str(picked or "").strip()
@@ -424,7 +433,6 @@ def render_dashboard_active_jobs_table(
                 _build_active_jobs_table_html(rows, subjob_counts=subjob_counts),
                 unsafe_allow_html=True,
             )
-            _render_dashboard_job_link_bridge(jobs_by_id)
 
         with actions_col:
             st.markdown(
@@ -443,3 +451,5 @@ def render_dashboard_active_jobs_table(
                     on_status_updated=lambda _jid, _status: None,
                 )
                 st.markdown("</div>", unsafe_allow_html=True)
+
+        _render_dashboard_job_link_bridge(jobs_by_id)

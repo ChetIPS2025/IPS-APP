@@ -1191,7 +1191,7 @@ def inject_dashboard_active_jobs_table_css() -> None:
     """Scope real HTML table styling to the dashboard Active Jobs panel."""
     st.markdown(
         """
-<style id="ips-dashboard-active-jobs-table-v8">
+<style id="ips-dashboard-active-jobs-table-v9">
 .st-key-dashboard_active_jobs_table {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
@@ -1205,6 +1205,15 @@ def inject_dashboard_active_jobs_table_css() -> None:
   min-width: 0 !important;
   overflow: visible !important;
   box-sizing: border-box !important;
+}
+.st-key-dashboard_active_jobs_table [data-testid="stMarkdownContainer"],
+.st-key-dashboard_active_jobs_table [data-testid="stMarkdownContainer"] .stMarkdown,
+.st-key-dashboard_active_jobs_table [data-testid="stMarkdownContainer"] p {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+.st-key-dashboard_active_jobs_table [data-testid="stMarkdownContainer"] p:has(.ips-dash-jobs-table-scroll) {
+  display: block !important;
 }
 .ips-ops-jobs-table-title {
   margin: 0 !important;
@@ -1237,30 +1246,37 @@ def inject_dashboard_active_jobs_table_css() -> None:
   scrollbar-gutter: stable;
 }
 .ips-dash-jobs-html-table {
-  display: table;
+  display: table !important;
   width: 100%;
   min-width: 1400px;
   border-collapse: collapse;
   table-layout: fixed;
   border-spacing: 0;
 }
+.ips-dash-jobs-html-table col {
+  display: table-column !important;
+}
 .ips-dash-jobs-html-table thead {
-  display: table-header-group;
+  display: table-header-group !important;
 }
 .ips-dash-jobs-html-table tbody {
-  display: table-row-group;
+  display: table-row-group !important;
 }
 .ips-dash-jobs-html-table tr {
-  display: table-row;
-  height: 46px;
+  display: table-row !important;
+  height: 46px !important;
+  min-height: 46px !important;
+  max-height: 46px !important;
 }
 .ips-dash-jobs-html-table thead tr {
-  height: 44px;
+  height: 44px !important;
+  min-height: 44px !important;
+  max-height: 44px !important;
 }
 .ips-dash-jobs-html-table th,
 .ips-dash-jobs-html-table td {
-  display: table-cell;
-  vertical-align: middle;
+  display: table-cell !important;
+  vertical-align: middle !important;
   padding: 8px 12px;
   line-height: 1.2;
   white-space: nowrap;
@@ -1268,6 +1284,9 @@ def inject_dashboard_active_jobs_table_css() -> None:
   text-overflow: ellipsis;
   box-sizing: border-box;
   border-bottom: 1px solid #eef2f7;
+  position: static !important;
+  float: none !important;
+  transform: none !important;
 }
 .ips-dash-jobs-html-table thead th {
   position: sticky;
@@ -1309,7 +1328,7 @@ def inject_dashboard_active_jobs_table_css() -> None:
 .ips-dash-td-subjobs {
   text-align: center;
 }
-.cell-wrapper {
+.ips-dash-jobs-html-table .cell-wrapper {
   display: flex;
   align-items: center;
   height: 100%;

@@ -13691,7 +13691,7 @@ def inject_ops_dashboard_css() -> None:
     """Compact operations dashboard layout — KPI row, news, quick actions, activity grid."""
     st.markdown(
         """
-<style id="ips-ops-dashboard-v19">
+<style id="ips-ops-dashboard-v20">
 /* ── App shell: flex main beside sidebar (desktop only) ── */
 .stApp:has(.ips-ops-dashboard-marker) [data-testid="stAppViewContainer"] {
   width: 100% !important;
@@ -14267,7 +14267,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
   border-radius: 11px !important;
-  padding: 20px 24px !important;
+  padding: 22px 28px !important;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05) !important;
   width: 100% !important;
   max-width: 100% !important;
@@ -14298,7 +14298,8 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-subtitle 
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker) {
   display: grid !important;
   grid-template-columns: repeat(2, minmax(170px, 1fr)) !important;
-  gap: 16px !important;
+  column-gap: 36px !important;
+  row-gap: 18px !important;
   width: 100% !important;
   box-sizing: border-box !important;
   align-items: stretch !important;
@@ -14321,28 +14322,44 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_o
 .quick-actions-grid-marker {
   display: none !important;
 }
+.quick-actions-card h3,
 .st-key-dashboard_ops_quick_actions [data-testid="stElementContainer"]:has(.ips-ops-qa-title) {
   grid-column: 1 / -1 !important;
   margin: 0 !important;
   padding: 0 !important;
   width: 100% !important;
   position: static !important;
+  top: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+  transform: none !important;
 }
-.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker) [data-testid="stElementContainer"]:has([data-testid="stHorizontalBlock"] .stButton),
-.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker) [data-testid="stHorizontalBlock"]:has(.stButton),
-.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker) [data-testid="column"]:has(.stButton),
-.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker) [data-testid="column"]:has(.stButton) > [data-testid="stVerticalBlock"],
-.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker) [data-testid="column"]:has(.stButton) [data-testid="stElementContainer"]:has(.stButton) {
-  display: contents !important;
+.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker) > [data-testid="stElementContainer"]:has(.stButton),
+.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker) > [data-testid="stElementContainer"]:has([data-testid="stButton"]) {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  position: static !important;
+  top: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+  transform: none !important;
+  align-self: stretch !important;
 }
 .st-key-dashboard_ops_quick_actions [data-testid="stElementContainer"] {
   margin: 0 !important;
   padding: 0 !important;
   position: static !important;
   top: auto !important;
+  bottom: auto !important;
   left: auto !important;
   transform: none !important;
 }
+.quick-actions-card h3,
 .ips-ops-qa-title {
   margin: 0 0 18px 0 !important;
   padding: 0 !important;
@@ -14360,29 +14377,34 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_o
   padding: 0 !important;
   position: static !important;
   top: auto !important;
+  bottom: auto !important;
   left: auto !important;
+  right: auto !important;
+  transform: none !important;
 }
 .st-key-dashboard_ops_quick_actions .stButton > button,
 .st-key-dashboard_ops_quick_actions [data-testid="stButton"] > button,
+.quick-action-btn,
 .quick-action-button,
 .quick-action-tile {
   width: 100% !important;
-  min-height: 40px !important;
-  height: 40px !important;
-  max-height: 40px !important;
-  border-radius: 8px !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  max-height: 42px !important;
+  border-radius: 10px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 8px !important;
+  gap: 10px !important;
   white-space: nowrap !important;
   box-sizing: border-box !important;
   position: static !important;
   top: auto !important;
   left: auto !important;
   bottom: auto !important;
+  right: auto !important;
   margin: 0 !important;
-  padding: 0 14px !important;
+  padding: 0 16px !important;
   background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%) !important;
   border: 1px solid #1e40af !important;
   color: #ffffff !important;
@@ -14390,13 +14412,14 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_o
   font-size: 14px !important;
   line-height: 1 !important;
   box-shadow: 0 2px 6px rgba(37, 99, 235, 0.24) !important;
-  transition: all 0.15s ease !important;
+  transition: background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease !important;
 }
 .st-key-dashboard_ops_quick_actions .stButton > button:hover,
-.st-key-dashboard_ops_quick_actions [data-testid="stButton"] > button:hover {
+.st-key-dashboard_ops_quick_actions [data-testid="stButton"] > button:hover,
+.quick-action-btn:hover {
   background: linear-gradient(180deg, #1d4ed8 0%, #1e3a8a 100%) !important;
   box-shadow: 0 6px 14px rgba(37, 99, 235, 0.34) !important;
-  transform: translateY(-2px) !important;
+  transform: none !important;
 }
 .st-key-dashboard_ops_quick_actions .stButton > button p,
 .st-key-dashboard_ops_quick_actions [data-testid="stButton"] > button p {
@@ -14412,7 +14435,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-dashboard_o
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 8px !important;
+  gap: 10px !important;
   color: #ffffff !important;
   letter-spacing: 0.01em !important;
 }
@@ -14742,7 +14765,8 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stExp
   .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlockBorderWrapper"] > [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker),
   .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker) {
     grid-template-columns: repeat(2, minmax(150px, 1fr)) !important;
-    gap: 16px !important;
+    column-gap: 24px !important;
+    row-gap: 16px !important;
   }
 }
 @media (max-width: 480px) {
@@ -14753,7 +14777,8 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stExp
   .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlockBorderWrapper"] > [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker),
   .st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"]:has(.quick-actions-grid-marker) {
     grid-template-columns: 1fr !important;
-    gap: 16px !important;
+    column-gap: 0 !important;
+    row-gap: 14px !important;
   }
 }
 </style>
