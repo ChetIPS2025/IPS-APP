@@ -585,16 +585,14 @@ def _render_inventory_qr_block(item: dict) -> None:
     """Clickable QR, scan link, and printable label downloads."""
     try:
         from app.services.inventory_qr_labels import (
-            inventory_label_2x1_sticker_download_filename,
-            inventory_label_2x1_sticker_pdf_bytes,
-            inventory_label_for_download,
+            inventory_label_download_basename,
+            inventory_label_png_bytes,
             inventory_qr_subject,
         )
     except ImportError:
         from services.inventory_qr_labels import (  # type: ignore
-            inventory_label_2x1_sticker_download_filename,
-            inventory_label_2x1_sticker_pdf_bytes,
-            inventory_label_for_download,
+            inventory_label_download_basename,
+            inventory_label_png_bytes,
             inventory_qr_subject,
         )
 
@@ -630,60 +628,18 @@ def _render_inventory_qr_block(item: dict) -> None:
             if scan_url.startswith("http"):
                 st.caption("Scan URL")
                 st.code(scan_url, language=None)
-        act1, act2, act3 = st.columns(3)
-        with act1:
-            try:
-                dl_bytes, dl_mime, dl_name = inventory_label_for_download(item, subject)
-                st.download_button(
-                    "Print Label",
-                    data=dl_bytes,
-                    file_name=dl_name,
-                    mime=dl_mime,
-                    key=f"inv_qr_label_{iid}",
-                    use_container_width=True,
-                )
-            except Exception:
-                if qr_png:
-                    st.download_button(
-                        "Download QR (PNG)",
-                        data=qr_png,
-                        file_name=f"{sku}_qr.png",
-                        mime="image/png",
-                        key=f"inv_qr_png_{iid}",
-                        use_container_width=True,
-                    )
-        with act2:
-            try:
-                st.download_button(
-                    "4×1 sticker",
-                    data=inventory_label_2x1_sticker_pdf_bytes(item, subject),
-                    file_name=inventory_label_2x1_sticker_download_filename(item),
-                    mime="application/pdf",
-                    key=f"inv_qr_sticker_{iid}",
-                    use_container_width=True,
-                )
-            except Exception:
-                pass
-        with act3:
-            try:
-                from app.services.inventory_qr_labels import inventory_label_png_bytes
-            except ImportError:
-                from services.inventory_qr_labels import inventory_label_png_bytes  # type: ignore
-            try:
-                from app.services.inventory_qr_labels import inventory_label_download_basename
-            except ImportError:
-                from services.inventory_qr_labels import inventory_label_download_basename  # type: ignore
-            try:
-                st.download_button(
-                    "Label PNG",
-                    data=inventory_label_png_bytes(item, subject),
-                    file_name=f"{inventory_label_download_basename(item)}.png",
-                    mime="image/png",
-                    key=f"inv_qr_label_png_{iid}",
-                    use_container_width=True,
-                )
-            except Exception:
-                pass
+        try:
+            st.download_button(
+                "Label PNG",
+                data=inventory_label_png_bytes(item, subject),
+                file_name=f"{inventory_label_download_basename(item)}.png",
+                mime="image/png",
+                key=f"inv_qr_label_png_{iid}",
+                type="primary",
+                use_container_width=True,
+            )
+        except Exception:
+            pass
 
 
 def _txn_action_label(txn_type: str) -> str:

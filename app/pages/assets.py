@@ -1558,18 +1558,16 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
     try:
         from app.services.asset_qr import (
             qr_embed_subject,
-            qr_label_2x1_sticker_download_filename,
-            qr_label_2x1_sticker_pdf_bytes,
-            qr_label_for_download,
+            qr_label_download_basename,
+            qr_label_png_bytes,
             qr_payload,
             qr_png_bytes,
         )
     except ImportError:
         from services.asset_qr import (  # type: ignore
             qr_embed_subject,
-            qr_label_2x1_sticker_download_filename,
-            qr_label_2x1_sticker_pdf_bytes,
-            qr_label_for_download,
+            qr_label_download_basename,
+            qr_label_png_bytes,
             qr_payload,
             qr_png_bytes,
         )
@@ -1617,49 +1615,27 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
         if scan_url:
             st.caption("Scan URL")
             st.code(scan_url, language=None)
-        act1, act2, act3 = st.columns(3)
-        with act1:
-            if st.button("Rebuild QR", key=f"ast_qr_rebuild_{aid}", use_container_width=True):
-                result = rebuild_asset_qr(asset)
-                if result.ok and isinstance(result.data, dict):
-                    clear_assets_cache()
-                    st.session_state["ips_sel_assets"] = aid
-                    st.success("QR label rebuilt. Reprint the sticker when ready.")
-                    st.rerun()
-                else:
-                    st.error(str(getattr(result, "error", None) or "Could not rebuild QR."))
-        with act2:
-            try:
-                dl_bytes, dl_mime, dl_name = qr_label_for_download(qr_asset, subject)
-                st.download_button(
-                    "Print Label",
-                    data=dl_bytes,
-                    file_name=dl_name,
-                    mime=dl_mime,
-                    key=f"ast_qr_label_{aid}",
-                    use_container_width=True,
-                )
-            except Exception:
-                st.download_button(
-                    "Download QR (PNG)",
-                    data=qr_png_bytes(subject),
-                    file_name=f"{token}_qr.png",
-                    mime="image/png",
-                    key=f"ast_qr_png_{aid}",
-                    use_container_width=True,
-                )
-        with act3:
-            try:
-                st.download_button(
-                    "2×1 sticker",
-                    data=qr_label_2x1_sticker_pdf_bytes(qr_asset, subject),
-                    file_name=qr_label_2x1_sticker_download_filename(qr_asset),
-                    mime="application/pdf",
-                    key=f"ast_qr_sticker_{aid}",
-                    use_container_width=True,
-                )
-            except Exception:
-                pass
+        if st.button("Rebuild QR", key=f"ast_qr_rebuild_{aid}", use_container_width=True):
+            result = rebuild_asset_qr(asset)
+            if result.ok and isinstance(result.data, dict):
+                clear_assets_cache()
+                st.session_state["ips_sel_assets"] = aid
+                st.success("QR label rebuilt. Download Label PNG when ready.")
+                st.rerun()
+            else:
+                st.error(str(getattr(result, "error", None) or "Could not rebuild QR."))
+        try:
+            st.download_button(
+                "Label PNG",
+                data=qr_label_png_bytes(qr_asset, subject),
+                file_name=f"{qr_label_download_basename(qr_asset)}.png",
+                mime="image/png",
+                key=f"ast_qr_label_png_{aid}",
+                type="primary",
+                use_container_width=True,
+            )
+        except Exception:
+            pass
 
 
 def _render_asset_documents_tab(asset: dict) -> None:
