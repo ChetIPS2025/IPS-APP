@@ -14910,6 +14910,19 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="colum
   overflow: visible !important;
   box-sizing: border-box !important;
 }
+.st-key-dashboard_preview_todos [data-testid="stMarkdownContainer"],
+.st-key-dashboard_preview_todos [data-testid="stMarkdownContainer"] p,
+.st-key-dashboard_preview_qr [data-testid="stMarkdownContainer"],
+.st-key-dashboard_preview_qr [data-testid="stMarkdownContainer"] p {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+.ips-dash-preview-card,
+.ips-dash-preview-card-body {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
 .ips-dash-preview-card-head {
   display: flex !important;
   align-items: center !important;
@@ -14939,16 +14952,22 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="colum
   list-style: none !important;
   margin: 0 0 12px 0 !important;
   padding: 0 !important;
+  width: 100% !important;
 }
 .ips-dash-preview-row {
-  display: flex !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
   align-items: center !important;
-  justify-content: space-between !important;
-  gap: 10px !important;
+  gap: 12px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
   padding: 8px 10px !important;
   border-radius: 8px !important;
   border: 1px solid transparent !important;
   transition: background 0.15s ease, border-color 0.15s ease !important;
+}
+.ips-dash-preview-row:has(.ips-dash-preview-row-meta) {
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.95fr) minmax(168px, auto) !important;
 }
 .ips-dash-preview-row:hover {
   background: #f8fbff !important;
@@ -14956,7 +14975,6 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="colum
 }
 .ips-dash-preview-row-main {
   min-width: 0 !important;
-  flex: 1 1 auto !important;
 }
 .ips-dash-preview-row-title {
   margin: 0 !important;
@@ -14964,9 +14982,10 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="colum
   font-weight: 700 !important;
   color: #0f172a !important;
   line-height: 1.25 !important;
-  white-space: nowrap !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
   overflow: hidden !important;
-  text-overflow: ellipsis !important;
 }
 .ips-dash-preview-row-sub {
   margin: 2px 0 0 0 !important;
@@ -14977,13 +14996,36 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="colum
   overflow: hidden !important;
   text-overflow: ellipsis !important;
 }
+.ips-dash-preview-row-meta {
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+.ips-dash-preview-row-meta-line {
+  margin: 0 !important;
+  font-size: 0.72rem !important;
+  color: #475569 !important;
+  line-height: 1.3 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+.ips-dash-preview-row-meta-label {
+  font-weight: 700 !important;
+  color: #64748b !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.02em !important;
+  font-size: 0.625rem !important;
+  margin-right: 4px !important;
+}
 .ips-dash-preview-row-badges {
   display: flex !important;
   align-items: center !important;
-  gap: 4px !important;
-  flex-shrink: 0 !important;
-  flex-wrap: wrap !important;
   justify-content: flex-end !important;
+  gap: 4px !important;
+  flex-wrap: wrap !important;
+  min-width: 168px !important;
 }
 .ips-dash-preview-badge {
   display: inline-flex !important;
@@ -15151,6 +15193,14 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="colum
     flex: 1 1 100% !important;
     min-width: 100% !important;
     max-width: 100% !important;
+  }
+  .ips-dash-preview-row {
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: flex-start !important;
+  }
+  .ips-dash-preview-row-badges {
+    justify-content: flex-start !important;
+    min-width: 0 !important;
   }
 }
 

@@ -85,6 +85,14 @@ def _todo_preview_rows(limit: int = 5) -> list[dict[str, Any]]:
     )
 
 
+def _todo_assignee_label(row: dict[str, Any]) -> str:
+    for field in ("assignee_name", "assigned_to", "assigned_to_email"):
+        val = str(row.get(field) or "").strip()
+        if val and val not in {"—", "— Select —", "-", "— None —", "— Unassigned —"}:
+            return val
+    return "Unassigned"
+
+
 def _todo_preview_html(rows: list[dict[str, Any]]) -> str:
     if not rows:
         return '<p class="ips-dash-preview-empty">No open to-dos assigned to you.</p>'
@@ -94,15 +102,22 @@ def _todo_preview_html(rows: list[dict[str, Any]]) -> str:
         due_raw = str(row.get("due_date") or "")[:10]
         due_txt = html.escape(fmt_date(due_raw) if due_raw else "No due date")
         due_label, due_level = due_date_badge(row.get("due_date"))
+        assignee = html.escape(_todo_assignee_label(row))
         link = _todo_link_label(row)
-        link_html = ""
-        if link:
-            link_html = f' · <span class="ips-dash-preview-meta">{html.escape(link)}</span>'
+        link_html = html.escape(link) if link else "—"
         items.append(
             '<li class="ips-dash-preview-row">'
             f'<div class="ips-dash-preview-row-main">'
             f'<p class="ips-dash-preview-row-title">{title}</p>'
-            f'<p class="ips-dash-preview-row-sub">Due {due_txt}{link_html}</p>'
+            f'<p class="ips-dash-preview-row-sub">Due {due_txt}</p>'
+            f"</div>"
+            f'<div class="ips-dash-preview-row-meta">'
+            f'<p class="ips-dash-preview-row-meta-line">'
+            f'<span class="ips-dash-preview-row-meta-label">Assigned</span> {assignee}'
+            f"</p>"
+            f'<p class="ips-dash-preview-row-meta-line">'
+            f'<span class="ips-dash-preview-row-meta-label">Link</span> {link_html}'
+            f"</p>"
             f"</div>"
             f'<div class="ips-dash-preview-row-badges">'
             f'{_priority_badge(row.get("priority"))}'
@@ -276,11 +291,13 @@ def _render_preview_card_shell(
 ) -> None:
     ot = "d" + "iv"
     st.markdown(
+        f'<{ot} class="ips-dash-preview-card">'
         f'<{ot} class="ips-dash-preview-card-head">'
         f'<span class="ips-dash-preview-card-icon">{html.escape(icon)}</span>'
         f'<p class="ips-dash-preview-card-title">{html.escape(title)}</p>'
         f"</{ot}>"
-        f"{body_html}",
+        f'<{ot} class="ips-dash-preview-card-body">{body_html}</{ot}>'
+        f"</{ot}>",
         unsafe_allow_html=True,
     )
     if st.button("View All", key=view_key, use_container_width=True):
