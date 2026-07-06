@@ -69,7 +69,8 @@ def _start_inspection(asset: dict[str, Any], inspection_type: str) -> None:
 
 
 def render() -> None:
-    begin_module("Rental Equipment", "Checkout and return inspections with required photos and signatures.")
+    if not begin_module("rental_equipment"):
+        return
     assets = list_rental_equipment_assets()
     if not assets:
         st.info("No rental equipment assets found. Mark assets as rentable or set category to Rental Equipment.")

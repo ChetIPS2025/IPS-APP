@@ -165,7 +165,10 @@ def render() -> None:
     user_id = str(prof.get("id") or "").strip() or None
     itype = str(record.get("inspection_type") or "checkout")
     title = inspection_type_label(itype)
-    begin_module(title, "Photo proof, checklist, damage report, and signatures required to complete.")
+    if not begin_module("rental_equipment_inspection"):
+        return
+    st.markdown(f"### {title}")
+    st.caption("Photo proof, checklist, damage report, and signatures required to complete.")
 
     if not str(record.get("asset_id") or "").strip():
         st.error("No rental asset selected.")
