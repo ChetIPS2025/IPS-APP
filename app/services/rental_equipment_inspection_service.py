@@ -247,9 +247,11 @@ def upload_inspection_photo(
     prof = current_profile() or {}
     uid = uploaded_by or str(prof.get("id") or "").strip() or None
     try:
-        from app.db import delete_row_admin, fetch_by_match_admin, insert_row_admin
+        from app.services.repository import delete_row_admin, insert_row_admin
+        from app.db import fetch_by_match_admin
     except ImportError:
-        from db import delete_row_admin, fetch_by_match_admin, insert_row_admin  # type: ignore
+        from db import fetch_by_match_admin  # type: ignore
+        from services.repository import delete_row_admin, insert_row_admin  # type: ignore
     try:
         existing = fetch_by_match_admin(PHOTOS_TABLE, {"inspection_id": iid, "slot_key": slot}, limit=5) or []
         for row in existing:
@@ -324,9 +326,9 @@ def validate_for_complete(data: dict[str, Any]) -> list[str]:
 
 def _sync_child_records(inspection_id: str, data: dict[str, Any]) -> None:
     try:
-        from app.db import delete_row_admin, insert_row_admin
+        from app.services.repository import delete_row_admin, insert_row_admin
     except ImportError:
-        from db import delete_row_admin, insert_row_admin  # type: ignore
+        from services.repository import delete_row_admin, insert_row_admin  # type: ignore
     sigs = _as_dict(data.get("signatures"))
     delete_row_admin(SIGNATURES_TABLE, {"inspection_id": inspection_id})
     for role in SIGNATURE_ROLES:
@@ -380,9 +382,9 @@ def save_rental_inspection(
 
     rid = str(inspection_id or data.get("id") or "").strip()
     try:
-        from app.db import insert_row_admin, update_row_admin
+        from app.services.repository import insert_row_admin, update_row_admin
     except ImportError:
-        from db import insert_row_admin, update_row_admin  # type: ignore
+        from services.repository import insert_row_admin, update_row_admin  # type: ignore
 
     try:
         if rid:
