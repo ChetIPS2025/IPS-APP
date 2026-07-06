@@ -585,15 +585,19 @@ def _render_inventory_qr_block(item: dict) -> None:
     """Clickable QR, scan link, and printable label downloads."""
     try:
         from app.services.inventory_qr_labels import (
+            LABEL_PNG_SIZE_CHOICES,
             inventory_label_download_basename,
             inventory_label_png_bytes,
             inventory_qr_subject,
+            label_png_download_filename,
         )
     except ImportError:
         from services.inventory_qr_labels import (  # type: ignore
+            LABEL_PNG_SIZE_CHOICES,
             inventory_label_download_basename,
             inventory_label_png_bytes,
             inventory_qr_subject,
+            label_png_download_filename,
         )
 
     scan_url = generate_inventory_qr_value(item)
@@ -628,11 +632,22 @@ def _render_inventory_qr_block(item: dict) -> None:
             if scan_url.startswith("http"):
                 st.caption("Scan URL")
                 st.code(scan_url, language=None)
+        size_opts = [key for key, _ in LABEL_PNG_SIZE_CHOICES]
+        size_labels = {key: label for key, label in LABEL_PNG_SIZE_CHOICES}
+        st.caption("Label size")
+        size_key = st.radio(
+            "Label size",
+            options=size_opts,
+            format_func=lambda key: size_labels[key],
+            horizontal=True,
+            key=f"inv_qr_label_size_{iid}",
+            label_visibility="collapsed",
+        )
         try:
             st.download_button(
                 "Label PNG",
-                data=inventory_label_png_bytes(item, subject),
-                file_name=f"{inventory_label_download_basename(item)}.png",
+                data=inventory_label_png_bytes(item, subject, size=size_key),
+                file_name=label_png_download_filename(inventory_label_download_basename(item), size_key),
                 mime="image/png",
                 key=f"inv_qr_label_png_{iid}",
                 type="primary",

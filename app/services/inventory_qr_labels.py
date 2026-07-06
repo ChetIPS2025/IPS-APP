@@ -41,6 +41,33 @@ def inventory_label_download_basename(item: dict[str, Any]) -> str:
     return f"{safe}_inv_label"
 
 
+LABEL_PNG_SIZE_1X4 = "1x4"
+LABEL_PNG_SIZE_2X6 = "2x6"
+DEFAULT_LABEL_PNG_SIZE = LABEL_PNG_SIZE_1X4
+LABEL_PNG_SIZE_CHOICES: tuple[tuple[str, str], ...] = (
+    (LABEL_PNG_SIZE_1X4, '1" x 4"'),
+    (LABEL_PNG_SIZE_2X6, '2" x 6"'),
+)
+
+
+def normalize_label_png_size(size: str | None) -> str:
+    token = str(size or "").strip().lower().replace('"', "").replace("×", "x").replace(" ", "")
+    if token in {LABEL_PNG_SIZE_2X6, "2in x 6in", "2inx6in"}:
+        return LABEL_PNG_SIZE_2X6
+    return LABEL_PNG_SIZE_1X4
+
+
+def label_png_pixel_size(size: str | None) -> tuple[int, int]:
+    if normalize_label_png_size(size) == LABEL_PNG_SIZE_2X6:
+        return 600, 1800
+    return 300, 1200
+
+
+def label_png_download_filename(base: str, size: str | None) -> str:
+    safe_base = str(base or "label").strip().strip("._") or "label"
+    return f"{safe_base}_{normalize_label_png_size(size)}.png"
+
+
 def inventory_qr_subject(item: dict[str, Any]) -> str:
     try:
         from app.services.inventory_service import generate_inventory_qr_value
@@ -215,6 +242,7 @@ def _draw_png_label_text(
     text_h: int,
     description: str,
     sku: str,
+    centered: bool = False,
 ) -> None:
     unit_scale = text_h / 64.0
     layout = _fit_label_text_layout(description, sku, float(text_w), float(text_h), unit_scale=unit_scale)
@@ -223,11 +251,26 @@ def _draw_png_label_text(
 
     y = int(y_top + (text_h - layout["block_h"]) / 2)
     for line in layout["lines"]:
-        draw.text((text_x, y), str(line)[:120], fill=(0, 0, 0), font=desc_font)
+        line_text = str(line)[:120]
+        if centered:
+            bbox = draw.textbbox((0, 0), line_text, font=desc_font)
+            line_w = bbox[2] - bbox[0]
+            x = text_x + max(0, (text_w - line_w) // 2)
+        else:
+            x = text_x
+        draw.text((x, y), line_text, fill=(0, 0, 0), font=desc_font)
         y += int(layout["line_h"])
 
     y += int(layout["line_h"] * 0.1)
-    draw.text((text_x, min(y_top + text_h - int(layout["sku_size"]) - 2, y)), layout["sku_text"], fill=(0, 0, 0), font=sku_font)
+    sku_y = min(y_top + text_h - int(layout["sku_size"]) - 2, y)
+    sku_text = layout["sku_text"]
+    if centered:
+        bbox = draw.textbbox((0, 0), sku_text, font=sku_font)
+        sku_w = bbox[2] - bbox[0]
+        sku_x = text_x + max(0, (text_w - sku_w) // 2)
+    else:
+        sku_x = text_x
+    draw.text((sku_x, sku_y), sku_text, fill=(0, 0, 0), font=sku_font)
 
 
 def _square_image_bytes(image_bytes: bytes, size_px: int) -> bytes:
@@ -321,55 +364,63 @@ def inventory_label_2x1_sticker_download_filename(item: dict[str, Any]) -> str:
     return f"{inventory_label_download_basename(item)}_4x1.pdf"
 
 
-def inventory_label_png_bytes(item: dict[str, Any], qr_text: str) -> bytes:
-    """PNG fallback matching 4\" × 1\" layout at 300 DPI."""
+def inventory_label_png_bytes(
+    item: dict[str, Any],
+    qr_text: str,
+    *,
+    size: str | None = None,
+) -> bytes:
+    """Portrait inventory label PNG at 300 DPI (1\"×4\" or 2\"×6\")."""
     from PIL import Image, ImageDraw
 
-    dpi = 300
-    w_px, h_px = 4 * dpi, 1 * dpi
-    margin = int(0.05 * dpi)
-    gap = int(0.05 * dpi)
-    square_px = h_px - 2 * margin
+    size_key = normalize_label_png_size(size)
+    w_px, h_px = label_png_pixel_size(size_key)
+    margin = max(12, int(min(w_px, h_px) * 0.04))
+    gap = max(8, int(margin * 0.45))
 
     im = Image.new("RGB", (w_px, h_px), "white")
     draw = ImageDraw.Draw(im)
 
-    x = margin
-    y_square = margin
+    qr_size = min(int(w_px * 0.72), w_px - 2 * margin, int(h_px * 0.34))
+    x_qr = (w_px - qr_size) // 2
+    y = margin
 
     qr_raw = generate_qr_png_bytes(qr_text)
     qr_img = Image.open(io.BytesIO(qr_raw)).convert("RGB")
-    qr_img = qr_img.resize((square_px, square_px), Image.Resampling.LANCZOS)
-    im.paste(qr_img, (x, y_square))
-    x += square_px + gap
+    qr_img = qr_img.resize((qr_size, qr_size), Image.Resampling.LANCZOS)
+    im.paste(qr_img, (x_qr, y))
+    y += qr_size + gap
 
     thumb_bytes = load_inventory_thumbnail_bytes(item)
     if thumb_bytes:
+        thumb_size = min(int(qr_size * 0.42), w_px - 2 * margin, max(48, h_px - y - margin - 80))
         try:
-            sq_bytes = _square_image_bytes(thumb_bytes, square_px)
+            sq_bytes = _square_image_bytes(thumb_bytes, thumb_size)
             thumb = Image.open(io.BytesIO(sq_bytes)).convert("RGB")
-            im.paste(thumb, (x, y_square))
-            x += square_px + gap
+            x_thumb = (w_px - thumb_size) // 2
+            im.paste(thumb, (x_thumb, y))
+            y += thumb_size + gap
         except Exception:
             pass
 
     sku = resolve_inventory_sku(item)
     description = inventory_item_description(item)
-    text_x = x
-    text_w = w_px - margin - text_x
-    text_h = square_px
+    text_x = margin
+    text_w = w_px - 2 * margin
+    text_h = max(48, h_px - margin - y)
     _draw_png_label_text(
         draw,
         text_x=text_x,
-        y_top=y_square,
+        y_top=y,
         text_w=text_w,
         text_h=text_h,
         description=description,
         sku=sku,
+        centered=True,
     )
 
     out = io.BytesIO()
-    im.save(out, format="PNG")
+    im.save(out, format="PNG", dpi=(300, 300))
     return out.getvalue()
 
 

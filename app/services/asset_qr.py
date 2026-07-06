@@ -387,51 +387,58 @@ def qr_label_2x1_sticker_download_filename(asset: dict[str, Any]) -> str:
     return f"{qr_label_download_basename(asset)}_2x1.pdf"
 
 
-def qr_label_png_bytes(asset: dict[str, Any], qr_text: str) -> bytes:
-    """
-    Fallback printable label as PNG (same layout intent as PDF).
-    Uses qr_png_bytes() for the QR; Pillow default font if no TTF available.
-    """
+def qr_label_png_bytes(
+    asset: dict[str, Any],
+    qr_text: str,
+    *,
+    size: str | None = None,
+) -> bytes:
+    """Portrait asset label PNG at 300 DPI (1\"×4\" or 2\"×6\")."""
     from PIL import Image, ImageDraw, ImageFont
 
-    w_px, h_px = 400, 500
+    try:
+        from app.services.inventory_qr_labels import label_png_pixel_size, normalize_label_png_size
+    except ImportError:
+        from services.inventory_qr_labels import label_png_pixel_size, normalize_label_png_size  # type: ignore
+
+    size_key = normalize_label_png_size(size)
+    w_px, h_px = label_png_pixel_size(size_key)
+    margin = max(12, int(min(w_px, h_px) * 0.04))
+    gap = max(8, int(margin * 0.45))
+    scale = w_px / 300.0
+
     im = Image.new("RGB", (w_px, h_px), "white")
     draw = ImageDraw.Draw(im)
 
+    qr_size = min(int(w_px * 0.72), w_px - 2 * margin, int(h_px * 0.34))
     qr_raw = qr_png_bytes(qr_text)
     qr_img = Image.open(io.BytesIO(qr_raw)).convert("RGB")
-    qr_target = 220
-    qr_img = qr_img.resize((qr_target, qr_target), Image.Resampling.LANCZOS)
-    qx = (w_px - qr_target) // 2
-    qy = 18
+    qr_img = qr_img.resize((qr_size, qr_size), Image.Resampling.LANCZOS)
+    qx = (w_px - qr_size) // 2
+    qy = margin
     im.paste(qr_img, (qx, qy))
 
-    use_bitmap_font = False
+    title_px = max(14, int(17 * scale))
+    meta_px = max(11, int(13 * scale))
     try:
-        font_title = ImageFont.truetype("arial.ttf", 17)
-        font_meta = ImageFont.truetype("arial.ttf", 13)
+        font_title = ImageFont.truetype("arial.ttf", title_px)
+        font_meta = ImageFont.truetype("arial.ttf", meta_px)
     except OSError:
         try:
-            font_title = ImageFont.truetype("DejaVuSans.ttf", 17)
-            font_meta = ImageFont.truetype("DejaVuSans.ttf", 13)
+            font_title = ImageFont.truetype("DejaVuSans.ttf", title_px)
+            font_meta = ImageFont.truetype("DejaVuSans.ttf", meta_px)
         except OSError:
             font_title = font_meta = ImageFont.load_default()
-            use_bitmap_font = True
 
     aid = str(asset.get("asset_id") or "").strip()
     name = str(asset.get("asset_name") or "").strip()
     serial = str(asset.get("serial_number") or "").strip()
     model = str(asset.get("model") or "").strip()
 
-    y = qy + qr_target + 14
-    margin = 14
-    gap_title = 11 if use_bitmap_font else 20
-    gap_meta = 10 if use_bitmap_font else 16
-    for line in textwrap.wrap(name or "(no name)", width=28)[:4]:
-        draw.text((margin, y), line[:120], fill=(0, 0, 0), font=font_title)
-        y += gap_title
-
-    y += 4
+    wrap_chars = max(16, min(34, int((w_px - 2 * margin) / max(8, title_px * 0.55))))
+    lines: list[tuple[str, str]] = []
+    for line in textwrap.wrap(name or "(no name)", width=wrap_chars)[:4]:
+        lines.append((line[:120], "title"))
     for block in [
         f"ID: {aid}" if aid else "",
         f"S/N: {serial}" if serial else "",
@@ -439,12 +446,28 @@ def qr_label_png_bytes(asset: dict[str, Any], qr_text: str) -> bytes:
     ]:
         if not block:
             continue
-        for line in textwrap.wrap(block, width=32)[:2]:
-            draw.text((margin, y), line[:120], fill=(0, 0, 0), font=font_meta)
-            y += gap_meta
+        for line in textwrap.wrap(block, width=wrap_chars + 2)[:2]:
+            lines.append((line[:120], "meta"))
+
+    line_heights = [
+        int(title_px * 1.35) if kind == "title" else int(meta_px * 1.35)
+        for _, kind in lines
+    ]
+    block_h = sum(line_heights) + gap * max(0, len(lines) - 1)
+    text_top = qr_size + margin + gap
+    text_h = max(48, h_px - margin - text_top)
+    y = text_top + max(0, (text_h - block_h) // 2)
+
+    for (line, kind), line_h in zip(lines, line_heights):
+        font = font_title if kind == "title" else font_meta
+        bbox = draw.textbbox((0, 0), line, font=font)
+        line_w = bbox[2] - bbox[0]
+        x = margin + max(0, (w_px - 2 * margin - line_w) // 2)
+        draw.text((x, y), line, fill=(0, 0, 0), font=font)
+        y += line_h + gap
 
     out = io.BytesIO()
-    im.save(out, format="PNG")
+    im.save(out, format="PNG", dpi=(300, 300))
     return out.getvalue()
 
 

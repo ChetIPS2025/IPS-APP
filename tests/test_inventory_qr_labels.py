@@ -53,6 +53,16 @@ class TestInventoryQrLabels(unittest.TestCase):
         self.assertTrue(png.startswith(b"\x89PNG"))
 
     @patch("app.services.inventory_qr_labels.load_inventory_thumbnail_bytes", return_value=None)
+    def test_label_png_sizes_use_print_ready_dimensions(self, _thumb) -> None:
+        from PIL import Image
+
+        subject = "https://app.example.com/?scan=inventory&token=abc"
+        png_1x4 = inventory_label_png_bytes(_SAMPLE_ITEM, subject, size="1x4")
+        png_2x6 = inventory_label_png_bytes(_SAMPLE_ITEM, subject, size="2x6")
+        self.assertEqual(Image.open(io.BytesIO(png_1x4)).size, (300, 1200))
+        self.assertEqual(Image.open(io.BytesIO(png_2x6)).size, (600, 1800))
+
+    @patch("app.services.inventory_qr_labels.load_inventory_thumbnail_bytes", return_value=None)
     def test_label_for_download_returns_pdf(self, _thumb) -> None:
         subject = "https://app.example.com/?scan=inventory&token=abc"
         data, mime, name = inventory_label_for_download(_SAMPLE_ITEM, subject)

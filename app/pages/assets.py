@@ -1563,6 +1563,7 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
             qr_payload,
             qr_png_bytes,
         )
+        from app.services.inventory_qr_labels import LABEL_PNG_SIZE_CHOICES, label_png_download_filename
     except ImportError:
         from services.asset_qr import (  # type: ignore
             qr_embed_subject,
@@ -1571,6 +1572,7 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
             qr_payload,
             qr_png_bytes,
         )
+        from services.inventory_qr_labels import LABEL_PNG_SIZE_CHOICES, label_png_download_filename  # type: ignore
 
     qr_asset = _asset_for_qr(asset)
     token = qr_payload(qr_asset)
@@ -1624,11 +1626,22 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
                 st.rerun()
             else:
                 st.error(str(getattr(result, "error", None) or "Could not rebuild QR."))
+        size_opts = [key for key, _ in LABEL_PNG_SIZE_CHOICES]
+        size_labels = {key: label for key, label in LABEL_PNG_SIZE_CHOICES}
+        st.caption("Label size")
+        size_key = st.radio(
+            "Label size",
+            options=size_opts,
+            format_func=lambda key: size_labels[key],
+            horizontal=True,
+            key=f"ast_qr_label_size_{aid}",
+            label_visibility="collapsed",
+        )
         try:
             st.download_button(
                 "Label PNG",
-                data=qr_label_png_bytes(qr_asset, subject),
-                file_name=f"{qr_label_download_basename(qr_asset)}.png",
+                data=qr_label_png_bytes(qr_asset, subject, size=size_key),
+                file_name=label_png_download_filename(qr_label_download_basename(qr_asset), size_key),
                 mime="image/png",
                 key=f"ast_qr_label_png_{aid}",
                 type="primary",
