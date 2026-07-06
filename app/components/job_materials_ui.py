@@ -25,6 +25,7 @@ try:
     from app.services.tasks_service import get_tasks_by_job
     from app.ui import IPS_NAV_PENDING_KEY
     from app.utils.formatting import fmt_currency, fmt_date
+    from app.utils.inventory_quantity import format_inventory_quantity, inventory_qty_input_kwargs
 except ImportError:
     from auth import current_profile, current_role, is_authenticated  # type: ignore
     from pages._core._data import load_employees, load_inventory  # type: ignore
@@ -42,6 +43,7 @@ except ImportError:
     from services.tasks_service import get_tasks_by_job  # type: ignore
     from ui import IPS_NAV_PENDING_KEY  # type: ignore
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
+    from utils.inventory_quantity import format_inventory_quantity, inventory_qty_input_kwargs  # type: ignore
 
 _USAGE_SOURCE_LABELS = {
     "pricing_guide": "Pricing Guide",
@@ -174,7 +176,7 @@ def _inventory_search_options(job_id: str) -> tuple[list[str], dict[str, dict[st
     for row in active:
         sku = str(row.get("sku") or "—")
         name = str(row.get("name") or row.get("item_name") or "—")
-        qoh = int(row.get("qty_on_hand") or row.get("quantity_on_hand") or 0)
+        qoh = format_inventory_quantity(row.get("qty_on_hand") or row.get("quantity_on_hand") or 0)
         label = f"{sku} · {name} (on hand: {qoh})"
         n = 2
         while label in label_to_item:
@@ -403,7 +405,11 @@ def _render_add_materials_form(job: dict, *, key_prefix: str) -> None:
         st.caption("Consumable inventory — on-hand quantity decreases when material is consumed on this job.")
         with st.form(f"{key_prefix}_inv_form", clear_on_submit=False):
             item_pick = st.selectbox("Inventory item", inv_labels, key=f"{key_prefix}_inv_pick")
-            qty = st.number_input("Quantity", min_value=0.0, value=1.0, step=0.25, format="%.4f", key=f"{key_prefix}_inv_qty")
+            qty = st.number_input(
+                "Quantity",
+                key=f"{key_prefix}_inv_qty",
+                **inventory_qty_input_kwargs(min_value=1, value=1),
+            )
             if allow_over:
                 st.checkbox("Allow quantity over on-hand (admin)", key=f"{key_prefix}_inv_over")
             submit_inv = st.form_submit_button("Add from inventory", type="primary", use_container_width=True)
@@ -414,7 +420,7 @@ def _render_add_materials_form(job: dict, *, key_prefix: str) -> None:
                 st.error("Select an inventory item.")
             else:
                 iid = str(item.get("id") or "").strip()
-                qv = float(qty or 0)
+                qv = int(qty or 0)
                 if qv <= 0:
                     st.error("Quantity must be greater than zero.")
                 else:
@@ -473,7 +479,11 @@ def _render_add_materials_form(job: dict, *, key_prefix: str) -> None:
                 key=f"{key_prefix}_scan_code",
                 placeholder="SKU, INV-…, or scan URL",
             )
-            qty = st.number_input("Quantity", min_value=0.0, value=1.0, step=0.25, format="%.4f", key=f"{key_prefix}_scan_qty")
+            qty = st.number_input(
+                "Quantity",
+                key=f"{key_prefix}_scan_qty",
+                **inventory_qty_input_kwargs(min_value=1, value=1),
+            )
             if allow_over:
                 st.checkbox("Allow quantity over on-hand (admin)", key=f"{key_prefix}_scan_over")
             submit_scan = st.form_submit_button("Add from scan", type="primary", use_container_width=True)
@@ -485,7 +495,7 @@ def _render_add_materials_form(job: dict, *, key_prefix: str) -> None:
             else:
                 item = resolved.data
                 iid = str(item.get("id") or "").strip()
-                qv = float(qty or 0)
+                qv = int(qty or 0)
                 if qv <= 0:
                     st.error("Quantity must be greater than zero.")
                 else:

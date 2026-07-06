@@ -87,7 +87,11 @@ def record_qr_scan_event(
     if tool_transaction_id:
         payload["tool_transaction_id"] = tool_transaction_id
     if quantity is not None:
-        payload["quantity"] = float(quantity)
+        try:
+            from app.utils.inventory_quantity import parse_inventory_quantity
+        except ImportError:
+            from utils.inventory_quantity import parse_inventory_quantity  # type: ignore
+        payload["quantity"] = parse_inventory_quantity(quantity, allow_zero=False, field_name="Quantity")
     if unit:
         payload["unit"] = _clean(unit)[:20]
 

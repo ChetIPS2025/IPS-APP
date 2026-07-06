@@ -669,6 +669,15 @@ def normalize_inventory(row: dict[str, Any]) -> dict[str, Any]:
     qty_available = row.get("quantity_available")
     if qty_available is None:
         qty_available = max(float(qty or 0) - qty_allocated, 0)
+    try:
+        from app.utils.inventory_quantity import parse_inventory_quantity
+    except ImportError:
+        from utils.inventory_quantity import parse_inventory_quantity  # type: ignore
+    qty_int = parse_inventory_quantity(qty, allow_negative=True, allow_zero=True)
+    qty_checked_out = parse_inventory_quantity(row.get("quantity_checked_out"), allow_negative=True, allow_zero=True)
+    qty_allocated_int = parse_inventory_quantity(qty_allocated, allow_negative=True, allow_zero=True)
+    qty_available_int = parse_inventory_quantity(qty_available, allow_negative=True, allow_zero=True)
+    reorder_int = parse_inventory_quantity(row.get("reorder_point"), allow_zero=True)
     return {
         "id": iid or sku,
         "sku": sku,
@@ -686,8 +695,8 @@ def normalize_inventory(row: dict[str, Any]) -> dict[str, Any]:
         "stock_location": str(row.get("stock_location") or row.get("storage_location") or ""),
         "department": str(row.get("department") or "—"),
         "status": str(row.get("status") or "In Stock"),
-        "qty_on_hand": int(float(qty or 0)),
-        "reorder_point": int(float(row.get("reorder_point") or 0)),
+        "qty_on_hand": qty_int,
+        "reorder_point": reorder_int,
         "unit_cost": float(row.get("unit_cost") or 0),
         "last_purchase_cost": float(row.get("last_purchase_cost") or row.get("unit_cost") or 0),
         "average_cost": float(row.get("average_cost") or row.get("unit_cost") or 0),
@@ -708,11 +717,11 @@ def normalize_inventory(row: dict[str, Any]) -> dict[str, Any]:
         "image_uploaded_by": str(row.get("image_uploaded_by") or ""),
         "image_status": str(row.get("image_status") or "missing"),
         "qr_token": str(row.get("qr_token") or "").strip(),
-        "quantity_checked_out": float(row.get("quantity_checked_out") or 0),
-        "quantity_allocated": qty_allocated,
-        "quantity_available": float(qty_available or 0),
+        "quantity_checked_out": qty_checked_out,
+        "quantity_allocated": qty_allocated_int,
+        "quantity_available": qty_available_int,
         "is_active": row.get("is_active", True),
-        "quantity_on_hand": float(qty or 0),
+        "quantity_on_hand": qty_int,
     }
 
 
@@ -1689,14 +1698,28 @@ def save_inventory_item(ui: dict[str, Any], *, row_id: str | None = None) -> Ser
         "vendor": ui.get("vendor"),
         "status": ui.get("status") or "In Stock",
     }
+    try:
+        from app.utils.inventory_quantity import try_parse_inventory_quantity
+    except ImportError:
+        from utils.inventory_quantity import try_parse_inventory_quantity  # type: ignore
     qty = ui.get("qty_on_hand")
     if qty is not None:
-        payload["quantity_on_hand"] = float(qty or 0)
+        qty_int, qty_err = try_parse_inventory_quantity(qty, allow_zero=True, field_name="Quantity on hand")
+        if qty_err:
+            return ServiceResult(ok=False, error=qty_err)
+        payload["quantity_on_hand"] = qty_int if qty_int is not None else 0
     elif not row_id:
-        payload["quantity_on_hand"] = 0.0
+        payload["quantity_on_hand"] = 0
     reorder = ui.get("reorder_point")
     if reorder is not None:
-        payload["reorder_point"] = int(float(reorder or 0))
+        reorder_int, reorder_err = try_parse_inventory_quantity(
+            reorder,
+            allow_zero=True,
+            field_name="Reorder point",
+        )
+        if reorder_err:
+            return ServiceResult(ok=False, error=reorder_err)
+        payload["reorder_point"] = reorder_int if reorder_int is not None else 0
     elif not row_id:
         payload["reorder_point"] = 0
     for key in (

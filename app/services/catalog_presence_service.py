@@ -209,7 +209,7 @@ def _ensure_inventory(row: dict[str, Any]) -> ServiceResult:
 
     cost = float(row.get("default_cost") or 0)
     description = str(row.get("description") or row.get("item") or "Inventory Item").strip()
-    reorder_point = float(row.get("default_reorder_point") or 0)
+    reorder_point = int(round(float(row.get("default_reorder_point") or 0)))
     now = _now_iso()
     payload: dict[str, Any] = {
         "item_name": description,

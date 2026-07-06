@@ -83,21 +83,23 @@ def render_catalog_stock_policy_panel(
         policy = _policy_from_label(policy_label)
         reorder = st.number_input(
             "Default reorder point",
-            min_value=0.0,
-            value=current_rp,
-            step=1.0,
+            min_value=0,
+            value=int(round(current_rp)),
+            step=1,
+            format="%d",
             key=_draft_key(pid, "reorder"),
             disabled=not can_manage or policy == "none",
             help="When on-hand quantity is at or below this level, mandatory items appear in Needs reorder.",
         )
-        qty_on_hand = 0.0
+        qty_on_hand = 0
         if policy != "none":
-            qty_on_hand = float(
+            qty_on_hand = int(
                 st.number_input(
                     "Quantity on hand",
-                    min_value=0.0,
-                    value=current_qty,
-                    step=1.0,
+                    min_value=0,
+                    value=int(round(current_qty)),
+                    step=1,
+                    format="%d",
                     key=_draft_key(pid, "qty"),
                     disabled=not can_manage,
                     help=(
@@ -110,13 +112,13 @@ def render_catalog_stock_policy_panel(
         if not can_manage:
             st.caption(f"Current policy: {stock_policy_label(current_policy)}")
             if current_policy != "none":
-                st.caption(f"Quantity on hand: {current_qty:g}")
+                st.caption(f"Quantity on hand: {int(round(current_qty))}")
             return
 
         unchanged = (
             policy == current_policy
-            and float(reorder) == current_rp
-            and (policy == "none" or float(qty_on_hand) == float(current_qty))
+            and int(round(reorder)) == int(round(current_rp))
+            and (policy == "none" or int(qty_on_hand) == int(round(current_qty)))
         )
         if success_solid_button(
             "Save Stock Policy",
@@ -127,8 +129,8 @@ def render_catalog_stock_policy_panel(
             result = save_pricing_stock_settings(
                 row,
                 stock_policy=policy,
-                default_reorder_point=float(reorder),
-                quantity_on_hand=float(qty_on_hand) if policy != "none" else None,
+                default_reorder_point=int(round(reorder)),
+                quantity_on_hand=int(qty_on_hand) if policy != "none" else None,
                 ensure_inventory=True,
             )
             if result.ok:

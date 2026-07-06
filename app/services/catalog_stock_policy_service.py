@@ -65,22 +65,35 @@ def _linked_inventory_id(row: dict[str, Any]) -> str:
     return str(row.get("linked_inventory_id") or row.get("inventory_item_id") or "").strip()
 
 
-def _inventory_qty(row: dict[str, Any]) -> float:
-    for key in ("qty_on_hand", "quantity_on_hand", "quantity"):
-        val = row.get(key)
-        if val is not None and str(val).strip() != "":
-            try:
-                return float(val)
-            except (TypeError, ValueError):
-                continue
-    return 0.0
-
-
-def _reorder_point(row: dict[str, Any]) -> float:
+def _inventory_qty(row: dict[str, Any]) -> int:
     try:
-        return float(row.get("reorder_point") or row.get("default_reorder_point") or 0)
-    except (TypeError, ValueError):
-        return 0.0
+        from app.utils.inventory_quantity import read_inventory_quantity
+    except ImportError:
+        from utils.inventory_quantity import read_inventory_quantity  # type: ignore
+    return read_inventory_quantity(row, "qty_on_hand", "quantity_on_hand", "quantity")
+
+
+def _reorder_point(row: dict[str, Any]) -> int:
+    try:
+        from app.utils.inventory_quantity import parse_inventory_quantity
+    except ImportError:
+        from utils.inventory_quantity import parse_inventory_quantity  # type: ignore
+    try:
+        return parse_inventory_quantity(
+            row.get("reorder_point") if row.get("reorder_point") is not None else row.get("default_reorder_point"),
+            allow_zero=True,
+            field_name="Reorder point",
+        )
+    except ValueError:
+        return 0
+
+
+def _parse_reorder_point(value: Any) -> tuple[int, str | None]:
+    try:
+        from app.utils.inventory_quantity import try_parse_inventory_quantity
+    except ImportError:
+        from utils.inventory_quantity import try_parse_inventory_quantity  # type: ignore
+    return try_parse_inventory_quantity(value, allow_zero=True, field_name="Reorder point")
 
 
 def pricing_guide_lookup_maps() -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
@@ -163,11 +176,16 @@ def derive_inventory_stock_status(row: dict[str, Any]) -> str:
     return "In Stock"
 
 
-def inventory_status_fields_for_qty(row: dict[str, Any], new_qty: float) -> dict[str, Any]:
+def inventory_status_fields_for_qty(row: dict[str, Any], new_qty: float | int) -> dict[str, Any]:
     """Return inventory_items fields to persist after a quantity change."""
+    try:
+        from app.utils.inventory_quantity import parse_inventory_quantity
+    except ImportError:
+        from utils.inventory_quantity import parse_inventory_quantity  # type: ignore
+    qty_int = parse_inventory_quantity(new_qty, allow_negative=True, allow_zero=True)
     patched = dict(row)
-    patched["quantity_on_hand"] = float(new_qty)
-    patched["qty_on_hand"] = float(new_qty)
+    patched["quantity_on_hand"] = qty_int
+    patched["qty_on_hand"] = qty_int
     return {"status": derive_inventory_stock_status(patched)}
 
 
@@ -196,7 +214,9 @@ def apply_pricing_stock_settings_to_inventory(pg_row: dict[str, Any]) -> Service
         from app.services.repository import update_row_admin
     except ImportError:
         from services.repository import update_row_admin  # type: ignore
-    rp = float(pg_row.get("default_reorder_point") or 0)
+    rp, rp_err = _parse_reorder_point(pg_row.get("default_reorder_point"))
+    if rp_err:
+        return ServiceResult(ok=False, error=rp_err)
     res = update_row_admin(
         "inventory_items",
         {"reorder_point": rp, "updated_at": _now_iso()},
@@ -225,16 +245,16 @@ def sync_linked_inventory_reorder(pricing_item_id: str) -> ServiceResult:
     return apply_pricing_stock_settings_to_inventory(row)
 
 
-def _linked_inventory_quantity(pg_row: dict[str, Any]) -> float:
+def _linked_inventory_quantity(pg_row: dict[str, Any]) -> int:
     """Current on-hand qty for the pricing item's linked inventory row, if any."""
     inv_id = _linked_inventory_id(pg_row)
     if not inv_id:
-        return 0.0
+        return 0
     inv = get_inventory_item(inv_id)
-    return _inventory_qty(inv) if inv else 0.0
+    return _inventory_qty(inv) if inv else 0
 
 
-def linked_inventory_quantity(pg_row: dict[str, Any]) -> float:
+def linked_inventory_quantity(pg_row: dict[str, Any]) -> int:
     """Public alias for reading linked inventory on-hand quantity."""
     return _linked_inventory_quantity(pg_row)
 
@@ -251,8 +271,20 @@ def _ensure_inventory_link_for_policy(
     if policy == "none" or _linked_inventory_id(fresh):
         return fresh, messages, None
 
-    qty = float(quantity_on_hand or 0) if quantity_on_hand is not None else 0.0
-    should_create = policy == "mandatory" or (policy == "optional" and qty > 0)
+    qty = 0
+    if quantity_on_hand is not None:
+        try:
+            from app.utils.inventory_quantity import try_parse_inventory_quantity
+        except ImportError:
+            from utils.inventory_quantity import try_parse_inventory_quantity  # type: ignore
+        qty, qty_err = try_parse_inventory_quantity(
+            quantity_on_hand,
+            allow_zero=True,
+            field_name="Quantity on hand",
+        )
+        if qty_err:
+            return fresh, messages, ServiceResult(ok=False, error=qty_err)
+    should_create = policy == "mandatory" or (policy == "optional" and (qty or 0) > 0)
     if not should_create:
         return fresh, messages, None
 
@@ -288,7 +320,7 @@ def _ensure_inventory_link_for_policy(
 
 def _apply_quantity_on_hand_to_inventory(
     pg_row: dict[str, Any],
-    quantity_on_hand: float,
+    quantity_on_hand: int,
 ) -> tuple[list[str], ServiceResult | None]:
     """Set linked inventory quantity; records an adjustment transaction when qty changes."""
     inv_id = _linked_inventory_id(pg_row)
@@ -299,13 +331,13 @@ def _apply_quantity_on_hand_to_inventory(
     if not inv:
         return [], ServiceResult(ok=False, error="Linked inventory item not found.")
 
-    new_qty = max(float(quantity_on_hand or 0), 0.0)
+    new_qty = max(int(quantity_on_hand or 0), 0)
     prev_qty = _inventory_qty(inv)
-    if abs(new_qty - prev_qty) < 1e-9:
+    if new_qty == prev_qty:
         return [], None
 
-    delta = round(new_qty - prev_qty, 4)
-    if abs(delta) < 1e-9:
+    delta = new_qty - prev_qty
+    if delta == 0:
         return [], None
 
     try:
@@ -344,15 +376,15 @@ def _apply_quantity_on_hand_to_inventory(
     else:
         clear_inventory_cache()
 
-    return [f"Quantity on hand set to {new_qty:g}."], None
+    return [f"Quantity on hand set to {new_qty}."], None
 
 
 def save_pricing_stock_settings(
     pg_row: dict[str, Any],
     *,
     stock_policy: str,
-    default_reorder_point: float,
-    quantity_on_hand: float | None = None,
+    default_reorder_point: float | int,
+    quantity_on_hand: float | int | None = None,
     ensure_inventory: bool = True,
 ) -> ServiceResult:
     """Persist stock policy on pricing guide and sync linked inventory."""
@@ -361,10 +393,9 @@ def save_pricing_stock_settings(
         return ServiceResult(ok=False, error="Missing pricing item id.")
 
     policy = normalize_stock_policy(stock_policy)
-    try:
-        rp = max(float(default_reorder_point or 0), 0.0)
-    except (TypeError, ValueError):
-        rp = 0.0
+    rp, rp_err = _parse_reorder_point(default_reorder_point)
+    if rp_err:
+        return ServiceResult(ok=False, error=rp_err)
 
     try:
         from app.services.repository import update_row_admin
@@ -396,12 +427,20 @@ def save_pricing_stock_settings(
 
     messages: list[str] = ["Stock policy saved."]
 
-    qty_value: float | None = None
+    qty_value: int | None = None
     if policy in {"mandatory", "optional"} and quantity_on_hand is not None:
         try:
-            qty_value = max(float(quantity_on_hand), 0.0)
-        except (TypeError, ValueError):
-            qty_value = 0.0
+            from app.utils.inventory_quantity import try_parse_inventory_quantity
+        except ImportError:
+            from utils.inventory_quantity import try_parse_inventory_quantity  # type: ignore
+        qty_value, qty_err = try_parse_inventory_quantity(
+            quantity_on_hand,
+            allow_zero=True,
+            field_name="Quantity on hand",
+        )
+        if qty_err:
+            return ServiceResult(ok=False, error=qty_err)
+        qty_value = max(qty_value or 0, 0)
 
     if ensure_inventory and policy in {"mandatory", "optional"}:
         fresh, ensure_msgs, ensure_err = _ensure_inventory_link_for_policy(
@@ -418,7 +457,7 @@ def save_pricing_stock_settings(
         if not sync_result.ok:
             return sync_result
         if policy == "mandatory" and rp > 0:
-            messages.append(f"Reorder point set to {rp:g} on linked inventory.")
+            messages.append(f"Reorder point set to {rp} on linked inventory.")
 
         if qty_value is not None:
             qty_msgs, qty_err = _apply_quantity_on_hand_to_inventory(fresh, qty_value)

@@ -29,6 +29,11 @@ from app.services.phase2_modules_service import (
 from app.services.repository import ServiceResult, fetch_rows, insert_row, update_row
 
 try:
+    from app.utils.inventory_quantity import parse_inventory_quantity, try_parse_inventory_quantity
+except ImportError:
+    from utils.inventory_quantity import parse_inventory_quantity, try_parse_inventory_quantity  # type: ignore
+
+try:
     from app.services.inventory_display_helpers import resolve_inventory_qr_value, resolve_inventory_sku
     from app.services.qr_codes import generate_inventory_qr_token, inventory_qr_link_url
     from app.config import settings
@@ -428,7 +433,13 @@ def record_inventory_transaction(data: dict[str, Any]) -> ServiceResult:
     """
     iid = str(data.get("inventory_id") or data.get("inventory_item_id") or "").strip()
     txn_type = str(data.get("transaction_type") or "").strip().lower()
-    qty = float(data.get("quantity") or 0)
+    qty, qty_err = try_parse_inventory_quantity(
+        data.get("quantity"),
+        allow_zero=False,
+        field_name="Quantity",
+    )
+    if qty_err or qty is None:
+        return ServiceResult(ok=False, error=qty_err or "Quantity must be greater than zero.")
     job_id = data.get("job_id") or None
     allow_overdraw = bool(data.get("allow_overdraw"))
 
@@ -471,12 +482,23 @@ def record_inventory_transaction(data: dict[str, Any]) -> ServiceResult:
     elif txn_type in {"consume_on_job", "consume_in_shop"}:
         new_qoh = prev_qoh - qty
     elif txn_type == "adjustment":
-        signed = float(data.get("signed_quantity") or data.get("quantity_delta") or qty)
-        new_qoh = prev_qoh + signed
+        signed_raw = data.get("signed_quantity") if data.get("signed_quantity") is not None else data.get("quantity_delta")
+        if signed_raw is None:
+            signed = qty
+        else:
+            signed, signed_err = try_parse_inventory_quantity(
+                signed_raw,
+                allow_zero=True,
+                allow_negative=True,
+                field_name="Adjustment quantity",
+            )
+            if signed_err or signed is None:
+                return ServiceResult(ok=False, error=signed_err or "Adjustment quantity must be a whole number.")
+        new_qoh = prev_qoh + float(signed)
 
     signed_qty = -qty if txn_type in _DECREASE_ON_HAND else qty
     if txn_type == "adjustment":
-        signed_qty = float(data.get("signed_quantity") or data.get("quantity_delta") or 0)
+        signed_qty = float(signed)
 
     ts = datetime.now(timezone.utc).isoformat()
     try:
@@ -588,7 +610,13 @@ def get_inventory_transactions(
             "item_name": str(item.get("name") or item.get("item_name") or "—"),
             "sku": resolve_inventory_sku(item) if item else "—",
             "job_label": job_row_select_label(job) if job else "—",
-            "quantity_display": abs(float(row.get("quantity") or row.get("qty") or 0)),
+            "quantity_display": abs(
+                parse_inventory_quantity(
+                    row.get("quantity") if row.get("quantity") is not None else row.get("qty"),
+                    allow_negative=True,
+                    allow_zero=True,
+                )
+            ),
         })
     out.sort(key=lambda r: str(r.get("created_at") or ""), reverse=True)
     return out

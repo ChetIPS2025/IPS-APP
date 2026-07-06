@@ -271,7 +271,13 @@ def issue_inventory_to_job(
     jid = str(job_id or "").strip()
     iid = str(inventory_item_id or "").strip()
     txn_type = str(transaction_type or "consume_on_job").strip().lower()
-    qty = float(quantity or 0)
+    try:
+        from app.utils.inventory_quantity import try_parse_inventory_quantity
+    except ImportError:
+        from utils.inventory_quantity import try_parse_inventory_quantity  # type: ignore
+    qty, qty_err = try_parse_inventory_quantity(quantity, allow_zero=False, field_name="Quantity")
+    if qty_err or qty is None:
+        return ServiceResult(ok=False, error=qty_err or "Quantity must be greater than zero.")
 
     if not jid:
         return ServiceResult(ok=False, error="Job is required.")

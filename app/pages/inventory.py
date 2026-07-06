@@ -77,6 +77,7 @@ try:
     )
     from app.styles import inject_inventory_module_css
     from app.utils.formatting import fmt_currency, fmt_date
+    from app.utils.inventory_quantity import format_inventory_quantity, inventory_qty_input_kwargs
     from app.utils.phone_helpers import format_phone_display
     from app.utils.field_context import (
         FIELD_EXPANDED_INVENTORY_KEY,
@@ -158,6 +159,7 @@ except ImportError:
     )
     from styles import inject_inventory_module_css  # type: ignore
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
+    from utils.inventory_quantity import format_inventory_quantity, inventory_qty_input_kwargs  # type: ignore
     from utils.phone_helpers import format_phone_display  # type: ignore
     from utils.field_context import (  # type: ignore
         FIELD_EXPANDED_INVENTORY_KEY,
@@ -274,15 +276,13 @@ def _inventory_unit(row: dict) -> str:
 
 
 def _inventory_qty(row: dict) -> str:
-    for key in ("quantity_on_hand", "qty_on_hand", "quantity"):
-        val = row.get(key)
-        if val is not None and str(val).strip() != "":
-            try:
-                num = float(val)
-                return str(int(num)) if num == int(num) else f"{num:.1f}"
-            except (TypeError, ValueError):
-                return str(val).strip()
-    return "0"
+    unit = _inventory_unit(row)
+    if unit and unit != "—":
+        return format_inventory_quantity(
+            row.get("quantity_on_hand") or row.get("qty_on_hand") or row.get("quantity"),
+            unit,
+        )
+    return format_inventory_quantity(row.get("quantity_on_hand") or row.get("qty_on_hand") or row.get("quantity"))
 
 
 def _inventory_status_pill_html(status: str) -> str:
@@ -668,11 +668,8 @@ def _render_inventory_issue_to_job_form(item: dict) -> None:
         job_pick = st.selectbox("Job", ["— Select job —", *job_labels], key=f"inv_issue_job_pick_{iid}")
         qty = st.number_input(
             "Quantity",
-            min_value=0.0,
-            value=1.0,
-            step=0.25,
-            format="%.4f",
             key=f"inv_issue_job_qty_{iid}",
+            **inventory_qty_input_kwargs(min_value=1, value=1),
         )
         notes = st.text_area("Notes", key=f"inv_issue_job_notes_{iid}", height=60)
         submit = st.form_submit_button("Use on Job", type="primary", use_container_width=True)
@@ -683,7 +680,7 @@ def _render_inventory_issue_to_job_form(item: dict) -> None:
     if not jid:
         st.error("Select a job.")
         return
-    qv = float(qty or 0)
+    qv = int(qty or 0)
     if qv <= 0:
         st.error("Quantity must be greater than zero.")
         return
@@ -741,7 +738,7 @@ def _render_inventory_transactions_tab(item: dict) -> None:
             '<div class="ips-inventory-txn-row">'
             f'<span>{html.escape(fmt_date(row.get("created_at")))}</span>'
             f'<span>{html.escape(_txn_action_label(row.get("transaction_type")))}</span>'
-            f'<span>{html.escape(str(row.get("quantity_display") or ""))}</span>'
+            f'<span>{html.escape(format_inventory_quantity(row.get("quantity_display")))}</span>'
             f'<span>{html.escape(str(row.get("job_label") or "—"))}</span>'
             f'<span>{html.escape(str(row.get("scanned_by_name") or "—"))}</span>'
             f'<span>{html.escape(format_phone_display(str(row.get("scanned_by_phone") or "")))}</span>'
@@ -833,7 +830,7 @@ def _render_inventory_edit_form(item: dict) -> None:
         st.selectbox("Status", lookup_options("inventory_statuses"), key=f"inv_edit_status_{iid}")
     with ic2:
         st.text_input("Location", key=f"inv_edit_loc_{iid}")
-        st.number_input("Qty on hand", key=f"inv_edit_qty_{iid}")
+        st.number_input("Qty on hand", key=f"inv_edit_qty_{iid}", min_value=0, step=1, format="%d")
         st.number_input("Unit cost", key=f"inv_edit_cost_{iid}")
 
     st.markdown("**Item Photo**")

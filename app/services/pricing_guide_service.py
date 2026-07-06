@@ -790,9 +790,23 @@ def save_pricing_item(
     if "stock_policy" in data:
         payload["stock_policy"] = normalize_stock_policy(data.get("stock_policy"))
     if "default_reorder_point" in data:
-        payload["default_reorder_point"] = max(float(data.get("default_reorder_point") or 0), 0.0)
+        try:
+            from app.utils.inventory_quantity import parse_inventory_quantity
+        except ImportError:
+            from utils.inventory_quantity import parse_inventory_quantity  # type: ignore
+        payload["default_reorder_point"] = max(
+            parse_inventory_quantity(data.get("default_reorder_point"), allow_zero=True, field_name="Reorder point"),
+            0,
+        )
     if "default_reorder_quantity" in data:
-        payload["default_reorder_quantity"] = max(float(data.get("default_reorder_quantity") or 0), 0.0)
+        try:
+            from app.utils.inventory_quantity import parse_inventory_quantity
+        except ImportError:
+            from utils.inventory_quantity import parse_inventory_quantity  # type: ignore
+        payload["default_reorder_quantity"] = max(
+            parse_inventory_quantity(data.get("default_reorder_quantity"), allow_zero=True, field_name="Reorder quantity"),
+            0,
+        )
     for key in ("image_path", "image_url", "image_file_name", "image_mime_type", "qr_code_url"):
         if key in data:
             payload[key] = str(data.get(key) or "").strip()

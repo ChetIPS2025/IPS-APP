@@ -950,9 +950,10 @@ def _render_edit_form(row: dict[str, Any]) -> None:
         stock_policy = stock_keys[stock_labels.index(stock_label)]
         default_reorder = st.number_input(
             "Default reorder point",
-            min_value=0.0,
-            value=float(row.get("default_reorder_point") or 0),
-            step=1.0,
+            min_value=0,
+            value=int(round(float(row.get("default_reorder_point") or 0))),
+            step=1,
+            format="%d",
             key=f"pg_edit_reorder_{rk}",
             disabled=stock_policy == "none",
         )
@@ -1003,7 +1004,7 @@ def _render_edit_form(row: dict[str, Any]) -> None:
                 "is_active": active,
                 "notes": notes,
                 "stock_policy": stock_policy,
-                "default_reorder_point": float(default_reorder),
+                "default_reorder_point": int(round(default_reorder)),
                 "item_code": row.get("item_code") or row.get("item_key"),
                 **extra,
             },
@@ -1016,7 +1017,7 @@ def _render_edit_form(row: dict[str, Any]) -> None:
                 save_pricing_stock_settings(
                     {**row, "id": row.get("id"), "stock_policy": stock_policy, "default_reorder_point": float(default_reorder)},
                     stock_policy=stock_policy,
-                    default_reorder_point=float(default_reorder),
+                    default_reorder_point=int(round(default_reorder)),
                     ensure_inventory=True,
                 )
             except Exception:

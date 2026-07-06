@@ -430,7 +430,7 @@ def _upsert_pricing_guide(
 def _upsert_inventory(row: dict[str, Any], pricing_item_id: str, existing: dict[str, Any] | None) -> tuple[bool, str, str | None, bool]:
     _, insert_row_admin, update_rows_admin = _admin()
     now = datetime.now(timezone.utc).isoformat()
-    qty = _num(row.get("qty_on_hand"))
+    qty = int(round(_num(row.get("qty_on_hand"))))
     cost = _num(row.get("unit_cost"))
     payload: dict[str, Any] = {
         "item_name": _str(row.get("description")),
@@ -452,7 +452,7 @@ def _upsert_inventory(row: dict[str, Any], pricing_item_id: str, existing: dict[
     try:
         if existing and str(existing.get("id") or ""):
             iid = str(existing["id"])
-            prev_qty = _num(existing.get("quantity_on_hand"))
+            prev_qty = int(round(_num(existing.get("quantity_on_hand"))))
             payload["quantity_on_hand"] = prev_qty + qty if qty else prev_qty
             if cost > 0:
                 payload["last_purchase_cost"] = cost

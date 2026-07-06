@@ -360,8 +360,8 @@ def live_low_stock_report() -> ReportData:
     for item in rows:
         if not isinstance(item, dict):
             continue
-        qty = _safe_float(item.get("quantity_on_hand") or item.get("qty_on_hand") or item.get("on_hand"))
-        reorder = _safe_float(item.get("reorder_point") or item.get("reorder_level") or 10)
+        qty = int(round(_safe_float(item.get("quantity_on_hand") or item.get("qty_on_hand") or item.get("on_hand"))))
+        reorder = int(round(_safe_float(item.get("reorder_point") or item.get("reorder_level") or 10)))
         status = _norm_status(item.get("status"))
         if status == "low stock" or (reorder > 0 and qty <= reorder):
             out.append(

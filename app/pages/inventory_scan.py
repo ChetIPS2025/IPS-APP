@@ -184,15 +184,23 @@ def _inject_inv_scan_mobile_css() -> None:
     )
 
 
-def _qty_on_hand(row: dict) -> float:
-    return float(row.get("quantity_on_hand") or 0)
-
-
-def _reorder(row: dict) -> float:
+def _qty_on_hand(row: dict) -> int:
     try:
-        return float(row.get("reorder_point") or 0)
-    except (TypeError, ValueError):
-        return 0.0
+        from app.utils.inventory_quantity import read_inventory_quantity
+    except ImportError:
+        from utils.inventory_quantity import read_inventory_quantity  # type: ignore
+    return read_inventory_quantity(row, "quantity_on_hand", "qty_on_hand", "quantity")
+
+
+def _reorder(row: dict) -> int:
+    try:
+        from app.utils.inventory_quantity import parse_inventory_quantity
+    except ImportError:
+        from utils.inventory_quantity import parse_inventory_quantity  # type: ignore
+    try:
+        return parse_inventory_quantity(row.get("reorder_point"), allow_zero=True, field_name="Reorder point")
+    except ValueError:
+        return 0
 
 
 def _is_low_stock(row: dict) -> bool:
@@ -1235,7 +1243,7 @@ def _render_inventory_scan_inner() -> None:
             "Auto-detected for this device. You can rename it — "
             "a stable id is kept in this browser (localStorage) when supported."
         )
-        qty = st.number_input("Quantity", min_value=0.0, value=1.0, step=0.25, format="%.4f", key="inv_scan_qty")
+        qty = st.number_input("Quantity", min_value=1, value=1, step=1, format="%d", key="inv_scan_qty")
         issue_type = st.selectbox("Use type", _ISSUE_TYPES, key="inv_scan_issue_type")
         job_opts = ["— No job —"] + job_labels
         job_pick = st.selectbox("Job", job_opts, key="inv_scan_job")
@@ -1249,7 +1257,7 @@ def _render_inventory_scan_inner() -> None:
         st.error("Enter **Your name / device** so we can record who issued this.")
         st.stop()
 
-    qv = float(qty or 0)
+    qv = int(qty or 0)
     if qv <= 0:
         st.error("Quantity must be greater than zero.")
         st.stop()
@@ -1622,7 +1630,7 @@ def _record_mobile_shop_use(
         from services.inventory_service import record_shop_inventory_consumption  # type: ignore
 
     iid = str(item.get("id") or "")
-    qv = float(qty or 0)
+    qv = int(qty or 0)
     if qv <= 0:
         return False, "Quantity must be greater than zero."
     if qv > qoh and not allow_over:
@@ -1699,7 +1707,7 @@ def _submit_mobile_inventory_scan(
 
     action = "consume_on_job"
     iid = str(item.get("id") or "")
-    qv = float(qty or 0)
+    qv = int(qty or 0)
     if qv <= 0:
         st.error("Quantity must be greater than zero.")
         st.stop()
@@ -1894,7 +1902,7 @@ def _render_inventory_scan_entry_fragment(
 
     _submit_mobile_inventory_scan(
         item=item,
-        qty=float(qty or 0),
+        qty=int(qty or 0),
         job_pick=job_pick,
         job_map=job_map,
         qoh=qoh,
