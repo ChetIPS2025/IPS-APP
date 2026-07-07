@@ -403,12 +403,23 @@ def _open_user_from_list(user: dict) -> None:
     st.session_state[ACTIVE_EMPLOYEE_KEY] = uid
 
 
+def _normalize_user_open_id(raw: object) -> str:
+    val = str(raw or "").strip()
+    if val.startswith("open:"):
+        return val.split(":", 1)[1].strip()
+    return val
+
+
 def _ips_app_rerun() -> None:
     try:
         from app.ui.streamlit_perf import ips_app_rerun
     except ImportError:
         from ui.streamlit_perf import ips_app_rerun  # type: ignore
     ips_app_rerun()
+
+
+def _on_users_table_open(user: dict) -> None:
+    _open_user_from_list(user)
 
 
 def _user_name_cell_html(name: str, user_id: str) -> str:
@@ -468,7 +479,7 @@ def _render_users_row_click_bridge() -> str | None:
 
   function isInteractive(target) {
     return !!(target && target.closest && target.closest(
-      "button, input, select, textarea, label, a, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox']"
+      "button, input, select, textarea, label, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox'], .ips-users-list-link"
     ));
   }
 
@@ -630,22 +641,23 @@ def _render_custom_users_table(
 
         st.markdown("</div>", unsafe_allow_html=True)
 
-    users_by_id = {
-        str(u.get("id") or "").strip(): u
-        for u in filtered
-        if str(u.get("id") or "").strip()
-    }
-    picked_row = _render_users_row_click_bridge()
-    picked_link = render_users_table_link_bridge()
-    for picked in (picked_link, picked_row):
-        open_id = str(picked or "").strip()
-        if not open_id:
-            continue
-        open_user = users_by_id.get(open_id)
-        if open_user:
-            _open_user_from_list(open_user)
-            _ips_app_rerun()
-            break
+        users_by_id = {
+            str(u.get("id") or "").strip(): u
+            for u in filtered
+            if str(u.get("id") or "").strip()
+        }
+        render_users_table_link_bridge(
+            users_by_id,
+            open_user_fn=_on_users_table_open,
+            rerun_fn=_ips_app_rerun,
+        )
+        picked_row = _render_users_row_click_bridge()
+        if picked_row:
+            open_id = _normalize_user_open_id(picked_row)
+            open_user = users_by_id.get(open_id)
+            if open_user:
+                _on_users_table_open(open_user)
+                _ips_app_rerun()
 
     return all_user_ids
 
@@ -1503,5 +1515,6 @@ def render() -> None:
         search=search_q,
     )
 
+    selected_user_id = str(st.session_state.get(SELECTED_USER_KEY) or "").strip()
     if selected_user_id and st.session_state.get(SHOW_MODAL_KEY):
         _show_employee_modal()

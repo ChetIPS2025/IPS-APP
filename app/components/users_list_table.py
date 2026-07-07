@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import html
+from collections.abc import Callable
+from typing import Any
 
 import streamlit as st
 
@@ -23,12 +25,40 @@ def user_list_link_html(
     )
 
 
+def handle_users_table_action(
+    raw: str,
+    users_by_id: dict[str, dict[str, Any]],
+    *,
+    last_action_key: str,
+    open_user_fn: Callable[[dict[str, Any]], None],
+    rerun_fn: Callable[[], None],
+) -> None:
+    val = str(raw or "").strip()
+    if not val:
+        return
+    if val == str(st.session_state.get(last_action_key) or ""):
+        return
+    st.session_state[last_action_key] = val
+
+    uid = val.split(":", 1)[1].strip() if val.startswith("open:") else val
+    if not uid:
+        return
+    open_user = users_by_id.get(uid)
+    if not open_user:
+        return
+    open_user_fn(open_user)
+    rerun_fn()
+
+
 def render_users_table_link_bridge(
+    users_by_id: dict[str, dict[str, Any]],
     *,
     component_key: str = "ips_users_list_bridge",
     hook_key: str = "ipsUsersList::action",
     last_action_key: str = "users_list_last_action",
-) -> str | None:
+    open_user_fn: Callable[[dict[str, Any]], None],
+    rerun_fn: Callable[[], None],
+) -> None:
     """Zero-height bridge: user name link clicks open user detail."""
     try:
         from app.ui.clean_table import _components_html
@@ -46,7 +76,7 @@ def render_users_table_link_bridge(
   const w = window.parent || window;
   const doc = w.document;
   const hookKey = {hook_key!r};
-  const sel = "[data-user-id][data-user-action]";
+  const sel = ".ips-users-list-link[data-user-id][data-user-action]";
 
   function sendValue(action) {{
     const payload = {{ type: "streamlit:setComponentValue", value: action }};
@@ -96,14 +126,14 @@ def render_users_table_link_bridge(
 </script>
         """,
         component_key=component_key,
-        height=0,
+        height=1,
     )
     action = str(picked or "").strip()
-    if not action:
-        return None
-    if action == str(st.session_state.get(last_action_key) or ""):
-        return None
-    st.session_state[last_action_key] = action
-    if action.startswith("open:"):
-        return action.split(":", 1)[1].strip()
-    return None
+    if action:
+        handle_users_table_action(
+            action,
+            users_by_id,
+            last_action_key=last_action_key,
+            open_user_fn=open_user_fn,
+            rerun_fn=rerun_fn,
+        )
