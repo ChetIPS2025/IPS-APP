@@ -575,7 +575,7 @@ def _render_custom_users_table(
     st.session_state[_ALL_USER_IDS_KEY] = all_user_ids
 
     with st.container(key="users_table_wrap"):
-        st.markdown('<div class="users-table-container ips-users-table-wrap">', unsafe_allow_html=True)
+        st.markdown('<span class="users-table-surface-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
 
         header_cols = st.columns(_USER_COLS, gap="xxsmall", vertical_alignment="center")
         for col, (label, field) in zip(header_cols, _USER_HEADER_SPECS):
@@ -660,8 +660,6 @@ def _render_custom_users_table(
                     unsafe_allow_html=True,
                 )
                 st.markdown(_user_row_marker_html(uid), unsafe_allow_html=True)
-
-        st.markdown("</div>", unsafe_allow_html=True)
 
         users_by_id = {
             str(u.get("id") or "").strip(): u
@@ -1390,7 +1388,7 @@ def render() -> None:
         st.rerun()
 
     def _render_users_toolbar() -> None:
-        with st.container(key="users_toolbar_wrap", border=True):
+        with st.container(key="users_toolbar_wrap"):
             st.markdown(
                 '<span class="users-toolbar-marker ips-filter-bar-marker" aria-hidden="true"></span>',
                 unsafe_allow_html=True,

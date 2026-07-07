@@ -139,75 +139,34 @@ def render_users_page_header(
     *,
     actions: list[_ActionFn] | None = None,
 ) -> None:
-    """Users page header with centered IPS wordmark above the title row."""
-    ot, ct = "d" + "iv", "/" + "d" + "iv"
-    st.markdown(f'<{ot} class="ips-page-shell-marker"></{ct}>', unsafe_allow_html=True)
-
-    logo = wording_logo_html(height=80, css_class="users-header-logo")
-    st.markdown(
-        f'<{ot} class="users-page-header">'
-        f'<{ot} class="users-header-logo-wrap">{logo}</{ct}>'
-        f'<{ot} class="users-title-section">',
-        unsafe_allow_html=True,
-    )
-
+    """Users page header card with icon, title, and subtitle."""
+    _ = actions
+    st.markdown('<span class="ips-page-shell-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
     sub_html = (
-        f'<p class="ips-page-subtitle">{html.escape(subtitle)}</p>'
+        f'<p class="users-page-header-subtitle">{html.escape(subtitle)}</p>'
         if subtitle
         else ""
     )
-    title_block = (
-        f'<{ot} class="ips-page-title-block">'
-        f'<h1 class="ips-page-title">{html.escape(title)}</h1>'
-        f"{sub_html}"
-        f"</{ct}>"
+    st.markdown(
+        f"""
+<div class="users-page-header-card">
+  <div class="users-page-header-inner">
+    <div class="users-page-header-icon" aria-hidden="true">
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21a8 8 0 0 0-16 0"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+    </div>
+    <div class="users-page-header-text">
+      <h1 class="users-page-header-title">{html.escape(title)}</h1>
+      {sub_html}
+    </div>
+  </div>
+</div>
+        """,
+        unsafe_allow_html=True,
     )
-
-    if actions:
-        n = len(actions)
-        if n >= 3:
-            title_w, actions_w = 1.65, 2.35
-        else:
-            title_w, actions_w = 2.55, 1.45
-        main_col, act_col = st.columns([title_w, actions_w], gap="small", vertical_alignment="top")
-        with main_col:
-            st.markdown(
-                f'<{ot} class="ips-page-header"><{ot} class="ips-page-title-row">{title_block}</{ct}></{ct}>',
-                unsafe_allow_html=True,
-            )
-        with act_col:
-            st.markdown(
-                '<span class="ips-page-actions-marker" aria-hidden="true"></span>',
-                unsafe_allow_html=True,
-            )
-            if n == 1:
-                actions[0]()
-            elif n == 2:
-                bc1, bc2 = st.columns([0.78, 1.22], gap="small")
-                with bc1:
-                    actions[0]()
-                with bc2:
-                    actions[1]()
-            elif n == 3:
-                bc1, bc2, bc3 = st.columns([0.95, 1.55, 1.1], gap="small")
-                with bc1:
-                    actions[0]()
-                with bc2:
-                    actions[1]()
-                with bc3:
-                    actions[2]()
-            else:
-                cols = st.columns(min(n, 4), gap="small")
-                for i, widget in enumerate(actions):
-                    with cols[i % len(cols)]:
-                        widget()
-    else:
-        st.markdown(
-            f'<{ot} class="ips-page-header"><{ot} class="ips-page-title-row">{title_block}</{ct}></{ct}>',
-            unsafe_allow_html=True,
-        )
-
-    st.markdown(f"</{ct}></{ct}>", unsafe_allow_html=True)
 
 
 def render_page_header(

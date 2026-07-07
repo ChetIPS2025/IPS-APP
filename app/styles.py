@@ -29,43 +29,76 @@ def inject_users_module_css() -> None:
     """Users list custom table styling — call at the top of the users page render."""
     st.markdown(
         f"""
-<style id="ips-users-module-v30">
-.users-page-header {{
-  margin: 0 0 14px 0;
-  width: 100%;
+<style id="ips-users-module-v31">
+section[data-testid="stMain"]:has(.ips-users-page) {{
+  background: #f9fafb !important;
 }}
-.users-header-logo-wrap {{
+section[data-testid="stMain"]:has(.ips-users-page) [data-testid="stAppViewContainer"],
+section[data-testid="stMain"]:has(.ips-users-page) .block-container {{
+  background: #f9fafb !important;
+}}
+section[data-testid="stMain"]:has(.ips-users-page) [data-testid="stCaptionContainer"] {{
+  margin: 0 0 10px 0 !important;
+  padding: 0 !important;
+}}
+section[data-testid="stMain"]:has(.ips-users-page) [data-testid="stCaptionContainer"] p {{
+  color: #64748b !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  margin: 0 !important;
+}}
+.users-page-header-card {{
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  padding: 28px 32px;
+  margin: 0 0 16px 0;
+}}
+.users-page-header-inner {{
   display: flex;
-  justify-content: center;
   align-items: center;
-  width: 100%;
-  padding: 4px 0 0 0;
+  gap: 18px;
 }}
-.users-header-logo {{
-  display: block;
-  height: auto !important;
-  max-height: 90px;
-  width: auto;
-  max-width: min(560px, 100%);
-  object-fit: contain;
-  background: transparent;
-  margin: 0 auto;
+.users-page-header-icon {{
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: #eff6ff;
+  color: #2563eb;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }}
-.users-title-section {{
-  margin-top: 24px;
+.users-page-header-text {{
+  min-width: 0;
 }}
-.users-title-section .ips-page-header {{
+.users-page-header-title {{
   margin: 0;
+  font-size: 34px;
+  line-height: 1.1;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}}
+.users-page-header-subtitle {{
+  margin: 8px 0 0 0;
+  font-size: 15px;
+  line-height: 1.35;
+  color: #64748b;
+  font-weight: 400;
+}}
+.st-key-users_toolbar_wrap {{
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 14px !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
+  padding: 12px 16px !important;
+  margin: 0 0 16px 0 !important;
 }}
 .users-toolbar-marker {{
   display: none !important;
-}}
-section[data-testid="stMain"]:has(.ips-users-page) [data-testid="stVerticalBlockBorderWrapper"]:has(.users-toolbar-marker) {{
-  margin: 12px 0 18px 0 !important;
-  background: #ffffff !important;
-  border: 1px solid #e5e7eb !important;
-  border-radius: 12px !important;
-  padding: 10px 12px !important;
 }}
 .st-key-users_toolbar_wrap [data-testid="stVerticalBlock"] {{
   gap: 0 !important;
@@ -89,17 +122,11 @@ section[data-testid="stMain"]:has(.ips-users-page) [data-testid="stVerticalBlock
 }}
 .st-key-users_toolbar_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {{
   flex: 1 1 auto !important;
-  min-width: 400px !important;
+  min-width: 280px !important;
 }}
 .st-key-users_toolbar_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:not(:first-child) {{
   flex: 0 0 auto !important;
   width: auto !important;
-  min-width: 0 !important;
-}}
-.st-key-users_toolbar_wrap .users-toolbar-search,
-.st-key-users_toolbar_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child [data-testid="stVerticalBlock"],
-.st-key-users_toolbar_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child [data-testid="stElementContainer"] {{
-  width: 100% !important;
   min-width: 0 !important;
 }}
 .st-key-users_toolbar_wrap [data-testid="stTextInput"] {{
@@ -116,6 +143,8 @@ section[data-testid="stMain"]:has(.ips-users-page) [data-testid="stVerticalBlock
   width: 100% !important;
   box-sizing: border-box !important;
   border-radius: 10px !important;
+  border: 1px solid #d1d5db !important;
+  background: #ffffff !important;
 }}
 .st-key-users_toolbar_wrap .stButton,
 .st-key-users_toolbar_wrap [data-testid="stButton"] {{
@@ -129,12 +158,31 @@ section[data-testid="stMain"]:has(.ips-users-page) [data-testid="stVerticalBlock
   padding: 0 16px !important;
   white-space: nowrap !important;
   border-radius: 10px !important;
+  font-weight: 600 !important;
+}}
+.st-key-users_toolbar_wrap [class*="st-key-users_export"] button,
+.st-key-users_toolbar_wrap [class*="st-key-users_clear_filters"] button {{
+  background: #ffffff !important;
+  border: 1px solid #d1d5db !important;
+  color: #334155 !important;
+}}
+.st-key-users_toolbar_wrap [class*="st-key-emp_add"] button {{
+  background: #2563eb !important;
+  border: 1px solid #2563eb !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
 }}
 .st-key-users_toolbar_wrap [data-testid="stElementContainer"] {{
   margin: 0 !important;
   padding: 0 !important;
 }}
 @media (max-width: 900px) {{
+  .users-page-header-card {{
+    padding: 20px 18px;
+  }}
+  .users-page-header-title {{
+    font-size: 28px;
+  }}
   .st-key-users_toolbar_wrap [data-testid="stHorizontalBlock"] {{
     flex-wrap: wrap !important;
     row-gap: 10px !important;
@@ -143,52 +191,33 @@ section[data-testid="stMain"]:has(.ips-users-page) [data-testid="stVerticalBlock
     flex: 1 1 100% !important;
     min-width: 0 !important;
   }}
-  .st-key-users_toolbar_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:not(:first-child) {{
-    flex: 1 1 auto !important;
-  }}
-}}
-.users-table-container,
-.ips-users-table-wrap {{
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  overflow: hidden;
-  margin-bottom: 0.35rem;
-  margin-top: 0 !important;
-  width: 100%;
-  max-width: 100%;
-}}
-section[data-testid="stMain"]:has(.ips-users-page) [data-testid="stCaptionContainer"] {{
-  margin: 4px 0 2px 0 !important;
-  padding: 0 !important;
 }}
 section[data-testid="stMain"]:has(.ips-users-page) .st-key-users_table_wrap {{
   margin-top: 0 !important;
-  background: #ffffff !important;
-  border: 1px solid #e5e7eb !important;
-  border-radius: 12px !important;
-  overflow: hidden !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
+  box-shadow: none !important;
 }}
 section[data-testid="stMain"]:has(.ips-users-page) .st-key-users_table_wrap [data-testid="stVerticalBlockBorderWrapper"],
 section[data-testid="stMain"]:has(.ips-users-page) .st-key-users_table_wrap [data-testid="stVerticalBlock"] {{
-  background: #ffffff !important;
+  background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-}}
-section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
-  margin-top: 0 !important;
 }}
 .st-key-users_table_wrap {{
   overflow-x: auto;
   max-width: 100%;
   width: 100%;
   margin-top: 0 !important;
-  background: #ffffff !important;
+  background: transparent !important;
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] {{
-  gap: 0 !important;
+  gap: 9px !important;
   width: 100%;
   max-width: 100%;
+  background: transparent !important;
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"],
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] {{
@@ -196,10 +225,12 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
   flex-wrap: nowrap !important;
   align-items: center !important;
   gap: 0.5rem !important;
-  border-bottom: 1px solid #e5e7eb;
-  padding: 8px 12px !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06) !important;
+  padding: 14px 18px !important;
   margin: 0 !important;
-  min-height: 56px;
+  min-height: 60px;
   max-height: none;
   width: 100% !important;
   min-width: 0 !important;
@@ -209,17 +240,20 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type,
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:first-of-type {{
   background: #ffffff !important;
-  min-height: 40px !important;
-  padding: 8px 12px !important;
+  min-height: 44px !important;
+  padding: 12px 18px !important;
+  margin-bottom: 2px !important;
+  border-bottom: 1px solid #e5e7eb !important;
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row),
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) {{
   cursor: pointer;
-  min-height: 56px;
+  min-height: 60px;
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row):hover,
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row):hover {{
-  background: #eef5ff !important;
+  background: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08) !important;
 }}
 .st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
   display: flex !important;
@@ -250,7 +284,7 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
 .st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child {{
   justify-content: flex-start !important;
   align-items: center !important;
-  padding-left: 12px !important;
+  padding-left: 4px !important;
 }}
 .st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-users-cell,
 .st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-user-pill,
@@ -263,9 +297,9 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
   padding: 0;
   font-size: 11px;
   font-weight: 800;
-  color: #475569;
+  color: #94a3b8;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   min-height: 0;
   display: flex;
   align-items: center;
@@ -277,7 +311,6 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
   justify-content: center !important;
   text-align: center !important;
 }}
-.users-name-cell,
 .st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child {{
   display: flex !important;
   align-items: center !important;
@@ -289,7 +322,7 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
 }}
 .ips-users-cell {{
   color: {TEXT};
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   line-height: 1.35;
   min-width: 0;
   padding: 0;
@@ -298,12 +331,9 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
   white-space: normal;
   word-break: break-word;
 }}
-.ips-users-cell-left {{
-  text-align: left;
-}}
 .ips-users-cell-email {{
   color: #64748b;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -323,11 +353,11 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 24px;
-  padding: 0 10px;
+  height: 26px;
+  padding: 0 12px;
   border-radius: 999px;
-  font-size: 10px;
-  font-weight: 800;
+  font-size: 11px;
+  font-weight: 700;
   white-space: nowrap;
 }}
 .ips-user-employee {{
@@ -366,6 +396,7 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
   max-width: 100% !important;
   margin: 0 !important;
   padding: 0 !important;
+  pointer-events: auto !important;
 }}
 .st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) [class*="st-key-users_open_"] [data-testid="stButton"],
 .st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) [class*="st-key-users_open_"] .stButton {{
@@ -384,7 +415,7 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
   display: inline-flex !important;
   align-items: center !important;
   justify-content: flex-start !important;
-  width: 100% !important;
+  width: auto !important;
   max-width: 100% !important;
   min-height: 0 !important;
   height: auto !important;
@@ -396,9 +427,9 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
   border-radius: 0 !important;
   box-shadow: none !important;
   color: #2563eb !important;
-  font-size: 20px !important;
+  font-size: 15px !important;
   font-weight: 700 !important;
-  line-height: 1.3 !important;
+  line-height: 1.35 !important;
   text-align: left !important;
   cursor: pointer !important;
   overflow: visible !important;
@@ -431,15 +462,6 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
 .st-key-users_table_wrap [data-testid="stElementContainer"] {{
   margin: 0 !important;
   padding: 0 !important;
-}}
-.st-key-users_table_wrap [data-testid="stElementContainer"]:not([class*="st-key-users_open_"]) .stButton > button,
-.st-key-users_table_wrap [data-testid="stElementContainer"]:not([class*="st-key-users_open_"]) [data-testid="stButton"] > button {{
-  height: 32px !important;
-  min-height: 32px !important;
-  padding: 0 12px !important;
-  border-radius: 9px !important;
-  font-size: 14px !important;
-  width: auto !important;
 }}
 .ips-admin-pw-reset-marker {{
   display: none !important;
