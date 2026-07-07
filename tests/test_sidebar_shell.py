@@ -59,21 +59,19 @@ def test_ensure_sidebar_collapsed_hydrated_skips_when_session_set():
     assert is_sidebar_collapsed() is False
 
 
-def test_nav_button_label_collapsed_icon_only():
+def test_nav_button_label_includes_icon_and_text():
     from app.components.sidebar import _nav_button_label
 
-    full = _nav_button_label("jobs", "Jobs", collapsed=False)
-    icon_only = _nav_button_label("jobs", "Jobs", collapsed=True)
+    full = _nav_button_label("jobs", "Jobs")
     assert "Jobs" in full
-    assert "Jobs" not in icon_only
-    assert icon_only == "💼"
+    assert full == "💼\u2002Jobs"
     assert nav_icon_for_slug("jobs") == "💼"
     assert nav_icon_for_slug("unknown_slug") == "•"
 
 
 def test_sidebar_width_tokens_match_design_spec():
-    assert IPS_SIDEBAR_EXPANDED_WIDTH_PX == 230
-    assert IPS_SIDEBAR_COLLAPSED_WIDTH_PX == 64
+    assert IPS_SIDEBAR_EXPANDED_WIDTH_PX == 232
+    assert IPS_SIDEBAR_COLLAPSED_WIDTH_PX == 60
 
 
 def test_employee_nav_is_simplified_portal_menu():

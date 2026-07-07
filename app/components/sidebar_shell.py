@@ -17,8 +17,8 @@ IPS_SIDEBAR_COLLAPSE_AFTER_NAV_KEY = "ips_sidebar_collapse_after_nav"
 IPS_SIDEBAR_COLLAPSED_STORAGE_KEY = "ips_sidebar_collapsed"
 IPS_SIDEBAR_COLLAPSED_HYDRATED_KEY = "_ips_sidebar_collapsed_hydrated"
 IPS_SIDEBAR_DESKTOP_MIN_PX = 900
-IPS_SIDEBAR_EXPANDED_WIDTH_PX = 230
-IPS_SIDEBAR_COLLAPSED_WIDTH_PX = 64
+IPS_SIDEBAR_EXPANDED_WIDTH_PX = 232
+IPS_SIDEBAR_COLLAPSED_WIDTH_PX = 60
 
 
 def _collapsed_sidebar_selectors() -> str:
@@ -103,7 +103,7 @@ def ensure_sidebar_collapsed_hydrated() -> None:
     var url = new URL(window.location.href);
     if (url.searchParams.has('ips_sb')) return;
     var collapsed = localStorage.getItem('{IPS_SIDEBAR_COLLAPSED_STORAGE_KEY}') === '1';
-    url.searchParams.set('ips_sb', collapsed ? 'c' : 'e');
+    url.searchParams.set('ips_sb', 'c');
     window.location.replace(url.toString());
   }} catch (e) {{}}
 }})();
@@ -153,7 +153,7 @@ def _fallback_nav_json() -> str:
 
 def inject_sidebar_shell() -> None:
     """Inject sidebar layout CSS/JS once per authenticated session."""
-    collapsed = is_sidebar_collapsed()
+    collapsed = True
     inject_sidebar_nav_override_css()
     if st.session_state.get(IPS_SIDEBAR_SHELL_KEY):
         inject_sidebar_menu_wire()
@@ -537,7 +537,6 @@ def inject_sidebar_nav_align() -> None:
   }
   function align(d) {
     if (!d || !d.body) return;
-    if (d.body.classList.contains('ips-sidebar-collapsed')) return;
     if (!d.querySelector('.ips-sidebar-nav-expanded')) return;
     d.querySelectorAll('section[data-testid="stSidebar"] [class*="st-key-nav_"] button').forEach(function (btn) {
       var p = btn.querySelector('p');
@@ -552,6 +551,20 @@ def inject_sidebar_nav_align() -> None:
         '<span class="sidebar-nav-icon">' + esc(parts.icon) + '</span>' +
         '<span class="sidebar-nav-label">' + esc(parts.label) + '</span>';
       p.dataset.ipsNavSplit = '1';
+    });
+    d.querySelectorAll('section[data-testid="stSidebar"] [class*="st-key-nav_"] button').forEach(function (btn) {
+      var text = '';
+      var host = btn.closest('[data-testid="stElementContainer"]');
+      var marker = host && host.previousElementSibling;
+      if (marker) {
+        var navItem = marker.querySelector('.sidebar-nav-item');
+        if (navItem) text = navItem.getAttribute('data-nav-label') || '';
+      }
+      var splitLabel = btn.querySelector('.sidebar-nav-label');
+      if (!text && splitLabel) text = String(splitLabel.textContent || '').trim();
+      if (!text) text = String(btn.getAttribute('aria-label') || '').trim();
+      if (text) btn.setAttribute('title', text);
+      else btn.removeAttribute('title');
     });
   }
   function run() { align(rootDoc()); }
@@ -604,7 +617,12 @@ def _shell_css() -> str:
     mobile_max = IPS_SIDEBAR_DESKTOP_MIN_PX - 1
     collapsed_sel = _collapsed_sidebar_selectors()
     return f"""
-<style id="ips-sidebar-shell-v8">
+<style id="ips-sidebar-shell-v9">
+section[data-testid="stSidebar"].app-sidebar,
+[data-testid="stSidebar"].app-sidebar {{
+  transition: width 0.2s ease, min-width 0.2s ease, max-width 0.2s ease, flex-basis 0.2s ease !important;
+  overflow: hidden !important;
+}}
 .ips-main-header-menu,
 button.ips-header-menu-btn {{
   display: none !important;
@@ -688,13 +706,114 @@ button.ips-header-menu-btn {{
     position: relative !important;
     z-index: 99995 !important;
     overflow: hidden !important;
-    transition: flex-basis 0.18s ease, width 0.18s ease, min-width 0.18s ease, max-width 0.18s ease !important;
+    transition: flex-basis 0.2s ease, width 0.2s ease, min-width 0.2s ease, max-width 0.2s ease !important;
   }}
   {collapsed_sel} {{
     flex-basis: {col}px !important;
     width: {col}px !important;
     min-width: {col}px !important;
     max-width: {col}px !important;
+  }}
+  {collapsed_sel}:hover {{
+    flex-basis: {exp}px !important;
+    width: {exp}px !important;
+    min-width: {exp}px !important;
+    max-width: {exp}px !important;
+    box-shadow: 4px 0 18px rgba(15, 23, 42, 0.12) !important;
+    z-index: 100010 !important;
+  }}
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) .sidebar-nav-label,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) .sidebar-section-title,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) .sidebar-logo-tagline,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) .sidebar-divider,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) .sidebar-footer-label,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) .ips-sidebar-user,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) .sidebar-version,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) .ips-sidebar-brand,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stWidgetLabel"],
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) .sidebar-nav-label,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) .sidebar-section-title,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) .sidebar-logo-tagline,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) .sidebar-divider,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) .sidebar-footer-label,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) .ips-sidebar-user,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) .sidebar-version,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) .ips-sidebar-brand,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stWidgetLabel"] {{
+    opacity: 0 !important;
+    width: 0 !important;
+    max-width: 0 !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    pointer-events: none !important;
+    transition: opacity 0.15s ease !important;
+  }}
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:hover .sidebar-nav-label,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:hover .sidebar-section-title,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:hover .sidebar-logo-tagline,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:hover .sidebar-divider,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:hover .sidebar-footer-label,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:hover .ips-sidebar-user,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:hover .sidebar-version,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:hover .ips-sidebar-brand,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:hover [data-testid="stWidgetLabel"],
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):hover .sidebar-nav-label,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):hover .sidebar-section-title,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):hover .sidebar-logo-tagline,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):hover .sidebar-divider,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):hover .sidebar-footer-label,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):hover .ips-sidebar-user,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):hover .sidebar-version,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):hover .ips-sidebar-brand,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):hover [data-testid="stWidgetLabel"] {{
+    opacity: 1 !important;
+    width: auto !important;
+    max-width: none !important;
+    overflow: visible !important;
+    pointer-events: auto !important;
+  }}
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) .sidebar-logo-wrap:not(.sidebar-logo-wrap--collapsed) img,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) .sidebar-logo-wrap:not(.sidebar-logo-wrap--collapsed) [data-testid="stImage"] img,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) .sidebar-logo-wrap:not(.sidebar-logo-wrap--collapsed) img,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) .sidebar-logo-wrap:not(.sidebar-logo-wrap--collapsed) [data-testid="stImage"] img {{
+    max-width: 42px !important;
+    max-height: 42px !important;
+  }}
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:hover .sidebar-logo-wrap img,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:hover .sidebar-logo-wrap [data-testid="stImage"] img,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):hover .sidebar-logo-wrap img,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):hover .sidebar-logo-wrap [data-testid="stImage"] img {{
+    max-width: 90% !important;
+    max-height: 110px !important;
+  }}
+  section[data-testid="stSidebar"] [class*="st-key-ips_sidebar_collapse_toggle"] {{
+    display: none !important;
+  }}
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:hover [class*="st-key-nav_"] .stButton,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:hover [class*="st-key-nav_"] [data-testid="stButton"],
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):hover [class*="st-key-nav_"] .stButton,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):hover [class*="st-key-nav_"] [data-testid="stButton"] {{
+    width: 100% !important;
+    max-width: 100% !important;
+  }}
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:hover [class*="st-key-nav_"] .stButton > button,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:hover [class*="st-key-nav_"] [data-testid="stButton"] > button,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:hover [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"],
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"]:hover [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"],
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):hover [class*="st-key-nav_"] .stButton > button,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):hover [class*="st-key-nav_"] [data-testid="stButton"] > button,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):hover [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"],
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):hover [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"] {{
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 2.25rem !important;
+    padding: 10px 14px 10px 22px !important;
+    margin: 0 !important;
+    justify-content: flex-start !important;
   }}
   section[data-testid="stSidebar"] > div {{
     width: 100% !important;
@@ -1105,6 +1224,10 @@ def _shell_script(nav_json: str) -> str:
     try {{ localStorage.setItem('ips_sidebar_open', '0'); }} catch (e3) {{}}
     syncBackdrop(d);
   }}
+  function tagSidebar(d) {{
+    var side = sidebarEl(d);
+    if (side) side.classList.add('app-sidebar');
+  }}
   function wireMenuButtons(d) {{
     d.querySelectorAll('button.ips-header-menu-btn').forEach(function (btn) {{
       if (btn.dataset.ipsMenuWired === '1') return;
@@ -1135,8 +1258,8 @@ def _shell_script(nav_json: str) -> str:
     opts = opts || {{}};
     if (isDesktop()) {{
       ensureDesktopVisible(d);
-      if (typeof opts.collapsed === 'boolean') setBodyCollapsed(d, opts.collapsed);
-      else setBodyCollapsed(d, readCollapsedPref());
+      setBodyCollapsed(d, true);
+      tagSidebar(d);
     }} else if (opts.afterNav) {{
       closeMobileDrawer(d);
     }}
@@ -1146,7 +1269,8 @@ def _shell_script(nav_json: str) -> str:
     var d = rootDoc();
     if (!isDesktop()) return;
     ensureDesktopVisible(d);
-    setBodyCollapsed(d, !!collapsed);
+    setBodyCollapsed(d, true);
+    tagSidebar(d);
   }};
   window.IPS.collapseAfterNav = function () {{
     var d = rootDoc();
@@ -1166,14 +1290,7 @@ def _shell_script(nav_json: str) -> str:
     }}
     if (isDesktop()) {{
       ensureDesktopVisible(d);
-      try {{
-        var url = new URL(window.location.href);
-        var collapsed = readCollapsedPref();
-        url.searchParams.set('ips_sb', collapsed ? 'e' : 'c');
-        window.location.replace(url.toString());
-      }} catch (deskErr) {{
-        setBodyCollapsed(d, !readCollapsedPref());
-      }}
+      tagSidebar(d);
       return;
     }}
     var btn = toggleBtn(d);
@@ -1190,8 +1307,11 @@ def _shell_script(nav_json: str) -> str:
     var d = rootDoc();
     wireMenuButtons(d);
     wireNavAutoCollapse(d);
-    if (isDesktop()) ensureDesktopVisible(d);
-    else restoreMobilePreference(d);
+    if (isDesktop()) {{
+      ensureDesktopVisible(d);
+      setBodyCollapsed(d, true);
+      tagSidebar(d);
+    }} else restoreMobilePreference(d);
     syncBackdrop(d);
     if (!sidebarEl(d) && NAV.length) window.IPS.showFallbackNav();
   }}

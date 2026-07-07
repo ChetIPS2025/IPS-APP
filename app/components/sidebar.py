@@ -12,7 +12,6 @@ try:
     from app.components.sidebar_nav_icons import nav_icon_for_slug
     from app.components.sidebar_shell import (
         apply_pending_sidebar_collapse,
-        is_sidebar_collapsed,
         request_sidebar_collapse_after_nav,
         request_sidebar_toggle,
         set_sidebar_collapsed,
@@ -33,7 +32,6 @@ except ImportError:
     from components.sidebar_nav_icons import nav_icon_for_slug  # type: ignore
     from components.sidebar_shell import (  # type: ignore
         apply_pending_sidebar_collapse,
-        is_sidebar_collapsed,
         request_sidebar_collapse_after_nav,
         request_sidebar_toggle,
         set_sidebar_collapsed,
@@ -66,10 +64,8 @@ def _logo_path(*, compact: bool = False) -> Path | None:
     return None
 
 
-def _nav_button_label(slug: str, label: str, *, collapsed: bool) -> str:
+def _nav_button_label(slug: str, label: str) -> str:
     icon = nav_icon_for_slug(slug)
-    if collapsed:
-        return icon
     return f"{icon}\u2002{label}"
 
 
@@ -78,6 +74,23 @@ def _section_for_slug(slug: str, sections: list[tuple[frozenset[str], str]]) -> 
         if slug in section_slugs:
             return section_label
     return None
+
+
+def _render_sidebar_header() -> None:
+    st.markdown('<span class="sidebar-header-anchor" aria-hidden="true"></span>', unsafe_allow_html=True)
+    brand_col, toggle_col = st.columns([8, 1], gap="small", vertical_alignment="center")
+    with brand_col:
+        st.markdown('<span class="sidebar-header-brand-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
+        logo = _logo_path(compact=False)
+        st.markdown('<span class="sidebar-logo-wrap" aria-hidden="true"></span>', unsafe_allow_html=True)
+        if logo:
+            st.image(str(logo), width=100)
+        else:
+            st.markdown('<p class="ips-sidebar-brand">IPS Operations</p>', unsafe_allow_html=True)
+        st.markdown('<p class="sidebar-logo-tagline sidebar-brand-text">Industrial Plant Solutions</p>', unsafe_allow_html=True)
+    with toggle_col:
+        _render_collapse_toggle(collapsed=True)
+    st.markdown('<hr class="sidebar-divider" />', unsafe_allow_html=True)
 
 
 def _render_collapse_toggle(*, collapsed: bool) -> None:
@@ -98,36 +111,8 @@ def _render_collapse_toggle(*, collapsed: bool) -> None:
         st.rerun()
 
 
-def _render_sidebar_header(*, collapsed: bool) -> None:
-    anchor_cls = (
-        "sidebar-header-anchor sidebar-header-anchor--collapsed"
-        if collapsed
-        else "sidebar-header-anchor"
-    )
-    st.markdown(f'<span class="{anchor_cls}" aria-hidden="true"></span>', unsafe_allow_html=True)
-    col_ratio = [1, 0.28] if collapsed else [8, 1]
-    col_align = "top" if collapsed else "center"
-    brand_col, toggle_col = st.columns(col_ratio, gap="small", vertical_alignment=col_align)
-    with brand_col:
-        st.markdown('<span class="sidebar-header-brand-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
-        logo = _logo_path(compact=collapsed)
-        logo_wrap_cls = "sidebar-logo-wrap sidebar-logo-wrap--collapsed" if collapsed else "sidebar-logo-wrap"
-        st.markdown(f'<span class="{logo_wrap_cls}" aria-hidden="true"></span>', unsafe_allow_html=True)
-        if logo:
-            st.image(str(logo), width=40 if collapsed else 100)
-        elif not collapsed:
-            st.markdown('<p class="ips-sidebar-brand">IPS Operations</p>', unsafe_allow_html=True)
-        if not collapsed:
-            st.markdown('<p class="sidebar-logo-tagline">Industrial Plant Solutions</p>', unsafe_allow_html=True)
-    with toggle_col:
-        _render_collapse_toggle(collapsed=collapsed)
-    if not collapsed:
-        st.markdown('<hr class="sidebar-divider" />', unsafe_allow_html=True)
-
-
 def render_sidebar(active_slug: str) -> None:
     apply_pending_sidebar_collapse()
-    collapsed = is_sidebar_collapsed()
     role = normalize_role(current_role())
     field_mode = bool(st.session_state.get("ips_field_mode"))
     is_employee_nav = role == "employee"
@@ -154,20 +139,16 @@ def render_sidebar(active_slug: str) -> None:
     ]
     _shown_sections: set[str] = set()
 
-    shell_cls = "ips-sidebar-shell ips-sidebar-collapsed" if collapsed else "ips-sidebar-shell ips-sidebar-expanded"
+    shell_cls = "ips-sidebar-shell ips-sidebar-collapsed ips-sidebar-hover-rail app-sidebar"
 
     with st.sidebar:
         st.markdown(
             f'<span class="{shell_cls}" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        _render_sidebar_header(collapsed=collapsed)
+        _render_sidebar_header()
 
-        nav_scroll_cls = (
-            "ips-sidebar-nav-scroll sidebar-nav-scroll ips-sidebar-nav-expanded"
-            if not collapsed
-            else "ips-sidebar-nav-scroll sidebar-nav-scroll"
-        )
+        nav_scroll_cls = "ips-sidebar-nav-scroll sidebar-nav-scroll ips-sidebar-nav-expanded"
         st.markdown(f'<{_OT} class="{nav_scroll_cls}">', unsafe_allow_html=True)
         for item in nav_items:
             if len(item) == 3:
@@ -175,17 +156,9 @@ def render_sidebar(active_slug: str) -> None:
             else:
                 slug, label = item  # type: ignore[misc]
             section_label = _section_for_slug(slug, _SECTION_HEADERS)
-            if collapsed:
-                if section_label and section_label not in _shown_sections:
-                    if _shown_sections:
-                        st.markdown(
-                            '<hr class="sidebar-nav-group-divider" aria-hidden="true" />',
-                            unsafe_allow_html=True,
-                        )
-                    _shown_sections.add(section_label)
-            elif section_label and section_label not in _shown_sections:
+            if section_label and section_label not in _shown_sections:
                 st.markdown(
-                    f'<p class="sidebar-section-title">{html.escape(section_label)}</p>',
+                    f'<p class="sidebar-section-title section-header">{html.escape(section_label)}</p>',
                     unsafe_allow_html=True,
                 )
                 _shown_sections.add(section_label)
@@ -194,14 +167,15 @@ def render_sidebar(active_slug: str) -> None:
                 is_active = True
             nav_cls = "sidebar-nav-item active" if is_active else "sidebar-nav-item"
             st.markdown(
-                f'<span class="{nav_cls}" data-nav-slug="{html.escape(slug)}" aria-hidden="true"></span>',
+                f'<span class="{nav_cls} nav-item" data-nav-slug="{html.escape(slug)}" '
+                f'data-nav-label="{html.escape(label)}" aria-hidden="true"></span>',
                 unsafe_allow_html=True,
             )
-            btn_label = _nav_button_label(slug, label, collapsed=collapsed)
+            btn_label = _nav_button_label(slug, label)
             if st.button(
                 btn_label,
                 key=f"nav_{slug}",
-                use_container_width=not collapsed,
+                use_container_width=True,
                 type="secondary",
                 help=label,
             ):
@@ -213,9 +187,9 @@ def render_sidebar(active_slug: str) -> None:
 
         st.markdown(f'<{_OT} class="ips-sidebar-footer sidebar-footer">', unsafe_allow_html=True)
 
-        if not collapsed and not is_employee_nav:
-            st.markdown('<p class="sidebar-section-title sidebar-footer-label">View mode</p>', unsafe_allow_html=True)
-        if not collapsed and not is_employee_nav:
+        if not is_employee_nav:
+            st.markdown('<p class="sidebar-section-title sidebar-footer-label section-header">View mode</p>', unsafe_allow_html=True)
+        if not is_employee_nav:
             fm = st.toggle(
                 "Field Supervisor Mode",
                 value=field_mode,
@@ -229,23 +203,20 @@ def render_sidebar(active_slug: str) -> None:
                 request_sidebar_collapse_after_nav()
                 st.rerun()
 
-        if not collapsed:
-            prof = current_profile()
-            name = html.escape(str(prof.get("full_name") or prof.get("email") or "User"))
-            role_lbl = html.escape(role.replace("_", " ").title())
-            st.markdown(
-                f'<{_OT} class="ips-sidebar-user sidebar-user"><strong>{name}</strong><br>{role_lbl}<{_CT}>',
-                unsafe_allow_html=True,
-            )
+        prof = current_profile()
+        name = html.escape(str(prof.get("full_name") or prof.get("email") or "User"))
+        role_lbl = html.escape(role.replace("_", " ").title())
+        st.markdown(
+            f'<{_OT} class="ips-sidebar-user sidebar-user sidebar-brand-text"><strong>{name}</strong><br>{role_lbl}<{_CT}>',
+            unsafe_allow_html=True,
+        )
 
         st.markdown('<span class="sidebar-footer-action" aria-hidden="true"></span>', unsafe_allow_html=True)
-        logout_label = "⎋" if collapsed else "Log out"
-        if st.button(logout_label, use_container_width=True, key="ips_logout", help="Log out", type="secondary"):
+        if st.button("⎋\u2002Log out", use_container_width=True, key="ips_logout", help="Log out", type="secondary"):
             sign_out()
 
-        if not collapsed:
-            st.markdown(
-                f'<p class="ips-sidebar-version sidebar-version">App v{html.escape(APP_VERSION)}</p>',
-                unsafe_allow_html=True,
-            )
+        st.markdown(
+            f'<p class="ips-sidebar-version sidebar-version sidebar-brand-text">App v{html.escape(APP_VERSION)}</p>',
+            unsafe_allow_html=True,
+        )
         st.markdown(f"<{_CT}>", unsafe_allow_html=True)
