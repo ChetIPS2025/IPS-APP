@@ -27,13 +27,9 @@ SELECTED_BORDER = "#2563eb"
 
 def inject_users_module_css() -> None:
     """Users list custom table styling — call at the top of the users page render."""
-    users_grid = (
-        "minmax(160px, 1.35fr) minmax(200px, 1.5fr) minmax(120px, 0.9fr) "
-        "minmax(140px, 1fr) minmax(110px, 0.85fr) minmax(100px, 0.75fr) minmax(90px, 0.7fr)"
-    )
     st.markdown(
         f"""
-<style id="ips-users-module-v26">
+<style id="ips-users-module-v27">
 .ips-users-table-wrap {{
   background: #ffffff;
   border: 1px solid #e5e7eb;
@@ -43,6 +39,94 @@ def inject_users_module_css() -> None:
   margin-top: 0 !important;
   width: 100%;
   max-width: 100%;
+}}
+section[data-testid="stMain"]:has(.ips-users-page) [data-testid="stCaptionContainer"] {{
+  margin: 4px 0 2px 0 !important;
+  padding: 0 !important;
+}}
+section[data-testid="stMain"]:has(.ips-users-page) .st-key-users_table_wrap {{
+  margin-top: 0 !important;
+}}
+section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
+  margin-top: 0 !important;
+}}
+.st-key-users_table_wrap {{
+  overflow-x: auto;
+  max-width: 100%;
+  width: 100%;
+  margin-top: 0 !important;
+}}
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] {{
+  gap: 0 !important;
+  width: 100%;
+  max-width: 100%;
+}}
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"],
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] {{
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 8px 12px !important;
+  margin: 0 !important;
+  min-height: 56px;
+  max-height: none;
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  background: #ffffff !important;
+}}
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type,
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:first-of-type {{
+  background: #f8fafc !important;
+  min-height: 40px !important;
+  padding: 8px 12px !important;
+}}
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row),
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) {{
+  cursor: pointer;
+  min-height: 56px;
+}}
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row):hover,
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row):hover {{
+  background: #eef5ff !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
+  display: flex !important;
+  align-items: center !important;
+  align-self: stretch !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: 0 8px !important;
+  overflow: visible !important;
+  justify-content: flex-start !important;
+  box-sizing: border-box !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(6),
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(7) {{
+  justify-content: center !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stVerticalBlock"],
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stElementContainer"] {{
+  width: 100% !important;
+  min-width: 0 !important;
+  justify-content: inherit !important;
+  align-items: inherit !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  gap: 0 !important;
+  overflow: visible !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child {{
+  justify-content: flex-start !important;
+  align-items: center !important;
+  padding-left: 12px !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-users-cell,
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-user-pill,
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-users-pill-col {{
+  pointer-events: none;
 }}
 .ips-users-header-row {{
   background: transparent;
@@ -58,86 +142,43 @@ def inject_users_module_css() -> None:
   align-items: center;
   width: 100%;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:nth-child(6) .ips-users-header-row,
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:nth-child(7) .ips-users-header-row {{
+  justify-content: center !important;
+  text-align: center !important;
+}}
+.users-name-cell,
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child {{
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  overflow: visible !important;
 }}
 .ips-users-cell {{
   color: {TEXT};
   font-size: 0.8125rem;
-  line-height: 1.25;
+  line-height: 1.35;
   min-width: 0;
   padding: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}}
-.ips-users-ellipsis {{
-  display: block;
-  width: 100%;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   text-align: left;
-}}
-.ips-users-name-cell-wrap {{
-  position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  width: 100%;
-  min-height: 46px;
-}}
-.ips-users-name-cell {{
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  width: 100%;
-  min-height: 46px;
-  padding-left: 24px;
-  padding-right: 24px;
-  box-sizing: border-box;
-  text-align: left;
-}}
-.ips-users-name-label {{
-  display: block;
-  width: 100%;
-  font-size: 20px;
-  font-weight: 700;
-  color: #2563eb;
-  line-height: 1.25;
-  text-align: left;
+  overflow: visible;
+  white-space: normal;
   word-break: break-word;
 }}
-.ips-users-list-link {{
-  pointer-events: auto !important;
-  cursor: pointer !important;
-  text-decoration: none !important;
-}}
-.ips-users-list-link:hover,
-.ips-users-list-link:focus {{
-  color: #1d4ed8 !important;
-  text-decoration: none !important;
-}}
-.ips-users-name {{
-  font-size: 20px;
-  font-weight: 700;
-  color: #2563eb;
-  line-height: 1.25;
+.ips-users-cell-left {{
   text-align: left;
 }}
-.ips-users-muted {{
-  font-size: 12px;
+.ips-users-cell-email {{
   color: #64748b;
-}}
-.ips-users-phone {{
   font-size: 0.8125rem;
-  color: #334155;
-}}
-.ips-users-role {{
-  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }}
 .ips-users-pill-col {{
   display: flex;
@@ -145,21 +186,20 @@ def inject_users_module_css() -> None:
   justify-content: flex-start;
   width: 100%;
   min-width: 0;
-  overflow: hidden;
+}}
+.ips-users-pill-col-center {{
+  justify-content: center !important;
 }}
 .ips-user-pill {{
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 22px;
-  padding: 0 8px;
+  height: 24px;
+  padding: 0 10px;
   border-radius: 999px;
   font-size: 10px;
   font-weight: 800;
   white-space: nowrap;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }}
 .ips-user-employee {{
   background: #dbeafe;
@@ -188,6 +228,89 @@ def inject_users_module_css() -> None:
 .ips-user-status-pending {{
   background: #fef3c7;
   color: #92400e;
+}}
+.ips-users-table-row {{
+  display: none !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) [class*="st-key-users_open_"] {{
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) [class*="st-key-users_open_"] [data-testid="stButton"],
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) [class*="st-key-users_open_"] .stButton {{
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) [class*="st-key-users_open_"] button,
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) [class*="st-key-users_open_"] [data-testid="stButton"] > button,
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) [class*="st-key-users_open_"] button[data-testid="stBaseButton-tertiary"],
+.users-name-link {{
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 0 !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: #2563eb !important;
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  line-height: 1.3 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  overflow: visible !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  text-overflow: clip !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) [class*="st-key-users_open_"] button:hover,
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) [class*="st-key-users_open_"] [data-testid="stButton"] > button:hover,
+.users-name-link:hover {{
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
+  background: transparent !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) [class*="st-key-users_open_"] button > div,
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) [class*="st-key-users_open_"] button p {{
+  text-align: left !important;
+  color: inherit !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow: visible !important;
+}}
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stHorizontalBlock"] {{
+  display: flex !important;
+  gap: 0 !important;
+  width: 100% !important;
+}}
+.st-key-users_table_wrap [data-testid="stElementContainer"] {{
+  margin: 0 !important;
+  padding: 0 !important;
+}}
+.st-key-users_table_wrap [data-testid="stElementContainer"]:not([class*="st-key-users_open_"]) .stButton > button,
+.st-key-users_table_wrap [data-testid="stElementContainer"]:not([class*="st-key-users_open_"]) [data-testid="stButton"] > button {{
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: 9px !important;
+  font-size: 14px !important;
+  width: auto !important;
 }}
 .ips-admin-pw-reset-marker {{
   display: none !important;
@@ -232,292 +355,6 @@ def inject_users_module_css() -> None:
 .ips-admin-auth-status-email {{
   color: #64748b;
   font-size: 0.75rem;
-}}
-section[data-testid="stMain"]:has(.ips-users-page) [data-testid="stCaptionContainer"] {{
-  margin: 4px 0 2px 0 !important;
-  padding: 0 !important;
-}}
-section[data-testid="stMain"]:has(.ips-users-page) .st-key-users_table_wrap {{
-  margin-top: 0 !important;
-}}
-section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
-  margin-top: 0 !important;
-}}
-.st-key-users_table_wrap {{
-  overflow-x: hidden;
-  max-width: 100%;
-  width: 100%;
-  margin-top: 0 !important;
-}}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] {{
-  gap: 0 !important;
-  width: 100%;
-  max-width: 100%;
-}}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"],
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"],
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row),
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) {{
-  display: grid !important;
-  grid-template-columns: {users_grid} !important;
-  column-gap: 0 !important;
-  row-gap: 0 !important;
-  gap: 0 !important;
-  align-items: center !important;
-  border-bottom: 1px solid #e5e7eb;
-  padding: 0 !important;
-  margin: 0 !important;
-  min-height: 56px;
-  width: 100% !important;
-  min-width: 0 !important;
-  max-width: 100% !important;
-  box-sizing: border-box !important;
-  justify-content: start !important;
-  justify-items: stretch !important;
-}}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row),
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row),
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) {{
-  cursor: pointer;
-  min-height: 56px;
-}}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"],
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"],
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"] {{
-  flex: unset !important;
-  flex-grow: 0 !important;
-  flex-shrink: 0 !important;
-  width: 100% !important;
-  min-width: 0 !important;
-  max-width: 100% !important;
-  margin: 0 !important;
-  padding: 0 14px !important;
-  display: flex !important;
-  align-items: center !important;
-  align-self: stretch !important;
-  overflow: hidden !important;
-  justify-content: flex-start !important;
-  border-right: 1px solid #e5e7eb;
-  box-sizing: border-box !important;
-}}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(7),
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(7) {{
-  border-right: none !important;
-}}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1),
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1),
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child {{
-  padding-left: 0 !important;
-  padding-right: 0 !important;
-  justify-content: flex-start !important;
-  align-items: stretch !important;
-}}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) [data-testid="stVerticalBlock"],
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) [data-testid="stVerticalBlock"],
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) [data-testid="stElementContainer"],
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) [data-testid="stElementContainer"],
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) [data-testid="stMarkdownContainer"],
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) [data-testid="stMarkdownContainer"] {{
-  align-items: flex-start !important;
-  justify-content: flex-start !important;
-  text-align: left !important;
-  width: 100% !important;
-}}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stVerticalBlock"],
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stVerticalBlock"],
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:not(:first-child) > [data-testid="stVerticalBlock"] {{
-  width: 100% !important;
-  min-width: 0 !important;
-  max-width: 100% !important;
-  justify-content: center !important;
-  align-items: center !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  gap: 0 !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child > [data-testid="stVerticalBlock"],
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child > [data-testid="stVerticalBlock"] {{
-  width: 100% !important;
-  min-width: 0 !important;
-  max-width: 100% !important;
-  justify-content: flex-start !important;
-  align-items: stretch !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  gap: 0 !important;
-}}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-users-cell,
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-users-cell,
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-user-pill,
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-user-pill,
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-users-pill-col,
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-users-pill-col {{
-  pointer-events: none;
-}}
-.st-key-users_table_wrap [data-testid="stMarkdownContainer"],
-.st-key-users_table_wrap .stMarkdown,
-.st-key-users_table_wrap .stMarkdown p {{
-  width: 100% !important;
-  min-width: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type {{
-  background: #f8fafc;
-  min-height: 36px !important;
-  padding: 0 !important;
-}}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stHorizontalBlock"] {{
-  display: flex !important;
-  grid-template-columns: none !important;
-  gap: 0 !important;
-  width: 100% !important;
-  max-width: 100% !important;
-}}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child {{
-  flex: 0 0 12px !important;
-  width: 12px !important;
-  min-width: 12px !important;
-  max-width: 12px !important;
-  padding: 0 !important;
-}}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:has(.ips-table-header-filter-marker) [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {{
-  overflow: hidden !important;
-  min-width: 0 !important;
-  flex: 1 1 auto !important;
-}}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type .ips-table-header-filter-text {{
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-}}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row):hover,
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row):hover {{
-  background: #eef5ff;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child {{
-  align-items: flex-start !important;
-  justify-content: flex-start !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child > [data-testid="stVerticalBlock"] {{
-  position: relative !important;
-  min-height: 46px !important;
-  width: 100% !important;
-  align-items: stretch !important;
-  justify-content: flex-start !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stElementContainer"]:has(.ips-users-table-row),
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stElementContainer"]:has(.ips-users-row-marker) {{
-  position: absolute !important;
-  left: 0 !important;
-  top: 0 !important;
-  width: 0 !important;
-  height: 0 !important;
-  min-height: 0 !important;
-  overflow: hidden !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  z-index: 0 !important;
-}}
-.st-key-users_table_wrap .ips-users-table-row,
-.st-key-users_table_wrap .ips-users-row-marker {{
-  display: block !important;
-  min-height: 0 !important;
-  max-height: 0 !important;
-  height: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-  border: none !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stElementContainer"]:has([data-testid="stButton"]),
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"],
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stElementContainer"]:has(.ips-users-name-cell-wrap),
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stElementContainer"]:has(.ips-users-name-cell) {{
-  position: relative !important;
-  z-index: 2 !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  align-self: stretch !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] {{
-  margin: 0 !important;
-  padding: 0 !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] [data-testid="stButton"],
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] .stButton {{
-  width: 100% !important;
-  max-width: 100% !important;
-  min-height: 46px !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  display: flex !important;
-  justify-content: flex-start !important;
-  align-items: stretch !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] [data-testid="stButton"] > button,
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] .stButton > button,
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] button[data-testid="stBaseButton-tertiary"] {{
-  display: flex !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  min-height: 46px !important;
-  margin: 0 !important;
-  padding: 0 14px 0 24px !important;
-  background: transparent !important;
-  background-color: transparent !important;
-  border: none !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  color: #2563eb !important;
-  font-size: 20px !important;
-  font-weight: 700 !important;
-  line-height: 1.25 !important;
-  text-align: left !important;
-  cursor: pointer !important;
-  outline: none !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] [data-testid="stButton"] > button:hover,
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] .stButton > button:hover,
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] button[data-testid="stBaseButton-tertiary"]:hover {{
-  color: #1d4ed8 !important;
-  text-decoration: underline !important;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] [data-testid="stButton"] > button > div,
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] [data-testid="stButton"] > button p {{
-  width: 100% !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-  text-align: left !important;
-  color: inherit !important;
-  font-size: inherit !important;
-  font-weight: inherit !important;
-}}
-.st-key-users_table_wrap [data-testid="stElementContainer"] {{
-  margin: 0 !important;
-  padding: 0 !important;
-}}
-.st-key-users_table_wrap [data-testid="stElementContainer"]:not([class*="st-key-users_open_"]) .stButton > button,
-.st-key-users_table_wrap [data-testid="stElementContainer"]:not([class*="st-key-users_open_"]) [data-testid="stButton"] > button {{
-  height: 32px !important;
-  min-height: 32px !important;
-  padding: 0 12px !important;
-  border-radius: 9px !important;
-  font-size: 14px !important;
-  width: auto !important;
 }}
 .ips-user-delete-actions {{
   margin: 0.35rem 0 0.75rem;
@@ -568,119 +405,6 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
   border: none !important;
   padding: 2px 0 !important;
   color: #9a3412;
-}}
-/* Keep Users grid layout ahead of global compact-table flex rules */
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"],
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"],
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row),
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) {{
-  display: grid !important;
-  grid-template-columns: {users_grid} !important;
-  column-gap: 0 !important;
-  row-gap: 0 !important;
-  gap: 0 !important;
-  width: 100% !important;
-  min-width: 0 !important;
-  max-width: 100% !important;
-  box-sizing: border-box !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stButton"],
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child .stButton,
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stButton"],
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child .stButton {{
-  width: 100% !important;
-  max-width: 100% !important;
-  min-height: 46px !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  display: flex !important;
-  justify-content: flex-start !important;
-  align-items: stretch !important;
-  flex: 1 1 auto !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stButton"] > button,
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child .stButton > button,
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child button[data-testid="stBaseButton-tertiary"],
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stButton"] > button,
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child button[data-testid="stBaseButton-tertiary"] {{
-  display: flex !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  min-width: 0 !important;
-  min-height: 46px !important;
-  margin: 0 !important;
-  padding: 0 14px 0 24px !important;
-  background: transparent !important;
-  background-color: transparent !important;
-  border: none !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  color: #2563eb !important;
-  font-size: 20px !important;
-  font-weight: 700 !important;
-  line-height: 1.25 !important;
-  text-align: left !important;
-  cursor: pointer !important;
-  outline: none !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stButton"] > button:hover,
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child .stButton > button:hover,
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child button[data-testid="stBaseButton-tertiary"]:hover,
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child button[data-testid="stBaseButton-tertiary"]:hover {{
-  color: #1d4ed8 !important;
-  text-decoration: underline !important;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stButton"] > button > div,
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stButton"] > button p,
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stButton"] > button p {{
-  width: 100% !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-  text-align: left !important;
-  color: inherit !important;
-  font-size: inherit !important;
-  font-weight: inherit !important;
-}}
-section[data-testid="stMain"]:has(.ips-users-page) .st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child,
-section[data-testid="stMain"]:has(.ips-users-page) .st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child > [data-testid="stVerticalBlock"],
-section[data-testid="stMain"]:has(.ips-users-page) .st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stElementContainer"]:has([data-testid="stButton"]),
-section[data-testid="stMain"]:has(.ips-users-page) .st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stButton"],
-section[data-testid="stMain"]:has(.ips-users-page) .st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child .stButton {{
-  justify-content: flex-start !important;
-  align-items: stretch !important;
-  align-self: stretch !important;
-  text-align: left !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  margin-left: 0 !important;
-}}
-section[data-testid="stMain"]:has(.ips-users-page) .st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child button,
-section[data-testid="stMain"]:has(.ips-users-page) .st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stButton"] > button,
-section[data-testid="stMain"]:has(.ips-users-page) .st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child button[data-testid="stBaseButton-tertiary"] {{
-  display: flex !important;
-  justify-content: flex-start !important;
-  align-items: center !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  min-width: 0 !important;
-  margin: 0 !important;
-  padding: 0 14px 0 24px !important;
-  color: #2563eb !important;
-  font-size: 20px !important;
-  font-weight: 700 !important;
-  text-align: left !important;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
 }}
 </style>
 """,

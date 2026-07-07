@@ -159,7 +159,7 @@ CACHE_KEY = "_ips_employees_modal_by_id"
 SELECTED_USER_KEY = "selected_user_id"
 SHOW_MODAL_KEY = "show_user_detail_modal"
 _ALL_USER_IDS_KEY = "_ips_users_visible_ids"
-_USER_COLS = [2.9, 2.5, 1.35, 1.55, 1.35, 1.15, 1.05]
+_USER_COLS = [3.25, 2.85, 1.45, 1.7, 1.35, 1.05, 0.95]
 _USER_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("NAME", None),
     ("EMAIL", None),
@@ -541,7 +541,7 @@ def _render_custom_users_table(
     st.session_state[_ALL_USER_IDS_KEY] = all_user_ids
 
     with st.container(key="users_table_wrap"):
-        st.markdown('<div class="ips-users-table-wrap ips-users-table-grid">', unsafe_allow_html=True)
+        st.markdown('<div class="ips-users-table-wrap">', unsafe_allow_html=True)
 
         header_cols = st.columns(_USER_COLS, gap="xxsmall", vertical_alignment="center")
         for col, (label, field) in zip(header_cols, _USER_HEADER_SPECS):
@@ -583,17 +583,16 @@ def _render_custom_users_table(
                     use_container_width=True,
                 ):
                     _open_users_table_user(user)
-                st.markdown(_user_row_marker_html(uid), unsafe_allow_html=True)
 
             with cols[1]:
                 st.markdown(
-                    _users_cell_html(email, "ips-users-muted ips-users-cell ips-users-ellipsis"),
+                    _users_cell_html(email, "ips-users-cell ips-users-cell-email"),
                     unsafe_allow_html=True,
                 )
 
             with cols[2]:
                 st.markdown(
-                    _users_cell_html(phone, "ips-users-cell ips-users-phone ips-users-ellipsis"),
+                    _users_cell_html(phone, "ips-users-cell ips-users-cell-left"),
                     unsafe_allow_html=True,
                 )
 
@@ -601,7 +600,7 @@ def _render_custom_users_table(
                 st.markdown(
                     _users_cell_html(
                         billing_class,
-                        "ips-users-cell ips-users-billing ips-users-ellipsis",
+                        "ips-users-cell ips-users-cell-left",
                     ),
                     unsafe_allow_html=True,
                 )
@@ -610,22 +609,23 @@ def _render_custom_users_table(
                 st.markdown(
                     _users_cell_html(
                         permission_role,
-                        "ips-users-cell ips-users-role ips-users-ellipsis",
+                        "ips-users-cell ips-users-cell-left",
                     ),
                     unsafe_allow_html=True,
                 )
 
             with cols[5]:
                 st.markdown(
-                    f'<div class="ips-users-pill-col">{_employee_type_pill_html(user)}</div>',
+                    f'<div class="ips-users-pill-col ips-users-pill-col-center">{_employee_type_pill_html(user)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[6]:
                 st.markdown(
-                    f'<div class="ips-users-pill-col">{_user_status_pill_html(status)}</div>',
+                    f'<div class="ips-users-pill-col ips-users-pill-col-center">{_user_status_pill_html(status)}</div>',
                     unsafe_allow_html=True,
                 )
+                st.markdown(_user_row_marker_html(uid), unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
