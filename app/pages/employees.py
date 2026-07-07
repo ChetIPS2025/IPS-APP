@@ -24,10 +24,6 @@ try:
         render_table_header_cell,
         sanitize_column_filters,
     )
-    from app.components.users_list_table import (
-        render_users_table_link_bridge,
-        user_list_link_html,
-    )
     from app.components.record_modal import (
         build_modal_cache,
         clear_edit_modes,
@@ -97,10 +93,6 @@ except ImportError:
         has_active_column_filters,
         render_table_header_cell,
         sanitize_column_filters,
-    )
-    from components.users_list_table import (  # type: ignore
-        render_users_table_link_bridge,
-        user_list_link_html,
     )
     from components.record_modal import (  # type: ignore
         build_modal_cache,
@@ -419,16 +411,8 @@ def _normalize_user_open_id(raw: object) -> str:
     return val
 
 
-def _user_name_cell_html(name: str, user_id: str) -> str:
-    label = name if name and name != "—" else "Open user"
-    title = html.escape(label, quote=True)
-    link_html = user_list_link_html(user_id, label)
-    return (
-        f'<div class="ips-users-name-cell-wrap">'
-        f'<div class="ips-users-name-cell" title="{title}">'
-        f"{link_html}"
-        f"</div></div>"
-    )
+def _user_name_open_label(name: str) -> str:
+    return name if name and name != "—" else "Open user"
 
 
 def _user_row_marker_html(user_id: str) -> str:
@@ -476,7 +460,7 @@ def _render_users_row_click_bridge() -> str | None:
 
   function isInteractive(target) {
     return !!(target && target.closest && target.closest(
-      "button, input, select, textarea, label, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox'], .ips-users-list-link"
+      "button, input, select, textarea, label, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox'], [class*='st-key-users_open_']"
     ));
   }
 
@@ -592,7 +576,14 @@ def _render_custom_users_table(
 
             with cols[0]:
                 st.markdown(_user_row_marker_html(uid), unsafe_allow_html=True)
-                st.markdown(_user_name_cell_html(name, uid), unsafe_allow_html=True)
+                if st.button(
+                    _user_name_open_label(name),
+                    key=f"users_open_{uid}",
+                    type="tertiary",
+                    help=f"View {name}",
+                    use_container_width=True,
+                ):
+                    _open_users_table_user(user)
 
             with cols[1]:
                 st.markdown(
@@ -643,10 +634,6 @@ def _render_custom_users_table(
             for u in filtered
             if str(u.get("id") or "").strip()
         }
-        render_users_table_link_bridge(
-            users_by_id,
-            open_user_fn=_open_users_table_user,
-        )
         picked_row = _render_users_row_click_bridge()
         if picked_row:
             open_id = _normalize_user_open_id(picked_row)
