@@ -279,10 +279,48 @@ section[data-testid="stMain"]:has(.ips-assets-page) [data-testid="column"]:has(.
   min-width: 60px !important;
   min-height: 60px !important;
 }
+.st-key-assets_table_wrap .ips-assets-thumb-cell-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 8px;
+  line-height: 0;
+}
+.st-key-assets_table_wrap .ips-assets-thumb-cell-link:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
 .st-key-assets_table_wrap .ips-asset-thumb-img {
   object-fit: cover;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.st-key-assets_table_wrap .ips-assets-thumb-cell-link:hover .ips-asset-thumb-img,
+.st-key-assets_table_wrap .ips-assets-thumb-cell-link:focus-visible .ips-asset-thumb-img {
+  border-color: #93c5fd;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.18);
+}
+.st-key-assets_table_wrap .ips-asset-thumb-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #94a3b8;
+  font-size: 1.1rem;
+  background: #f8fafc;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.st-key-assets_table_wrap .ips-assets-thumb-cell-link:hover .ips-asset-thumb-placeholder,
+.st-key-assets_table_wrap .ips-assets-thumb-cell-link:focus-visible .ips-asset-thumb-placeholder {
+  border-color: #93c5fd;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.18);
 }
 .ips-assets-equipment-table-row,
 .ips-assets-row-marker {
@@ -538,7 +576,7 @@ def render_assets_equipment_row_click_bridge() -> str | None:
 
   function isInteractive(target) {
     return !!(target && target.closest && target.closest(
-      "button, input, select, textarea, label, a, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox'], .asset-actions-cell, .asset-actions-button, .ips-assets-name-cell-link"
+      "button, input, select, textarea, label, a, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox'], .asset-actions-cell, .asset-actions-button, .ips-assets-name-cell-link, .ips-assets-thumb-cell-link"
     ));
   }
 
@@ -548,12 +586,12 @@ def render_assets_equipment_row_click_bridge() -> str | None:
     return anchor.closest('[data-testid="stVerticalBlockBorderWrapper"]') || anchor.parentElement;
   }
 
-  function bindNameLinks() {
+  function bindAssetOpenLinks() {
     const scope = tableScope();
     if (!scope) return;
-    scope.querySelectorAll(".ips-assets-name-cell-link[data-row-id]").forEach(function (cell) {
-      if (cell.dataset.ipsAssetsNameBound === "1") return;
-      cell.dataset.ipsAssetsNameBound = "1";
+    scope.querySelectorAll(".ips-assets-name-cell-link[data-row-id], .ips-assets-thumb-cell-link[data-row-id]").forEach(function (cell) {
+      if (cell.dataset.ipsAssetsOpenBound === "1") return;
+      cell.dataset.ipsAssetsOpenBound = "1";
       function openAssetDetail(ev) {
         ev.preventDefault();
         ev.stopPropagation();
@@ -586,7 +624,7 @@ def render_assets_equipment_row_click_bridge() -> str | None:
         sendValue(id);
       });
     });
-    bindNameLinks();
+    bindAssetOpenLinks();
   }
 
   if (!doc.ipsAssetsRowClickRegistry) doc.ipsAssetsRowClickRegistry = {};

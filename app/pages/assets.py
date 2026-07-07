@@ -757,25 +757,33 @@ def _asset_image_src(asset: dict) -> str | None:
     return get_catalog_image_url(asset, kind="asset")
 
 
+def _asset_open_aria_label(asset: dict) -> str:
+    name = _asset_name(asset)
+    label = name if name and name != "—" else "asset"
+    return f"Open asset details for {label}"
+
+
 def _render_asset_thumbnail(asset: dict) -> None:
+    aid = str(asset.get("id") or "").strip()
+    aria = html.escape(_asset_open_aria_label(asset), quote=True)
     image_url = _asset_image_src(asset)
     if image_url:
-        st.markdown(
-            (
-                f'<span class="ips-asset-thumb-cell">'
-                f'<img class="ips-asset-thumb-img" src="{html.escape(image_url, quote=True)}" '
-                f'alt="Asset image" />'
-                f"</span>"
-            ),
-            unsafe_allow_html=True,
+        inner = (
+            f'<img class="ips-asset-thumb-img" src="{html.escape(image_url, quote=True)}" '
+            f'alt="" aria-hidden="true" />'
         )
     else:
-        st.markdown(
-            '<span class="ips-asset-thumb-cell">'
-            '<span class="ips-asset-thumb-placeholder">—</span>'
-            "</span>",
-            unsafe_allow_html=True,
-        )
+        inner = '<span class="ips-asset-thumb-placeholder" aria-hidden="true">—</span>'
+    st.markdown(
+        (
+            f'<button type="button" class="ips-asset-thumb-cell ips-assets-thumb-cell-link" '
+            f'data-row-id="{html.escape(aid, quote=True)}" '
+            f'aria-label="{aria}" tabindex="0">'
+            f"{inner}"
+            f"</button>"
+        ),
+        unsafe_allow_html=True,
+    )
 
 
 def _current_user_id() -> str | None:
@@ -966,17 +974,19 @@ def _render_custom_assets_table(
             with cols[1]:
                 rentable_badge = _asset_rentable_badge_html(asset)
                 name_label = name if name and name != "—" else "View asset"
+                aria = html.escape(_asset_open_aria_label(asset), quote=True)
                 badges_html = (
                     f'<div class="ips-assets-name-badges">{rentable_badge}</div>' if rentable_badge else ""
                 )
                 st.markdown(
                     f'<div class="ips-assets-name-cell-wrap asset-name-cell ips-assets-name-cell-link" '
                     f'data-row-id="{html.escape(aid, quote=True)}" '
-                    f'title="Open Asset Details" role="button" tabindex="0">'
+                    f'title="Open Asset Details" role="button" tabindex="0" '
+                    f'aria-label="{aria}">'
                     f'<a href="#" class="ips-assets-name-text asset-name-link" '
                     f'data-row-id="{html.escape(aid, quote=True)}" '
-                    f'title="Open Asset Details" aria-label="Open Asset Details for '
-                    f'{html.escape(name_label, quote=True)}">{html.escape(name_label)}</a>'
+                    f'title="Open Asset Details" aria-label="{aria}">'
+                    f"{html.escape(name_label)}</a>"
                     f"{badges_html}"
                     f"</div>",
                     unsafe_allow_html=True,
@@ -1021,10 +1031,7 @@ def _render_custom_assets_table(
                     render_asset_row_actions(
                         asset,
                         key_prefix=f"ast_eq_{aid}",
-                        on_view=lambda row: _open_assets_detail_modal(
-                            str(row.get("id") or "").strip(),
-                            row,
-                        ),
+                        on_view=lambda row: _handle_open_asset(row),
                         on_edit=_set_asset_edit_mode,
                         on_open_tab=lambda row, tab: _open_assets_detail_modal(
                             str(row.get("id") or "").strip(),
@@ -1048,7 +1055,7 @@ def _render_custom_assets_table(
             open_id = str(picked).strip()
             open_asset = assets_by_id.get(open_id)
             if open_asset:
-                _open_assets_detail_modal(open_id, open_asset)
+                _handle_open_asset(open_asset)
                 st.rerun()
 
     return all_asset_ids
@@ -1503,6 +1510,13 @@ def _open_assets_detail_modal(
         module=_MOD,
         id_fields=("id", "asset_number"),
     )
+
+
+def _handle_open_asset(asset: dict) -> None:
+    """Shared entry point for opening an asset detail view from the table."""
+    aid = str(asset.get("id") or "").strip()
+    if aid:
+        _open_assets_detail_modal(aid, asset)
 
 
 def _maintenance_rows(asset: dict) -> list[dict[str, str]]:
