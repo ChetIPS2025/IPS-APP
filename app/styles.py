@@ -947,7 +947,15 @@ def inject_jobs_module_css() -> None:
     """Jobs list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-jobs-module-v24">
+<style id="ips-jobs-module-v25">
+.st-key-jobs_table_wrap .ips-jobs-table-wrap,
+.st-key-jobs_table_wrap .ips-jobs-table-wrap.jobs-table {{
+  background: #ffffff;
+  border: none !important;
+  border-radius: 0 !important;
+  overflow: visible;
+  margin-bottom: 0 !important;
+}}
 .ips-jobs-table-wrap,
 .ips-jobs-table-wrap.jobs-table {{
   background: #ffffff;
@@ -1120,35 +1128,43 @@ def inject_jobs_module_css() -> None:
   gap: 0 !important;
 }}
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"] {{
-  gap: 0.35rem !important;
+  gap: 0 !important;
   align-items: center !important;
   border-bottom: 1px solid #e8edf4;
   margin: 0 !important;
 }}
+.st-key-jobs_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row),
+.st-key-jobs_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row),
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) {{
   background: #ffffff !important;
   cursor: pointer;
-  min-height: 48px !important;
-  max-height: 52px !important;
-  height: 50px !important;
-  padding: 0 10px 0 8px !important;
+  min-height: 46px !important;
+  max-height: 46px !important;
+  height: 46px !important;
+  padding: 0 !important;
 }}
+.st-key-jobs_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type,
+.st-key-jobs_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:first-of-type,
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
   background: #eef2f7;
-  min-height: 40px !important;
+  min-height: 44px !important;
   max-height: 44px !important;
-  height: 42px !important;
-  padding: 0 10px 0 8px !important;
+  height: 44px !important;
+  padding: 0 !important;
   position: sticky;
   top: 0;
   z-index: 12;
   box-shadow: 0 1px 0 #dbe3ef;
 }}
+.st-key-jobs_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-jobs-row-even),
+.st-key-jobs_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-jobs-row-even),
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-row-even) {{
-  background: #f8fafc !important;
+  background: #ffffff !important;
 }}
+.st-key-jobs_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover,
+.st-key-jobs_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover,
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover {{
-  background: #eff6ff !important;
+  background: #f8fbff !important;
 }}
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row),
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.job-row),
@@ -1216,10 +1232,10 @@ def inject_jobs_module_css() -> None:
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"]:not(:has(.ips-jobs-col-num)):not(:has(.ips-jobs-col-desc)) .ips-jobs-cell,
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"]:not(:has(.ips-jobs-col-num)):not(:has(.ips-jobs-col-desc)) .job-cell,
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"]:not(:has(.ips-jobs-col-num)):not(:has(.ips-jobs-col-desc)) .jobs-table-cell {{
-  font-weight: 700 !important;
+  font-weight: 600 !important;
   color: #0f172a !important;
-  font-size: 0.875rem !important;
-  line-height: 1.3 !important;
+  font-size: 0.8125rem !important;
+  line-height: 1.25 !important;
 }}
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"]:has(.ips-job-status-pill),
 .st-key-jobs_table_wrap [data-testid="column"]:has(.job-status-cell) {{
@@ -1272,7 +1288,7 @@ def inject_jobs_module_css() -> None:
   background-color: transparent !important;
   color: {PRIMARY} !important;
   font-weight: 800 !important;
-  font-size: 0.875rem !important;
+  font-size: 0.8125rem !important;
   border: none !important;
   border-radius: 0 !important;
   padding: 0 !important;
@@ -11335,8 +11351,8 @@ def inject_compact_table_rows_css() -> None:
   padding: 5px 10px !important;
   background: #f8fafc !important;
 }}
-[class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:not(:first-of-type):not(:has(.timesheet-list-row-marker)):not(:has(.timekeeping-list-header-marker)):not(:has(.timekeeping-list-row-header-marker)):not(:has(.timekeeping-detail-row-marker)):not(:has(.timekeeping-detail-header-marker)):not(:has(.weekly-timesheet-row-marker)),
-[class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:not(:first-of-type):not(:has(.timesheet-list-row-marker)):not(:has(.timekeeping-list-header-marker)):not(:has(.timekeeping-list-row-header-marker)):not(:has(.timekeeping-detail-row-marker)):not(:has(.timekeeping-detail-header-marker)):not(:has(.weekly-timesheet-row-marker)),
+[class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:not(:first-of-type):not(:has(.ips-jobs-table-row)):not(:has(.timesheet-list-row-marker)):not(:has(.timekeeping-list-header-marker)):not(:has(.timekeeping-list-row-header-marker)):not(:has(.timekeeping-detail-row-marker)):not(:has(.timekeeping-detail-header-marker)):not(:has(.weekly-timesheet-row-marker)),
+[class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:not(:first-of-type):not(:has(.ips-jobs-table-row)):not(:has(.timesheet-list-row-marker)):not(:has(.timekeeping-list-header-marker)):not(:has(.timekeeping-list-row-header-marker)):not(:has(.timekeeping-detail-row-marker)):not(:has(.timekeeping-detail-header-marker)):not(:has(.weekly-timesheet-row-marker)),
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:not(:first-of-type),
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:not(:first-of-type) {{
   min-height: 56px !important;
@@ -11344,8 +11360,8 @@ def inject_compact_table_rows_css() -> None:
   padding: 5px 10px !important;
 }}
 @media (min-width: 768px) and (max-width: 1024px) {{
-  [class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:not(:first-of-type):not(:has(.timesheet-list-row-marker)):not(:has(.timekeeping-list-header-marker)):not(:has(.timekeeping-list-row-header-marker)):not(:has(.timekeeping-detail-row-marker)):not(:has(.weekly-timesheet-row-marker)),
-  [class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:not(:first-of-type):not(:has(.timesheet-list-row-marker)):not(:has(.timekeeping-list-header-marker)):not(:has(.timekeeping-list-row-header-marker)):not(:has(.timekeeping-detail-row-marker)):not(:has(.weekly-timesheet-row-marker)),
+  [class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:not(:first-of-type):not(:has(.ips-jobs-table-row)):not(:has(.timesheet-list-row-marker)):not(:has(.timekeeping-list-header-marker)):not(:has(.timekeeping-list-row-header-marker)):not(:has(.timekeeping-detail-row-marker)):not(:has(.weekly-timesheet-row-marker)),
+  [class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:not(:first-of-type):not(:has(.ips-jobs-table-row)):not(:has(.timesheet-list-row-marker)):not(:has(.timekeeping-list-header-marker)):not(:has(.timekeeping-list-row-header-marker)):not(:has(.timekeeping-detail-row-marker)):not(:has(.weekly-timesheet-row-marker)),
   .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:not(:first-of-type),
   .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:not(:first-of-type) {{
     min-height: 58px !important;
@@ -13988,6 +14004,7 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stCaptio
 .ips-table-wrap,
 .ips-users-table-wrap,
 .ips-jobs-table-wrap,
+.ips-jobs-table-wrap.jobs-table,
 .ips-customers-table-wrap,
 .ips-estimates-table-wrap,
 .ips-inventory-table-wrap,
@@ -14002,9 +14019,12 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stCaptio
 .ips-documents-table-wrap {{
   margin-top: 10px !important;
 }}
+.st-key-jobs_table_wrap .ips-jobs-table-wrap,
+.st-key-jobs_table_wrap .ips-jobs-table-wrap.jobs-table {{
+  margin-top: 0 !important;
+}}
 .ips-table-header-row,
 .ips-users-header-row,
-.ips-jobs-header-row,
 .ips-customers-header-row,
 .ips-estimates-header-row,
 .ips-inventory-header-row,
@@ -14018,6 +14038,10 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stCaptio
 .ips-tasks-header-row {{
   padding: 5px 10px !important;
   min-height: 36px !important;
+}}
+.st-key-jobs_table_wrap .ips-jobs-header-row {{
+  padding: 0 !important;
+  min-height: 0 !important;
 }}
 .ips-table-row,
 .ips-users-row,

@@ -59,7 +59,7 @@ def _summary_money(value: float, *, has_data: bool) -> str:
 def inject_jobs_page_layout_css() -> None:
     st.markdown(
         """
-<style id="ips-jobs-page-layout-v15">
+<style id="ips-jobs-page-layout-v16">
 section[data-testid="stMain"]:has(.ips-jobs-page) {
   background: #ffffff !important;
 }
@@ -124,14 +124,18 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap .stB
   margin-bottom: 0;
 }
 .st-key-jobs_table_wrap {
-  background: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
-  border-radius: 12px !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-  margin-top: 0.25rem !important;
+  max-height: min(calc(100vh - 220px), 920px);
   min-height: 0;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
   position: relative;
+  background: #ffffff !important;
+  border: 1px solid #dbe3ef !important;
+  border-radius: 12px !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 4px 14px rgba(15, 23, 42, 0.04);
+  padding: 0 6px 0 0 !important;
+  scrollbar-gutter: stable;
+  margin-top: 0.25rem !important;
 }
 .st-key-jobs_table_wrap .ips-jobs-col-marker {
   display: block !important;
@@ -147,6 +151,8 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap .stB
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"] {
   gap: 0 !important;
 }
+.st-key-jobs_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row),
+.st-key-jobs_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row),
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) {
   display: flex !important;
   align-items: center !important;
@@ -161,15 +167,23 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap .stB
   transition: background 0.15s ease !important;
   cursor: pointer;
 }
+.st-key-jobs_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-jobs-row-even),
+.st-key-jobs_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-jobs-row-even),
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-row-even) {
   background: #ffffff !important;
 }
+.st-key-jobs_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-jobs-row-odd),
+.st-key-jobs_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-jobs-row-odd),
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-row-odd) {
   background: #ffffff !important;
 }
+.st-key-jobs_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover,
+.st-key-jobs_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover,
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover {
   background: #f8fbff !important;
 }
+.st-key-jobs_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type,
+.st-key-jobs_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:first-of-type,
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {
   display: flex !important;
   align-items: center !important;
@@ -186,6 +200,12 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap .stB
   z-index: 12 !important;
   box-shadow: 0 1px 0 #dbe3ef !important;
   border-bottom: 1px solid #dbe3ef !important;
+}
+.st-key-jobs_table_wrap .ips-jobs-header-row {
+  padding: 0 !important;
+  min-height: 0 !important;
+  background: transparent !important;
+  border: none !important;
 }
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:first-of-type .ips-jobs-header-row {
   font-size: 0.68rem !important;
@@ -276,6 +296,11 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap .stB
   flex: 0 0 108px !important;
   min-width: 108px !important;
   align-items: flex-end !important;
+}
+.ips-jobs-customer-cell {
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  color: #0f172a !important;
 }
 .ips-jobs-cell-truncate,
 .ips-jobs-customer-cell {
@@ -756,41 +781,36 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 20px;
-  height: 20px;
-  padding: 0 8px;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  border: 1px solid transparent;
+  min-height: 22px;
+  height: 22px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 800;
+  border: none;
   line-height: 1;
   border-radius: 999px;
   white-space: nowrap;
 }
 .ips-job-status-active {
   background: #dcfce7;
-  color: #14532d;
-  border-color: #86efac;
+  color: #166534;
 }
 .ips-job-status-pending,
 .ips-job-status-estimate-pending {
-  background: #fef9c3;
-  color: #854d0e;
-  border-color: #fde047;
+  background: #fef3c7;
+  color: #92400e;
 }
 .ips-job-status-scheduled {
   background: #ffedd5;
   color: #c2410c;
-  border-color: #fdba74;
 }
 .ips-job-status-on-hold {
   background: #fee2e2;
   color: #991b1b;
-  border-color: #fca5a5;
 }
 .ips-job-status-completed {
   background: #dbeafe;
-  color: #1e40af;
-  border-color: #93c5fd;
+  color: #1d4ed8;
 }
 .ips-job-status-closed,
 .ips-job-status-cancelled,
@@ -798,17 +818,14 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-
 .ips-job-status-deleted {
   background: #f1f5f9;
   color: #64748b;
-  border-color: #cbd5e1;
 }
 .ips-job-status-draft {
-  background: #fef9c3;
-  color: #854d0e;
-  border-color: #fde047;
+  background: #f1f5f9;
+  color: #475569;
 }
 .ips-job-status-awarded {
   background: #dcfce7;
-  color: #14532d;
-  border-color: #86efac;
+  color: #166534;
 }
 .ips-job-status-table-pill {
   display: flex;
@@ -817,18 +834,49 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-
   width: 100%;
   pointer-events: auto;
 }
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-job-status-active) [data-testid="stPopover"] > button,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-job-status-active.ips-job-status-table-editor-marker) [data-testid="stPopover"] > button {
+  background: #dcfce7 !important;
+  color: #166534 !important;
+}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-job-status-pending) [data-testid="stPopover"] > button,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-job-status-estimate-pending) [data-testid="stPopover"] > button {
+  background: #fef3c7 !important;
+  color: #92400e !important;
+}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-job-status-scheduled) [data-testid="stPopover"] > button {
+  background: #ffedd5 !important;
+  color: #c2410c !important;
+}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-job-status-on-hold) [data-testid="stPopover"] > button {
+  background: #fee2e2 !important;
+  color: #991b1b !important;
+}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-job-status-completed) [data-testid="stPopover"] > button {
+  background: #dbeafe !important;
+  color: #1d4ed8 !important;
+}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-job-status-closed) [data-testid="stPopover"] > button,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-job-status-cancelled) [data-testid="stPopover"] > button,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-job-status-archived) [data-testid="stPopover"] > button,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-job-status-deleted) [data-testid="stPopover"] > button {
+  background: #f1f5f9 !important;
+  color: #64748b !important;
+}
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-job-status-draft) [data-testid="stPopover"] > button {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+}
 section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-testid="column"]:has(.ips-job-status-table-editor-marker) [data-testid="stPopover"] > button,
 section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-testid="column"]:has(.ips-job-status-table-pill) [data-testid="stPopover"] > button {
-  min-height: 20px !important;
-  height: 20px !important;
-  padding: 0 8px !important;
+  min-height: 22px !important;
+  height: 22px !important;
+  padding: 0 10px !important;
   border-radius: 999px !important;
-  font-size: 0.6875rem !important;
-  font-weight: 700 !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
   box-shadow: none !important;
-  border: 1px solid transparent !important;
-  background: #dcfce7 !important;
-  color: #14532d !important;
+  border: none !important;
 }
 section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap [data-testid="column"]:has(.ips-job-status-table-editor-marker) [data-testid="stPopover"] > button:hover {
   filter: brightness(0.97);
@@ -898,7 +946,7 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .job-actions-button {
 .st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-desc) button[data-testid="stBaseButton-tertiary"] {
   color: #2563eb !important;
   font-weight: 800 !important;
-  font-size: 14px !important;
+  font-size: 0.8125rem !important;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;

@@ -1161,7 +1161,7 @@ def _render_custom_jobs_table(
     with st.container(key="jobs_table_wrap"):
         st.markdown('<div class="ips-jobs-table-wrap jobs-table">', unsafe_allow_html=True)
 
-        header_cols = st.columns(visible_weights, gap="small", vertical_alignment="center")
+        header_cols = st.columns(visible_weights, gap="xxsmall", vertical_alignment="center")
         for col, (label, field), marker in zip(header_cols, visible_headers, visible_markers):
             with col:
                 st.markdown(_jobs_col_marker(marker), unsafe_allow_html=True)
@@ -1198,7 +1198,7 @@ def _render_custom_jobs_table(
             expanded = field_mode and field_expanded_id(FIELD_EXPANDED_JOB_KEY) == jid
 
             row_parity = "even" if row_idx % 2 else "odd"
-            cols = st.columns(visible_weights, gap="small", vertical_alignment="center")
+            cols = st.columns(visible_weights, gap="xxsmall", vertical_alignment="center")
 
             with cols[col_map["num"]]:
                 st.markdown(

@@ -207,8 +207,9 @@ def render_job_status_table_pill(
     current = normalize_job_status(job.get("status"))
     index = options.index(current) if current in options else 0
 
+    pill_cls = job_status_pill_class(label)
     st.markdown(
-        '<span class="ips-job-status-table-editor-marker" aria-hidden="true"></span>',
+        f'<span class="ips-job-status-table-editor-marker {pill_cls}" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
     with st.popover(
