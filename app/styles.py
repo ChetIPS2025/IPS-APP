@@ -480,7 +480,7 @@ def inject_customers_module_css() -> None:
     """Customers list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-customers-module-v3">
+<style id="ips-customers-module-v4">
 .ips-customers-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -520,8 +520,8 @@ def inject_customers_module_css() -> None:
   min-width: 0;
 }}
 .ips-customers-name {{
-  font-size: 1rem;
-  font-weight: 800;
+  font-size: 18px;
+  font-weight: 700;
   color: #2563eb;
   line-height: 1.25;
   word-break: break-word;
@@ -532,6 +532,15 @@ def inject_customers_module_css() -> None:
   width: 100% !important;
   min-width: 0 !important;
   height: 100% !important;
+  min-height: 46px !important;
+  padding-left: 24px !important;
+  padding-right: 24px !important;
+  box-sizing: border-box !important;
+}}
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type) > [data-testid="column"]:first-child,
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:first-child {{
+  padding-left: 24px !important;
+  padding-right: 24px !important;
 }}
 .st-key-customers_table_wrap .ips-customers-name-link [data-testid="stButton"],
 .st-key-customers_table_wrap .ips-customers-name-link .stButton {{
@@ -543,15 +552,15 @@ def inject_customers_module_css() -> None:
   background: transparent !important;
   background-color: transparent !important;
   color: #2563eb !important;
-  font-weight: 800 !important;
-  font-size: 1rem !important;
+  font-weight: 700 !important;
+  font-size: 18px !important;
   line-height: 1.25 !important;
   border: none !important;
   border-radius: 0 !important;
   box-shadow: none !important;
   padding: 0 !important;
-  height: auto !important;
-  min-height: 0 !important;
+  height: 100% !important;
+  min-height: 46px !important;
   max-height: none !important;
   justify-content: flex-start !important;
   text-align: left !important;
