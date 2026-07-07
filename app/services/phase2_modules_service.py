@@ -1960,11 +1960,21 @@ def save_employee(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
     if "is_employee" in ui:
         payload["is_employee"] = bool(ui.get("is_employee"))
     if row_id:
-        result = update_row("employees", payload, {"id": row_id})
+        result = update_row_admin("employees", payload, {"id": row_id})
         saved_id = row_id
+        if result.ok and not result.data:
+            return ServiceResult(
+                ok=False,
+                error="User record not found or could not be updated. Refresh and try again.",
+            )
     else:
-        result = insert_row("employees", payload)
+        result = insert_row_admin("employees", payload)
         saved_id = str((result.data or {}).get("id") or "").strip()
+        if result.ok and not saved_id:
+            return ServiceResult(
+                ok=False,
+                error="User record could not be created. Refresh and try again.",
+            )
 
     if result.ok and saved_id:
         warning = sync_linked_profile_permission_role(

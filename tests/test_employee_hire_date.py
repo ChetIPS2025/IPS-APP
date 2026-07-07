@@ -45,11 +45,11 @@ class TestEmployeeHireDate(unittest.TestCase):
         self.assertIsNone(iso)
         self.assertIn("valid date", str(err or "").lower())
 
-    @patch("app.services.phase2_modules_service.update_row")
+    @patch("app.services.phase2_modules_service.update_row_admin")
     @patch("app.services.users_service.can_edit_employee_profile", return_value=True)
     @patch("app.services.employee_role_service.sync_linked_profile_permission_role", return_value=None)
     def test_save_employee_persists_hire_date(self, _sync, _can, update_mock) -> None:
-        update_mock.return_value = type("R", (), {"ok": True, "data": {}})()
+        update_mock.return_value = type("R", (), {"ok": True, "data": {"id": "emp-1"}})()
         result = save_employee(
             {
                 "name": "Pat",
@@ -62,6 +62,15 @@ class TestEmployeeHireDate(unittest.TestCase):
         self.assertTrue(result.ok)
         payload = update_mock.call_args[0][1]
         self.assertEqual(payload["hire_date"], "2022-03-04")
+
+    @patch("app.services.phase2_modules_service.update_row_admin")
+    @patch("app.services.users_service.can_edit_employee_profile", return_value=True)
+    @patch("app.services.employee_role_service.sync_linked_profile_permission_role", return_value=None)
+    def test_save_employee_reports_missing_row(self, _sync, _can, update_mock) -> None:
+        update_mock.return_value = type("R", (), {"ok": True, "data": None})()
+        result = save_employee({"name": "Pat", "status": "Active"}, row_id="emp-missing")
+        self.assertFalse(result.ok)
+        self.assertIn("not found", str(result.error or "").lower())
 
     @patch("app.services.users_service.can_edit_employee_profile", return_value=False)
     def test_save_employee_unauthorized(self, _can) -> None:
