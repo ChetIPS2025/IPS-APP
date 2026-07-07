@@ -184,9 +184,8 @@ _CONTACT_TABS = [
 SELECTED_CUSTOMER_KEY = "selected_customer_id"
 SHOW_CUSTOMER_MODAL_KEY = "show_customer_detail_modal"
 _ALL_CUSTOMER_IDS_KEY = "_ips_customers_visible_ids"
-_CUSTOMER_COLS = [0.35, 4.5, 1.2, 1.2, 1.4, 1.3]
+_CUSTOMER_COLS = [4.85, 1.2, 1.2, 1.4, 1.3]
 _CUSTOMER_HEADER_SPECS: list[tuple[str, str | None]] = [
-    ("", None),
     ("CUSTOMER", None),
     ("CONTACTS", None),
     ("OPEN JOBS", None),
@@ -282,20 +281,34 @@ def _clear_customer_selection(customer_ids: list[str] | None = None) -> None:
             st.session_state[key] = False
 
 
-def _on_customer_checkbox_change(customer_id: str, all_customer_ids: list[str]) -> None:
-    key = _customer_select_key(customer_id)
-    if st.session_state.get(key):
-        for cid in all_customer_ids:
-            if cid != customer_id:
-                st.session_state[_customer_select_key(cid)] = False
-        st.session_state[SELECTED_CUSTOMER_KEY] = customer_id
-        st.session_state[SHOW_CUSTOMER_MODAL_KEY] = True
-        cache = st.session_state.get(_CUSTOMERS_CACHE_KEY) or {}
-        customer = cache.get(customer_id) if isinstance(cache, dict) else None
-        _open_customers_detail_modal(customer_id, customer)
-    elif st.session_state.get(SELECTED_CUSTOMER_KEY) == customer_id:
-        st.session_state[SELECTED_CUSTOMER_KEY] = None
-        st.session_state[SHOW_CUSTOMER_MODAL_KEY] = False
+def _open_customer_from_list(customer: dict) -> None:
+    cid = str(customer.get("id") or "").strip()
+    if not cid:
+        return
+    st.session_state[SELECTED_CUSTOMER_KEY] = cid
+    st.session_state[SHOW_CUSTOMER_MODAL_KEY] = True
+    cache = st.session_state.get(_CUSTOMERS_CACHE_KEY) or {}
+    cached = cache.get(cid) if isinstance(cache, dict) else None
+    _open_customers_detail_modal(cid, cached or customer)
+    st.rerun()
+
+
+def _render_customer_list_link_cell(
+    customer: dict,
+    label: str,
+    *,
+    key: str,
+) -> None:
+    st.markdown('<div class="ips-customers-table-link ips-customers-name-link">', unsafe_allow_html=True)
+    if st.button(
+        label,
+        key=key,
+        type="tertiary",
+        help="Open customer details",
+        use_container_width=True,
+    ):
+        _open_customer_from_list(customer)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 @fragment
@@ -357,39 +370,32 @@ def _render_custom_customers_table(
             cols = st.columns(_CUSTOMER_COLS, gap="small", vertical_alignment="center")
 
             with cols[0]:
-                st.checkbox(
-                    "",
-                    key=_customer_select_key(cid),
-                    label_visibility="collapsed",
-                    on_change=_on_customer_checkbox_change,
-                    args=(cid, all_customer_ids),
+                name_label = name if name and name != "—" else "Open customer"
+                _render_customer_list_link_cell(
+                    customer,
+                    name_label,
+                    key=f"customer_open_name_{cid}",
                 )
 
             with cols[1]:
-                st.markdown(
-                    f'<div class="ips-customers-name">{html.escape(name)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[2]:
                 st.markdown(
                     f'<div class="ips-customers-cell ips-customers-count-cell">{html.escape(contacts)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[3]:
+            with cols[2]:
                 st.markdown(
                     f'<div class="ips-customers-cell ips-customers-count-cell">{html.escape(open_jobs)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[4]:
+            with cols[3]:
                 st.markdown(
                     f'<div class="ips-customers-cell ips-customers-count-cell">{html.escape(open_estimates)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[5]:
+            with cols[4]:
                 st.markdown(_customer_status_pill_html(status), unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)

@@ -480,7 +480,7 @@ def inject_customers_module_css() -> None:
     """Customers list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-customers-module-v2">
+<style id="ips-customers-module-v3">
 .ips-customers-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -520,11 +520,68 @@ def inject_customers_module_css() -> None:
   min-width: 0;
 }}
 .ips-customers-name {{
-  font-size: 14px;
-  font-weight: 700;
-  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #2563eb;
   line-height: 1.25;
   word-break: break-word;
+}}
+.ips-customers-table-link {{
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 100% !important;
+}}
+.st-key-customers_table_wrap .ips-customers-name-link [data-testid="stButton"],
+.st-key-customers_table_wrap .ips-customers-name-link .stButton {{
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+}}
+.st-key-customers_table_wrap .ips-customers-name-link button {{
+  background: transparent !important;
+  background-color: transparent !important;
+  color: #2563eb !important;
+  font-weight: 800 !important;
+  font-size: 1rem !important;
+  line-height: 1.25 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  outline: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  cursor: pointer !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+}}
+.st-key-customers_table_wrap .ips-customers-name-link button:hover,
+.st-key-customers_table_wrap .ips-customers-name-link button:focus {{
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}}
+.st-key-customers_table_wrap .ips-customers-name-link button p {{
+  color: inherit !important;
+  font-weight: inherit !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  text-align: left !important;
 }}
 .ips-customers-count-cell {{
   text-align: center;
