@@ -594,7 +594,7 @@ def inject_customers_module_css() -> None:
     """Customers list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-customers-module-v6">
+<style id="ips-customers-module-v7">
 .ips-customers-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -683,10 +683,100 @@ def inject_customers_module_css() -> None:
   text-align: left !important;
   width: 100% !important;
 }}
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) > [data-testid="column"]:first-child [data-testid="stElementContainer"]:has(.ips-customers-table-row) {{
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  z-index: 0 !important;
+}}
+.st-key-customers_table_wrap .ips-customers-table-row {{
+  display: block !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: none !important;
+}}
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) > [data-testid="column"]:first-child [class*="st-key-customers_open_"] {{
+  position: relative !important;
+  z-index: 2 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  align-self: stretch !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}}
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) > [data-testid="column"]:first-child [class*="st-key-customers_open_"] [data-testid="stButton"],
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) > [data-testid="column"]:first-child [class*="st-key-customers_open_"] .stButton {{
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 46px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  justify-content: flex-start !important;
+  align-items: stretch !important;
+}}
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) > [data-testid="column"]:first-child [class*="st-key-customers_open_"] [data-testid="stButton"] > button,
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) > [data-testid="column"]:first-child [class*="st-key-customers_open_"] .stButton > button,
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) > [data-testid="column"]:first-child [class*="st-key-customers_open_"] button[data-testid="stBaseButton-tertiary"] {{
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 46px !important;
+  margin: 0 !important;
+  padding: 0 14px 0 24px !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: #2563eb !important;
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}}
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) > [data-testid="column"]:first-child [class*="st-key-customers_open_"] [data-testid="stButton"] > button:hover,
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) > [data-testid="column"]:first-child [class*="st-key-customers_open_"] .stButton > button:hover,
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) > [data-testid="column"]:first-child [class*="st-key-customers_open_"] button[data-testid="stBaseButton-tertiary"]:hover {{
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}}
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) > [data-testid="column"]:first-child [class*="st-key-customers_open_"] [data-testid="stButton"] > button > div,
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) > [data-testid="column"]:first-child [class*="st-key-customers_open_"] [data-testid="stButton"] > button p {{
+  width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  text-align: left !important;
+  color: inherit !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+}}
 .st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) .ips-customers-cell,
-.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) .ips-customer-status-pill,
-.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) .ips-customers-name-cell,
-.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) .ips-customers-name-label {{
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) .ips-customer-status-pill {{
   pointer-events: none;
 }}
 .ips-customers-count-cell {{

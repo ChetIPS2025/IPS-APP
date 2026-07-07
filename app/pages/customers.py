@@ -68,7 +68,7 @@ try:
         update_customer_location,
     )
     from app.styles import inject_customers_module_css
-    from app.ui.streamlit_perf import fragment, ips_app_rerun
+    from app.ui.streamlit_perf import fragment
 except ImportError:
     from components.headers import render_page_brand_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
@@ -129,7 +129,7 @@ except ImportError:
         update_customer_location,
     )
     from styles import inject_customers_module_css  # type: ignore
-    from ui.streamlit_perf import fragment, ips_app_rerun  # type: ignore
+    from ui.streamlit_perf import fragment  # type: ignore
 
 _SEL = select_key("customers")
 _LOC_SEL = select_key("customer_locations")
@@ -292,14 +292,13 @@ def _open_customer_from_list(customer: dict) -> None:
     _open_customers_detail_modal(cid, cached or customer)
 
 
-def _customer_name_cell_html(name: str) -> str:
-    label = name if name and name != "—" else "Open customer"
-    label_html = html.escape(label)
-    return (
-        f'<div class="ips-customers-name-cell">'
-        f'<span class="ips-customers-name-label">{label_html}</span>'
-        f"</div>"
-    )
+def _open_customers_table_customer(customer: dict) -> None:
+    _open_customer_from_list(customer)
+    _show_customers_detail_modal()
+
+
+def _customer_name_open_label(name: str) -> str:
+    return name if name and name != "—" else "Open customer"
 
 
 def _customer_row_marker_html(customer_id: str) -> str:
@@ -349,7 +348,7 @@ def _render_customers_row_click_bridge() -> str | None:
 
   function isInteractive(target) {
     return !!(target && target.closest && target.closest(
-      "button, input, select, textarea, label, a, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox']"
+      "button, input, select, textarea, label, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox'], [class*='st-key-customers_open_']"
     ));
   }
 
@@ -456,7 +455,14 @@ def _render_custom_customers_table(
 
             with cols[0]:
                 st.markdown(_customer_row_marker_html(cid), unsafe_allow_html=True)
-                st.markdown(_customer_name_cell_html(name), unsafe_allow_html=True)
+                if st.button(
+                    _customer_name_open_label(name),
+                    key=f"customers_open_{cid}",
+                    type="tertiary",
+                    help=f"View {name}",
+                    use_container_width=True,
+                ):
+                    _open_customers_table_customer(customer)
 
             with cols[1]:
                 st.markdown(
@@ -491,8 +497,7 @@ def _render_custom_customers_table(
         open_id = str(picked).strip()
         open_customer = customers_by_id.get(open_id)
         if open_customer:
-            _open_customer_from_list(open_customer)
-            ips_app_rerun()
+            _open_customers_table_customer(open_customer)
 
     return all_customer_ids
 
