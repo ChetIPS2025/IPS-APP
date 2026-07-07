@@ -99,27 +99,28 @@ def _render_collapse_toggle(*, collapsed: bool) -> None:
 
 
 def _render_sidebar_header(*, collapsed: bool) -> None:
-    header_cls = "sidebar-header sidebar-header--collapsed" if collapsed else "sidebar-header"
-    st.markdown(f'<{_OT} class="{header_cls}">', unsafe_allow_html=True)
-    st.markdown(f'<{_OT} class="sidebar-header-top">', unsafe_allow_html=True)
-    brand_col, toggle_col = st.columns([8, 1], gap="small")
+    anchor_cls = (
+        "sidebar-header-anchor sidebar-header-anchor--collapsed"
+        if collapsed
+        else "sidebar-header-anchor"
+    )
+    st.markdown(f'<span class="{anchor_cls}" aria-hidden="true"></span>', unsafe_allow_html=True)
+    col_ratio = [1, 0.28] if collapsed else [8, 1]
+    col_align = "top" if collapsed else "center"
+    brand_col, toggle_col = st.columns(col_ratio, gap="small", vertical_alignment=col_align)
     with brand_col:
-        st.markdown(f'<{_OT} class="sidebar-header-brand">', unsafe_allow_html=True)
+        st.markdown('<span class="sidebar-header-brand-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
         logo = _logo_path(compact=collapsed)
         logo_wrap_cls = "sidebar-logo-wrap sidebar-logo-wrap--collapsed" if collapsed else "sidebar-logo-wrap"
-        st.markdown(f'<{_OT} class="{logo_wrap_cls}">', unsafe_allow_html=True)
+        st.markdown(f'<span class="{logo_wrap_cls}" aria-hidden="true"></span>', unsafe_allow_html=True)
         if logo:
-            st.image(str(logo), width=44 if collapsed else 100)
+            st.image(str(logo), width=40 if collapsed else 100)
         elif not collapsed:
             st.markdown('<p class="ips-sidebar-brand">IPS Operations</p>', unsafe_allow_html=True)
-        st.markdown(f"<{_CT}>", unsafe_allow_html=True)
         if not collapsed:
             st.markdown('<p class="sidebar-logo-tagline">Industrial Plant Solutions</p>', unsafe_allow_html=True)
-        st.markdown(f"<{_CT}>", unsafe_allow_html=True)
     with toggle_col:
         _render_collapse_toggle(collapsed=collapsed)
-    st.markdown(f"<{_CT}>", unsafe_allow_html=True)
-    st.markdown(f"<{_CT}>", unsafe_allow_html=True)
     if not collapsed:
         st.markdown('<hr class="sidebar-divider" />', unsafe_allow_html=True)
 

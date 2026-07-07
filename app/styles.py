@@ -13363,8 +13363,8 @@ section[data-testid="stSidebar"] > div {{
   min-height: 150px;
 }}
 .sidebar-header--collapsed {{
-  min-height: 4.5rem;
-  padding: 0.35rem 0.25rem 0.25rem;
+  min-height: 0;
+  padding: 0.12rem 0.15rem 0.15rem;
 }}
 .sidebar-header-brand {{
   display: flex;
@@ -13422,8 +13422,20 @@ section[data-testid="stSidebar"] > div {{
 .sidebar-header--collapsed .sidebar-logo-wrap [data-testid="stImage"] img,
 .sidebar-header--collapsed .sidebar-logo-wrap--collapsed img,
 .sidebar-header--collapsed .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {{
-  max-width: 48px;
-  max-height: 48px;
+  max-width: 42px;
+  max-height: 42px;
+}}
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed) {{
+  min-height: 0 !important;
+  height: auto !important;
+  align-items: flex-start !important;
+  margin: 0 !important;
+  padding: 0.12rem 0.08rem 0.18rem !important;
+}}
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stElementContainer"]:has(.sidebar-logo-wrap--collapsed) {{
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 0 !important;
 }}
 section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"],
 section[data-testid="stSidebar"] .ips-sidebar-logo-wrap [data-testid="stImage"],

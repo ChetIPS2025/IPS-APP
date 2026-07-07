@@ -331,8 +331,8 @@ body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap i
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"] img,
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed img,
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {
-  max-width: 48px !important;
-  max-height: 48px !important;
+  max-width: 42px !important;
+  max-height: 42px !important;
 }
 section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"],
 section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] {
@@ -359,6 +359,52 @@ section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed {
   justify-content: center !important;
   align-items: center !important;
   width: 100% !important;
+}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) .sidebar-logo-wrap--collapsed {
+  align-items: flex-start !important;
+}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-header-anchor--collapsed),
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stElementContainer"]:has(.sidebar-header-anchor--collapsed) {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed),
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed) {
+  min-height: 0 !important;
+  height: auto !important;
+  align-items: flex-start !important;
+  margin: 0 !important;
+  padding: 0.12rem 0.08rem 0.18rem !important;
+  gap: 0 !important;
+}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed) [data-testid="column"],
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed) [data-testid="column"] {
+  min-height: 0 !important;
+  padding: 0 !important;
+  align-self: flex-start !important;
+}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed) [data-testid="column"]:first-child,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed) [data-testid="column"]:first-child {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-logo-wrap--collapsed),
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stElementContainer"]:has(.sidebar-logo-wrap--collapsed) {
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-logo-wrap--collapsed) [data-testid="stImage"],
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stElementContainer"]:has(.sidebar-logo-wrap--collapsed) [data-testid="stImage"] {
+  margin: 0 auto !important;
+  padding: 0 !important;
+  min-height: 0 !important;
 }
 section[data-testid="stSidebar"] .sidebar-logo-tagline {
   font-size: 0.875rem !important;
@@ -558,7 +604,7 @@ def _shell_css() -> str:
     mobile_max = IPS_SIDEBAR_DESKTOP_MIN_PX - 1
     collapsed_sel = _collapsed_sidebar_selectors()
     return f"""
-<style id="ips-sidebar-shell-v7">
+<style id="ips-sidebar-shell-v8">
 .ips-main-header-menu,
 button.ips-header-menu-btn {{
   display: none !important;
@@ -690,8 +736,29 @@ button.ips-header-menu-btn {{
     min-height: 150px !important;
   }}
   .sidebar-header--collapsed {{
-    min-height: 4.5rem !important;
-    padding: 0.35rem 0.25rem 0.25rem !important;
+    min-height: 0 !important;
+    padding: 0.12rem 0.15rem 0.15rem !important;
+  }}
+  {collapsed_sel} [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed) {{
+    min-height: 0 !important;
+    height: auto !important;
+    align-items: flex-start !important;
+    margin: 0 !important;
+    padding: 0.12rem 0.08rem 0.18rem !important;
+    gap: 0 !important;
+  }}
+  {collapsed_sel} [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed) [data-testid="column"] {{
+    min-height: 0 !important;
+    padding: 0 !important;
+    align-self: flex-start !important;
+  }}
+  {collapsed_sel} [data-testid="stElementContainer"]:has(.sidebar-logo-wrap--collapsed) {{
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+  }}
+  {collapsed_sel} [data-testid="stSidebarContent"] > [data-testid="stVerticalBlock"] {{
+    gap: 0.2rem !important;
   }}
   .sidebar-header-brand {{
     display: flex !important;
@@ -765,8 +832,8 @@ button.ips-header-menu-btn {{
   .sidebar-header--collapsed .sidebar-logo-wrap [data-testid="stImage"] img,
   .sidebar-header--collapsed .sidebar-logo-wrap--collapsed img,
   .sidebar-header--collapsed .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {{
-    max-width: 48px !important;
-    max-height: 48px !important;
+    max-width: 42px !important;
+    max-height: 42px !important;
   }}
   section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"],
   section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] {{
