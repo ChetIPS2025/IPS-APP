@@ -27,6 +27,7 @@ try:
         render_job_status_badge_editor,
         render_job_status_table_pill,
     )
+    from app.components.jobs_list_table import job_list_link_html, render_jobs_table_link_bridge
     from app.components.jobs_page_layout import (
         close_jobs_filter_bar_shell,
         inject_jobs_page_layout_css,
@@ -144,6 +145,7 @@ except ImportError:
         render_job_status_badge_editor,
         render_job_status_table_pill,
     )
+    from components.jobs_list_table import job_list_link_html, render_jobs_table_link_bridge  # type: ignore
     from components.jobs_page_layout import (  # type: ignore
         close_jobs_filter_bar_shell,
         inject_jobs_page_layout_css,
@@ -1020,26 +1022,24 @@ def _render_job_list_link_cell(
     job: dict,
     label: str,
     *,
-    key: str,
+    key: str = "",
     extra_class: str = "",
     truncate: bool = False,
 ) -> None:
+    _ = key  # legacy callers pass Streamlit keys; HTML links use the row bridge.
+    jid = str(job.get("id") or "").strip()
     wrapper_class = f"ips-jobs-table-link job-link-wrap {extra_class}".strip()
     if truncate:
         wrapper_class = f"{wrapper_class} ips-jobs-cell-truncate".strip()
+    link_class = extra_class
+    if truncate:
+        link_class = f"{link_class} ips-jobs-desc-link".strip()
     st.markdown(
-        f'<div class="{html.escape(wrapper_class)}">',
+        f'<div class="{html.escape(wrapper_class)}">'
+        f"{job_list_link_html(jid, label, extra_class=link_class)}"
+        f"</div>",
         unsafe_allow_html=True,
     )
-    if st.button(
-        label,
-        key=key,
-        type="tertiary",
-        help="Open job details",
-        use_container_width=truncate,
-    ):
-        _open_job_from_list(job)
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _on_job_status_updated(job_id: str, new_status: str) -> None:
@@ -1179,7 +1179,7 @@ def _render_custom_jobs_table(
                         base_class="ips-jobs-header-row ips-jobs-cell",
                     )
 
-        for row_idx, job in enumerate(filtered):
+        for job in filtered:
             jid = str(job.get("id") or "").strip()
             if not jid:
                 continue
@@ -1197,12 +1197,11 @@ def _render_custom_jobs_table(
             field_mode = is_field_context()
             expanded = field_mode and field_expanded_id(FIELD_EXPANDED_JOB_KEY) == jid
 
-            row_parity = "even" if row_idx % 2 else "odd"
             cols = st.columns(visible_weights, gap="xxsmall", vertical_alignment="center")
 
             with cols[col_map["num"]]:
                 st.markdown(
-                    f'<span class="ips-jobs-row-marker ips-jobs-table-row job-row jobs-table-row ips-jobs-row-{row_parity}" '
+                    f'<span class="ips-jobs-row-marker ips-jobs-table-row job-row jobs-table-row" '
                     f'data-row-id="{html.escape(jid, quote=True)}" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
@@ -1299,6 +1298,12 @@ def _render_custom_jobs_table(
             for j in filtered
             if str(j.get("id") or "").strip()
         }
+        link_id = render_jobs_table_link_bridge()
+        if link_id:
+            open_job = jobs_by_id.get(str(link_id).strip())
+            if open_job:
+                _open_jobs_detail_modal(str(link_id).strip(), open_job)
+                ips_app_rerun()
         picked = render_jobs_row_click_bridge()
         if picked:
             open_id = str(picked).strip()
