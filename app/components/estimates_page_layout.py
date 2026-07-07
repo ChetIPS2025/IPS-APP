@@ -49,7 +49,7 @@ def estimate_col_marker(name: str) -> str:
 def inject_estimates_page_layout_css() -> None:
     st.markdown(
         """
-<style id="ips-estimates-page-layout-v4">
+<style id="ips-estimates-page-layout-v5">
 section[data-testid="stMain"]:has(.ips-estimates-page) {
   background: #ffffff !important;
 }
@@ -237,16 +237,16 @@ section[data-testid="stMain"]:has(.ips-estimates-page) [data-testid="column"]:ha
   text-align: center;
 }
 .st-key-estimates_table_wrap {
-  max-height: min(calc(100vh - 200px), 980px);
-  min-height: 520px;
+  max-height: min(calc(100vh - 220px), 920px);
+  min-height: 0;
   overflow-x: auto !important;
   overflow-y: auto !important;
   position: relative;
   border: 1px solid #dbe3ef;
-  border-radius: 10px;
+  border-radius: 12px;
   background: #ffffff;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
-  padding-right: 6px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 4px 14px rgba(15, 23, 42, 0.04);
+  padding: 0 6px 0 0;
   scrollbar-gutter: stable;
 }
 .ips-estimates-table-wrap {
@@ -287,9 +287,9 @@ section[data-testid="stMain"]:has(.ips-estimates-page) [data-testid="column"]:ha
 .st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-estimates-table-row) {
   display: flex !important;
   align-items: center !important;
-  min-height: 48px !important;
-  max-height: 48px !important;
-  height: 48px !important;
+  min-height: 46px !important;
+  max-height: 46px !important;
+  height: 46px !important;
   min-width: max-content !important;
   padding: 0 !important;
   margin: 0 !important;
@@ -304,15 +304,15 @@ section[data-testid="stMain"]:has(.ips-estimates-page) [data-testid="column"]:ha
   background: #ffffff !important;
 }
 .st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-estimates-table-row):hover {
-  background: #eff6ff !important;
+  background: #f8fbff !important;
 }
 .st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {
   display: flex !important;
   align-items: center !important;
   background: #eef2f7 !important;
-  min-height: 42px !important;
+  min-height: 44px !important;
   max-height: 44px !important;
-  height: 42px !important;
+  height: 44px !important;
   min-width: max-content !important;
   padding: 0 !important;
   margin: 0 !important;
@@ -324,7 +324,7 @@ section[data-testid="stMain"]:has(.ips-estimates-page) [data-testid="column"]:ha
   border-bottom: 1px solid #dbe3ef !important;
 }
 .st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type .ips-estimates-header-row {
-  font-size: 0.58rem !important;
+  font-size: 0.68rem !important;
   font-weight: 800 !important;
   letter-spacing: 0.03em;
   color: #64748b !important;
@@ -348,13 +348,14 @@ section[data-testid="stMain"]:has(.ips-estimates-page) [data-testid="column"]:ha
   align-items: stretch !important;
   align-self: stretch !important;
   height: 100% !important;
-  min-height: 48px !important;
-  padding: 6px 12px !important;
+  min-height: 46px !important;
+  padding: 0 10px !important;
   min-width: 0 !important;
   box-sizing: border-box !important;
 }
 .st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"] {
-  min-height: 42px !important;
+  min-height: 44px !important;
+  padding: 0 10px !important;
 }
 .st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-estimates-table-row) [data-testid="stVerticalBlock"],
 .st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="stVerticalBlock"] {
@@ -393,49 +394,44 @@ section[data-testid="stMain"]:has(.ips-estimates-page) [data-testid="column"]:ha
   box-sizing: border-box !important;
 }
 .st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-num) {
-  flex: 0 0 112px !important;
-  min-width: 112px !important;
+  flex: 0 0 96px !important;
+  min-width: 96px !important;
   max-width: none !important;
   flex-shrink: 0 !important;
   align-items: flex-start !important;
 }
 .st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-desc),
 .st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-customer),
-.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-job),
 .st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-date) {
   align-items: flex-start !important;
 }
 .st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-desc) {
-  flex: 2.35 1 220px !important;
-  min-width: 220px !important;
+  flex: 2.6 1 260px !important;
+  min-width: 260px !important;
 }
 .st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-customer) {
-  flex: 1.65 1 150px !important;
-  min-width: 150px !important;
-}
-.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-job) {
-  flex: 1.1 1 115px !important;
-  min-width: 115px !important;
+  flex: 1.8 1 180px !important;
+  min-width: 180px !important;
 }
 .st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-status) {
-  flex: 1.1 1 115px !important;
-  min-width: 115px !important;
+  flex: 0 0 96px !important;
+  min-width: 96px !important;
   align-items: center !important;
 }
 .st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-date) {
-  flex: 1.2 1 125px !important;
-  min-width: 125px !important;
+  flex: 0 0 118px !important;
+  min-width: 118px !important;
 }
 .st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-total) {
-  flex: 1 1 108px !important;
+  flex: 0 0 108px !important;
   min-width: 108px !important;
   align-items: flex-end !important;
 }
 .st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-actions) {
-  flex: 0 0 118px !important;
-  min-width: 118px !important;
-  width: 118px !important;
-  max-width: 118px !important;
+  flex: 0 0 148px !important;
+  min-width: 148px !important;
+  width: 148px !important;
+  max-width: 148px !important;
   flex-shrink: 0 !important;
   position: sticky !important;
   right: 0 !important;
@@ -443,7 +439,7 @@ section[data-testid="stMain"]:has(.ips-estimates-page) [data-testid="column"]:ha
   background: inherit !important;
   box-shadow: -1px 0 0 #eef2f7;
   align-items: center !important;
-  justify-content: center !important;
+  justify-content: flex-end !important;
 }
 .st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-estimates-col-actions) {
   z-index: 5 !important;
@@ -452,7 +448,6 @@ section[data-testid="stMain"]:has(.ips-estimates-page) [data-testid="column"]:ha
 .st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-estimates-col-num) .ips-estimates-header-row,
 .st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-estimates-col-desc) .ips-estimates-header-row,
 .st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-estimates-col-customer) .ips-estimates-header-row,
-.st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-estimates-col-job) .ips-estimates-header-row,
 .st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-estimates-col-date) .ips-estimates-header-row {
   justify-content: flex-start !important;
   text-align: left !important;
@@ -466,6 +461,10 @@ section[data-testid="stMain"]:has(.ips-estimates-page) [data-testid="column"]:ha
   justify-content: center !important;
   text-align: center !important;
 }
+.st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-estimates-col-actions) .ips-estimates-header-row {
+  justify-content: flex-end !important;
+  text-align: right !important;
+}
 .st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-estimates-col-total),
 .st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-estimates-col-status),
 .st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:first-of-type [data-testid="column"]:has(.ips-estimates-col-actions) {
@@ -475,9 +474,82 @@ section[data-testid="stMain"]:has(.ips-estimates-page) [data-testid="column"]:ha
   align-items: flex-end !important;
 }
 .st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-total) .ips-estimates-number,
-.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-total) .ips-estimates-cell {
+.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-total) .ips-estimates-cell,
+.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-total) .ips-estimates-total-value {
   justify-content: flex-end !important;
   text-align: right !important;
+  color: #2563eb !important;
+  font-weight: 800 !important;
+  font-size: 0.8125rem !important;
+  font-variant-numeric: tabular-nums !important;
+}
+.st-key-estimates_table_wrap .ips-estimates-customer-cell,
+.st-key-estimates_table_wrap .ips-estimates-date-cell {
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  color: #0f172a !important;
+}
+.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-est-list-actions-marker) [data-testid="stHorizontalBlock"] {
+  gap: 6px !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  height: auto !important;
+  border-bottom: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-est-list-actions-marker) [data-testid="column"] {
+  padding: 0 !important;
+  min-height: 0 !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+}
+.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-est-list-actions-marker) .stButton > button[kind="secondary"],
+.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-est-list-actions-marker) button[data-testid="stBaseButton-secondary"] {
+  background: #ffffff !important;
+  color: #2563eb !important;
+  border: 1px solid #bfdbfe !important;
+  min-height: 30px !important;
+  height: 30px !important;
+  min-width: 58px !important;
+  padding: 0 10px !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-est-list-actions-marker) .stButton > button[kind="secondary"]:hover,
+.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-est-list-actions-marker) button[data-testid="stBaseButton-secondary"]:hover {
+  background: #eff6ff !important;
+  border-color: #93c5fd !important;
+  color: #1d4ed8 !important;
+}
+.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-est-list-actions-marker) .stButton > button[kind="primary"],
+.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-est-list-actions-marker) button[data-testid="stBaseButton-primary"] {
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid #1e40af !important;
+  min-height: 30px !important;
+  height: 30px !important;
+  min-width: 58px !important;
+  padding: 0 10px !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-est-list-actions-marker) .stButton > button[kind="primary"]:hover,
+.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-est-list-actions-marker) button[data-testid="stBaseButton-primary"]:hover {
+  filter: brightness(1.05) !important;
+}
+.st-key-estimates_table_wrap .ips-est-approve-done {
+  font-size: 0.68rem !important;
+  font-weight: 700 !important;
+  color: #15803d !important;
+  white-space: nowrap !important;
 }
 .st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-status) [data-testid="stMarkdown"],
 .st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-status) [data-testid="stElementContainer"] {
@@ -507,34 +579,16 @@ section[data-testid="stMain"]:has(.ips-estimates-page) [data-testid="column"]:ha
 .st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-actions) [data-testid="stElementContainer"] {
   display: flex !important;
   align-items: center !important;
-  justify-content: center !important;
+  justify-content: flex-end !important;
   height: 100% !important;
   width: 100% !important;
 }
 .st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-actions) .stButton {
   display: flex !important;
   align-items: center !important;
-  justify-content: center !important;
-  width: 100% !important;
-  margin: 0 !important;
-}
-.st-key-estimates_table_wrap [data-testid="column"]:has(.ips-estimates-col-actions) .stButton > button {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  min-height: 32px !important;
-  height: 32px !important;
-  max-height: 34px !important;
-  padding: 0 12px !important;
-  font-size: 0.72rem !important;
-  font-weight: 600 !important;
-  border-radius: 8px !important;
+  justify-content: flex-end !important;
   width: auto !important;
-  min-width: 88px !important;
-  max-width: 100% !important;
   margin: 0 !important;
-  white-space: nowrap !important;
-  overflow: visible !important;
 }
 .st-key-estimates_table_wrap .ips-estimates-table-link {
   display: flex !important;
@@ -560,7 +614,7 @@ section[data-testid="stMain"]:has(.ips-estimates-page) [data-testid="column"]:ha
   background-color: transparent !important;
   color: #2563eb !important;
   font-weight: 800 !important;
-  font-size: 14px !important;
+  font-size: 0.8125rem !important;
   line-height: 1.2 !important;
   border: none !important;
   border-radius: 0 !important;

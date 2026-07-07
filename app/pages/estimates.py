@@ -245,17 +245,16 @@ _ESTIMATE_DETAIL_TABS = [
     "Summary",
     "Documents",
 ]
-_ESTIMATE_COLS = [0.35, 1.05, 2.2, 1.55, 1.05, 1.05, 1.15, 0.95, 1.15]
-_ESTIMATE_COL_MARKERS = ("sel", "num", "desc", "customer", "job", "status", "date", "total", "actions")
+_ESTIMATE_COLS = [0.01, 0.95, 2.5, 1.65, 1.15, 1.05, 1.05, 1.35]
+_ESTIMATE_COL_MARKERS = ("sel", "num", "desc", "customer", "date", "total", "status", "actions")
 _ESTIMATE_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
     ("ESTIMATE #", None),
     ("PROJECT / DESCRIPTION", None),
     ("CUSTOMER", "customer"),
-    ("LINKED JOB", None),
-    ("STATUS", "status"),
     ("ESTIMATE DATE", None),
     ("TOTAL", None),
+    ("STATUS", "status"),
     ("ACTIONS", None),
 ]
 _PENDING_APPROVE_KEY = "est_pending_approve_id"
@@ -799,6 +798,59 @@ def _render_estimate_list_link_button(
     st.markdown("</div>", unsafe_allow_html=True)
 
 
+def _render_estimate_list_actions(est: dict, *, eid: str) -> None:
+    """Row actions aligned with dashboard Estimates Waiting Approval (Approve + View)."""
+    st.markdown('<span class="ips-est-list-actions-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
+    show_approve = _can_show_approve_job(est)
+    approved = estimate_visible_in_approved_view(est)
+
+    if show_approve:
+        approve_col, view_col = st.columns(2, gap="small")
+        with approve_col:
+            if st.button(
+                "Approve",
+                key=f"est_row_approve_{eid}",
+                type="secondary",
+                use_container_width=True,
+            ):
+                st.session_state[_PENDING_APPROVE_KEY] = eid
+                st.rerun()
+        with view_col:
+            if st.button(
+                "View",
+                key=f"est_row_view_{eid}",
+                type="primary",
+                use_container_width=True,
+            ):
+                _open_estimate_from_list(est)
+        return
+
+    if approved:
+        status_col, view_col = st.columns([1.15, 1], gap="small")
+        with status_col:
+            st.markdown(
+                '<span class="ips-est-approve-done">Job Approved</span>',
+                unsafe_allow_html=True,
+            )
+        with view_col:
+            if st.button(
+                "View",
+                key=f"est_row_view_{eid}",
+                type="primary",
+                use_container_width=True,
+            ):
+                _open_estimate_from_list(est)
+        return
+
+    if st.button(
+        "View",
+        key=f"est_row_view_{eid}",
+        type="primary",
+        use_container_width=True,
+    ):
+        _open_estimate_from_list(est)
+
+
 def _render_custom_estimates_table(
     filtered: list[dict],
     *,
@@ -845,7 +897,6 @@ def _render_custom_estimates_table(
             customer = _estimate_customer(est)
             status = _normalize_estimate_status(est.get("status"))
             est_date = fmt_date(est.get("estimate_date"))
-            job_no = _estimate_job(est)
             total = _estimate_customer_price(est)
             row_parity = "even" if row_idx % 2 else "odd"
 
@@ -892,51 +943,31 @@ def _render_custom_estimates_table(
             with cols[3]:
                 st.markdown(estimate_col_marker("customer"), unsafe_allow_html=True)
                 st.markdown(
-                    f'<div class="ips-estimates-cell">{html.escape(customer)}</div>',
+                    f'<div class="ips-estimates-cell ips-estimates-customer-cell">{html.escape(customer)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[4]:
-                st.markdown(estimate_col_marker("job"), unsafe_allow_html=True)
+                st.markdown(estimate_col_marker("date"), unsafe_allow_html=True)
                 st.markdown(
-                    f'<div class="ips-estimates-cell ips-estimates-muted">{html.escape(job_no)}</div>',
+                    f'<div class="ips-estimates-cell ips-estimates-muted ips-estimates-date-cell">{html.escape(est_date)}</div>',
                     unsafe_allow_html=True,
                 )
 
             with cols[5]:
+                st.markdown(estimate_col_marker("total"), unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="ips-estimates-cell ips-estimates-number ips-estimates-total-value">{html.escape(total)}</div>',
+                    unsafe_allow_html=True,
+                )
+
+            with cols[6]:
                 st.markdown(estimate_col_marker("status"), unsafe_allow_html=True)
                 st.markdown(_estimate_status_pill_html(status), unsafe_allow_html=True)
 
-            with cols[6]:
-                st.markdown(estimate_col_marker("date"), unsafe_allow_html=True)
-                st.markdown(
-                    f'<div class="ips-estimates-cell ips-estimates-muted">{html.escape(est_date)}</div>',
-                    unsafe_allow_html=True,
-                )
-
             with cols[7]:
-                st.markdown(estimate_col_marker("total"), unsafe_allow_html=True)
-                st.markdown(
-                    f'<div class="ips-estimates-cell ips-estimates-number">{html.escape(total)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[8]:
                 st.markdown(estimate_col_marker("actions"), unsafe_allow_html=True)
-                if _can_show_approve_job(est):
-                    if st.button(
-                        "Approve Job",
-                        key=f"est_row_approve_{eid}",
-                        type="secondary",
-                        use_container_width=True,
-                    ):
-                        st.session_state[_PENDING_APPROVE_KEY] = eid
-                        st.rerun()
-                elif estimate_visible_in_approved_view(est):
-                    st.markdown(
-                        '<span class="ips-est-approve-done">Job Approved</span>',
-                        unsafe_allow_html=True,
-                    )
+                _render_estimate_list_actions(est, eid=eid)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -2042,7 +2073,7 @@ def render() -> None:
 
     render_page_brand_header(
         "Estimates",
-        "Create, review, price, and send customer proposals.",
+        "Track and manage estimates",
         actions=[_est_export, _est_new],
         actions_column_ratio=(1.85, 1.15),
     )
