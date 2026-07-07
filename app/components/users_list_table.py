@@ -31,7 +31,6 @@ def handle_users_table_action(
     *,
     last_action_key: str,
     open_user_fn: Callable[[dict[str, Any]], None],
-    rerun_fn: Callable[[], None],
 ) -> None:
     val = str(raw or "").strip()
     if not val:
@@ -47,7 +46,6 @@ def handle_users_table_action(
     if not open_user:
         return
     open_user_fn(open_user)
-    rerun_fn()
 
 
 def render_users_table_link_bridge(
@@ -57,7 +55,6 @@ def render_users_table_link_bridge(
     hook_key: str = "ipsUsersList::action",
     last_action_key: str = "users_list_last_action",
     open_user_fn: Callable[[dict[str, Any]], None],
-    rerun_fn: Callable[[], None],
 ) -> None:
     """Zero-height bridge: user name link clicks open user detail."""
     try:
@@ -135,5 +132,4 @@ def render_users_table_link_bridge(
             users_by_id,
             last_action_key=last_action_key,
             open_user_fn=open_user_fn,
-            rerun_fn=rerun_fn,
         )

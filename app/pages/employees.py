@@ -392,9 +392,13 @@ def _open_user_from_list(user: dict) -> None:
     st.session_state[SHOW_MODAL_KEY] = True
     cache = st.session_state.get(CACHE_KEY) or {}
     cached = cache.get(uid) if isinstance(cache, dict) else None
+    record = cached if isinstance(cached, dict) else user
+    if isinstance(cache, dict):
+        cache[uid] = record
+        st.session_state[CACHE_KEY] = cache
     open_record_modal(
         uid,
-        cached if isinstance(cached, dict) else user,
+        record,
         session_select_key=_SEL,
         modal_key=MODAL_KEY,
         module=MODULE,
@@ -403,23 +407,16 @@ def _open_user_from_list(user: dict) -> None:
     st.session_state[ACTIVE_EMPLOYEE_KEY] = uid
 
 
+def _open_users_table_user(user: dict) -> None:
+    _open_user_from_list(user)
+    _show_employee_modal()
+
+
 def _normalize_user_open_id(raw: object) -> str:
     val = str(raw or "").strip()
     if val.startswith("open:"):
         return val.split(":", 1)[1].strip()
     return val
-
-
-def _ips_app_rerun() -> None:
-    try:
-        from app.ui.streamlit_perf import ips_app_rerun
-    except ImportError:
-        from ui.streamlit_perf import ips_app_rerun  # type: ignore
-    ips_app_rerun()
-
-
-def _on_users_table_open(user: dict) -> None:
-    _open_user_from_list(user)
 
 
 def _user_name_cell_html(name: str, user_id: str) -> str:
@@ -648,16 +645,14 @@ def _render_custom_users_table(
         }
         render_users_table_link_bridge(
             users_by_id,
-            open_user_fn=_on_users_table_open,
-            rerun_fn=_ips_app_rerun,
+            open_user_fn=_open_users_table_user,
         )
         picked_row = _render_users_row_click_bridge()
         if picked_row:
             open_id = _normalize_user_open_id(picked_row)
             open_user = users_by_id.get(open_id)
             if open_user:
-                _on_users_table_open(open_user)
-                _ips_app_rerun()
+                _open_users_table_user(open_user)
 
     return all_user_ids
 
