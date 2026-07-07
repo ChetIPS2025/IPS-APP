@@ -384,7 +384,8 @@ def _fetch_table_query(
     client = get_admin_client() if use_admin else get_client()
     tag = "fetch_table_admin" if use_admin else "fetch_table"
     cols = columns
-    for _ in range(8):
+    max_col_retries = 8 if cols.strip() == "*" else max(8, cols.count(",") + 1)
+    for _ in range(max_col_retries):
         query = client.table(table_name).select(cols).limit(limit)
         if order_by:
             query = query.order(order_by)
@@ -421,7 +422,8 @@ def _fetch_by_match_query(
     tag = "fetch_by_match_admin" if use_admin else "fetch_by_match"
     cols = columns
     match_cur = dict(match)
-    for _ in range(8):
+    max_col_retries = 8 if cols.strip() == "*" else max(8, cols.count(",") + 1)
+    for _ in range(max_col_retries):
         query = client.table(table_name).select(cols).limit(limit)
         for key, value in match_cur.items():
             query = query.eq(key, value)
@@ -435,10 +437,12 @@ def _fetch_by_match_query(
                 )
             return resp.data or []
         except Exception as exc:
-            if table_name != "jobs":
-                raise RuntimeError(f"{tag}({table_name!r}) failed: {exc!r}") from exc
-            next_cols = _jobs_columns_after_missing_column(cols, exc)
-            next_match = _jobs_match_after_missing_column(match_cur, exc)
+            next_cols = _columns_after_missing_column(table_name, cols, exc)
+            next_match = (
+                _jobs_match_after_missing_column(match_cur, exc)
+                if table_name == "jobs"
+                else None
+            )
             changed = False
             if next_cols and next_cols != cols:
                 cols = next_cols
