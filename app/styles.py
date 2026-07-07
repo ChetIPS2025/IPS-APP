@@ -13355,21 +13355,32 @@ section[data-testid="stSidebar"] > div {{
 }}
 .sidebar-header {{
   position: relative;
-  padding: 0.55rem 0.45rem 0.4rem;
-  min-height: 2.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.45rem 0.25rem;
+  min-height: 150px;
+}}
+.sidebar-header--collapsed {{
+  min-height: 4.5rem;
+  padding: 0.35rem 0.25rem 0.25rem;
 }}
 .sidebar-header-brand {{
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 0.15rem;
-  padding-right: 1.85rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding-right: 0;
   min-width: 0;
+  width: 100%;
+  text-align: center;
 }}
 .sidebar-header--collapsed .sidebar-header-brand {{
   align-items: center;
   padding-right: 0;
-  padding-top: 0.15rem;
+  padding-top: 0;
 }}
 .sidebar-logo-wrap,
 .ips-sidebar-logo-wrap,
@@ -13381,8 +13392,9 @@ section[data-testid="stSidebar"] > div {{
   border: none;
   background: transparent !important;
   display: flex;
-  justify-content: flex-start;
+  justify-content: center;
   align-items: center;
+  width: 100%;
 }}
 .sidebar-header--collapsed .sidebar-logo-wrap,
 .sidebar-header--collapsed .sidebar-logo-wrap--collapsed {{
@@ -13397,11 +13409,12 @@ section[data-testid="stSidebar"] > div {{
 .ips-sidebar-logo-wrap [data-testid="stImage"] img,
 .sidebar-logo-wrap--collapsed img,
 .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {{
-  max-width: 90px;
-  max-height: 32px;
+  max-width: 90%;
+  max-height: 110px;
   width: auto;
   height: auto;
   display: block;
+  margin: 0 auto;
   object-fit: contain;
   background: transparent !important;
 }}
@@ -13409,16 +13422,20 @@ section[data-testid="stSidebar"] > div {{
 .sidebar-header--collapsed .sidebar-logo-wrap [data-testid="stImage"] img,
 .sidebar-header--collapsed .sidebar-logo-wrap--collapsed img,
 .sidebar-header--collapsed .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {{
-  max-width: 36px;
-  max-height: 36px;
+  max-width: 48px;
+  max-height: 48px;
 }}
 section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"],
 section[data-testid="stSidebar"] .ips-sidebar-logo-wrap [data-testid="stImage"],
 section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] {{
   background: transparent !important;
   padding: 0 !important;
-  margin: 0 !important;
-  width: auto !important;
+  margin: 0 auto !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
 }}
 section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"] > div,
 section[data-testid="stSidebar"] .ips-sidebar-logo-wrap [data-testid="stImage"] > div,
@@ -13427,15 +13444,15 @@ section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stI
 }}
 .sidebar-logo-tagline,
 .ips-sidebar-tagline {{
-  font-size: 0.6875rem;
+  font-size: 0.875rem;
   color: {TEXT_MUTED};
-  margin: 0;
+  margin: 8px 0 0;
   line-height: 1.25;
   font-weight: 500;
   max-width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  text-align: center;
+  width: 100%;
+  white-space: normal;
 }}
 .sidebar-divider {{
   margin: 0.1rem 0.55rem 0.3rem !important;
@@ -13779,11 +13796,29 @@ section[data-testid="stSidebar"] hr {{
 }}
 .sidebar-header-top {{
   width: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}}
+.sidebar-header-top [data-testid="column"]:first-child {{
+  flex: 1 1 100% !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
 }}
 .sidebar-header-top [data-testid="column"]:last-child {{
+  position: absolute;
+  top: 0.2rem;
+  right: 0.2rem;
   display: flex !important;
   justify-content: flex-end !important;
   align-items: flex-start !important;
+  width: auto !important;
+  flex: 0 0 auto !important;
+  z-index: 2;
 }}
 section[data-testid="stSidebar"] [class*="st-key-ips_sidebar_collapse_toggle"] {{
   position: static !important;

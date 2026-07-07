@@ -109,7 +109,7 @@ def _render_sidebar_header(*, collapsed: bool) -> None:
         logo_wrap_cls = "sidebar-logo-wrap sidebar-logo-wrap--collapsed" if collapsed else "sidebar-logo-wrap"
         st.markdown(f'<{_OT} class="{logo_wrap_cls}">', unsafe_allow_html=True)
         if logo:
-            st.image(str(logo), width=36 if collapsed else 90)
+            st.image(str(logo), width=44 if collapsed else 100)
         elif not collapsed:
             st.markdown('<p class="ips-sidebar-brand">IPS Operations</p>', unsafe_allow_html=True)
         st.markdown(f"<{_CT}>", unsafe_allow_html=True)

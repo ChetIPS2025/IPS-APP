@@ -183,7 +183,7 @@ def inject_sidebar_nav_override_css() -> None:
 def _sidebar_nav_override_css() -> str:
     """Final cascade override for sidebar navigation rows (not button chrome)."""
     return """
-<style id="ips-sidebar-nav-override-v2">
+<style id="ips-sidebar-nav-override-v3">
 section[data-testid="stSidebar"] > div,
 section[data-testid="stSidebar"] [data-testid="stSidebarContent"],
 section[data-testid="stSidebar"] .block-container {
@@ -321,8 +321,8 @@ section[data-testid="stSidebar"] .sidebar-logo-wrap img,
 section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"] img,
 section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed img,
 section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {
-  max-width: 90px !important;
-  max-height: 32px !important;
+  max-width: 90% !important;
+  max-height: 110px !important;
   width: auto !important;
   height: auto !important;
   object-fit: contain !important;
@@ -331,8 +331,42 @@ body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap i
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"] img,
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed img,
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {
-  max-width: 36px !important;
-  max-height: 36px !important;
+  max-width: 48px !important;
+  max-height: 48px !important;
+}
+section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"],
+section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+}
+section[data-testid="stSidebar"] .sidebar-header-brand {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  text-align: center !important;
+  padding-right: 0 !important;
+  gap: 0 !important;
+}
+section[data-testid="stSidebar"] .sidebar-logo-wrap,
+section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed {
+  justify-content: center !important;
+  align-items: center !important;
+  width: 100% !important;
+}
+section[data-testid="stSidebar"] .sidebar-logo-tagline {
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  margin: 8px 0 0 !important;
+  text-align: center !important;
+  width: 100% !important;
+  line-height: 1.25 !important;
 }
 section[data-testid="stSidebar"] [class*="st-key-ips_sidebar_collapse_toggle"] {
   position: static !important;
@@ -524,7 +558,7 @@ def _shell_css() -> str:
     mobile_max = IPS_SIDEBAR_DESKTOP_MIN_PX - 1
     collapsed_sel = _collapsed_sidebar_selectors()
     return f"""
-<style id="ips-sidebar-shell-v6">
+<style id="ips-sidebar-shell-v7">
 .ips-main-header-menu,
 button.ips-header-menu-btn {{
   display: none !important;
@@ -648,39 +682,65 @@ button.ips-header-menu-btn {{
   }}
   .sidebar-header {{
     position: relative !important;
-    display: block !important;
-    padding: 0.55rem 0.45rem 0.4rem !important;
-    min-height: 2.75rem !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0.35rem 0.45rem 0.25rem !important;
+    min-height: 150px !important;
   }}
   .sidebar-header--collapsed {{
-    padding: 0.45rem 0.25rem 0.35rem !important;
+    min-height: 4.5rem !important;
+    padding: 0.35rem 0.25rem 0.25rem !important;
   }}
   .sidebar-header-brand {{
     display: flex !important;
     flex-direction: column !important;
-    align-items: flex-start !important;
-    gap: 0.15rem !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0 !important;
     padding-right: 0 !important;
     min-width: 0 !important;
+    width: 100% !important;
+    text-align: center !important;
   }}
   .sidebar-header-top {{
     width: 100% !important;
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }}
+  .sidebar-header-top [data-testid="column"]:first-child {{
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
   }}
   .sidebar-header-top [data-testid="column"]:last-child {{
+    position: absolute !important;
+    top: 0.2rem !important;
+    right: 0.2rem !important;
     display: flex !important;
     justify-content: flex-end !important;
     align-items: flex-start !important;
+    width: auto !important;
+    flex: 0 0 auto !important;
+    z-index: 2 !important;
   }}
   .sidebar-header--collapsed .sidebar-header-brand {{
     align-items: center !important;
     padding-right: 0 !important;
-    padding-top: 0.15rem !important;
+    padding-top: 0 !important;
   }}
   .sidebar-logo-wrap,
   .sidebar-logo-wrap--collapsed {{
     width: 100% !important;
     display: flex !important;
-    justify-content: flex-start !important;
+    justify-content: center !important;
+    align-items: center !important;
     padding: 0 !important;
     margin: 0 !important;
     border: none !important;
@@ -694,27 +754,38 @@ button.ips-header-menu-btn {{
   .sidebar-logo-wrap [data-testid="stImage"] img,
   .sidebar-logo-wrap--collapsed img,
   .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {{
-    max-width: 90px !important;
-    max-height: 32px !important;
+    max-width: 90% !important;
+    max-height: 110px !important;
     width: auto !important;
     height: auto !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     object-fit: contain !important;
   }}
   .sidebar-header--collapsed .sidebar-logo-wrap img,
   .sidebar-header--collapsed .sidebar-logo-wrap [data-testid="stImage"] img,
   .sidebar-header--collapsed .sidebar-logo-wrap--collapsed img,
   .sidebar-header--collapsed .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {{
-    max-width: 36px !important;
-    max-height: 36px !important;
+    max-width: 48px !important;
+    max-height: 48px !important;
   }}
   section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"],
   section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] {{
-    width: auto !important;
+    width: 100% !important;
     max-width: 100% !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
     background: transparent !important;
     padding: 0 !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
+  }}
+  .sidebar-logo-tagline {{
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    margin: 8px 0 0 !important;
+    text-align: center !important;
+    width: 100% !important;
+    line-height: 1.25 !important;
   }}
   body.ips-sidebar-collapsed .sidebar-section-title,
   body.ips-sidebar-collapsed .sidebar-logo-tagline,
