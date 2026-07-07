@@ -232,7 +232,7 @@ def _db():
 def fetch_rows(
     table: str,
     *,
-    columns: str = "*",
+    columns: str | None = None,
     limit: int = 500,
     order_by: str | None = None,
     alt_tables: tuple[str, ...] = (),
@@ -264,7 +264,7 @@ def fetch_rows(
 def fetch_rows_admin(
     table: str,
     *,
-    columns: str = "*",
+    columns: str | None = None,
     limit: int = 500,
     order_by: str | None = None,
     alt_tables: tuple[str, ...] = (),

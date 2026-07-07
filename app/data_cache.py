@@ -70,7 +70,7 @@ def clear_session_table_cache() -> None:
 def fetch_table_admin_cached(
     table_name: str,
     *,
-    columns: str = "*",
+    columns: str | None = None,
     limit: int = 1000,
     order_by: str | None = None,
     cache_version: int = 0,
@@ -85,7 +85,7 @@ def fetch_table_admin_cached(
 def fetch_table_cached(
     table_name: str,
     *,
-    columns: str = "*",
+    columns: str | None = None,
     limit: int = 1000,
     order_by: str | None = None,
     cache_version: int = 0,
@@ -100,7 +100,7 @@ def fetch_table_for_session(
     table_name: str,
     *,
     session_key: str,
-    columns: str = "*",
+    columns: str | None = None,
     limit: int = 1000,
     order_by: str | None = None,
     use_admin: bool = False,

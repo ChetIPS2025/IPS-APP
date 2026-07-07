@@ -70,7 +70,11 @@ def _estimate_table_column_names() -> frozenset[str]:
     if isinstance(cached, frozenset):
         return cached
     try:
-        rows = fetch_table_admin("estimates", limit=1)
+        from app.db_table_columns import SCHEMA_INTROSPECTION_COLUMNS
+    except ImportError:
+        from db_table_columns import SCHEMA_INTROSPECTION_COLUMNS  # type: ignore
+    try:
+        rows = fetch_table_admin("estimates", columns=SCHEMA_INTROSPECTION_COLUMNS, limit=1)
         cols = frozenset(rows[0].keys()) if rows else frozenset()
     except Exception:
         cols = frozenset()

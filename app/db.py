@@ -355,12 +355,17 @@ def _ensure_supabase_client_session() -> None:
 
 def _fetch_table_query(
     table_name: str,
-    columns: str,
+    columns: str | None,
     limit: int,
     order_by: str | None,
     *,
     use_admin: bool,
 ) -> list[dict[str, Any]]:
+    try:
+        from app.db_table_columns import resolve_list_columns
+    except ImportError:
+        from db_table_columns import resolve_list_columns  # type: ignore
+    columns = resolve_list_columns(table_name, columns)
     if table_name == "jobs":
         columns, order_by = _normalize_jobs_query(columns=columns, order_by=order_by)
     if not use_admin:
@@ -548,7 +553,7 @@ def clear_streamlit_db_read_cache() -> None:
 
 def fetch_table_admin(
     table_name: str,
-    columns: str = "*",
+    columns: str | None = None,
     limit: int = 1000,
     order_by: str | None = None,
 ) -> list[dict[str, Any]]:
@@ -557,7 +562,7 @@ def fetch_table_admin(
 
 def fetch_table(
     table_name: str,
-    columns: str = "*",
+    columns: str | None = None,
     limit: int = 1000,
     order_by: str | None = None,
 ) -> list[dict[str, Any]]:
@@ -568,7 +573,7 @@ def fetch_table(
 
 def fetch_table_with_order_fallback(
     table_name: str,
-    columns: str = "*",
+    columns: str | None = None,
     limit: int = 1000,
     order_by: str | None = None,
 ) -> list[dict[str, Any]]:
@@ -593,12 +598,15 @@ def fetch_rows_unfiltered(
     order_by: str | None = None,
     use_admin: bool = False,
 ) -> list[dict[str, Any]]:
-    """
-    ``select('*')`` with optional ``order_by`` — same normalization as :func:`fetch_table`
-    (e.g. jobs column mapping). Use ``use_admin=True`` for service-role reads when RLS hides rows.
-    """
+    """``select`` with optional ``order_by`` — same normalization as :func:`fetch_table`."""
     fn = fetch_table_admin if use_admin else fetch_table
-    return fn(table_name, columns="*", limit=limit, order_by=order_by)
+    if table_name == "jobs":
+        try:
+            from app.db_table_columns import JOBS_COLUMNS
+        except ImportError:
+            from db_table_columns import JOBS_COLUMNS  # type: ignore
+        return fn(table_name, columns=JOBS_COLUMNS, limit=limit, order_by=order_by)
+    return fn(table_name, limit=limit, order_by=order_by)
 
 
 def fetch_jobs_with_order_fallback(
@@ -607,7 +615,7 @@ def fetch_jobs_with_order_fallback(
     use_admin: bool = False,
 ) -> list[dict[str, Any]]:
     """
-    Load ``public.jobs`` with ``select('*')``, trying common ``order_by`` columns until one works.
+    Load ``public.jobs`` with the standard jobs projection, trying common ``order_by`` columns until one works.
 
     Use when typed column lists fail (schema drift) or to diagnose empty Job Database grids.
     """
@@ -1394,7 +1402,11 @@ def find_auth_user_by_email_admin(email: str) -> dict[str, Any] | None:
 def _filter_admin_table_payload(table: str, payload: dict[str, Any]) -> dict[str, Any]:
     """Drop keys that are not present on the live table (legacy schema drift)."""
     try:
-        rows = fetch_table_admin(table, limit=1)  # type: ignore[name-defined]
+        from app.db_table_columns import SCHEMA_INTROSPECTION_COLUMNS
+    except ImportError:
+        from db_table_columns import SCHEMA_INTROSPECTION_COLUMNS  # type: ignore
+    try:
+        rows = fetch_table_admin(table, columns=SCHEMA_INTROSPECTION_COLUMNS, limit=1)  # type: ignore[name-defined]
         if rows:
             cols = frozenset(str(k) for k in rows[0].keys())
             return {k: v for k, v in payload.items() if k in cols}

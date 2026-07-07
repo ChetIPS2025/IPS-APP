@@ -79,7 +79,7 @@ def timesheet_table_available(*, force: bool = False) -> bool:
     if not force and _table_available is not None:
         return _table_available
     try:
-        fetch_table_admin(TIMESHEET_TABLE, limit=1)
+        fetch_table_admin(TIMESHEET_TABLE, columns="id", limit=1)
         _table_available = True
     except Exception as exc:
         if _is_missing_table_error(exc):

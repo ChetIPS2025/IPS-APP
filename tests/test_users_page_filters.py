@@ -72,7 +72,7 @@ def test_fetch_rows_records_last_error(monkeypatch):
     calls: list[str | None] = []
 
     class _FakeDb:
-        def fetch_table(self, table_name, *, columns="*", limit=500, order_by=None):
+        def fetch_table(self, table_name, *, columns=None, limit=500, order_by=None):
             calls.append(order_by)
             if order_by == "name":
                 raise RuntimeError("order failed")

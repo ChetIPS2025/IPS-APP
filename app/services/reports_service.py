@@ -38,14 +38,20 @@ def _norm_status(raw: object) -> str:
     return str(raw or "").strip().lower().replace("_", " ")
 
 
-def _admin_table(table: str, *, limit: int = 20000, order_by: str | None = None) -> tuple[list[dict[str, Any]], bool]:
+def _admin_table(
+    table: str,
+    *,
+    columns: str | None = None,
+    limit: int = 20000,
+    order_by: str | None = None,
+) -> tuple[list[dict[str, Any]], bool]:
     """Return (rows, is_live). ``is_live`` is False when the table could not be read."""
     try:
         from app.db import fetch_table_admin
     except ImportError:
         from db import fetch_table_admin  # type: ignore
     try:
-        rows = list(fetch_table_admin(table, limit=limit, order_by=order_by) or [])
+        rows = list(fetch_table_admin(table, columns=columns, limit=limit, order_by=order_by) or [])
         return rows, True
     except Exception:
         return [], False
