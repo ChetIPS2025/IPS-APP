@@ -43,6 +43,7 @@ try:
         render_save_cancel_actions,
         safe_value,
         set_view_mode,
+        show_modal_if_pending,
         status_pill_html,
     )
     from app.components.tables import render_data_table
@@ -113,6 +114,7 @@ except ImportError:
         render_save_cancel_actions,
         safe_value,
         set_view_mode,
+        show_modal_if_pending,
         status_pill_html,
     )
     from components.tables import render_data_table  # type: ignore
@@ -400,8 +402,8 @@ def _open_user_from_list(user: dict) -> None:
 
 
 def _open_users_table_user(user: dict) -> None:
+    """Set selected user state; the page render opens the dialog once."""
     _open_user_from_list(user)
-    _show_employee_modal()
 
 
 def _normalize_user_open_id(raw: object) -> str:
@@ -1497,6 +1499,5 @@ def render() -> None:
         search=search_q,
     )
 
-    selected_user_id = str(st.session_state.get(SELECTED_USER_KEY) or "").strip()
-    if selected_user_id and st.session_state.get(SHOW_MODAL_KEY):
-        _show_employee_modal()
+    if st.session_state.get(SHOW_MODAL_KEY):
+        show_modal_if_pending(MODAL_KEY, _show_employee_modal)
