@@ -575,7 +575,6 @@ def _render_custom_users_table(
             cols = st.columns(_USER_COLS, gap="xxsmall", vertical_alignment="center")
 
             with cols[0]:
-                st.markdown(_user_row_marker_html(uid), unsafe_allow_html=True)
                 if st.button(
                     _user_name_open_label(name),
                     key=f"users_open_{uid}",
@@ -584,6 +583,7 @@ def _render_custom_users_table(
                     use_container_width=True,
                 ):
                     _open_users_table_user(user)
+                st.markdown(_user_row_marker_html(uid), unsafe_allow_html=True)
 
             with cols[1]:
                 st.markdown(
