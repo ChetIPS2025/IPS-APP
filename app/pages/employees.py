@@ -15,7 +15,7 @@ try:
         render_user_action_button_row,
         render_user_action_confirm_panel,
     )
-    from app.components.headers import render_page_brand_header
+    from app.components.headers import render_users_page_header
     from app.components.table_filters import (
         apply_column_filters,
         build_filter_options,
@@ -87,7 +87,7 @@ except ImportError:
         render_user_action_button_row,
         render_user_action_confirm_panel,
     )
-    from components.headers import render_page_brand_header  # type: ignore
+    from components.headers import render_users_page_header  # type: ignore
     from components.table_filters import (  # type: ignore
         apply_column_filters,
         build_filter_options,
@@ -1396,7 +1396,7 @@ def render() -> None:
         if st.button("+ New User", key="emp_add", type="primary", use_container_width=True):
             st.session_state["ips_emp_form"] = True
 
-    render_page_brand_header(
+    render_users_page_header(
         "Users",
         "Manage system users, roles, and permissions.",
         actions=[_users_export, _users_new],

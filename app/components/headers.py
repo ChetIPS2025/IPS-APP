@@ -133,6 +133,83 @@ def render_page_brand_header(
         )
 
 
+def render_users_page_header(
+    title: str,
+    subtitle: str | None = None,
+    *,
+    actions: list[_ActionFn] | None = None,
+) -> None:
+    """Users page header with centered IPS wordmark above the title row."""
+    ot, ct = "d" + "iv", "/" + "d" + "iv"
+    st.markdown(f'<{ot} class="ips-page-shell-marker"></{ct}>', unsafe_allow_html=True)
+
+    logo = wording_logo_html(height=80, css_class="users-header-logo")
+    st.markdown(
+        f'<{ot} class="users-page-header">'
+        f'<{ot} class="users-header-logo-wrap">{logo}</{ct}>'
+        f'<{ot} class="users-title-section">',
+        unsafe_allow_html=True,
+    )
+
+    sub_html = (
+        f'<p class="ips-page-subtitle">{html.escape(subtitle)}</p>'
+        if subtitle
+        else ""
+    )
+    title_block = (
+        f'<{ot} class="ips-page-title-block">'
+        f'<h1 class="ips-page-title">{html.escape(title)}</h1>'
+        f"{sub_html}"
+        f"</{ct}>"
+    )
+
+    if actions:
+        n = len(actions)
+        if n >= 3:
+            title_w, actions_w = 1.65, 2.35
+        else:
+            title_w, actions_w = 2.55, 1.45
+        main_col, act_col = st.columns([title_w, actions_w], gap="small", vertical_alignment="top")
+        with main_col:
+            st.markdown(
+                f'<{ot} class="ips-page-header"><{ot} class="ips-page-title-row">{title_block}</{ct}></{ct}>',
+                unsafe_allow_html=True,
+            )
+        with act_col:
+            st.markdown(
+                '<span class="ips-page-actions-marker" aria-hidden="true"></span>',
+                unsafe_allow_html=True,
+            )
+            if n == 1:
+                actions[0]()
+            elif n == 2:
+                bc1, bc2 = st.columns([0.78, 1.22], gap="small")
+                with bc1:
+                    actions[0]()
+                with bc2:
+                    actions[1]()
+            elif n == 3:
+                bc1, bc2, bc3 = st.columns([0.95, 1.55, 1.1], gap="small")
+                with bc1:
+                    actions[0]()
+                with bc2:
+                    actions[1]()
+                with bc3:
+                    actions[2]()
+            else:
+                cols = st.columns(min(n, 4), gap="small")
+                for i, widget in enumerate(actions):
+                    with cols[i % len(cols)]:
+                        widget()
+    else:
+        st.markdown(
+            f'<{ot} class="ips-page-header"><{ot} class="ips-page-title-row">{title_block}</{ct}></{ct}>',
+            unsafe_allow_html=True,
+        )
+
+    st.markdown(f"</{ct}></{ct}>", unsafe_allow_html=True)
+
+
 def render_page_header(
     title: str,
     subtitle: str = "",

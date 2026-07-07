@@ -79,7 +79,12 @@ def _logo_data_uri(path_str: str) -> str:
     return f"data:{mime};base64,{encoded}"
 
 
-def wording_logo_html(*, height: int = 46, alt: str = "Industrial Plant Solutions") -> str:
+def wording_logo_html(
+    *,
+    height: int = 46,
+    alt: str = "Industrial Plant Solutions",
+    css_class: str = "ips-main-header-logo",
+) -> str:
     """Inline wording logo for the light-gray main content header bar."""
     path = get_wording_logo_path()
     if not path:
@@ -88,7 +93,7 @@ def wording_logo_html(*, height: int = 46, alt: str = "Industrial Plant Solution
         )
     src = _logo_data_uri(str(path))
     return (
-        f'<img class="ips-main-header-logo" src="{src}" alt="{html.escape(alt)}" '
+        f'<img class="{html.escape(css_class, quote=True)}" src="{src}" alt="{html.escape(alt)}" '
         f'height="{int(height)}" style="height:{int(height)}px;" />'
     )
 

@@ -174,7 +174,8 @@ def render_module(slug: str | None = None) -> None:
                 from app.components.headers import render_main_brand_bar
             except ImportError:
                 from components.headers import render_main_brand_bar  # type: ignore
-            render_main_brand_bar()
+            if active not in {"employees", "users"}:
+                render_main_brand_bar()
             with perf_span(f"module.render:{active}"):
                 fn()  # type: ignore[operator]
         except Exception as exc:

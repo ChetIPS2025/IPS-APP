@@ -29,7 +29,34 @@ def inject_users_module_css() -> None:
     """Users list custom table styling — call at the top of the users page render."""
     st.markdown(
         f"""
-<style id="ips-users-module-v28">
+<style id="ips-users-module-v29">
+.users-page-header {{
+  margin: 0 0 14px 0;
+  width: 100%;
+}}
+.users-header-logo-wrap {{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  padding: 4px 0 0 0;
+}}
+.users-header-logo {{
+  display: block;
+  height: auto !important;
+  max-height: 90px;
+  width: auto;
+  max-width: min(560px, 100%);
+  object-fit: contain;
+  background: transparent;
+  margin: 0 auto;
+}}
+.users-title-section {{
+  margin-top: 24px;
+}}
+.users-title-section .ips-page-header {{
+  margin: 0;
+}}
 .users-table-container,
 .ips-users-table-wrap {{
   background: #ffffff;
