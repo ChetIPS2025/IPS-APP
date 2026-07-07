@@ -947,11 +947,27 @@ def _activate_job_detail_modal(job_id: str, job: dict | None = None) -> None:
     st.session_state[_SEL] = jid
     st.session_state[_JOBS_MODAL_KEY] = jid
     if isinstance(job, dict):
+        cache = st.session_state.get(CACHE_KEY) or {}
+        if isinstance(cache, dict):
+            cache[jid] = job
+            st.session_state[CACHE_KEY] = cache
         st.session_state[_job_edit_mode_key(job)] = False
     else:
         st.session_state[
             f"job_edit_mode_{''.join(ch if ch.isalnum() else '_' for ch in jid) or 'job'}"
         ] = False
+
+
+def _normalize_job_open_id(raw: object) -> str:
+    val = str(raw or "").strip()
+    if val.startswith("open:"):
+        return val.split(":", 1)[1].strip()
+    return val
+
+
+def _open_jobs_table_job(job_id: str, job: dict) -> None:
+    _open_jobs_detail_modal(job_id, job)
+    _show_jobs_detail_modal()
 
 
 def _open_job_detail_task_form(job: dict) -> None:
@@ -1294,25 +1310,22 @@ def _render_custom_jobs_table(
 
         st.markdown("</div>", unsafe_allow_html=True)
 
-    if not is_field_context():
-        jobs_by_id = {
-            str(j.get("id") or "").strip(): j
-            for j in filtered
-            if str(j.get("id") or "").strip()
-        }
-        link_id = render_jobs_table_link_bridge()
-        if link_id:
-            open_job = jobs_by_id.get(str(link_id).strip())
-            if open_job:
-                _open_jobs_detail_modal(str(link_id).strip(), open_job)
-                ips_app_rerun()
-        picked = render_jobs_row_click_bridge()
-        if picked:
-            open_id = str(picked).strip()
-            open_job = jobs_by_id.get(open_id)
-            if open_job:
-                _open_jobs_detail_modal(open_id, open_job)
-                ips_app_rerun()
+        if not is_field_context():
+            jobs_by_id = {
+                str(j.get("id") or "").strip(): j
+                for j in filtered
+                if str(j.get("id") or "").strip()
+            }
+            render_jobs_table_link_bridge(
+                jobs_by_id,
+                open_job_fn=_open_jobs_table_job,
+            )
+            picked = render_jobs_row_click_bridge()
+            if picked:
+                open_id = _normalize_job_open_id(picked)
+                open_job = jobs_by_id.get(open_id)
+                if open_job:
+                    _open_jobs_table_job(open_id, open_job)
 
     return all_job_ids
 
@@ -3227,5 +3240,6 @@ def _render_jobs_page() -> None:
     )
     render_jobs_pagination_footer(len(filtered), _TABLE_KEY, item_label="job")
 
+    selected_job_id = str(st.session_state.get(SELECTED_JOB_KEY) or "").strip()
     if selected_job_id and st.session_state.get(SHOW_MODAL_KEY):
         _show_jobs_detail_modal()

@@ -972,7 +972,7 @@ def inject_jobs_module_css() -> None:
     """Jobs list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-jobs-module-v27">
+<style id="ips-jobs-module-v28">
 .st-key-jobs_table_wrap .ips-jobs-table-wrap,
 .st-key-jobs_table_wrap .ips-jobs-table-wrap.jobs-table {{
   background: #ffffff !important;
@@ -1320,6 +1320,7 @@ def inject_jobs_module_css() -> None:
   font-size: 0.8125rem !important;
   text-decoration: none !important;
   cursor: pointer !important;
+  pointer-events: auto !important;
 }}
 .ips-jobs-list-link:hover,
 .ips-jobs-list-link:focus {{

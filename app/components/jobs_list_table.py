@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+from collections.abc import Callable
 from typing import Any
 
 import streamlit as st
@@ -24,12 +25,37 @@ def job_list_link_html(
     )
 
 
+def handle_jobs_table_action(
+    raw: str,
+    jobs_by_id: dict[str, dict[str, Any]],
+    *,
+    last_action_key: str,
+    open_job_fn: Callable[[str, dict[str, Any]], None],
+) -> None:
+    val = str(raw or "").strip()
+    if not val:
+        return
+    if val == str(st.session_state.get(last_action_key) or ""):
+        return
+    st.session_state[last_action_key] = val
+
+    job_id = val.split(":", 1)[1].strip() if val.startswith("open:") else val
+    if not job_id:
+        return
+    open_job = jobs_by_id.get(job_id)
+    if not open_job:
+        return
+    open_job_fn(job_id, open_job)
+
+
 def render_jobs_table_link_bridge(
+    jobs_by_id: dict[str, dict[str, Any]],
     *,
     component_key: str = "ips_jobs_list_bridge",
     hook_key: str = "ipsJobsList::action",
     last_action_key: str = "jobs_list_last_action",
-) -> str | None:
+    open_job_fn: Callable[[str, dict[str, Any]], None],
+) -> None:
     """Zero-height bridge: job # / project link clicks open job detail."""
     try:
         from app.ui.clean_table import _components_html
@@ -47,7 +73,7 @@ def render_jobs_table_link_bridge(
   const w = window.parent || window;
   const doc = w.document;
   const hookKey = {hook_key!r};
-  const sel = "[data-job-id][data-job-action]";
+  const sel = ".ips-jobs-list-link[data-job-id][data-job-action]";
 
   function sendValue(action) {{
     const payload = {{ type: "streamlit:setComponentValue", value: action }};
@@ -97,17 +123,16 @@ def render_jobs_table_link_bridge(
 </script>
         """,
         component_key=component_key,
-        height=0,
+        height=1,
     )
     action = str(picked or "").strip()
-    if not action:
-        return None
-    if action == str(st.session_state.get(last_action_key) or ""):
-        return None
-    st.session_state[last_action_key] = action
-    if action.startswith("open:"):
-        return action.split(":", 1)[1].strip()
-    return None
+    if action:
+        handle_jobs_table_action(
+            action,
+            jobs_by_id,
+            last_action_key=last_action_key,
+            open_job_fn=open_job_fn,
+        )
 
 
 def resolve_jobs_table_link_action(
@@ -115,6 +140,8 @@ def resolve_jobs_table_link_action(
     jobs_by_id: dict[str, dict[str, Any]],
 ) -> dict[str, Any] | None:
     job_id = str(action or "").strip()
+    if job_id.startswith("open:"):
+        job_id = job_id.split(":", 1)[1].strip()
     if not job_id:
         return None
     return jobs_by_id.get(job_id)
