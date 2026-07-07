@@ -159,9 +159,8 @@ CACHE_KEY = "_ips_employees_modal_by_id"
 SELECTED_USER_KEY = "selected_user_id"
 SHOW_MODAL_KEY = "show_user_detail_modal"
 _ALL_USER_IDS_KEY = "_ips_users_visible_ids"
-_USER_COLS = [0.52, 2.3, 2.5, 1.35, 1.55, 1.35, 1.15, 1.05]
+_USER_COLS = [2.9, 2.5, 1.35, 1.55, 1.35, 1.15, 1.05]
 _USER_HEADER_SPECS: list[tuple[str, str | None]] = [
-    ("", None),
     ("NAME", None),
     ("EMAIL", None),
     ("PHONE", None),
@@ -377,29 +376,125 @@ def _clear_user_selection(user_ids: list[str] | None = None) -> None:
             st.session_state[key] = False
 
 
-def _on_user_checkbox_change(user_id: str, all_user_ids: list[str]) -> None:
-    key = _user_select_key(user_id)
-    if st.session_state.get(key):
-        for uid in all_user_ids:
-            if uid != user_id:
-                st.session_state[_user_select_key(uid)] = False
-        st.session_state[SELECTED_USER_KEY] = user_id
-        st.session_state[SHOW_MODAL_KEY] = True
-        cache = st.session_state.get(CACHE_KEY) or {}
-        user = cache.get(user_id) if isinstance(cache, dict) else None
-        open_record_modal(
-            user_id,
-            user if isinstance(user, dict) else None,
-            session_select_key=_SEL,
-            modal_key=MODAL_KEY,
-            module=MODULE,
-            id_fields=("id", "email"),
-        )
-        if isinstance(user, dict) and user.get("id"):
-            st.session_state[ACTIVE_EMPLOYEE_KEY] = str(user.get("id"))
-    elif st.session_state.get(SELECTED_USER_KEY) == user_id:
-        st.session_state[SELECTED_USER_KEY] = None
-        st.session_state[SHOW_MODAL_KEY] = False
+def _open_user_from_list(user: dict) -> None:
+    uid = str(user.get("id") or "").strip()
+    if not uid:
+        return
+    st.session_state[SELECTED_USER_KEY] = uid
+    st.session_state[SHOW_MODAL_KEY] = True
+    cache = st.session_state.get(CACHE_KEY) or {}
+    cached = cache.get(uid) if isinstance(cache, dict) else None
+    open_record_modal(
+        uid,
+        cached if isinstance(cached, dict) else user,
+        session_select_key=_SEL,
+        modal_key=MODAL_KEY,
+        module=MODULE,
+        id_fields=("id", "email"),
+    )
+    st.session_state[ACTIVE_EMPLOYEE_KEY] = uid
+
+
+def _user_name_cell_html(name: str) -> str:
+    label = name if name and name != "—" else "Open user"
+    label_html = html.escape(label)
+    return (
+        f'<div class="ips-users-name-cell">'
+        f'<span class="ips-users-name-label">{label_html}</span>'
+        f"</div>"
+    )
+
+
+def _user_row_marker_html(user_id: str) -> str:
+    uid_attr = html.escape(user_id, quote=True)
+    return f'<span class="ips-users-table-row" data-row-id="{uid_attr}" aria-hidden="true"></span>'
+
+
+def _render_users_row_click_bridge() -> str | None:
+    try:
+        from app.ui.clean_table import _components_html
+    except ImportError:
+        from ui.clean_table import _components_html  # type: ignore
+
+    st.markdown(
+        '<span class="ips-users-row-click-bridge-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    return _components_html(
+        """
+<script>
+(function () {
+  const w = window.parent || window;
+  const doc = w.document;
+  const hookKey = "ipsUsersRowClick::list";
+  const tblSel = ".st-key-users_table_wrap";
+  const rowSel = '[data-testid="stHorizontalBlock"]:has(.ips-users-table-row)';
+
+  function sendValue(id) {
+    const payload = { type: "streamlit:setComponentValue", value: id };
+    const frames = [window, window.parent, w].filter(function (f, i, arr) {
+      return f && arr.indexOf(f) === i;
+    });
+    for (var i = 0; i < frames.length; i++) {
+      try {
+        if (frames[i].Streamlit && typeof frames[i].Streamlit.setComponentValue === "function") {
+          frames[i].Streamlit.setComponentValue(id);
+          return;
+        }
+      } catch (err) {}
+    }
+    for (var j = 0; j < frames.length; j++) {
+      try { frames[j].postMessage(payload, "*"); } catch (err) {}
+    }
+  }
+
+  function isInteractive(target) {
+    return !!(target && target.closest && target.closest(
+      "button, input, select, textarea, label, a, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox']"
+    ));
+  }
+
+  function tableScope() {
+    const anchor = doc.querySelector(tblSel);
+    if (!anchor) return null;
+    return anchor.closest('[data-testid="stVerticalBlockBorderWrapper"]') || anchor.parentElement;
+  }
+
+  function bindRows() {
+    const scope = tableScope();
+    if (!scope) return;
+    scope.querySelectorAll(rowSel).forEach(function (row) {
+      if (row.dataset.ipsUsersRowBound === "1") return;
+      row.dataset.ipsUsersRowBound = "1";
+      row.addEventListener("click", function (e) {
+        if (isInteractive(e.target)) return;
+        const marker = row.querySelector(".ips-users-table-row[data-row-id]");
+        const id = marker && marker.getAttribute("data-row-id");
+        if (!id) return;
+        e.preventDefault();
+        e.stopPropagation();
+        sendValue(id);
+      });
+    });
+  }
+
+  if (!doc.ipsUsersRowClickRegistry) doc.ipsUsersRowClickRegistry = {};
+  doc.ipsUsersRowClickRegistry[hookKey] = { bind: bindRows };
+  bindRows();
+  if (!doc.ipsUsersRowBindObserver) {
+    doc.ipsUsersRowBindObserver = new MutationObserver(function () {
+      Object.values(doc.ipsUsersRowClickRegistry || {}).forEach(function (cfg) {
+        if (cfg && typeof cfg.bind === "function") cfg.bind();
+      });
+    });
+    doc.ipsUsersRowBindObserver.observe(doc.body, { childList: true, subtree: true });
+  }
+})();
+</script>
+        """,
+        component_key="ips_users_list_row_click",
+        height=1,
+    )
 
 
 def _clear_employee_modal() -> None:
@@ -470,34 +565,22 @@ def _render_custom_users_table(
             cols = st.columns(_USER_COLS, gap="xxsmall", vertical_alignment="center")
 
             with cols[0]:
-                st.markdown(
-                    '<span class="ips-users-checkbox-cell-marker" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                st.checkbox(
-                    "",
-                    key=_user_select_key(uid),
-                    label_visibility="collapsed",
-                    on_change=_on_user_checkbox_change,
-                    args=(uid, all_user_ids),
-                )
+                st.markdown(_user_row_marker_html(uid), unsafe_allow_html=True)
+                st.markdown(_user_name_cell_html(name), unsafe_allow_html=True)
 
             with cols[1]:
-                st.markdown(_users_cell_html(name, "ips-users-name ips-users-ellipsis"), unsafe_allow_html=True)
-
-            with cols[2]:
                 st.markdown(
                     _users_cell_html(email, "ips-users-muted ips-users-cell ips-users-ellipsis"),
                     unsafe_allow_html=True,
                 )
 
-            with cols[3]:
+            with cols[2]:
                 st.markdown(
                     _users_cell_html(phone, "ips-users-cell ips-users-phone ips-users-ellipsis"),
                     unsafe_allow_html=True,
                 )
 
-            with cols[4]:
+            with cols[3]:
                 st.markdown(
                     _users_cell_html(
                         billing_class,
@@ -506,7 +589,7 @@ def _render_custom_users_table(
                     unsafe_allow_html=True,
                 )
 
-            with cols[5]:
+            with cols[4]:
                 st.markdown(
                     _users_cell_html(
                         permission_role,
@@ -515,19 +598,32 @@ def _render_custom_users_table(
                     unsafe_allow_html=True,
                 )
 
-            with cols[6]:
+            with cols[5]:
                 st.markdown(
                     f'<div class="ips-users-pill-col">{_employee_type_pill_html(user)}</div>',
                     unsafe_allow_html=True,
                 )
 
-            with cols[7]:
+            with cols[6]:
                 st.markdown(
                     f'<div class="ips-users-pill-col">{_user_status_pill_html(status)}</div>',
                     unsafe_allow_html=True,
                 )
 
         st.markdown("</div>", unsafe_allow_html=True)
+
+    users_by_id = {
+        str(u.get("id") or "").strip(): u
+        for u in filtered
+        if str(u.get("id") or "").strip()
+    }
+    picked = _render_users_row_click_bridge()
+    if picked:
+        open_id = str(picked).strip()
+        open_user = users_by_id.get(open_id)
+        if open_user:
+            _open_user_from_list(open_user)
+            st.rerun()
 
     return all_user_ids
 

@@ -28,12 +28,12 @@ SELECTED_BORDER = "#2563eb"
 def inject_users_module_css() -> None:
     """Users list custom table styling — call at the top of the users page render."""
     users_grid = (
-        "52px minmax(140px, 1.1fr) minmax(200px, 1.5fr) minmax(120px, 0.9fr) "
-        "minmax(140px, 1fr) minmax(110px, 0.85fr) minmax(100px, 0.75fr)"
+        "minmax(160px, 1.35fr) minmax(200px, 1.5fr) minmax(120px, 0.9fr) "
+        "minmax(140px, 1fr) minmax(110px, 0.85fr) minmax(100px, 0.75fr) minmax(90px, 0.7fr)"
     )
     st.markdown(
         f"""
-<style id="ips-users-module-v18">
+<style id="ips-users-module-v19">
 .ips-users-table-wrap {{
   background: #ffffff;
   border: 1px solid #e5e7eb;
@@ -81,11 +81,34 @@ def inject_users_module_css() -> None:
   white-space: nowrap;
   text-align: left;
 }}
-.ips-users-name {{
-  font-size: 13px;
+.ips-users-name-cell {{
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 46px;
+  padding-left: 24px;
+  padding-right: 24px;
+  box-sizing: border-box;
+  text-align: left;
+  pointer-events: none;
+}}
+.ips-users-name-label {{
+  pointer-events: none;
+  display: block;
+  width: 100%;
+  font-size: 20px;
   font-weight: 700;
-  color: #0f172a;
-  line-height: 1.2;
+  color: #2563eb;
+  line-height: 1.25;
+  text-align: left;
+  word-break: break-word;
+}}
+.ips-users-name {{
+  font-size: 20px;
+  font-weight: 700;
+  color: #2563eb;
+  line-height: 1.25;
   text-align: left;
 }}
 .ips-users-muted {{
@@ -193,9 +216,6 @@ def inject_users_module_css() -> None:
   color: #64748b;
   font-size: 0.75rem;
 }}
-.ips-users-checkbox-cell-marker {{
-  display: none !important;
-}}
 section[data-testid="stMain"]:has(.ips-users-page) [data-testid="stCaptionContainer"] {{
   margin: 4px 0 2px 0 !important;
   padding: 0 !important;
@@ -236,7 +256,8 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
   justify-content: start !important;
   justify-items: stretch !important;
 }}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:not(:first-of-type) {{
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row),
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) {{
   cursor: pointer;
   min-height: 56px;
 }}
@@ -264,17 +285,20 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1),
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) {{
-  flex: 0 0 52px !important;
-  width: 52px !important;
-  min-width: 52px !important;
-  max-width: 52px !important;
-  padding: 0 !important;
-  justify-content: center !important;
-}}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2),
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) {{
-  padding: 0 14px !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
   justify-content: flex-start !important;
+}}
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) [data-testid="stVerticalBlock"],
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) [data-testid="stVerticalBlock"],
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) [data-testid="stElementContainer"],
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) [data-testid="stElementContainer"],
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) [data-testid="stMarkdownContainer"],
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) [data-testid="stMarkdownContainer"] {{
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  width: 100% !important;
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stVerticalBlock"],
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stVerticalBlock"] {{
@@ -287,39 +311,17 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
   margin: 0 !important;
   gap: 0 !important;
 }}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) > [data-testid="stVerticalBlock"],
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) > [data-testid="stVerticalBlock"] {{
-  width: 52px !important;
-  max-width: 52px !important;
-  min-width: 52px !important;
-  justify-content: center !important;
-  align-items: center !important;
-}}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) [data-testid="stElementContainer"],
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) [data-testid="stElementContainer"] {{
-  width: 52px !important;
-  max-width: 52px !important;
-  min-width: 52px !important;
-  padding: 0 !important;
-  margin: 0 !important;
-}}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) [data-testid="stCheckbox"],
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) [data-testid="stCheckbox"] {{
-  width: 52px !important;
-  max-width: 52px !important;
-  min-width: 52px !important;
-  margin: 0 auto !important;
-  padding: 0 !important;
-}}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) [data-testid="stCheckbox"] label,
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) [data-testid="stCheckbox"] label {{
-  min-height: 20px !important;
-  width: 52px !important;
-  max-width: 52px !important;
-  justify-content: center !important;
-  align-items: center !important;
-  padding: 0 !important;
-  margin: 0 !important;
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-users-cell,
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-users-cell,
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-user-pill,
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-user-pill,
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-users-pill-col,
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-users-pill-col,
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-users-name-cell,
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-users-name-cell,
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-users-name-label,
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-users-name-label {{
+  pointer-events: none;
 }}
 .st-key-users_table_wrap [data-testid="stMarkdownContainer"],
 .st-key-users_table_wrap .stMarkdown,
@@ -358,28 +360,11 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
 }}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row):hover,
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row):hover {{
   background: #eef5ff;
 }}
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
-  background: #eaf2ff !important;
-}}
 .st-key-users_table_wrap [data-testid="stElementContainer"] {{
-  margin: 0 !important;
-  padding: 0 !important;
-}}
-.st-key-users_table_wrap [data-testid="stElementContainer"]:has(.ips-users-checkbox-cell-marker) {{
-  margin: 0 !important;
-  padding: 0 !important;
-  width: 52px !important;
-  max-width: 52px !important;
-}}
-.st-key-users_table_wrap [data-testid="stCheckbox"] {{
-  margin: 0 !important;
-  padding: 0 !important;
-}}
-.st-key-users_table_wrap [data-testid="stCheckbox"] label {{
-  min-height: 20px !important;
   margin: 0 !important;
   padding: 0 !important;
 }}
