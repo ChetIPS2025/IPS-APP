@@ -157,6 +157,7 @@ def inject_sidebar_shell() -> None:
     inject_sidebar_nav_override_css()
     if st.session_state.get(IPS_SIDEBAR_SHELL_KEY):
         inject_sidebar_menu_wire()
+        inject_sidebar_nav_align()
         inject_sidebar_layout_state(collapsed)
         if st.session_state.pop(IPS_SIDEBAR_TOGGLE_REQUEST_KEY, False):
             components.html(_toggle_script(collapsed=collapsed, after_nav=True), height=0)
@@ -170,6 +171,7 @@ def inject_sidebar_shell() -> None:
     components.html(_shell_script(nav_json), height=0)
     st.markdown(_shell_css(), unsafe_allow_html=True)
     inject_sidebar_menu_wire()
+    inject_sidebar_nav_align()
     inject_sidebar_layout_state(collapsed)
 
 
@@ -181,11 +183,26 @@ def inject_sidebar_nav_override_css() -> None:
 def _sidebar_nav_override_css() -> str:
     """Final cascade override for sidebar navigation rows (not button chrome)."""
     return """
-<style id="ips-sidebar-nav-override-v1">
+<style id="ips-sidebar-nav-override-v2">
 section[data-testid="stSidebar"] > div,
 section[data-testid="stSidebar"] [data-testid="stSidebarContent"],
 section[data-testid="stSidebar"] .block-container {
   position: relative !important;
+}
+section[data-testid="stSidebar"] .sidebar-section-title {
+  text-align: left !important;
+  padding-left: 20px !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+section[data-testid="stSidebar"]:has(.ips-sidebar-nav-expanded) [class*="st-key-nav_"],
+section[data-testid="stSidebar"]:has(.ips-sidebar-nav-expanded) [class*="st-key-nav_"] [data-testid="stElementContainer"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: block !important;
+  justify-content: flex-start !important;
 }
 section[data-testid="stSidebar"] [class*="st-key-nav_"],
 section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stElementContainer"] {
@@ -225,8 +242,8 @@ section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="base
   font-size: 0.8125rem !important;
   min-height: 2.25rem !important;
   height: auto !important;
-  padding: 0.45rem 0.65rem !important;
-  margin: 0.05rem 0 !important;
+  padding: 10px 14px 10px 22px !important;
+  margin: 0 !important;
   border-radius: 8px !important;
   transition: background 0.12s ease, color 0.12s ease !important;
 }
@@ -238,7 +255,8 @@ section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBa
 section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"] span {
   display: flex !important;
   align-items: center !important;
-  gap: 0.55rem !important;
+  justify-content: flex-start !important;
+  gap: 10px !important;
   width: 100% !important;
   margin: 0 !important;
   text-align: left !important;
@@ -247,6 +265,26 @@ section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBa
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
+}
+section[data-testid="stSidebar"] [class*="st-key-nav_"] .sidebar-nav-icon {
+  width: 20px !important;
+  min-width: 20px !important;
+  max-width: 20px !important;
+  flex: 0 0 20px !important;
+  text-align: center !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+}
+section[data-testid="stSidebar"] [class*="st-key-nav_"] .sidebar-nav-label {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  text-align: left !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  display: block !important;
 }
 section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton > button:hover,
 section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button:hover,
@@ -382,6 +420,65 @@ def inject_sidebar_layout_state(collapsed: bool) -> None:
   setTimeout(apply, 40);
   setTimeout(apply, 180);
 }})();
+</script>
+        """,
+        height=0,
+    )
+
+
+def inject_sidebar_nav_align() -> None:
+    """Split nav button labels into icon + text columns for left-aligned sidebar rows."""
+    components.html(
+        """
+<script>
+(function () {
+  function rootDoc() {
+    try { return window.parent && window.parent.document ? window.parent.document : document; }
+    catch (e) { return document; }
+  }
+  function esc(s) {
+    return String(s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+  function splitNavLabel(text) {
+    var raw = String(text || '').trim();
+    if (!raw) return null;
+    var sep = raw.indexOf('\u2002');
+    if (sep < 0) sep = raw.indexOf('  ');
+    if (sep >= 0) {
+      return { icon: raw.slice(0, sep).trim(), label: raw.slice(sep + 1).trim() };
+    }
+    var m = raw.match(/^(\\S+)\\s+(.+)$/);
+    if (m) return { icon: m[1], label: m[2] };
+    return null;
+  }
+  function align(d) {
+    if (!d || !d.body) return;
+    if (d.body.classList.contains('ips-sidebar-collapsed')) return;
+    if (!d.querySelector('.ips-sidebar-nav-expanded')) return;
+    d.querySelectorAll('section[data-testid="stSidebar"] [class*="st-key-nav_"] button').forEach(function (btn) {
+      var p = btn.querySelector('p');
+      if (!p) return;
+      if (p.querySelector('.sidebar-nav-icon') && p.querySelector('.sidebar-nav-label')) {
+        p.dataset.ipsNavSplit = '1';
+        return;
+      }
+      var parts = splitNavLabel(p.textContent || '');
+      if (!parts || !parts.label) return;
+      p.innerHTML =
+        '<span class="sidebar-nav-icon">' + esc(parts.icon) + '</span>' +
+        '<span class="sidebar-nav-label">' + esc(parts.label) + '</span>';
+      p.dataset.ipsNavSplit = '1';
+    });
+  }
+  function run() { align(rootDoc()); }
+  run();
+  setTimeout(run, 40);
+  setTimeout(run, 180);
+})();
 </script>
         """,
         height=0,

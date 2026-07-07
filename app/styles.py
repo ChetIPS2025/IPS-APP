@@ -11244,6 +11244,27 @@ section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stBaseButt
   flex: 1 1 auto !important;
   display: flex !important;
   justify-content: flex-start !important;
+  text-align: left !important;
+}
+section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton > button p,
+section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button p,
+section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"] p,
+section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"] p {
+  display: flex !important;
+  width: 100% !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+}
+section[data-testid="stSidebar"] [class*="st-key-nav_"] .sidebar-nav-icon,
+section[data-testid="stSidebar"] [class*="st-key-nav_"] .sidebar-nav-label {
+  display: inline-flex !important;
+  width: auto !important;
+  max-width: none !important;
+}
+section[data-testid="stSidebar"] [class*="st-key-nav_"] .sidebar-nav-label {
+  display: block !important;
+  flex: 1 1 auto !important;
+  text-align: left !important;
 }
 </style>
 """,
@@ -13444,15 +13465,33 @@ section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stI
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: {TEXT_MUTED};
-  padding: 0.55rem 0.65rem 0.15rem;
+  text-align: left !important;
+  padding: 0.55rem 0.65rem 0.15rem 20px;
   margin: 0;
-}}
-.sidebar-footer-label {{
-  padding-top: 0.1rem !important;
 }}
 .sidebar-nav-scroll,
 .ips-sidebar-nav-scroll {{
   padding: 0.15rem 0.35rem 0.2rem !important;
+}}
+section[data-testid="stSidebar"]:has(.ips-sidebar-nav-expanded) .sidebar-nav-scroll,
+section[data-testid="stSidebar"]:has(.ips-sidebar-nav-expanded) .ips-sidebar-nav-scroll {{
+  padding: 0.1rem 0.25rem 0.2rem !important;
+}}
+section[data-testid="stSidebar"]:has(.ips-sidebar-nav-expanded) [class*="st-key-nav_"] {{
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}}
+section[data-testid="stSidebar"]:has(.ips-sidebar-nav-expanded) [class*="st-key-nav_"] .stButton,
+section[data-testid="stSidebar"]:has(.ips-sidebar-nav-expanded) [class*="st-key-nav_"] [data-testid="stButton"] {{
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+}}
+.sidebar-footer-label {{
+  padding-top: 0.1rem !important;
 }}
 section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-nav-item) {{
   display: none !important;
@@ -13495,10 +13534,19 @@ section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stBaseButt
   font-weight: 500 !important;
   font-size: 0.8125rem !important;
   min-height: 2.25rem !important;
-  padding: 0.45rem 0.65rem !important;
-  margin: 0.05rem 0 !important;
+  padding: 10px 14px 10px 22px !important;
+  margin: 0 !important;
   border-radius: 8px !important;
   transition: background 0.12s ease, color 0.12s ease !important;
+}}
+section[data-testid="stSidebar"]:has(.ips-sidebar-nav-expanded) [class*="st-key-nav_"] .stButton > button,
+section[data-testid="stSidebar"]:has(.ips-sidebar-nav-expanded) [class*="st-key-nav_"] [data-testid="stButton"] > button,
+section[data-testid="stSidebar"]:has(.ips-sidebar-nav-expanded) [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"],
+section[data-testid="stSidebar"]:has(.ips-sidebar-nav-expanded) [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"] {{
+  padding: 10px 14px 10px 22px !important;
+  margin: 0 !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
 }}
 section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton > button p,
 section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button p,
@@ -13506,12 +13554,32 @@ section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBa
 section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"] p {{
   display: flex !important;
   align-items: center !important;
-  gap: 0.55rem !important;
+  justify-content: flex-start !important;
+  gap: 10px !important;
   width: 100% !important;
   margin: 0 !important;
   text-align: left !important;
   font-weight: inherit !important;
   color: inherit !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}}
+.sidebar-nav-icon {{
+  width: 20px !important;
+  min-width: 20px !important;
+  max-width: 20px !important;
+  flex: 0 0 20px !important;
+  text-align: center !important;
+  line-height: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}}
+.sidebar-nav-label {{
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  text-align: left !important;
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
