@@ -261,6 +261,38 @@ def fetch_rows(
     return [], last_err
 
 
+def fetch_rows_admin(
+    table: str,
+    *,
+    columns: str = "*",
+    limit: int = 500,
+    order_by: str | None = None,
+    alt_tables: tuple[str, ...] = (),
+) -> tuple[list[dict[str, Any]], str | None]:
+    """Service-role read (bypasses RLS). Used when user-scoped roster reads return empty."""
+    db = _db()
+    last_err: str | None = None
+    table_key = str(table or "").strip().lower()
+    order_attempts: list[str | None] = [order_by] if order_by else [None]
+    if order_by:
+        order_attempts.append(None)
+    for name in (table, *alt_tables):
+        for ob in order_attempts:
+            try:
+                rows = db.fetch_table_admin(name, columns=columns, limit=limit, order_by=ob) or []
+                _LAST_FETCH_ERRORS[table_key] = None
+                if ob is None and order_by:
+                    _LOG.info("fetch_rows_admin %s succeeded without order_by=%r", name, order_by)
+                return rows, None
+            except Exception as exc:
+                last_err = str(exc)
+                _LOG.debug("fetch_rows_admin %s order_by=%r failed: %s", name, ob, exc)
+                if ob is None:
+                    break
+    _LAST_FETCH_ERRORS[table_key] = last_err
+    return [], last_err
+
+
 def fetch_list(
     table: str,
     *,

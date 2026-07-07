@@ -307,6 +307,52 @@ def _match_json_for_cache(match: dict[str, Any]) -> str:
     return json.dumps(match or {}, sort_keys=True, default=str)
 
 
+def _auth_session_tokens_from_client(client: Any) -> tuple[str, str] | None:
+    """Return ``(access_token, refresh_token)`` from the Supabase client, if any."""
+    raw: Any = None
+    try:
+        raw = client.auth.get_session()
+    except Exception:
+        return None
+    sess: Any = getattr(raw, "session", raw)
+    if sess is None:
+        return None
+    at = getattr(sess, "access_token", None)
+    rt = getattr(sess, "refresh_token", None)
+    if at is None and isinstance(sess, dict):
+        at = sess.get("access_token")
+        rt = sess.get("refresh_token")
+    at_s = str(at or "").strip()
+    rt_s = str(rt or "").strip()
+    if not at_s or not rt_s:
+        return None
+    return at_s, rt_s
+
+
+def _ensure_supabase_client_session() -> None:
+    """Attach Streamlit session tokens to the shared client when JWT is missing."""
+    if _st_for_cache is None:
+        return
+    try:
+        client = get_client()
+        if _auth_session_tokens_from_client(client):
+            return
+        stored = _st_for_cache.session_state.get("auth_session")
+        if stored is None:
+            return
+        at = getattr(stored, "access_token", None)
+        rt = getattr(stored, "refresh_token", None)
+        if at is None and isinstance(stored, dict):
+            at = stored.get("access_token")
+            rt = stored.get("refresh_token")
+        at_s = str(at or "").strip()
+        rt_s = str(rt or "").strip()
+        if at_s and rt_s:
+            client.auth.set_session(at_s, rt_s)
+    except Exception as exc:
+        _LOG.debug("ensure supabase client session failed: %r", exc)
+
+
 def _fetch_table_query(
     table_name: str,
     columns: str,
@@ -317,6 +363,8 @@ def _fetch_table_query(
 ) -> list[dict[str, Any]]:
     if table_name == "jobs":
         columns, order_by = _normalize_jobs_query(columns=columns, order_by=order_by)
+    if not use_admin:
+        _ensure_supabase_client_session()
     client = get_admin_client() if use_admin else get_client()
     tag = "fetch_table_admin" if use_admin else "fetch_table"
     cols = columns
@@ -353,6 +401,8 @@ def _fetch_by_match_query(
 ) -> list[dict[str, Any]]:
     if table_name == "jobs":
         columns, _ = _normalize_jobs_query(columns=columns, order_by=None)
+    if not use_admin:
+        _ensure_supabase_client_session()
     client = get_admin_client() if use_admin else get_client()
     tag = "fetch_by_match_admin" if use_admin else "fetch_by_match"
     cols = columns

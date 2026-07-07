@@ -15,6 +15,7 @@ try:
         delete_row,
         fetch_list,
         fetch_rows,
+        fetch_rows_admin,
         insert_row,
         insert_row_admin,
         table_column_names,
@@ -27,6 +28,7 @@ except ImportError:
         delete_row,
         fetch_list,
         fetch_rows,
+        fetch_rows_admin,
         insert_row,
         insert_row_admin,
         table_column_names,
@@ -1076,7 +1078,13 @@ def list_assets(*, demo: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], bo
 
 
 def list_employees(*, demo: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], bool]:
-    return fetch_list("employees", order_by="name", normalize=normalize_employee, demo=demo)
+    rows, used = fetch_list("employees", order_by="name", normalize=normalize_employee, demo=demo)
+    if rows or used:
+        return rows, used
+    admin_rows, admin_err = fetch_rows_admin("employees", order_by="name")
+    if admin_rows and not admin_err:
+        return [normalize_employee(r) for r in admin_rows if r], False
+    return rows, used
 
 
 def list_certifications(employee_id: str, *, demo: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], bool]:

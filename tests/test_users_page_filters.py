@@ -84,3 +84,23 @@ def test_fetch_rows_records_last_error(monkeypatch):
     assert len(rows) == 1
     assert calls == ["name", None]
     assert get_last_fetch_error("employees") is None
+
+
+def test_list_employees_falls_back_to_admin_when_user_scoped_empty(monkeypatch):
+    from app.services.phase2_modules_service import list_employees
+
+    monkeypatch.setattr(
+        "app.services.phase2_modules_service.fetch_list",
+        lambda *args, **kwargs: ([], False),
+    )
+    monkeypatch.setattr(
+        "app.services.phase2_modules_service.fetch_rows_admin",
+        lambda *args, **kwargs: (
+            [{"id": "1", "name": "Test User", "email": "t@example.com", "is_active": True}],
+            None,
+        ),
+    )
+    rows, used = list_employees(demo=[])
+    assert len(rows) == 1
+    assert rows[0]["name"] == "Test User"
+    assert used is False
