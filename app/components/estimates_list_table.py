@@ -324,6 +324,7 @@ def handle_estimates_table_action(
     *,
     last_action_key: str,
     pending_approve_key: str = "est_pending_approve_id",
+    open_estimate_fn: Callable[[str, dict[str, Any] | None], None] | None = None,
 ) -> None:
     val = str(raw or "").strip()
     if not val:
@@ -343,6 +344,10 @@ def handle_estimates_table_action(
     eid = val.split(":", 1)[1].strip() if val.startswith("open:") else val
     if not eid or eid not in estimates_by_id:
         return
+    if open_estimate_fn is not None:
+        open_estimate_fn(eid, estimates_by_id.get(eid))
+        st.rerun()
+        return
     try:
         from app.navigation import navigate_to_estimate_detail
     except ImportError:
@@ -358,6 +363,7 @@ def render_estimates_table_bridge(
     hook_key: str,
     last_action_key: str,
     pending_approve_key: str = "est_pending_approve_id",
+    open_estimate_fn: Callable[[str, dict[str, Any] | None], None] | None = None,
 ) -> None:
     try:
         from app.ui.clean_table import _components_html
@@ -430,4 +436,5 @@ def render_estimates_table_bridge(
             estimates_by_id,
             last_action_key=last_action_key,
             pending_approve_key=pending_approve_key,
+            open_estimate_fn=open_estimate_fn,
         )

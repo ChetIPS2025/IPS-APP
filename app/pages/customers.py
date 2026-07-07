@@ -44,6 +44,7 @@ try:
         safe_value,
         set_edit_mode,
         set_view_mode,
+        show_modal_if_pending,
         status_pill_html as modal_status_pill_html,
     )
     from app.components.status import status_pill_html
@@ -105,6 +106,7 @@ except ImportError:
         safe_value,
         set_edit_mode,
         set_view_mode,
+        show_modal_if_pending,
         status_pill_html as modal_status_pill_html,
     )
     from components.status import status_pill_html  # type: ignore
@@ -293,8 +295,8 @@ def _open_customer_from_list(customer: dict) -> None:
 
 
 def _open_customers_table_customer(customer: dict) -> None:
+    """Set selected customer state; the page render opens the dialog once."""
     _open_customer_from_list(customer)
-    _show_customers_detail_modal()
 
 
 def _customer_name_open_label(name: str) -> str:
@@ -2721,5 +2723,5 @@ def render() -> None:
     render_table_pagination_footer(len(filtered), _CUSTOMERS_TABLE_KEY)
 
     selected_customer_id = st.session_state.get(SELECTED_CUSTOMER_KEY)
-    if selected_customer_id and st.session_state.get(SHOW_CUSTOMER_MODAL_KEY):
-        _show_customers_detail_modal()
+    if st.session_state.get(SHOW_CUSTOMER_MODAL_KEY):
+        show_modal_if_pending(_CUSTOMERS_MODAL_KEY, _show_customers_detail_modal)

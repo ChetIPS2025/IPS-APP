@@ -28,6 +28,7 @@ try:
         safe_value,
         set_edit_mode,
         set_view_mode,
+        show_modal_if_pending,
         status_pill_html as modal_status_pill_html,
     )
     from app.components.tabs import render_tabs
@@ -137,6 +138,7 @@ except ImportError:
         safe_value,
         set_edit_mode,
         set_view_mode,
+        show_modal_if_pending,
         status_pill_html as modal_status_pill_html,
     )
     from components.tabs import render_tabs  # type: ignore
@@ -898,6 +900,7 @@ def _render_custom_estimates_table(filtered: list[dict]) -> list[str]:
             hook_key="ipsEstList::action",
             last_action_key=_EST_LIST_LAST_KEY,
             pending_approve_key=_PENDING_APPROVE_KEY,
+            open_estimate_fn=_activate_estimate_detail_modal,
         )
 
     return all_estimate_ids
@@ -2087,6 +2090,5 @@ def render() -> None:
     _render_custom_estimates_table(page_rows)
     render_estimates_pagination_footer(len(filtered), _TABLE_KEY)
 
-    selected_estimate_id = st.session_state.get(SELECTED_ESTIMATE_KEY)
-    if selected_estimate_id and st.session_state.get(SHOW_ESTIMATE_MODAL_KEY):
-        _show_estimates_detail_modal()
+    if st.session_state.get(SHOW_ESTIMATE_MODAL_KEY):
+        show_modal_if_pending(_ESTIMATES_MODAL_KEY, _show_estimates_detail_modal)

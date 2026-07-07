@@ -76,6 +76,7 @@ try:
         paginate_rows,
         reset_table_page,
     )
+    from app.components.record_modal import show_modal_if_pending
     from app.pages._core._data import (
         customer_contact_select_options,
         customer_filter_options,
@@ -181,6 +182,7 @@ except ImportError:
         paginate_rows,
         reset_table_page,
     )
+    from components.record_modal import show_modal_if_pending  # type: ignore
     from pages._core._data import (  # type: ignore
         customer_contact_select_options,
         customer_filter_options,
@@ -966,8 +968,8 @@ def _normalize_job_open_id(raw: object) -> str:
 
 
 def _open_jobs_table_job(job_id: str, job: dict) -> None:
+    """Set selected job state; the page render opens the dialog once."""
     _open_jobs_detail_modal(job_id, job)
-    _show_jobs_detail_modal()
 
 
 def _open_job_detail_task_form(job: dict) -> None:
@@ -1234,23 +1236,26 @@ def _render_custom_jobs_table(
                         set_field_job_id(jid)
                         st.rerun()
                 num_label = job_no if job_no and job_no != "—" else "View job"
-                _render_job_list_link_cell(
-                    job,
+                if st.button(
                     num_label,
                     key=f"job_open_num_{jid}",
-                    extra_class="ips-jobs-number-link job-number-link job-link",
-                )
+                    type="tertiary",
+                    help=f"View job {num_label}",
+                    use_container_width=False,
+                ):
+                    _open_jobs_table_job(jid, job)
 
             with cols[col_map["desc"]]:
                 st.markdown(_jobs_col_marker("desc"), unsafe_allow_html=True)
                 title_label = project if project and project != "—" else "View job"
-                _render_job_list_link_cell(
-                    job,
+                if st.button(
                     title_label,
                     key=f"job_open_title_{jid}",
-                    extra_class="ips-jobs-title-link job-project-link job-link",
-                    truncate=True,
-                )
+                    type="tertiary",
+                    help=f"View job {title_label}",
+                    use_container_width=True,
+                ):
+                    _open_jobs_table_job(jid, job)
 
             with cols[col_map["customer"]]:
                 st.markdown(_jobs_col_marker("customer"), unsafe_allow_html=True)
@@ -3240,6 +3245,5 @@ def _render_jobs_page() -> None:
     )
     render_jobs_pagination_footer(len(filtered), _TABLE_KEY, item_label="job")
 
-    selected_job_id = str(st.session_state.get(SELECTED_JOB_KEY) or "").strip()
-    if selected_job_id and st.session_state.get(SHOW_MODAL_KEY):
-        _show_jobs_detail_modal()
+    if st.session_state.get(SHOW_MODAL_KEY):
+        show_modal_if_pending(_JOBS_MODAL_KEY, _show_jobs_detail_modal)

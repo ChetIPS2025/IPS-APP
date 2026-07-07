@@ -1376,7 +1376,9 @@ def inject_jobs_module_css() -> None:
 .st-key-jobs_table_wrap .job-number-link button,
 .st-key-jobs_table_wrap .ips-jobs-number-link button,
 .st-key-jobs_table_wrap .ips-jobs-title-link button,
-.st-key-jobs_table_wrap .job-project-link button {{
+.st-key-jobs_table_wrap .job-project-link button,
+.st-key-jobs_table_wrap [class*="st-key-job_open_num_"] button,
+.st-key-jobs_table_wrap [class*="st-key-job_open_title_"] button {{
   background: transparent !important;
   background-color: transparent !important;
   color: {PRIMARY} !important;
@@ -1401,7 +1403,8 @@ def inject_jobs_module_css() -> None:
   transition: color 0.15s ease !important;
 }}
 .st-key-jobs_table_wrap .ips-jobs-number-link button,
-.st-key-jobs_table_wrap .job-number-link button {{
+.st-key-jobs_table_wrap .job-number-link button,
+.st-key-jobs_table_wrap [class*="st-key-job_open_num_"] button {{
   white-space: nowrap !important;
   overflow: visible !important;
   text-overflow: clip !important;
@@ -1409,17 +1412,20 @@ def inject_jobs_module_css() -> None:
   max-width: none !important;
 }}
 .st-key-jobs_table_wrap .ips-jobs-number-link [data-testid="stButton"],
-.st-key-jobs_table_wrap .job-number-link [data-testid="stButton"] {{
+.st-key-jobs_table_wrap .job-number-link [data-testid="stButton"],
+.st-key-jobs_table_wrap [class*="st-key-job_open_num_"] [data-testid="stButton"] {{
   width: auto !important;
   max-width: none !important;
 }}
 .st-key-jobs_table_wrap .ips-jobs-number-link button p,
-.st-key-jobs_table_wrap .job-number-link button p {{
+.st-key-jobs_table_wrap .job-number-link button p,
+.st-key-jobs_table_wrap [class*="st-key-job_open_num_"] button p {{
   overflow: visible !important;
   text-overflow: clip !important;
 }}
 .st-key-jobs_table_wrap .ips-jobs-title-link button,
-.st-key-jobs_table_wrap .job-project-link button {{
+.st-key-jobs_table_wrap .job-project-link button,
+.st-key-jobs_table_wrap [class*="st-key-job_open_title_"] button {{
   white-space: nowrap !important;
   line-height: 1.2 !important;
   overflow: hidden !important;
@@ -2724,7 +2730,7 @@ def inject_inventory_module_css() -> None:
     checkbox_css = _list_table_checkbox_column_css("inventory_table_wrap")
     st.markdown(
         f"""
-<style id="ips-inventory-module-v5">
+<style id="ips-inventory-module-v6">
 .ips-inventory-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -2978,6 +2984,77 @@ def inject_inventory_module_css() -> None:
   height: 36px !important;
   object-fit: cover !important;
   border-radius: 6px !important;
+}}
+.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) {{
+  position: relative !important;
+  cursor: pointer !important;
+}}
+.st-key-inventory_table_wrap .ips-inventory-table-row {{
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+}}
+.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) [class*="st-key-inv_open_"] {{
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}}
+.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) [class*="st-key-inv_open_"] [data-testid="stButton"],
+.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) [class*="st-key-inv_open_"] .stButton {{
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+}}
+.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) [class*="st-key-inv_open_"] button,
+.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) [class*="st-key-inv_open_"] [data-testid="stButton"] > button,
+.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) [class*="st-key-inv_open_"] button[data-testid="stBaseButton-tertiary"] {{
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 0 !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: #2563eb !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  overflow: visible !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  text-overflow: clip !important;
+}}
+.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) [class*="st-key-inv_open_"] button:hover,
+.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) [class*="st-key-inv_open_"] [data-testid="stButton"] > button:hover,
+.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) [class*="st-key-inv_open_"] button[data-testid="stBaseButton-tertiary"]:hover {{
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}}
+.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) [class*="st-key-inv_open_"] button > div,
+.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) [class*="st-key-inv_open_"] button p {{
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: left !important;
+  white-space: normal !important;
+  word-break: break-word !important;
 }}
 </style>
 """,
@@ -4069,7 +4146,9 @@ def inject_assets_module_css() -> None:
 .st-key-assets_table_wrap .ips-assets-name-link [data-testid="stButton"],
 .st-key-assets_table_wrap .ips-assets-name-link .stButton,
 .st-key-assets_table_wrap .asset-name-button [data-testid="stButton"],
-.st-key-assets_table_wrap .asset-name-button .stButton {{
+.st-key-assets_table_wrap .asset-name-button .stButton,
+.st-key-assets_table_wrap [class*="st-key-assets_open_"] [data-testid="stButton"],
+.st-key-assets_table_wrap [class*="st-key-assets_open_"] .stButton {{
   width: 100%;
   max-width: 500px;
   min-width: 0;
@@ -4077,7 +4156,8 @@ def inject_assets_module_css() -> None:
 }}
 .st-key-assets_table_wrap .ips-assets-name-link button,
 .st-key-assets_table_wrap .asset-name-link button,
-.st-key-assets_table_wrap .asset-name-button button {{
+.st-key-assets_table_wrap .asset-name-button button,
+.st-key-assets_table_wrap [class*="st-key-assets_open_"] button {{
   background: transparent !important;
   background-color: transparent !important;
   color: {PRIMARY};
@@ -4111,7 +4191,9 @@ def inject_assets_module_css() -> None:
 .st-key-assets_table_wrap .asset-name-link button:hover,
 .st-key-assets_table_wrap .asset-name-link button:focus,
 .st-key-assets_table_wrap .asset-name-button button:hover,
-.st-key-assets_table_wrap .asset-name-button button:focus {{
+.st-key-assets_table_wrap .asset-name-button button:focus,
+.st-key-assets_table_wrap [class*="st-key-assets_open_"] button:hover,
+.st-key-assets_table_wrap [class*="st-key-assets_open_"] button:focus {{
   background: transparent !important;
   background-color: transparent !important;
   color: {PRIMARY_HOVER};

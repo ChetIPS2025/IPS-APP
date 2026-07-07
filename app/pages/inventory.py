@@ -45,6 +45,7 @@ try:
         render_missing_record,
         render_save_cancel_actions,
         set_view_mode,
+        show_modal_if_pending,
         status_pill_html,
     )
     from app.pages._core._data import load_inventory, load_recent_qr_scans, lookup_options
@@ -127,6 +128,7 @@ except ImportError:
         render_missing_record,
         render_save_cancel_actions,
         set_view_mode,
+        show_modal_if_pending,
         status_pill_html,
     )
     from pages._core._data import load_inventory, load_recent_qr_scans, lookup_options  # type: ignore
@@ -464,10 +466,15 @@ def _render_custom_inventory_table(
                 _render_inventory_thumbnail(item)
 
             with cols[2]:
-                st.markdown(
-                    f'<div class="ips-inventory-title">{html.escape(description)}</div>',
-                    unsafe_allow_html=True,
-                )
+                open_label = _inventory_description_open_label(description)
+                if st.button(
+                    open_label,
+                    key=f"inv_open_{iid}",
+                    type="tertiary",
+                    help=f"View {open_label}",
+                    use_container_width=True,
+                ):
+                    _open_inventory_table_item(iid, item)
 
             with cols[3]:
                 st.markdown(
@@ -504,7 +511,8 @@ def _render_custom_inventory_table(
 
             with cols[9]:
                 st.markdown(
-                    f'<div class="ips-inventory-muted ips-inventory-cell">{html.escape(vendor)}</div>',
+                    f'<div class="ips-inventory-muted ips-inventory-cell">{html.escape(vendor)}</div>'
+                    f"{_inventory_row_marker_html(iid)}",
                     unsafe_allow_html=True,
                 )
 
@@ -514,6 +522,18 @@ def _render_custom_inventory_table(
                 st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
+
+    items_by_id = {
+        str(i.get("id") or "").strip(): i
+        for i in filtered
+        if str(i.get("id") or "").strip()
+    }
+    picked = _render_inventory_row_click_bridge()
+    if picked:
+        open_id = str(picked).strip()
+        open_item = items_by_id.get(open_id)
+        if open_item:
+            _open_inventory_table_item(open_id, open_item)
 
     return all_item_ids
 
@@ -567,6 +587,107 @@ def _open_inventory_modal(record_id: str, record: dict | None) -> None:
         session_select_key=_SEL,
         modal_key=_MODAL_KEY,
         module=_MODULE,
+    )
+
+
+def _open_inventory_table_item(item_id: str, item: dict | None = None) -> None:
+    """Set selected inventory state; the page render opens the dialog once."""
+    _open_inventory_modal(item_id, item)
+
+
+def _inventory_description_open_label(description: str) -> str:
+    return description if description and description != "—" else "View item"
+
+
+def _inventory_row_marker_html(item_id: str) -> str:
+    iid_attr = html.escape(item_id, quote=True)
+    return f'<span class="ips-inventory-table-row" data-row-id="{iid_attr}" aria-hidden="true"></span>'
+
+
+def _render_inventory_row_click_bridge() -> str | None:
+    try:
+        from app.ui.clean_table import _components_html
+    except ImportError:
+        from ui.clean_table import _components_html  # type: ignore
+
+    st.markdown(
+        '<span class="ips-inventory-row-click-bridge-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    return _components_html(
+        """
+<script>
+(function () {
+  const w = window.parent || window;
+  const doc = w.document;
+  const hookKey = "ipsInventoryRowClick::list";
+  const tblSel = ".st-key-inventory_table_wrap";
+  const rowSel = '[data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row)';
+
+  function sendValue(id) {
+    const payload = { type: "streamlit:setComponentValue", value: id };
+    const frames = [window, window.parent, w].filter(function (f, i, arr) {
+      return f && arr.indexOf(f) === i;
+    });
+    for (var i = 0; i < frames.length; i++) {
+      try {
+        if (frames[i].Streamlit && typeof frames[i].Streamlit.setComponentValue === "function") {
+          frames[i].Streamlit.setComponentValue(id);
+          return;
+        }
+      } catch (err) {}
+    }
+    for (var j = 0; j < frames.length; j++) {
+      try { frames[j].postMessage(payload, "*"); } catch (err) {}
+    }
+  }
+
+  function isInteractive(target) {
+    return !!(target && target.closest && target.closest(
+      "button, input, select, textarea, label, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox'], [class*='st-key-inv_open_']"
+    ));
+  }
+
+  function tableScope() {
+    const anchor = doc.querySelector(tblSel);
+    if (!anchor) return null;
+    return anchor.closest('[data-testid="stVerticalBlockBorderWrapper"]') || anchor.parentElement;
+  }
+
+  function bindRows() {
+    const scope = tableScope();
+    if (!scope) return;
+    scope.querySelectorAll(rowSel).forEach(function (row) {
+      if (row.dataset.ipsInventoryRowBound === "1") return;
+      row.dataset.ipsInventoryRowBound = "1";
+      row.addEventListener("click", function (e) {
+        if (isInteractive(e.target)) return;
+        const marker = row.querySelector(".ips-inventory-table-row[data-row-id]");
+        const id = marker && marker.getAttribute("data-row-id");
+        if (!id) return;
+        e.preventDefault();
+        e.stopPropagation();
+        sendValue(id);
+      });
+    });
+  }
+
+  if (!doc.ipsInventoryRowClickRegistry) doc.ipsInventoryRowClickRegistry = {};
+  doc.ipsInventoryRowClickRegistry[hookKey] = { bind: bindRows };
+  bindRows();
+  if (!doc.ipsInventoryRowBindObserver) {
+    doc.ipsInventoryRowBindObserver = new MutationObserver(function () {
+      Object.values(doc.ipsInventoryRowClickRegistry || {}).forEach(function (cfg) {
+        if (cfg && typeof cfg.bind === "function") cfg.bind();
+      });
+    });
+    doc.ipsInventoryRowBindObserver.observe(doc.body, { childList: true, subtree: true });
+  }
+})();
+</script>
+        """,
+        component_key="ips_inventory_row_click_bridge",
+        height=0,
     )
 
 
@@ -1201,6 +1322,5 @@ def render() -> None:
             empty_message="No QR scans recorded yet. Scans appear when materials or tools are used via QR.",
         )
 
-    selected_inventory_id = st.session_state.get(SELECTED_INVENTORY_KEY)
-    if selected_inventory_id and st.session_state.get(SHOW_INVENTORY_MODAL_KEY):
-        _show_inventory_detail_modal()
+    if st.session_state.get(SHOW_INVENTORY_MODAL_KEY):
+        show_modal_if_pending(_MODAL_KEY, _show_inventory_detail_modal)

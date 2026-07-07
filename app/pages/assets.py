@@ -61,6 +61,7 @@ try:
         safe_value,
         set_edit_mode,
         set_view_mode,
+        show_modal_if_pending,
     )
     from app.pages._core._data import load_assets, lookup_options, persist_asset
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
@@ -200,6 +201,7 @@ except ImportError:
         safe_value,
         set_edit_mode,
         set_view_mode,
+        show_modal_if_pending,
     )
     from pages._core._data import load_assets, lookup_options, persist_asset  # type: ignore
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
@@ -974,23 +976,19 @@ def _render_custom_assets_table(
             with cols[1]:
                 rentable_badge = _asset_rentable_badge_html(asset)
                 name_label = name if name and name != "—" else "View asset"
-                aria = html.escape(_asset_open_aria_label(asset), quote=True)
-                badges_html = (
-                    f'<div class="ips-assets-name-badges">{rentable_badge}</div>' if rentable_badge else ""
-                )
-                st.markdown(
-                    f'<div class="ips-assets-name-cell-wrap asset-name-cell ips-assets-name-cell-link" '
-                    f'data-row-id="{html.escape(aid, quote=True)}" '
-                    f'title="Open Asset Details" role="button" tabindex="0" '
-                    f'aria-label="{aria}">'
-                    f'<a href="#" class="ips-assets-name-text asset-name-link" '
-                    f'data-row-id="{html.escape(aid, quote=True)}" '
-                    f'title="Open Asset Details" aria-label="{aria}">'
-                    f"{html.escape(name_label)}</a>"
-                    f"{badges_html}"
-                    f"</div>",
-                    unsafe_allow_html=True,
-                )
+                if st.button(
+                    name_label,
+                    key=f"assets_open_{aid}",
+                    type="tertiary",
+                    help=f"View {name_label}",
+                    use_container_width=True,
+                ):
+                    _handle_open_asset(asset)
+                if rentable_badge:
+                    st.markdown(
+                        f'<div class="ips-assets-name-badges">{rentable_badge}</div>',
+                        unsafe_allow_html=True,
+                    )
 
             with cols[2]:
                 st.markdown(
@@ -2528,8 +2526,5 @@ def render() -> None:
     with tab_hand_tools:
         render_hand_tools_tab(rows)
 
-    selected_asset_id = st.session_state.get(SELECTED_ASSET_KEY)
-    if selected_asset_id and st.session_state.get(SHOW_ASSET_MODAL_KEY):
-        _show_assets_detail_modal()
-    elif str(st.session_state.get(_ASSETS_MODAL_KEY) or "").strip():
-        _show_assets_detail_modal()
+    if st.session_state.get(SHOW_ASSET_MODAL_KEY):
+        show_modal_if_pending(_ASSETS_MODAL_KEY, _show_assets_detail_modal)
