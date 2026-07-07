@@ -33,7 +33,7 @@ def inject_users_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-users-module-v20">
+<style id="ips-users-module-v21">
 .ips-users-table-wrap {{
   background: #ffffff;
   border: 1px solid #e5e7eb;
@@ -80,6 +80,16 @@ def inject_users_module_css() -> None:
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: left;
+}}
+.ips-users-name-cell-wrap {{
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 46px;
+  pointer-events: none;
 }}
 .ips-users-name-cell {{
   display: flex;
@@ -369,40 +379,88 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
   min-height: 46px !important;
   width: 100% !important;
 }}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stElementContainer"]:has(.ips-users-name-open-marker) + [data-testid="stElementContainer"] {{
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] {{
   position: absolute !important;
   inset: 0 !important;
-  z-index: 1 !important;
-  width: 100% !important;
-  height: 100% !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  display: flex !important;
-  align-items: stretch !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stElementContainer"]:has(.ips-users-name-open-marker) + [data-testid="stElementContainer"] [data-testid="stButton"],
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stElementContainer"]:has(.ips-users-name-open-marker) + [data-testid="stElementContainer"] .stButton {{
+  z-index: 0 !important;
   width: 100% !important;
   height: 100% !important;
   min-height: 46px !important;
   margin: 0 !important;
   padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  overflow: visible !important;
 }}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stElementContainer"]:has(.ips-users-name-open-marker) + [data-testid="stElementContainer"] [data-testid="stButton"] > button,
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stElementContainer"]:has(.ips-users-name-open-marker) + [data-testid="stElementContainer"] .stButton > button {{
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] [data-testid="stVerticalBlockBorderWrapper"],
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] [data-testid="stVerticalBlockBorderWrapper"] > div {{
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] [data-testid="stButton"],
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] .stButton {{
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 0 !important;
   width: 100% !important;
   height: 100% !important;
   min-height: 46px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] [data-testid="stButton"] > button,
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] .stButton > button,
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] button[data-testid="stBaseButton-tertiary"],
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] button[data-testid="stBaseButton-secondary"] {{
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 46px !important;
+  max-height: none !important;
   margin: 0 !important;
   padding: 0 !important;
   opacity: 0 !important;
-  border: none !important;
   background: transparent !important;
   background-color: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
   box-shadow: none !important;
   color: transparent !important;
   cursor: pointer !important;
+  outline: none !important;
 }}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] [data-testid="stButton"] > button:hover,
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] .stButton > button:hover,
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] [data-testid="stButton"] > button:focus,
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] .stButton > button:focus {{
+  opacity: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: transparent !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] [data-testid="stButton"] > button > div,
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] [data-testid="stButton"] > button p,
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] [data-testid="stButton"] > button span {{
+  opacity: 0 !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stElementContainer"]:has(.ips-users-name-cell-wrap),
 .st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stElementContainer"]:has(.ips-users-name-cell) {{
   position: relative !important;
   z-index: 2 !important;
@@ -413,7 +471,8 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
   margin: 0 !important;
   padding: 0 !important;
 }}
-.st-key-users_table_wrap .stButton > button {{
+.st-key-users_table_wrap [data-testid="stElementContainer"]:not([class*="st-key-users_open_"]) .stButton > button,
+.st-key-users_table_wrap [data-testid="stElementContainer"]:not([class*="st-key-users_open_"]) [data-testid="stButton"] > button {{
   height: 32px !important;
   min-height: 32px !important;
   padding: 0 12px !important;

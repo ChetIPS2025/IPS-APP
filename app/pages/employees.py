@@ -411,10 +411,12 @@ def _on_user_name_click(user: dict) -> None:
 def _user_name_cell_html(name: str) -> str:
     label = name if name and name != "—" else "Open user"
     label_html = html.escape(label)
+    title = html.escape(label, quote=True)
     return (
-        f'<div class="ips-users-name-cell">'
-        f'<span class="ips-users-name-label">{label_html}</span>'
-        f"</div>"
+        f'<div class="ips-users-name-cell-wrap">'
+        f'<div class="ips-users-name-cell" title="{title}">'
+        f'<span class="ips-users-name-label ips-users-name">{label_html}</span>'
+        f"</div></div>"
     )
 
 
@@ -579,14 +581,11 @@ def _render_custom_users_table(
 
             with cols[0]:
                 st.markdown(_user_row_marker_html(uid), unsafe_allow_html=True)
-                st.markdown(
-                    '<span class="ips-users-name-open-marker" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
                 st.button(
-                    " ",
+                    "\u200b",
                     key=f"users_open_{uid}",
                     help=f"Open {name}",
+                    type="tertiary",
                     on_click=_on_user_name_click,
                     args=(user,),
                 )
