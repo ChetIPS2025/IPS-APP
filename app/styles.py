@@ -480,7 +480,7 @@ def inject_customers_module_css() -> None:
     """Customers list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-customers-module-v5">
+<style id="ips-customers-module-v6">
 .ips-customers-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -527,8 +527,6 @@ def inject_customers_module_css() -> None:
   word-break: break-word;
 }}
 .ips-customers-name-cell {{
-  position: relative;
-  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -541,8 +539,6 @@ def inject_customers_module_css() -> None:
   pointer-events: none;
 }}
 .ips-customers-name-label {{
-  position: relative;
-  z-index: 2;
   pointer-events: none;
   display: block;
   width: 100%;
@@ -552,33 +548,6 @@ def inject_customers_module_css() -> None:
   line-height: 1.25;
   text-align: left;
   word-break: break-word;
-}}
-.ips-customers-row-click-target {{
-  position: absolute;
-  z-index: 1;
-  opacity: 0;
-  background: transparent !important;
-  border: none !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  cursor: pointer;
-  box-shadow: none !important;
-}}
-.ips-customers-row-click-full {{
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}}
-.ips-customers-row-click-target:hover,
-.ips-customers-row-click-target:focus {{
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  outline: none;
-}}
-.ips-customers-row-click-target:focus-visible {{
-  outline: 2px solid #2563eb;
-  outline-offset: -2px;
 }}
 .st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) {{
   position: relative !important;
@@ -601,9 +570,9 @@ def inject_customers_module_css() -> None:
   width: 100% !important;
 }}
 .st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) .ips-customers-cell,
-.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) .ips-customer-status-pill {{
-  position: relative;
-  z-index: 2;
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) .ips-customer-status-pill,
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) .ips-customers-name-cell,
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) .ips-customers-name-label {{
   pointer-events: none;
 }}
 .ips-customers-count-cell {{

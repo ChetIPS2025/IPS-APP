@@ -68,7 +68,7 @@ try:
         update_customer_location,
     )
     from app.styles import inject_customers_module_css
-    from app.ui.streamlit_perf import fragment
+    from app.ui.streamlit_perf import fragment, ips_app_rerun
 except ImportError:
     from components.headers import render_page_brand_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
@@ -129,7 +129,7 @@ except ImportError:
         update_customer_location,
     )
     from styles import inject_customers_module_css  # type: ignore
-    from ui.streamlit_perf import fragment  # type: ignore
+    from ui.streamlit_perf import fragment, ips_app_rerun  # type: ignore
 
 _SEL = select_key("customers")
 _LOC_SEL = select_key("customer_locations")
@@ -184,7 +184,6 @@ _CONTACT_TABS = [
 SELECTED_CUSTOMER_KEY = "selected_customer_id"
 SHOW_CUSTOMER_MODAL_KEY = "show_customer_detail_modal"
 _ALL_CUSTOMER_IDS_KEY = "_ips_customers_visible_ids"
-_CUSTOMER_ROW_LAST_KEY = "_ips_customers_list_last_row"
 _CUSTOMER_COLS = [4.85, 1.2, 1.2, 1.4, 1.3]
 _CUSTOMER_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("CUSTOMER", None),
@@ -291,42 +290,36 @@ def _open_customer_from_list(customer: dict) -> None:
     cache = st.session_state.get(_CUSTOMERS_CACHE_KEY) or {}
     cached = cache.get(cid) if isinstance(cache, dict) else None
     _open_customers_detail_modal(cid, cached or customer)
-    st.rerun()
 
 
-def _customer_name_cell_html(customer: dict, name: str) -> str:
-    cid = str(customer.get("id") or "").strip()
+def _customer_name_cell_html(name: str) -> str:
     label = name if name and name != "—" else "Open customer"
-    cid_attr = html.escape(cid, quote=True)
     label_html = html.escape(label)
-    aria_label = html.escape(f"Open details for {label}", quote=True)
     return (
-        f'<span class="ips-customers-table-row" data-row-id="{cid_attr}" aria-hidden="true"></span>'
-        f'<button type="button" class="ips-customers-row-click-target ips-customers-row-click-full" '
-        f'data-customer-id="{cid_attr}" aria-label="{aria_label}"></button>'
         f'<div class="ips-customers-name-cell">'
         f'<span class="ips-customers-name-label">{label_html}</span>'
         f"</div>"
     )
 
 
-def _handle_customer_row_pick(raw: str, customers_by_id: dict[str, dict]) -> None:
-    cid = str(raw or "").strip()
-    if not cid or cid not in customers_by_id:
-        return
-    if cid == str(st.session_state.get(_CUSTOMER_ROW_LAST_KEY) or ""):
-        return
-    st.session_state[_CUSTOMER_ROW_LAST_KEY] = cid
-    _open_customer_from_list(customers_by_id[cid])
+def _customer_row_marker_html(customer_id: str) -> str:
+    cid_attr = html.escape(customer_id, quote=True)
+    return (
+        f'<span class="ips-customers-table-row" data-row-id="{cid_attr}" aria-hidden="true"></span>'
+    )
 
 
-def _render_customers_row_click_bridge(customers_by_id: dict[str, dict]) -> None:
+def _render_customers_row_click_bridge() -> str | None:
     try:
         from app.ui.clean_table import _components_html
     except ImportError:
         from ui.clean_table import _components_html  # type: ignore
 
-    picked = _components_html(
+    st.markdown(
+        '<span class="ips-customers-row-click-bridge-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    return _components_html(
         """
 <script>
 (function () {
@@ -334,7 +327,6 @@ def _render_customers_row_click_bridge(customers_by_id: dict[str, dict]) -> None
   const doc = w.document;
   const hookKey = "ipsCustomersRowClick::list";
   const tblSel = ".st-key-customers_table_wrap";
-  const btnSel = ".ips-customers-row-click-target[data-customer-id]";
   const rowSel = '[data-testid="stHorizontalBlock"]:has(.ips-customers-table-row)';
 
   function sendValue(id) {
@@ -358,7 +350,7 @@ def _render_customers_row_click_bridge(customers_by_id: dict[str, dict]) -> None
   function isInteractive(target) {
     return !!(target && target.closest && target.closest(
       "button, input, select, textarea, label, a, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox']"
-    ) && !target.closest(".ips-customers-row-click-target"));
+    ));
   }
 
   function tableScope() {
@@ -367,20 +359,9 @@ def _render_customers_row_click_bridge(customers_by_id: dict[str, dict]) -> None
     return anchor.closest('[data-testid="stVerticalBlockBorderWrapper"]') || anchor.parentElement;
   }
 
-  function bindTargets() {
+  function bindRows() {
     const scope = tableScope();
     if (!scope) return;
-    scope.querySelectorAll(btnSel).forEach(function (btn) {
-      if (btn.dataset.ipsCustomersBtnBound === "1") return;
-      btn.dataset.ipsCustomersBtnBound = "1";
-      btn.addEventListener("click", function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        const id = btn.getAttribute("data-customer-id");
-        if (!id) return;
-        sendValue(id);
-      });
-    });
     scope.querySelectorAll(rowSel).forEach(function (row) {
       if (row.dataset.ipsCustomersRowBound === "1") return;
       row.dataset.ipsCustomersRowBound = "1";
@@ -397,8 +378,8 @@ def _render_customers_row_click_bridge(customers_by_id: dict[str, dict]) -> None
   }
 
   if (!doc.ipsCustomersRowClickRegistry) doc.ipsCustomersRowClickRegistry = {};
-  doc.ipsCustomersRowClickRegistry[hookKey] = { bind: bindTargets };
-  bindTargets();
+  doc.ipsCustomersRowClickRegistry[hookKey] = { bind: bindRows };
+  bindRows();
   if (!doc.ipsCustomersRowBindObserver) {
     doc.ipsCustomersRowBindObserver = new MutationObserver(function () {
       Object.values(doc.ipsCustomersRowClickRegistry || {}).forEach(function (cfg) {
@@ -411,11 +392,8 @@ def _render_customers_row_click_bridge(customers_by_id: dict[str, dict]) -> None
 </script>
         """,
         component_key="ips_customers_list_row_click",
-        height=0,
+        height=1,
     )
-    action = str(picked or "").strip()
-    if action:
-        _handle_customer_row_pick(action, customers_by_id)
 
 
 @fragment
@@ -477,7 +455,8 @@ def _render_custom_customers_table(
             cols = st.columns(_CUSTOMER_COLS, gap="small", vertical_alignment="center")
 
             with cols[0]:
-                st.markdown(_customer_name_cell_html(customer, name), unsafe_allow_html=True)
+                st.markdown(_customer_row_marker_html(cid), unsafe_allow_html=True)
+                st.markdown(_customer_name_cell_html(name), unsafe_allow_html=True)
 
             with cols[1]:
                 st.markdown(
@@ -507,7 +486,13 @@ def _render_custom_customers_table(
         for c in filtered
         if str(c.get("id") or "").strip()
     }
-    _render_customers_row_click_bridge(customers_by_id)
+    picked = _render_customers_row_click_bridge()
+    if picked:
+        open_id = str(picked).strip()
+        open_customer = customers_by_id.get(open_id)
+        if open_customer:
+            _open_customer_from_list(open_customer)
+            ips_app_rerun()
 
     return all_customer_ids
 
