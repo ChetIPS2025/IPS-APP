@@ -116,14 +116,21 @@ _patch_supabase_publishable_keys()
 
 _JOBS_STALE_COLUMN_DESCRIPTION = "description"
 _JOBS_ORDER_BY_FOR_STALE_DESCRIPTION = "job_name"
-def _jobs_columns_after_missing_column(columns: str, exc: BaseException) -> str | None:
-    """Drop a missing ``jobs.*`` column from an explicit SELECT list (Postgres 42703)."""
+def _columns_after_missing_column(
+    table_name: str, columns: str, exc: BaseException
+) -> str | None:
+    """Drop a missing ``table.*`` column from an explicit SELECT list (Postgres 42703)."""
     import re
 
     msg = str(exc).lower()
     if "does not exist" not in msg and "42703" not in msg:
         return None
-    m = re.search(r"column\s+jobs\.(\w+)\s+does not exist", str(exc), re.I)
+    table_key = str(table_name or "").strip().lower()
+    m = re.search(
+        rf"column\s+{re.escape(table_key)}\.(\w+)\s+does not exist",
+        str(exc),
+        re.I,
+    )
     if not m:
         return None
     bad = m.group(1).lower()
@@ -134,6 +141,10 @@ def _jobs_columns_after_missing_column(columns: str, exc: BaseException) -> str 
     if not kept:
         return "id"
     return ", ".join(kept)
+
+
+def _jobs_columns_after_missing_column(columns: str, exc: BaseException) -> str | None:
+    return _columns_after_missing_column("jobs", columns, exc)
 
 
 def _jobs_match_after_missing_column(match: dict[str, Any], exc: BaseException) -> dict[str, Any] | None:
@@ -387,9 +398,7 @@ def _fetch_table_query(
                 )
             return resp.data or []
         except Exception as exc:
-            if table_name != "jobs":
-                raise RuntimeError(f"{tag}({table_name!r}) failed: {exc!r}") from exc
-            next_cols = _jobs_columns_after_missing_column(cols, exc)
+            next_cols = _columns_after_missing_column(table_name, cols, exc)
             if not next_cols or next_cols == cols:
                 raise RuntimeError(f"{tag}({table_name!r}) failed: {exc!r}") from exc
             cols = next_cols
