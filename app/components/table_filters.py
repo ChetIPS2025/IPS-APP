@@ -47,6 +47,35 @@ def clear_table_filters(
         st.session_state.pop(key, None)
 
 
+def has_active_column_filters(table_key: str, filter_fields: list[str]) -> bool:
+    return any(get_column_filter_values(table_key, field) for field in filter_fields)
+
+
+def sanitize_column_filters(
+    table_key: str,
+    filter_options: dict[str, list[str]],
+    *,
+    filter_fields: list[str] | None = None,
+) -> bool:
+    """Drop stale multiselect values that no longer match live row labels. Returns True if changed."""
+    changed = False
+    fields = filter_fields or list(filter_options.keys())
+    for field in fields:
+        session_key = filter_session_key(table_key, field)
+        selected = get_column_filter_values(table_key, field)
+        if not selected:
+            continue
+        valid = set(filter_options.get(field, []))
+        pruned = [val for val in selected if val in valid]
+        if pruned != selected:
+            changed = True
+            if pruned:
+                st.session_state[session_key] = pruned
+            else:
+                st.session_state.pop(session_key, None)
+    return changed
+
+
 def get_unique_filter_options(
     records: list[dict[str, Any]],
     field: str,

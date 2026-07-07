@@ -833,9 +833,13 @@ def normalize_employee(row: dict[str, Any]) -> dict[str, Any]:
 
     eid = str(row.get("id") or "").strip()
     active = row.get("is_active", row.get("status") == "Active")
-    status = "Active" if active in (True, "true", "Active", 1) else "Inactive"
-    if str(row.get("status") or "") in {"Active", "Inactive"}:
-        status = str(row.get("status"))
+    raw_status = str(row.get("status") or "").strip()
+    if raw_status in {"Active", "Inactive", "Deleted", "Pending", "Locked"}:
+        status = raw_status
+    elif row.get("deleted_at"):
+        status = "Deleted"
+    else:
+        status = "Active" if active in (True, "true", "Active", 1) else "Inactive"
     is_employee_raw = row.get("is_employee")
     is_employee = bool(is_employee_raw) if is_employee_raw is not None else True
     phone = ""

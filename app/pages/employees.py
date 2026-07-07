@@ -19,7 +19,10 @@ try:
     from app.components.table_filters import (
         apply_column_filters,
         build_filter_options,
+        clear_table_filters,
+        has_active_column_filters,
         render_table_header_cell,
+        sanitize_column_filters,
     )
     from app.components.record_modal import (
         build_modal_cache,
@@ -46,6 +49,7 @@ try:
     from app.components.status import status_pill_html as legacy_status_pill_html
     from app.pages._core._data import (
         ACTIVE_EMPLOYEE_KEY,
+        clear_employees_catalog_cache,
         load_certifications,
         load_employee_documents,
         load_employees,
@@ -62,7 +66,7 @@ try:
         options_with_current,
         permission_role_options,
     )
-    from app.services.repository import clear_data_cache_for_table
+    from app.services.repository import clear_data_cache_for_table, get_last_fetch_error
     from app.services.users_service import (
         admin_reset_employee_password,
         can_edit_employee_profile,
@@ -85,7 +89,10 @@ except ImportError:
     from components.table_filters import (  # type: ignore
         apply_column_filters,
         build_filter_options,
+        clear_table_filters,
+        has_active_column_filters,
         render_table_header_cell,
+        sanitize_column_filters,
     )
     from components.record_modal import (  # type: ignore
         build_modal_cache,
@@ -112,6 +119,7 @@ except ImportError:
     from components.status import status_pill_html as legacy_status_pill_html  # type: ignore
     from pages._core._data import (  # type: ignore
         ACTIVE_EMPLOYEE_KEY,
+        clear_employees_catalog_cache,
         load_certifications,
         load_employee_documents,
         load_employees,
@@ -128,7 +136,7 @@ except ImportError:
         options_with_current,
         permission_role_options,
     )
-    from services.repository import clear_data_cache_for_table  # type: ignore
+    from services.repository import clear_data_cache_for_table, get_last_fetch_error  # type: ignore
     from services.users_service import (  # type: ignore
         admin_reset_employee_password,
         can_edit_employee_profile,
@@ -143,6 +151,8 @@ except ImportError:
 
 _SEL = select_key("employees")
 _TABLE_KEY = "employees_list"
+_SEARCH_KEY = "employees_list_search"
+_FILTER_FIELDS = ["billing_class", "permission_role", "employee_type", "status"]
 MODULE = "employees"
 MODAL_KEY = "ips_employees_detail_modal_id"
 CACHE_KEY = "_ips_employees_modal_by_id"
@@ -306,8 +316,50 @@ def _user_status_pill_html(status: str) -> str:
     return f'<span class="ips-user-pill {cls}">{html.escape(status)}</span>'
 
 
-def _filter_employees(rows: list[dict]) -> list[dict]:
-    return apply_column_filters(rows, _TABLE_KEY, _USER_COLUMN_FILTER_SPECS)
+def _filter_employees(rows: list[dict], *, search: str = "") -> list[dict]:
+    out = list(rows)
+    q = str(search or "").strip().casefold()
+    if q:
+        filtered: list[dict] = []
+        for row in out:
+            haystack = " ".join(
+                [
+                    _user_display_name(row),
+                    _user_display_email(row),
+                    _user_display_phone(row),
+                    _user_display_billing_class(row),
+                    _user_display_permission_role(row),
+                    _employee_type_label(row),
+                    _normalize_user_status(row.get("status")),
+                ]
+            ).casefold()
+            if q in haystack:
+                filtered.append(row)
+        out = filtered
+    return apply_column_filters(out, _TABLE_KEY, _USER_COLUMN_FILTER_SPECS)
+
+
+def _users_load_error() -> str | None:
+    err = get_last_fetch_error("employees")
+    if not err:
+        return None
+    text = str(err).strip()
+    return text or None
+
+
+def _render_users_empty_state(*, total_count: int, filtered_count: int, search: str) -> None:
+    if total_count == 0:
+        err = _users_load_error()
+        if err:
+            st.error(f"Could not load users from the database: {err}")
+        else:
+            st.info("No users found.")
+        return
+    if filtered_count == 0:
+        if search.strip() or has_active_column_filters(_TABLE_KEY, _FILTER_FIELDS):
+            st.info("No users match your filters.")
+        else:
+            st.info("No users found.")
 
 
 def _user_select_key(user_id: str) -> str:
@@ -366,9 +418,15 @@ def _render_custom_users_table(
     filtered: list[dict],
     *,
     filter_options: dict[str, list[str]],
+    total_count: int,
+    search: str,
 ) -> list[str]:
     if not filtered:
-        st.info("No users match your filters.")
+        _render_users_empty_state(
+            total_count=total_count,
+            filtered_count=0,
+            search=search,
+        )
         st.session_state[_ALL_USER_IDS_KEY] = []
         return []
 
@@ -1176,8 +1234,14 @@ def render() -> None:
             from services.employee_seed_service import ensure_core_employee_seed  # type: ignore
         ensure_core_employee_seed()
         st.session_state["_ips_core_employees_seeded"] = True
+        clear_employees_catalog_cache()
     all_emp = load_employees()
+    if not all_emp and not _users_load_error():
+        clear_employees_catalog_cache()
+        all_emp = load_employees()
     filter_options = build_filter_options(all_emp, _USER_COLUMN_FILTER_SPECS)
+    if sanitize_column_filters(_TABLE_KEY, filter_options, filter_fields=_FILTER_FIELDS):
+        st.rerun()
 
     def _users_export() -> None:
         st.button("Export", key="users_export", use_container_width=True)
@@ -1191,6 +1255,27 @@ def render() -> None:
         "Manage system users, roles, and permissions.",
         actions=[_users_export, _users_new],
     )
+
+    try:
+        from app.components.layout import render_filter_bar
+    except ImportError:
+        from components.layout import render_filter_bar  # type: ignore
+
+    def _users_filters() -> None:
+        c1, c2 = st.columns([5, 0.9])
+        with c1:
+            st.text_input(
+                "Search users",
+                placeholder="Search name, email, role, or status…",
+                key=_SEARCH_KEY,
+                label_visibility="collapsed",
+            )
+        with c2:
+            if st.button("Clear Filters", key="users_clear_filters", use_container_width=True):
+                clear_table_filters(_TABLE_KEY, _FILTER_FIELDS, extra_keys=[_SEARCH_KEY])
+                st.rerun()
+
+    render_filter_bar(_users_filters)
 
     if st.session_state.get("ips_emp_form"):
         with st.expander("New User", expanded=True):
@@ -1279,7 +1364,8 @@ def render() -> None:
                     st.session_state["users_action_flash"] = (flash_kind, flash_msg)
                     st.rerun()
 
-    filtered = _filter_employees(all_emp)
+    search_q = str(st.session_state.get(_SEARCH_KEY) or "").strip()
+    filtered = _filter_employees(all_emp, search=search_q)
 
     st.caption(f"{len(filtered)} user(s)")
 
@@ -1292,7 +1378,12 @@ def render() -> None:
                 st.session_state[CACHE_KEY] = modal_cache
                 break
 
-    _render_custom_users_table(filtered, filter_options=filter_options)
+    _render_custom_users_table(
+        filtered,
+        filter_options=filter_options,
+        total_count=len(all_emp),
+        search=search_q,
+    )
 
     if selected_user_id and st.session_state.get(SHOW_MODAL_KEY):
         _show_employee_modal()

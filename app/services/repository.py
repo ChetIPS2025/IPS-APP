@@ -10,6 +10,12 @@ from typing import Any, Callable
 _LOG = logging.getLogger(__name__)
 
 _PGRST204_COLUMN_RE = re.compile(r"Could not find the '([^']+)' column", re.I)
+_LAST_FETCH_ERRORS: dict[str, str | None] = {}
+
+
+def get_last_fetch_error(table: str) -> str | None:
+    """Most recent fetch_rows/fetch_list error for a table (None when last read succeeded)."""
+    return _LAST_FETCH_ERRORS.get(str(table or "").strip().lower())
 
 # Fallback when the table has no rows yet — prevents sending columns that do not exist
 # (e.g. cost_total on estimate_line_items, which uses total_cost instead).
@@ -234,13 +240,24 @@ def fetch_rows(
     """Try primary table then alternates; return (rows, error_message)."""
     db = _db()
     last_err: str | None = None
+    table_key = str(table or "").strip().lower()
+    order_attempts: list[str | None] = [order_by] if order_by else [None]
+    if order_by:
+        order_attempts.append(None)
     for name in (table, *alt_tables):
-        try:
-            rows = db.fetch_table(name, columns=columns, limit=limit, order_by=order_by) or []
-            return rows, None
-        except Exception as exc:
-            last_err = str(exc)
-            _LOG.debug("fetch_rows %s failed: %s", name, exc)
+        for ob in order_attempts:
+            try:
+                rows = db.fetch_table(name, columns=columns, limit=limit, order_by=ob) or []
+                _LAST_FETCH_ERRORS[table_key] = None
+                if ob is None and order_by:
+                    _LOG.info("fetch_rows %s succeeded without order_by=%r", name, order_by)
+                return rows, None
+            except Exception as exc:
+                last_err = str(exc)
+                _LOG.debug("fetch_rows %s order_by=%r failed: %s", name, ob, exc)
+                if ob is None:
+                    break
+    _LAST_FETCH_ERRORS[table_key] = last_err
     return [], last_err
 
 
@@ -260,6 +277,7 @@ def fetch_list(
     An empty successful response returns [] with used_demo=False — never overrides live data.
     """
     rows, err = fetch_rows(table, limit=limit, order_by=order_by, alt_tables=alt_tables)
+    _LAST_FETCH_ERRORS[str(table or "").strip().lower()] = err
     if err:
         _LOG.info("Using demo fallback for %s (%s)", table, err)
         if normalize and demo:
