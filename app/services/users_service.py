@@ -220,8 +220,10 @@ def resolve_employee_auth_login(
 def get_user_delete_context(user_id: str) -> dict[str, Any]:
     """Summary fields for delete confirmation UI."""
     employee = _employee_row(user_id) or {}
-    profile = _find_profile_for_employee(user_id, email=str(employee.get("email") or ""))
-    login = resolve_employee_auth_login(user_id)
+    profile = _find_profile_for_employee(user_id, email=str(employee.get("email") or "")) or {}
+    login = resolve_employee_auth_login(user_id, employee=employee or None)
+    if not isinstance(login, dict):
+        login = {}
     email = login.get("email") or str(employee.get("email") or profile.get("email") or "")
     return {
         "user_id": user_id,
@@ -317,7 +319,9 @@ def admin_reset_employee_password(
         return ServiceResult(ok=False, error="Employee id is required.")
 
     emp = employee if employee is not None else (_employee_row(eid) or {})
-    login = resolve_employee_auth_login(eid)
+    login = resolve_employee_auth_login(eid, employee=emp or None)
+    if not isinstance(login, dict):
+        login = {}
     email = str(login.get("email") or emp.get("email") or "").strip().lower()
     if not email or "@" not in email:
         return ServiceResult(ok=False, error="Add a valid work email before resetting the password.")
@@ -583,7 +587,10 @@ def hard_delete_user(
     auth_deleted = False
     auth_warning: str | None = None
 
-    resolved_auth_id = str(resolve_employee_auth_login(uid).get("auth_user_id") or "").strip()
+    resolved_login = resolve_employee_auth_login(uid, employee=employee or None)
+    if not isinstance(resolved_login, dict):
+        resolved_login = {}
+    resolved_auth_id = str(resolved_login.get("auth_user_id") or "").strip()
     if resolved_auth_id:
         profile_id = resolved_auth_id
         try:

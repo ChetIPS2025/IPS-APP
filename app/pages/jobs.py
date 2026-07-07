@@ -12,6 +12,7 @@ try:
     from app.components.job_actions import render_job_lifecycle_confirmations
     from app.components.job_detail_header_menu import render_job_detail_header_menu
     from app.components.job_detail_layout import (
+        build_job_detail_tab_labels,
         can_view_job_financial_tab,
         gather_job_detail_stats,
         inject_job_detail_layout_css,
@@ -116,6 +117,7 @@ except ImportError:
     from components.job_actions import render_job_lifecycle_confirmations  # type: ignore
     from components.job_detail_header_menu import render_job_detail_header_menu  # type: ignore
     from components.job_detail_layout import (  # type: ignore
+        build_job_detail_tab_labels,
         can_view_job_financial_tab,
         gather_job_detail_stats,
         inject_job_detail_layout_css,

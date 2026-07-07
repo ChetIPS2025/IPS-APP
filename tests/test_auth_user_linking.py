@@ -365,3 +365,26 @@ def test_resolve_employee_auth_login_handles_missing_profile(monkeypatch):
     assert login["email"] == "dylan@example.com"
     assert login["profile_exists"] is False
     assert login["has_login"] is False
+
+
+def test_get_user_delete_context_handles_missing_login(monkeypatch):
+    from app.services.users_service import get_user_delete_context
+
+    monkeypatch.setattr(
+        "app.services.users_service._employee_row",
+        lambda eid: {"id": eid, "name": "Amanda", "email": "amanda@example.com", "role": "Employee"},
+    )
+    monkeypatch.setattr(
+        "app.services.users_service._find_profile_for_employee",
+        lambda eid, email="": None,
+    )
+    monkeypatch.setattr(
+        "app.services.users_service.resolve_employee_auth_login",
+        lambda eid, employee=None: None,
+    )
+    monkeypatch.setattr("app.services.users_service._count_time_entries", lambda eid: 0)
+
+    ctx = get_user_delete_context("emp-amanda")
+    assert ctx["name"] == "Amanda"
+    assert ctx["email"] == "amanda@example.com"
+    assert ctx["has_login"] is False
