@@ -343,3 +343,25 @@ def test_resolve_employee_auth_login_marks_unlinked(monkeypatch):
     assert login["auth_unlinked"] is True
     assert login["has_login"] is False
     assert login["auth_user_id"] == "auth-77"
+
+
+def test_resolve_employee_auth_login_handles_missing_profile(monkeypatch):
+    from app.services.users_service import resolve_employee_auth_login
+
+    monkeypatch.setattr(
+        "app.services.users_service._employee_row",
+        lambda eid: None,
+    )
+    monkeypatch.setattr(
+        "app.services.users_service._find_profile_for_employee",
+        lambda eid, email="": None,
+    )
+    monkeypatch.setattr("app.services.users_service.resolve_auth_user_id", lambda **k: "")
+
+    login = resolve_employee_auth_login(
+        "emp-1",
+        employee={"id": "emp-1", "email": "dylan@example.com"},
+    )
+    assert login["email"] == "dylan@example.com"
+    assert login["profile_exists"] is False
+    assert login["has_login"] is False

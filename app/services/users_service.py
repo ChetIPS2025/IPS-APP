@@ -159,7 +159,11 @@ class DeleteUserCheck:
     time_entry_count: int = 0
 
 
-def resolve_employee_auth_login(employee_id: str) -> dict[str, Any]:
+def resolve_employee_auth_login(
+    employee_id: str,
+    *,
+    employee: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """
     Resolve the Supabase Auth login for a workforce user.
 
@@ -167,11 +171,22 @@ def resolve_employee_auth_login(employee_id: str) -> dict[str, Any]:
     ``employee_id`` for app data; ``auth_user_id`` for login/password/invite only.
     """
     eid = str(employee_id or "").strip()
-    employee = _employee_row(eid) or {}
-    profile = _find_profile_for_employee(eid, email=str(employee.get("email") or ""))
-    email = str(employee.get("email") or profile.get("email") or "").strip().lower()
-    profile_id = str(profile.get("id") or "") if profile else ""
-    stored_auth_id = str(employee.get("auth_user_id") or "").strip()
+    employee_row = _employee_row(eid) or {}
+    if not employee_row and isinstance(employee, dict):
+        employee_row = dict(employee)
+    profile = _find_profile_for_employee(
+        eid,
+        email=str(employee_row.get("email") or employee_row.get("work_email") or ""),
+    )
+    profile_row = profile or {}
+    email = str(
+        employee_row.get("email")
+        or employee_row.get("work_email")
+        or profile_row.get("email")
+        or ""
+    ).strip().lower()
+    profile_id = str(profile_row.get("id") or "")
+    stored_auth_id = str(employee_row.get("auth_user_id") or "").strip()
     auth_user_id = resolve_auth_user_id(
         email=email,
         auth_user_id=stored_auth_id,

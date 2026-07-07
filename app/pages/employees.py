@@ -943,7 +943,7 @@ def _send_employee_invite(emp: dict) -> str:
     if not _email_domain_allowed(email):
         raise RuntimeError("Email domain is not allowed for app login.")
 
-    login = resolve_employee_auth_login(eid)
+    login = resolve_employee_auth_login(eid, employee=emp)
     if login.get("has_login"):
         raise RuntimeError("This user already has a login. Use Resend invite instead.")
 
@@ -1003,7 +1003,7 @@ def _render_user_login_panel(emp: dict, rk: str) -> None:
     if not eid or is_demo_id(eid):
         return
 
-    login = resolve_employee_auth_login(eid)
+    login = resolve_employee_auth_login(eid, employee=emp)
     email = _employee_invite_email(emp)
     has_login = bool(login.get("has_login"))
 
