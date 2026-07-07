@@ -395,6 +395,19 @@ def _open_user_from_list(user: dict) -> None:
     st.session_state[ACTIVE_EMPLOYEE_KEY] = uid
 
 
+def _ips_app_rerun() -> None:
+    try:
+        from app.ui.streamlit_perf import ips_app_rerun
+    except ImportError:
+        from ui.streamlit_perf import ips_app_rerun  # type: ignore
+    ips_app_rerun()
+
+
+def _on_user_name_click(user: dict) -> None:
+    _open_user_from_list(user)
+    _ips_app_rerun()
+
+
 def _user_name_cell_html(name: str) -> str:
     label = name if name and name != "—" else "Open user"
     label_html = html.escape(label)
@@ -566,6 +579,17 @@ def _render_custom_users_table(
 
             with cols[0]:
                 st.markdown(_user_row_marker_html(uid), unsafe_allow_html=True)
+                st.markdown(
+                    '<span class="ips-users-name-open-marker" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+                st.button(
+                    " ",
+                    key=f"users_open_{uid}",
+                    help=f"Open {name}",
+                    on_click=_on_user_name_click,
+                    args=(user,),
+                )
                 st.markdown(_user_name_cell_html(name), unsafe_allow_html=True)
 
             with cols[1]:
@@ -623,7 +647,7 @@ def _render_custom_users_table(
         open_user = users_by_id.get(open_id)
         if open_user:
             _open_user_from_list(open_user)
-            st.rerun()
+            _ips_app_rerun()
 
     return all_user_ids
 

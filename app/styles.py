@@ -33,7 +33,7 @@ def inject_users_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-users-module-v19">
+<style id="ips-users-module-v20">
 .ips-users-table-wrap {{
   background: #ffffff;
   border: 1px solid #e5e7eb;
@@ -363,6 +363,51 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row):hover,
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row):hover {{
   background: #eef5ff;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child > [data-testid="stVerticalBlock"] {{
+  position: relative !important;
+  min-height: 46px !important;
+  width: 100% !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stElementContainer"]:has(.ips-users-name-open-marker) + [data-testid="stElementContainer"] {{
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 1 !important;
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: stretch !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stElementContainer"]:has(.ips-users-name-open-marker) + [data-testid="stElementContainer"] [data-testid="stButton"],
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stElementContainer"]:has(.ips-users-name-open-marker) + [data-testid="stElementContainer"] .stButton {{
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 46px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stElementContainer"]:has(.ips-users-name-open-marker) + [data-testid="stElementContainer"] [data-testid="stButton"] > button,
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stElementContainer"]:has(.ips-users-name-open-marker) + [data-testid="stElementContainer"] .stButton > button {{
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 46px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  opacity: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  cursor: pointer !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stElementContainer"]:has(.ips-users-name-cell) {{
+  position: relative !important;
+  z-index: 2 !important;
+  pointer-events: none !important;
+  width: 100% !important;
 }}
 .st-key-users_table_wrap [data-testid="stElementContainer"] {{
   margin: 0 !important;
