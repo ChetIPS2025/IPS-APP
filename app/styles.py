@@ -29,11 +29,12 @@ def inject_users_module_css() -> None:
     """Users list custom table styling — call at the top of the users page render."""
     st.markdown(
         f"""
-<style id="ips-users-module-v27">
+<style id="ips-users-module-v28">
+.users-table-container,
 .ips-users-table-wrap {{
   background: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
   margin-bottom: 0.35rem;
   margin-top: 0 !important;
@@ -46,6 +47,16 @@ section[data-testid="stMain"]:has(.ips-users-page) [data-testid="stCaptionContai
 }}
 section[data-testid="stMain"]:has(.ips-users-page) .st-key-users_table_wrap {{
   margin-top: 0 !important;
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+}}
+section[data-testid="stMain"]:has(.ips-users-page) .st-key-users_table_wrap [data-testid="stVerticalBlockBorderWrapper"],
+section[data-testid="stMain"]:has(.ips-users-page) .st-key-users_table_wrap [data-testid="stVerticalBlock"] {{
+  background: #ffffff !important;
+  border: none !important;
+  box-shadow: none !important;
 }}
 section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
   margin-top: 0 !important;
@@ -55,6 +66,7 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
   max-width: 100%;
   width: 100%;
   margin-top: 0 !important;
+  background: #ffffff !important;
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] {{
   gap: 0 !important;
@@ -79,7 +91,7 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
 }}
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type,
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:first-of-type {{
-  background: #f8fafc !important;
+  background: #ffffff !important;
   min-height: 40px !important;
   padding: 8px 12px !important;
 }}

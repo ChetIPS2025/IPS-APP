@@ -575,7 +575,7 @@ def _render_custom_users_table(
     st.session_state[_ALL_USER_IDS_KEY] = all_user_ids
 
     with st.container(key="users_table_wrap"):
-        st.markdown('<div class="ips-users-table-wrap">', unsafe_allow_html=True)
+        st.markdown('<div class="users-table-container ips-users-table-wrap">', unsafe_allow_html=True)
 
         header_cols = st.columns(_USER_COLS, gap="xxsmall", vertical_alignment="center")
         for col, (label, field) in zip(header_cols, _USER_HEADER_SPECS):
