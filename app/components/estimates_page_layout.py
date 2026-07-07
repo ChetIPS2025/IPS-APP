@@ -49,7 +49,7 @@ def estimate_col_marker(name: str) -> str:
 def inject_estimates_page_layout_css() -> None:
     st.markdown(
         """
-<style id="ips-estimates-page-layout-v5">
+<style id="ips-estimates-page-layout-v6">
 section[data-testid="stMain"]:has(.ips-estimates-page) {
   background: #ffffff !important;
 }
@@ -200,6 +200,202 @@ section[data-testid="stMain"]:has(.ips-estimates-page) .ips-estimates-filter-bar
 }
 .ips-estimates-summary-chip.ips-estimates-chip-money strong {
   color: #15803d;
+}
+.ips-estimates-view-nav {
+  margin: 0 0 0.4rem 0;
+  padding: 0.2rem 0;
+}
+.ips-estimates-view-nav [data-testid="stRadio"],
+.ips-estimates-view-nav [data-testid="stSegmentedControl"] {
+  margin: 0 !important;
+}
+.ips-estimates-view-nav [data-testid="stRadio"] > div {
+  gap: 0.35rem !important;
+  flex-wrap: wrap !important;
+}
+.ips-estimates-view-nav [data-testid="stRadio"] label,
+.ips-estimates-view-nav [data-testid="stSegmentedControl"] label {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 999px !important;
+  padding: 0.35rem 0.85rem !important;
+  font-size: 0.8125rem !important;
+  font-weight: 700 !important;
+  color: #475569 !important;
+}
+.st-key-estimates_table_wrap {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  margin-top: 0.25rem !important;
+}
+.st-key-estimates_table_wrap [data-testid="stMarkdownContainer"],
+.st-key-estimates_table_wrap [data-testid="stMarkdownContainer"] p {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+.st-key-estimates_table_wrap .ips-dash-est-table-scroll {
+  width: 100% !important;
+  overflow-x: auto !important;
+  margin-top: 0 !important;
+}
+.st-key-estimates_table_wrap .ips-dash-est-html-table {
+  width: 100% !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  table-layout: fixed !important;
+  background: #ffffff !important;
+}
+.st-key-estimates_table_wrap .ips-dash-est-html-table tr {
+  display: table-row !important;
+  height: 46px !important;
+}
+.st-key-estimates_table_wrap .ips-dash-est-html-table thead tr {
+  height: 44px !important;
+}
+.st-key-estimates_table_wrap .ips-dash-est-html-table th,
+.st-key-estimates_table_wrap .ips-dash-est-html-table td {
+  display: table-cell !important;
+  vertical-align: middle !important;
+  padding: 0 10px !important;
+  border-bottom: 1px solid #e8edf4 !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  background: #ffffff !important;
+}
+.st-key-estimates_table_wrap .ips-dash-est-html-table thead th {
+  background: #eef2f7 !important;
+  color: #64748b !important;
+  font-size: 0.68rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+  white-space: nowrap !important;
+}
+.st-key-estimates_table_wrap .ips-dash-est-html-table tbody tr:hover td {
+  background: #f8fbff !important;
+}
+.st-key-estimates_table_wrap .ips-dash-est-html-table .cell-wrapper {
+  display: flex !important;
+  align-items: center !important;
+  min-height: 46px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+.st-key-estimates_table_wrap .ips-dash-est-cell-right {
+  justify-content: flex-end !important;
+  text-align: right !important;
+}
+.st-key-estimates_table_wrap .ips-dash-est-cell-center {
+  justify-content: center !important;
+  text-align: center !important;
+}
+.st-key-estimates_table_wrap .ips-dash-est-link {
+  color: #2563eb !important;
+  font-weight: 800 !important;
+  font-size: 0.8125rem !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+}
+.st-key-estimates_table_wrap .ips-dash-est-desc-link {
+  display: inline-block !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+.st-key-estimates_table_wrap .ips-dash-est-link:hover,
+.st-key-estimates_table_wrap .ips-dash-est-link:focus {
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
+}
+.st-key-estimates_table_wrap .ips-dash-est-customer-cell,
+.st-key-estimates_table_wrap .ips-dash-est-date-cell {
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  color: #0f172a !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+.st-key-estimates_table_wrap .ips-dash-est-total-cell {
+  font-size: 0.8125rem !important;
+  font-weight: 800 !important;
+  color: #2563eb !important;
+  font-variant-numeric: tabular-nums !important;
+}
+.st-key-estimates_table_wrap .ips-estimate-status-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 22px !important;
+  min-height: 22px !important;
+  max-height: 22px !important;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+}
+.st-key-estimates_table_wrap .ips-estimate-status-draft {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+}
+.st-key-estimates_table_wrap .ips-estimate-status-pending {
+  background: #fef3c7 !important;
+  color: #92400e !important;
+}
+.st-key-estimates_table_wrap .ips-estimate-status-sent {
+  background: #dbeafe !important;
+  color: #1d4ed8 !important;
+}
+.st-key-estimates_table_wrap .ips-dash-est-actions {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 6px !important;
+  flex-wrap: nowrap !important;
+}
+.st-key-estimates_table_wrap .ips-dash-est-action {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 30px !important;
+  min-width: 58px !important;
+  padding: 0 10px !important;
+  border-radius: 8px !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  box-sizing: border-box !important;
+}
+.st-key-estimates_table_wrap .ips-dash-est-approve {
+  background: #ffffff !important;
+  color: #2563eb !important;
+  border: 1px solid #bfdbfe !important;
+}
+.st-key-estimates_table_wrap .ips-dash-est-approve:hover,
+.st-key-estimates_table_wrap .ips-dash-est-approve:focus {
+  background: #eff6ff !important;
+  border-color: #93c5fd !important;
+  color: #1d4ed8 !important;
+}
+.st-key-estimates_table_wrap .ips-dash-est-view {
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid #1e40af !important;
+}
+.st-key-estimates_table_wrap .ips-est-approve-done {
+  font-size: 0.68rem !important;
+  font-weight: 700 !important;
+  color: #15803d !important;
+  white-space: nowrap !important;
+  margin-right: 2px !important;
 }
 section[data-testid="stMain"]:has(.ips-estimates-page) [data-testid="column"]:has(.ips-estimates-page-size-marker) > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] {
   align-items: center !important;
@@ -854,4 +1050,44 @@ def render_estimates_pagination_footer(total: int, table_key: str, *, item_label
                 ):
                     st.session_state[page_key(table_key)] = min(total_pages, page + 1)
                     st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def render_estimates_view_navigation(
+    options: list[str],
+    *,
+    session_key: str = "estimates_view",
+    default: str | None = None,
+) -> None:
+    """Horizontal navigation tabs for estimate list views."""
+    opts = [str(option).strip() for option in options if str(option).strip()]
+    if not opts:
+        return
+
+    if session_key not in st.session_state:
+        st.session_state[session_key] = default or opts[0]
+    current = str(st.session_state.get(session_key) or "").strip()
+    if current not in opts:
+        st.session_state[session_key] = default or opts[0]
+
+    st.markdown(
+        '<span class="ips-estimates-view-nav-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    st.markdown('<div class="ips-estimates-view-nav">', unsafe_allow_html=True)
+    if hasattr(st, "segmented_control"):
+        st.segmented_control(
+            "Estimate view",
+            opts,
+            key=session_key,
+            label_visibility="collapsed",
+        )
+    else:
+        st.radio(
+            "Estimate view",
+            opts,
+            key=session_key,
+            horizontal=True,
+            label_visibility="collapsed",
+        )
     st.markdown("</div>", unsafe_allow_html=True)
