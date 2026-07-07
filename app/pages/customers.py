@@ -184,6 +184,7 @@ _CONTACT_TABS = [
 SELECTED_CUSTOMER_KEY = "selected_customer_id"
 SHOW_CUSTOMER_MODAL_KEY = "show_customer_detail_modal"
 _ALL_CUSTOMER_IDS_KEY = "_ips_customers_visible_ids"
+_CUSTOMER_ROW_LAST_KEY = "_ips_customers_list_last_row"
 _CUSTOMER_COLS = [4.85, 1.2, 1.2, 1.4, 1.3]
 _CUSTOMER_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("CUSTOMER", None),
@@ -293,22 +294,128 @@ def _open_customer_from_list(customer: dict) -> None:
     st.rerun()
 
 
-def _render_customer_list_link_cell(
-    customer: dict,
-    label: str,
-    *,
-    key: str,
-) -> None:
-    st.markdown('<div class="ips-customers-table-link ips-customers-name-link">', unsafe_allow_html=True)
-    if st.button(
-        label,
-        key=key,
-        type="tertiary",
-        help="Open customer details",
-        use_container_width=True,
-    ):
-        _open_customer_from_list(customer)
-    st.markdown("</div>", unsafe_allow_html=True)
+def _customer_name_cell_html(customer: dict, name: str) -> str:
+    cid = str(customer.get("id") or "").strip()
+    label = name if name and name != "—" else "Open customer"
+    cid_attr = html.escape(cid, quote=True)
+    label_html = html.escape(label)
+    aria_label = html.escape(f"Open details for {label}", quote=True)
+    return (
+        f'<span class="ips-customers-table-row" data-row-id="{cid_attr}" aria-hidden="true"></span>'
+        f'<button type="button" class="ips-customers-row-click-target ips-customers-row-click-full" '
+        f'data-customer-id="{cid_attr}" aria-label="{aria_label}"></button>'
+        f'<div class="ips-customers-name-cell">'
+        f'<span class="ips-customers-name-label">{label_html}</span>'
+        f"</div>"
+    )
+
+
+def _handle_customer_row_pick(raw: str, customers_by_id: dict[str, dict]) -> None:
+    cid = str(raw or "").strip()
+    if not cid or cid not in customers_by_id:
+        return
+    if cid == str(st.session_state.get(_CUSTOMER_ROW_LAST_KEY) or ""):
+        return
+    st.session_state[_CUSTOMER_ROW_LAST_KEY] = cid
+    _open_customer_from_list(customers_by_id[cid])
+
+
+def _render_customers_row_click_bridge(customers_by_id: dict[str, dict]) -> None:
+    try:
+        from app.ui.clean_table import _components_html
+    except ImportError:
+        from ui.clean_table import _components_html  # type: ignore
+
+    picked = _components_html(
+        """
+<script>
+(function () {
+  const w = window.parent || window;
+  const doc = w.document;
+  const hookKey = "ipsCustomersRowClick::list";
+  const tblSel = ".st-key-customers_table_wrap";
+  const btnSel = ".ips-customers-row-click-target[data-customer-id]";
+  const rowSel = '[data-testid="stHorizontalBlock"]:has(.ips-customers-table-row)';
+
+  function sendValue(id) {
+    const payload = { type: "streamlit:setComponentValue", value: id };
+    const frames = [window, window.parent, w].filter(function (f, i, arr) {
+      return f && arr.indexOf(f) === i;
+    });
+    for (var i = 0; i < frames.length; i++) {
+      try {
+        if (frames[i].Streamlit && typeof frames[i].Streamlit.setComponentValue === "function") {
+          frames[i].Streamlit.setComponentValue(id);
+          return;
+        }
+      } catch (err) {}
+    }
+    for (var j = 0; j < frames.length; j++) {
+      try { frames[j].postMessage(payload, "*"); } catch (err) {}
+    }
+  }
+
+  function isInteractive(target) {
+    return !!(target && target.closest && target.closest(
+      "button, input, select, textarea, label, a, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox']"
+    ) && !target.closest(".ips-customers-row-click-target"));
+  }
+
+  function tableScope() {
+    const anchor = doc.querySelector(tblSel);
+    if (!anchor) return null;
+    return anchor.closest('[data-testid="stVerticalBlockBorderWrapper"]') || anchor.parentElement;
+  }
+
+  function bindTargets() {
+    const scope = tableScope();
+    if (!scope) return;
+    scope.querySelectorAll(btnSel).forEach(function (btn) {
+      if (btn.dataset.ipsCustomersBtnBound === "1") return;
+      btn.dataset.ipsCustomersBtnBound = "1";
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = btn.getAttribute("data-customer-id");
+        if (!id) return;
+        sendValue(id);
+      });
+    });
+    scope.querySelectorAll(rowSel).forEach(function (row) {
+      if (row.dataset.ipsCustomersRowBound === "1") return;
+      row.dataset.ipsCustomersRowBound = "1";
+      row.addEventListener("click", function (e) {
+        if (isInteractive(e.target)) return;
+        const marker = row.querySelector(".ips-customers-table-row[data-row-id]");
+        const id = marker && marker.getAttribute("data-row-id");
+        if (!id) return;
+        e.preventDefault();
+        e.stopPropagation();
+        sendValue(id);
+      });
+    });
+  }
+
+  if (!doc.ipsCustomersRowClickRegistry) doc.ipsCustomersRowClickRegistry = {};
+  doc.ipsCustomersRowClickRegistry[hookKey] = { bind: bindTargets };
+  bindTargets();
+  if (!doc.ipsCustomersRowBindObserver) {
+    doc.ipsCustomersRowBindObserver = new MutationObserver(function () {
+      Object.values(doc.ipsCustomersRowClickRegistry || {}).forEach(function (cfg) {
+        if (cfg && typeof cfg.bind === "function") cfg.bind();
+      });
+    });
+    doc.ipsCustomersRowBindObserver.observe(doc.body, { childList: true, subtree: true });
+  }
+})();
+</script>
+        """,
+        component_key="ips_customers_list_row_click",
+        height=0,
+    )
+    action = str(picked or "").strip()
+    if action:
+        _handle_customer_row_pick(action, customers_by_id)
 
 
 @fragment
@@ -370,12 +477,7 @@ def _render_custom_customers_table(
             cols = st.columns(_CUSTOMER_COLS, gap="small", vertical_alignment="center")
 
             with cols[0]:
-                name_label = name if name and name != "—" else "Open customer"
-                _render_customer_list_link_cell(
-                    customer,
-                    name_label,
-                    key=f"customer_open_name_{cid}",
-                )
+                st.markdown(_customer_name_cell_html(customer, name), unsafe_allow_html=True)
 
             with cols[1]:
                 st.markdown(
@@ -399,6 +501,13 @@ def _render_custom_customers_table(
                 st.markdown(_customer_status_pill_html(status), unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
+
+    customers_by_id = {
+        str(c.get("id") or "").strip(): c
+        for c in filtered
+        if str(c.get("id") or "").strip()
+    }
+    _render_customers_row_click_bridge(customers_by_id)
 
     return all_customer_ids
 

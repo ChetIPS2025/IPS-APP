@@ -480,7 +480,7 @@ def inject_customers_module_css() -> None:
     """Customers list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-customers-module-v4">
+<style id="ips-customers-module-v5">
 .ips-customers-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -520,77 +520,91 @@ def inject_customers_module_css() -> None:
   min-width: 0;
 }}
 .ips-customers-name {{
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
   color: #2563eb;
   line-height: 1.25;
   word-break: break-word;
 }}
-.ips-customers-table-link {{
-  display: flex !important;
-  align-items: center !important;
-  width: 100% !important;
-  min-width: 0 !important;
-  height: 100% !important;
-  min-height: 46px !important;
-  padding-left: 24px !important;
-  padding-right: 24px !important;
-  box-sizing: border-box !important;
+.ips-customers-name-cell {{
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 46px;
+  padding-left: 24px;
+  padding-right: 24px;
+  box-sizing: border-box;
+  text-align: left;
+  pointer-events: none;
 }}
-.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type) > [data-testid="column"]:first-child,
-.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:first-child {{
-  padding-left: 24px !important;
-  padding-right: 24px !important;
+.ips-customers-name-label {{
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+  display: block;
+  width: 100%;
+  font-size: 20px;
+  font-weight: 700;
+  color: #2563eb;
+  line-height: 1.25;
+  text-align: left;
+  word-break: break-word;
 }}
-.st-key-customers_table_wrap .ips-customers-name-link [data-testid="stButton"],
-.st-key-customers_table_wrap .ips-customers-name-link .stButton {{
-  width: 100% !important;
-  min-width: 0 !important;
-  margin: 0 !important;
-}}
-.st-key-customers_table_wrap .ips-customers-name-link button {{
+.ips-customers-row-click-target {{
+  position: absolute;
+  z-index: 1;
+  opacity: 0;
   background: transparent !important;
-  background-color: transparent !important;
-  color: #2563eb !important;
-  font-weight: 700 !important;
-  font-size: 18px !important;
-  line-height: 1.25 !important;
   border: none !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
   padding: 0 !important;
-  height: 100% !important;
-  min-height: 46px !important;
-  max-height: none !important;
+  margin: 0 !important;
+  cursor: pointer;
+  box-shadow: none !important;
+}}
+.ips-customers-row-click-full {{
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}}
+.ips-customers-row-click-target:hover,
+.ips-customers-row-click-target:focus {{
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none;
+}}
+.ips-customers-row-click-target:focus-visible {{
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}}
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) {{
+  position: relative !important;
+  cursor: pointer !important;
+}}
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) > [data-testid="column"]:first-child,
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:first-child {{
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+}}
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) > [data-testid="column"]:first-child [data-testid="stVerticalBlock"],
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) > [data-testid="column"]:first-child [data-testid="stElementContainer"],
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) > [data-testid="column"]:first-child [data-testid="stMarkdownContainer"] {{
+  align-items: flex-start !important;
   justify-content: flex-start !important;
   text-align: left !important;
   width: 100% !important;
-  max-width: 100% !important;
-  min-width: 0 !important;
-  outline: none !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  cursor: pointer !important;
-  white-space: normal !important;
-  word-break: break-word !important;
 }}
-.st-key-customers_table_wrap .ips-customers-name-link button:hover,
-.st-key-customers_table_wrap .ips-customers-name-link button:focus {{
-  color: #1d4ed8 !important;
-  text-decoration: underline !important;
-  background: transparent !important;
-  box-shadow: none !important;
-}}
-.st-key-customers_table_wrap .ips-customers-name-link button p {{
-  color: inherit !important;
-  font-weight: inherit !important;
-  font-size: inherit !important;
-  line-height: inherit !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  white-space: normal !important;
-  word-break: break-word !important;
-  text-align: left !important;
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) .ips-customers-cell,
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-customers-table-row) .ips-customer-status-pill {{
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
 }}
 .ips-customers-count-cell {{
   text-align: center;
