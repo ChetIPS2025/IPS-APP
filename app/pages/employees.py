@@ -20,6 +20,7 @@ try:
         apply_column_filters,
         build_filter_options,
         clear_table_filters,
+        get_column_filter_values,
         has_active_column_filters,
         render_table_header_cell,
         sanitize_column_filters,
@@ -91,6 +92,7 @@ except ImportError:
         apply_column_filters,
         build_filter_options,
         clear_table_filters,
+        get_column_filter_values,
         has_active_column_filters,
         render_table_header_cell,
         sanitize_column_filters,
@@ -198,6 +200,33 @@ def _normalize_user_status(raw: object) -> str:
         return "Pending"
     label = str(raw or "").strip()
     return label if label else "Active"
+
+
+def _user_is_deleted(user: dict) -> bool:
+    if user.get("is_deleted") is True:
+        return True
+    if str(user.get("deleted_at") or "").strip():
+        return True
+    return _normalize_user_status(user.get("status")) == "Deleted"
+
+
+def _user_filter_status(user: dict) -> str:
+    if _user_is_deleted(user):
+        return "Deleted"
+    return _normalize_user_status(user.get("status"))
+
+
+def _filter_users_by_deleted_visibility(
+    rows: list[dict],
+    *,
+    status_filter: list[str] | None = None,
+) -> list[dict]:
+    selected = [str(v).strip() for v in (status_filter or []) if str(v).strip()]
+    if not selected:
+        return [row for row in rows if not _user_is_deleted(row)]
+    if "Deleted" in selected:
+        return list(rows)
+    return [row for row in rows if not _user_is_deleted(row)]
 
 
 def _user_display_name(user: dict) -> str:
@@ -318,7 +347,10 @@ def _user_status_pill_html(status: str) -> str:
 
 
 def _filter_employees(rows: list[dict], *, search: str = "") -> list[dict]:
-    out = list(rows)
+    out = _filter_users_by_deleted_visibility(
+        rows,
+        status_filter=get_column_filter_values(_TABLE_KEY, "status"),
+    )
     q = str(search or "").strip().casefold()
     if q:
         filtered: list[dict] = []
@@ -331,7 +363,7 @@ def _filter_employees(rows: list[dict], *, search: str = "") -> list[dict]:
                     _user_display_billing_class(row),
                     _user_display_permission_role(row),
                     _employee_type_label(row),
-                    _normalize_user_status(row.get("status")),
+                    _user_filter_status(row),
                 ]
             ).casefold()
             if q in haystack:
@@ -572,7 +604,7 @@ def _render_custom_users_table(
             phone = _user_display_phone(user)
             billing_class = _user_display_billing_class(user)
             permission_role = _user_display_permission_role(user)
-            status = _normalize_user_status(user.get("status"))
+            status = _user_filter_status(user)
 
             cols = st.columns(_USER_COLS, gap="xxsmall", vertical_alignment="center")
 
@@ -1258,7 +1290,7 @@ _USER_COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
     ("billing_class", _user_display_billing_class),
     ("permission_role", _user_display_permission_role),
     ("employee_type", _employee_type_label),
-    ("status", lambda u: _normalize_user_status(u.get("status"))),
+    ("status", _user_filter_status),
 ]
 
 
