@@ -992,7 +992,7 @@ def inject_jobs_module_css() -> None:
     """Jobs list custom table styling."""
     st.markdown(
         f"""
-<style id="ips-jobs-module-v26">
+<style id="ips-jobs-module-v27">
 .st-key-jobs_table_wrap .ips-jobs-table-wrap,
 .st-key-jobs_table_wrap .ips-jobs-table-wrap.jobs-table {{
   background: #ffffff !important;
@@ -1176,7 +1176,7 @@ def inject_jobs_module_css() -> None:
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"] {{
   gap: 0 !important;
   align-items: center !important;
-  border-bottom: 1px solid #e8edf4;
+  border-bottom: 1px solid #e5e7eb;
   margin: 0 !important;
 }}
 .st-key-jobs_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row),
@@ -1212,8 +1212,12 @@ def inject_jobs_module_css() -> None:
 }}
 .st-key-jobs_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover,
 .st-key-jobs_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover,
-.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover {{
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover,
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover > [data-testid="column"],
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover > [data-testid="column"] > [data-testid="stVerticalBlock"],
+.st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row):hover > [data-testid="column"] > [data-testid="stElementContainer"] {{
   background: #f8fbff !important;
+  background-color: #f8fbff !important;
 }}
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row),
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.job-row),
@@ -1230,6 +1234,8 @@ def inject_jobs_module_css() -> None:
   min-height: 0 !important;
   height: auto !important;
   min-width: 0 !important;
+  padding: 0 10px !important;
+  box-sizing: border-box !important;
 }}
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"] > [data-testid="stVerticalBlock"],
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-table-row) > [data-testid="column"] > [data-testid="stElementContainer"],
