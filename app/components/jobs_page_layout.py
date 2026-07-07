@@ -59,7 +59,7 @@ def _summary_money(value: float, *, has_data: bool) -> str:
 def inject_jobs_page_layout_css() -> None:
     st.markdown(
         """
-<style id="ips-jobs-page-layout-v14">
+<style id="ips-jobs-page-layout-v15">
 section[data-testid="stMain"]:has(.ips-jobs-page) {
   background: #ffffff !important;
 }
@@ -124,17 +124,14 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap .stB
   margin-bottom: 0;
 }
 .st-key-jobs_table_wrap {
-  max-height: min(calc(100vh - 220px), 920px);
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  margin-top: 0.25rem !important;
   min-height: 0;
-  overflow-x: auto !important;
-  overflow-y: auto !important;
   position: relative;
-  border: 1px solid #dbe3ef;
-  border-radius: 12px;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 4px 14px rgba(15, 23, 42, 0.04);
-  padding: 0 6px 0 0;
-  scrollbar-gutter: stable;
 }
 .st-key-jobs_table_wrap .ips-jobs-col-marker {
   display: block !important;
@@ -165,7 +162,7 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap .stB
   cursor: pointer;
 }
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-row-even) {
-  background: #f8fafc !important;
+  background: #ffffff !important;
 }
 .st-key-jobs_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-jobs-row-odd) {
   background: #ffffff !important;
@@ -326,7 +323,14 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap .stB
   justify-content: center !important;
   text-align: center !important;
 }
-.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-estimated) .ips-jobs-money,
+.st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-estimated) .ips-jobs-money {
+  justify-content: flex-end !important;
+  text-align: right !important;
+  color: #2563eb !important;
+  font-weight: 800 !important;
+  font-size: 0.8125rem !important;
+  font-variant-numeric: tabular-nums !important;
+}
 .st-key-jobs_table_wrap [data-testid="column"]:has(.ips-jobs-col-actual) .ips-jobs-money {
   justify-content: flex-end !important;
   text-align: right !important;
@@ -363,7 +367,6 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap .stB
   transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
 }
 .ips-jobs-stat-card:hover {
-  transform: translateY(-1px);
   box-shadow: 0 4px 10px rgba(37, 99, 235, 0.1);
   border-color: #bfd3f2;
 }
@@ -441,6 +444,28 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap .stB
 }
 .ips-jobs-summary-chip.ips-jobs-chip-money strong {
   color: #15803d;
+}
+.ips-jobs-view-nav {
+  margin: 0 0 0.4rem 0;
+  padding: 0.2rem 0;
+}
+.ips-jobs-view-nav [data-testid="stRadio"],
+.ips-jobs-view-nav [data-testid="stSegmentedControl"] {
+  margin: 0 !important;
+}
+.ips-jobs-view-nav [data-testid="stRadio"] > div {
+  gap: 0.35rem !important;
+  flex-wrap: wrap !important;
+}
+.ips-jobs-view-nav [data-testid="stRadio"] label,
+.ips-jobs-view-nav [data-testid="stSegmentedControl"] label {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 999px !important;
+  padding: 0.35rem 0.85rem !important;
+  font-size: 0.8125rem !important;
+  font-weight: 700 !important;
+  color: #475569 !important;
 }
 section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="column"]:has(.ips-jobs-page-size-marker) > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] {
   align-items: center !important;
@@ -550,7 +575,7 @@ section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="column"]:has(.ip
   background-color: transparent !important;
   color: #2563eb !important;
   font-weight: 800 !important;
-  font-size: 14px !important;
+  font-size: 0.8125rem !important;
   line-height: 1.2 !important;
   border: none !important;
   border-radius: 0 !important;
@@ -1064,6 +1089,46 @@ def render_jobs_pagination_footer(total: int, table_key: str, *, item_label: str
                 ):
                     st.session_state[page_key(table_key)] = min(total_pages, page + 1)
                     st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def render_jobs_view_navigation(
+    options: list[str],
+    *,
+    session_key: str = "jobs_view",
+    default: str | None = None,
+) -> None:
+    """Horizontal navigation tabs for job list views."""
+    opts = [str(option).strip() for option in options if str(option).strip()]
+    if not opts:
+        return
+
+    if session_key not in st.session_state:
+        st.session_state[session_key] = default or opts[0]
+    current = str(st.session_state.get(session_key) or "").strip()
+    if current not in opts:
+        st.session_state[session_key] = default or opts[0]
+
+    st.markdown(
+        '<span class="ips-jobs-view-nav-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    st.markdown('<div class="ips-jobs-view-nav">', unsafe_allow_html=True)
+    if hasattr(st, "segmented_control"):
+        st.segmented_control(
+            "Job view",
+            opts,
+            key=session_key,
+            label_visibility="collapsed",
+        )
+    else:
+        st.radio(
+            "Job view",
+            opts,
+            key=session_key,
+            horizontal=True,
+            label_visibility="collapsed",
+        )
     st.markdown("</div>", unsafe_allow_html=True)
 
 

@@ -37,6 +37,7 @@ try:
         render_jobs_summary_badge_bar,
         render_jobs_summary_cards,
         render_jobs_table_pagination_header,
+        render_jobs_view_navigation,
         jobs_visible_table_layout,
     )
     from app.components.job_ips_forms import render_job_ips_forms_tab
@@ -153,6 +154,7 @@ except ImportError:
         render_jobs_summary_badge_bar,
         render_jobs_summary_cards,
         render_jobs_table_pagination_header,
+        render_jobs_view_navigation,
         jobs_visible_table_layout,
     )
     from components.job_cost_summary_cards import (  # type: ignore
@@ -3136,7 +3138,7 @@ def _render_jobs_page() -> None:
                     st.error(msg or "Could not save job.")
 
     def _filters() -> None:
-        c1, c2, c3 = st.columns([6.5, 2.5, 1], gap="small")
+        c1, c2 = st.columns([9, 1], gap="small")
         with c1:
             st.text_input(
                 "Search",
@@ -3145,13 +3147,6 @@ def _render_jobs_page() -> None:
                 label_visibility="collapsed",
             )
         with c2:
-            st.selectbox(
-                "View",
-                _JOBS_VIEW_OPTIONS,
-                key="jobs_view",
-                label_visibility="collapsed",
-            )
-        with c3:
             if st.button("Clear", key="jobs_clear", use_container_width=True):
                 clear_table_filters(
                     _TABLE_KEY,
@@ -3174,6 +3169,11 @@ def _render_jobs_page() -> None:
     render_jobs_filter_bar_shell()
     layout_filter_bar(_filters)
     close_jobs_filter_bar_shell()
+    render_jobs_view_navigation(
+        _JOBS_VIEW_OPTIONS,
+        session_key="jobs_view",
+        default=_JOBS_DEFAULT_VIEW,
+    )
 
     summary = _jobs_summary_counts(filtered, subjob_counts)
     render_jobs_summary_cards(
