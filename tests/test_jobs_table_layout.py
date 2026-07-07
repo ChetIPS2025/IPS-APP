@@ -28,12 +28,11 @@ def test_jobs_visible_table_layout_hides_empty_financial_columns():
         }
     ]
     markers, headers, weights = jobs_visible_table_layout(rows, _cost_fields)
-    assert "contract" in markers
-    assert "actions" in markers
+    assert markers == ("num", "desc", "customer", "status")
     assert "estimated" not in markers
     assert "actual" not in markers
-    assert "profit" not in markers
-    assert "margin" not in markers
+    assert "contract" not in markers
+    assert "actions" not in markers
     assert len(headers) == len(weights) == len(markers)
 
 
