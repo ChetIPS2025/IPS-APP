@@ -10046,7 +10046,7 @@ def inject_ips_dialog_styles() -> None:
     """Reusable IPS SaaS dialog / ``st.dialog`` styling (Jobs detail and future modals)."""
     st.markdown(
         f"""
-<style id="ips-dialog-styles-v3">
+<style id="ips-dialog-styles-v4">
 div[data-testid="stBackdrop"] {{
   background: rgba(15, 23, 42, 0.42) !important;
   backdrop-filter: blur(3px) !important;
@@ -10066,8 +10066,30 @@ div[data-testid="stDialog"] div[role="dialog"] {{
   border: 1px solid #d8e0ea !important;
   border-radius: 18px !important;
   box-shadow: 0 24px 64px rgba(15, 23, 42, 0.22) !important;
-  overflow: hidden !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
   padding-top: 14px !important;
+}}
+div[data-testid="stDialog"] [data-testid="stDateInput"],
+div[data-testid="stDialog"] [data-testid="stDateInput"] > div,
+div[data-testid="stDialog"] [data-testid="stElementContainer"]:has([data-testid="stDateInput"]),
+div[data-testid="stDialog"] [data-testid="stVerticalBlock"]:has([data-testid="stDateInput"]),
+div[data-testid="stDialog"] [data-testid="stTabContent"]:has([data-testid="stDateInput"]),
+div[data-testid="stDialog"] [data-testid="column"]:has([data-testid="stDateInput"]) {{
+  overflow: visible !important;
+}}
+body:has(div[data-testid="stDialog"]) div[data-baseweb="popover"]:has([data-baseweb="calendar"]),
+body:has(div[data-testid="stDialog"]) .ips-dialog-date-popper,
+body:has(div[data-testid="stDialog"]) .hire-date-popper {{
+  z-index: 100000 !important;
+  position: fixed !important;
+  overflow: visible !important;
+  pointer-events: auto !important;
+}}
+body:has(div[data-testid="stDialog"]) div[data-baseweb="popover"]:has([data-baseweb="calendar"]) [data-baseweb="calendar"],
+body:has(div[data-testid="stDialog"]) .ips-dialog-date-popper [data-baseweb="calendar"],
+body:has(div[data-testid="stDialog"]) .hire-date-popper [data-baseweb="calendar"] {{
+  overflow: visible !important;
 }}
 div[data-testid="stDialog"] [data-testid="stModalHeader"] {{
   padding-bottom: 0.15rem !important;
@@ -10643,6 +10665,53 @@ div[data-testid="stDialog"] [class*="st-key-job_subjob_doc_"][class*="cancel_del
 }}
 </style>
 """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        """
+<script>
+(function () {
+  var w = window.parent || window;
+  var doc = w.document;
+  if (w.__ipsDialogDatePopperBound) return;
+  w.__ipsDialogDatePopperBound = true;
+
+  var DIALOG_SEL = 'div[data-testid="stDialog"]';
+  var DATE_INPUT_SEL = '[data-testid="stDateInput"]';
+  var POPPER_SEL = 'div[data-baseweb="popover"]:has([data-baseweb="calendar"])';
+
+  function dialogHasDateInput() {
+    var dialog = doc.querySelector(DIALOG_SEL);
+    return !!(dialog && dialog.querySelector(DATE_INPUT_SEL));
+  }
+
+  function elevatePopper(pop) {
+    if (!pop || !dialogHasDateInput()) return;
+    pop.classList.add('ips-dialog-date-popper', 'hire-date-popper');
+    pop.style.zIndex = '100000';
+    pop.style.position = 'fixed';
+    pop.style.overflow = 'visible';
+    if (pop.parentElement && pop.parentElement !== doc.body) {
+      doc.body.appendChild(pop);
+    }
+  }
+
+  function scan() {
+    if (!dialogHasDateInput()) return;
+    doc.querySelectorAll(POPPER_SEL).forEach(elevatePopper);
+  }
+
+  scan();
+  if (!doc.__ipsDialogDatePopperObserver) {
+    doc.__ipsDialogDatePopperObserver = new MutationObserver(scan);
+    doc.__ipsDialogDatePopperObserver.observe(doc.body, {
+      childList: true,
+      subtree: true,
+    });
+  }
+})();
+</script>
+        """,
         unsafe_allow_html=True,
     )
 
