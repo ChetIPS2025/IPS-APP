@@ -24,6 +24,10 @@ try:
         render_table_header_cell,
         sanitize_column_filters,
     )
+    from app.components.users_list_table import (
+        render_users_table_link_bridge,
+        user_list_link_html,
+    )
     from app.components.record_modal import (
         build_modal_cache,
         clear_edit_modes,
@@ -93,6 +97,10 @@ except ImportError:
         has_active_column_filters,
         render_table_header_cell,
         sanitize_column_filters,
+    )
+    from components.users_list_table import (  # type: ignore
+        render_users_table_link_bridge,
+        user_list_link_html,
     )
     from components.record_modal import (  # type: ignore
         build_modal_cache,
@@ -403,19 +411,14 @@ def _ips_app_rerun() -> None:
     ips_app_rerun()
 
 
-def _on_user_name_click(user: dict) -> None:
-    _open_user_from_list(user)
-    _ips_app_rerun()
-
-
-def _user_name_cell_html(name: str) -> str:
+def _user_name_cell_html(name: str, user_id: str) -> str:
     label = name if name and name != "—" else "Open user"
-    label_html = html.escape(label)
     title = html.escape(label, quote=True)
+    link_html = user_list_link_html(user_id, label)
     return (
         f'<div class="ips-users-name-cell-wrap">'
         f'<div class="ips-users-name-cell" title="{title}">'
-        f'<span class="ips-users-name-label ips-users-name">{label_html}</span>'
+        f"{link_html}"
         f"</div></div>"
     )
 
@@ -581,15 +584,7 @@ def _render_custom_users_table(
 
             with cols[0]:
                 st.markdown(_user_row_marker_html(uid), unsafe_allow_html=True)
-                st.button(
-                    "\u200b",
-                    key=f"users_open_{uid}",
-                    help=f"Open {name}",
-                    type="tertiary",
-                    on_click=_on_user_name_click,
-                    args=(user,),
-                )
-                st.markdown(_user_name_cell_html(name), unsafe_allow_html=True)
+                st.markdown(_user_name_cell_html(name, uid), unsafe_allow_html=True)
 
             with cols[1]:
                 st.markdown(
@@ -640,13 +635,17 @@ def _render_custom_users_table(
         for u in filtered
         if str(u.get("id") or "").strip()
     }
-    picked = _render_users_row_click_bridge()
-    if picked:
-        open_id = str(picked).strip()
+    picked_row = _render_users_row_click_bridge()
+    picked_link = render_users_table_link_bridge()
+    for picked in (picked_link, picked_row):
+        open_id = str(picked or "").strip()
+        if not open_id:
+            continue
         open_user = users_by_id.get(open_id)
         if open_user:
             _open_user_from_list(open_user)
             _ips_app_rerun()
+            break
 
     return all_user_ids
 

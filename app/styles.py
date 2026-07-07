@@ -33,7 +33,7 @@ def inject_users_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-users-module-v21">
+<style id="ips-users-module-v22">
 .ips-users-table-wrap {{
   background: #ffffff;
   border: 1px solid #e5e7eb;
@@ -89,7 +89,6 @@ def inject_users_module_css() -> None:
   justify-content: flex-start;
   width: 100%;
   min-height: 46px;
-  pointer-events: none;
 }}
 .ips-users-name-cell {{
   display: flex;
@@ -101,10 +100,8 @@ def inject_users_module_css() -> None:
   padding-right: 24px;
   box-sizing: border-box;
   text-align: left;
-  pointer-events: none;
 }}
 .ips-users-name-label {{
-  pointer-events: none;
   display: block;
   width: 100%;
   font-size: 20px;
@@ -113,6 +110,16 @@ def inject_users_module_css() -> None:
   line-height: 1.25;
   text-align: left;
   word-break: break-word;
+}}
+.ips-users-list-link {{
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+}}
+.ips-users-list-link:hover,
+.ips-users-list-link:focus {{
+  color: #1d4ed8 !important;
+  text-decoration: none !important;
 }}
 .ips-users-name {{
   font-size: 20px;
@@ -326,11 +333,7 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-user-pill,
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-user-pill,
 .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-users-pill-col,
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-users-pill-col,
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-users-name-cell,
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-users-name-cell,
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-users-name-label,
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-users-name-label {{
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) .ips-users-pill-col {{
   pointer-events: none;
 }}
 .st-key-users_table_wrap [data-testid="stMarkdownContainer"],
@@ -379,92 +382,10 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
   min-height: 46px !important;
   width: 100% !important;
 }}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] {{
-  position: absolute !important;
-  inset: 0 !important;
-  z-index: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  min-height: 46px !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  overflow: visible !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] [data-testid="stVerticalBlockBorderWrapper"],
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] [data-testid="stVerticalBlockBorderWrapper"] > div {{
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-  margin: 0 !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] [data-testid="stButton"],
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] .stButton {{
-  position: absolute !important;
-  inset: 0 !important;
-  z-index: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  min-height: 46px !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] [data-testid="stButton"] > button,
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] .stButton > button,
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] button[data-testid="stBaseButton-tertiary"],
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] button[data-testid="stBaseButton-secondary"] {{
-  position: absolute !important;
-  inset: 0 !important;
-  z-index: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  min-height: 46px !important;
-  max-height: none !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  opacity: 0 !important;
-  background: transparent !important;
-  background-color: transparent !important;
-  border: none !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  color: transparent !important;
-  cursor: pointer !important;
-  outline: none !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] [data-testid="stButton"] > button:hover,
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] .stButton > button:hover,
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] [data-testid="stButton"] > button:focus,
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] .stButton > button:focus {{
-  opacity: 0 !important;
-  background: transparent !important;
-  background-color: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  color: transparent !important;
-}}
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] [data-testid="stButton"] > button > div,
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] [data-testid="stButton"] > button p,
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [class*="st-key-users_open_"] [data-testid="stButton"] > button span {{
-  opacity: 0 !important;
-  color: transparent !important;
-  font-size: 0 !important;
-  line-height: 0 !important;
-  width: 0 !important;
-  height: 0 !important;
-  overflow: hidden !important;
-}}
 .st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stElementContainer"]:has(.ips-users-name-cell-wrap),
 .st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stElementContainer"]:has(.ips-users-name-cell) {{
   position: relative !important;
   z-index: 2 !important;
-  pointer-events: none !important;
   width: 100% !important;
 }}
 .st-key-users_table_wrap [data-testid="stElementContainer"] {{
