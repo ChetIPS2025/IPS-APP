@@ -1389,39 +1389,40 @@ def render() -> None:
     if sanitize_column_filters(_TABLE_KEY, filter_options, filter_fields=_FILTER_FIELDS):
         st.rerun()
 
-    def _users_export() -> None:
-        st.button("Export", key="users_export", use_container_width=True)
-
-    def _users_new() -> None:
-        if st.button("+ New User", key="emp_add", type="primary", use_container_width=True):
-            st.session_state["ips_emp_form"] = True
+    def _render_users_toolbar() -> None:
+        with st.container(key="users_toolbar_wrap", border=True):
+            st.markdown(
+                '<span class="users-toolbar-marker ips-filter-bar-marker" aria-hidden="true"></span>',
+                unsafe_allow_html=True,
+            )
+            search_col, export_col, new_col, clear_col = st.columns(
+                [12, 1.05, 1.35, 1.15],
+                gap="small",
+                vertical_alignment="center",
+            )
+            with search_col:
+                st.text_input(
+                    "Search users",
+                    placeholder="Search name, email, role, or status…",
+                    key=_SEARCH_KEY,
+                    label_visibility="collapsed",
+                )
+            with export_col:
+                st.button("Export", key="users_export", use_container_width=True)
+            with new_col:
+                if st.button("+ New User", key="emp_add", type="primary", use_container_width=True):
+                    st.session_state["ips_emp_form"] = True
+            with clear_col:
+                if st.button("Clear Filters", key="users_clear_filters", use_container_width=True):
+                    clear_table_filters(_TABLE_KEY, _FILTER_FIELDS, extra_keys=[_SEARCH_KEY])
+                    st.rerun()
 
     render_users_page_header(
         "Users",
         "Manage system users, roles, and permissions.",
-        actions=[_users_export, _users_new],
     )
 
-    try:
-        from app.components.layout import render_filter_bar
-    except ImportError:
-        from components.layout import render_filter_bar  # type: ignore
-
-    def _users_filters() -> None:
-        c1, c2 = st.columns([5, 0.9])
-        with c1:
-            st.text_input(
-                "Search users",
-                placeholder="Search name, email, role, or status…",
-                key=_SEARCH_KEY,
-                label_visibility="collapsed",
-            )
-        with c2:
-            if st.button("Clear Filters", key="users_clear_filters", use_container_width=True):
-                clear_table_filters(_TABLE_KEY, _FILTER_FIELDS, extra_keys=[_SEARCH_KEY])
-                st.rerun()
-
-    render_filter_bar(_users_filters)
+    _render_users_toolbar()
 
     if st.session_state.get("ips_emp_form"):
         with st.expander("New User", expanded=True):

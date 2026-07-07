@@ -29,7 +29,7 @@ def inject_users_module_css() -> None:
     """Users list custom table styling — call at the top of the users page render."""
     st.markdown(
         f"""
-<style id="ips-users-module-v29">
+<style id="ips-users-module-v30">
 .users-page-header {{
   margin: 0 0 14px 0;
   width: 100%;
@@ -56,6 +56,96 @@ def inject_users_module_css() -> None:
 }}
 .users-title-section .ips-page-header {{
   margin: 0;
+}}
+.users-toolbar-marker {{
+  display: none !important;
+}}
+section[data-testid="stMain"]:has(.ips-users-page) [data-testid="stVerticalBlockBorderWrapper"]:has(.users-toolbar-marker) {{
+  margin: 12px 0 18px 0 !important;
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  padding: 10px 12px !important;
+}}
+.st-key-users_toolbar_wrap [data-testid="stVerticalBlock"] {{
+  gap: 0 !important;
+}}
+.st-key-users_toolbar_wrap [data-testid="stHorizontalBlock"] {{
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  gap: 14px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+}}
+.st-key-users_toolbar_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
+  display: flex !important;
+  align-items: center !important;
+  align-self: stretch !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}}
+.st-key-users_toolbar_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {{
+  flex: 1 1 auto !important;
+  min-width: 400px !important;
+}}
+.st-key-users_toolbar_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:not(:first-child) {{
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+}}
+.st-key-users_toolbar_wrap .users-toolbar-search,
+.st-key-users_toolbar_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child [data-testid="stVerticalBlock"],
+.st-key-users_toolbar_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child [data-testid="stElementContainer"] {{
+  width: 100% !important;
+  min-width: 0 !important;
+}}
+.st-key-users_toolbar_wrap [data-testid="stTextInput"] {{
+  margin: 0 !important;
+  width: 100% !important;
+}}
+.st-key-users_toolbar_wrap [data-testid="stTextInput"] > div,
+.st-key-users_toolbar_wrap [data-testid="stTextInput"] > div > div {{
+  width: 100% !important;
+}}
+.st-key-users_toolbar_wrap [data-testid="stTextInput"] input {{
+  min-height: 46px !important;
+  height: 46px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  border-radius: 10px !important;
+}}
+.st-key-users_toolbar_wrap .stButton,
+.st-key-users_toolbar_wrap [data-testid="stButton"] {{
+  margin: 0 !important;
+  width: 100% !important;
+}}
+.st-key-users_toolbar_wrap .stButton > button,
+.st-key-users_toolbar_wrap [data-testid="stButton"] > button {{
+  min-height: 46px !important;
+  height: 46px !important;
+  padding: 0 16px !important;
+  white-space: nowrap !important;
+  border-radius: 10px !important;
+}}
+.st-key-users_toolbar_wrap [data-testid="stElementContainer"] {{
+  margin: 0 !important;
+  padding: 0 !important;
+}}
+@media (max-width: 900px) {{
+  .st-key-users_toolbar_wrap [data-testid="stHorizontalBlock"] {{
+    flex-wrap: wrap !important;
+    row-gap: 10px !important;
+  }}
+  .st-key-users_toolbar_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {{
+    flex: 1 1 100% !important;
+    min-width: 0 !important;
+  }}
+  .st-key-users_toolbar_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:not(:first-child) {{
+    flex: 1 1 auto !important;
+  }}
 }}
 .users-table-container,
 .ips-users-table-wrap {{
