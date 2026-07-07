@@ -33,7 +33,7 @@ def inject_users_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-users-module-v24">
+<style id="ips-users-module-v25">
 .ips-users-table-wrap {{
   background: #ffffff;
   border: 1px solid #e5e7eb;
@@ -554,6 +554,85 @@ section[data-testid="stMain"]:has(.ips-users-page) .ips-users-table-wrap {{
   border: none !important;
   padding: 2px 0 !important;
   color: #9a3412;
+}}
+/* Keep Users grid layout ahead of global compact-table flex rules */
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"],
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] {{
+  display: grid !important;
+  grid-template-columns: {users_grid} !important;
+  column-gap: 0 !important;
+  row-gap: 0 !important;
+  gap: 0 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stButton"],
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child .stButton,
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stButton"],
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child .stButton {{
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 46px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  justify-content: flex-start !important;
+  align-items: stretch !important;
+  flex: 1 1 auto !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stButton"] > button,
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child .stButton > button,
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child button[data-testid="stBaseButton-tertiary"],
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stButton"] > button,
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child button[data-testid="stBaseButton-tertiary"] {{
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  min-height: 46px !important;
+  margin: 0 !important;
+  padding: 0 14px 0 24px !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: #2563eb !important;
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  outline: none !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stButton"] > button:hover,
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child .stButton > button:hover,
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child button[data-testid="stBaseButton-tertiary"]:hover,
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child button[data-testid="stBaseButton-tertiary"]:hover {{
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}}
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stButton"] > button > div,
+.st-key-users_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stButton"] > button p,
+.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has(.ips-users-table-row) > [data-testid="column"]:first-child [data-testid="stButton"] > button p {{
+  width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  text-align: left !important;
+  color: inherit !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
 }}
 </style>
 """,
@@ -3860,6 +3939,7 @@ div[data-testid="stDataFrame"].ips-table-fit-host {
 
   function applyOne(wrap) {
     if (!wrap || wrap.closest('.ips-proposal-preview-root, .ips-login-page-marker')) return;
+    if (wrap.classList && wrap.classList.contains('st-key-users_table_wrap')) return;
     var scaler = getScaler(wrap);
     if (!scaler) return;
     resetWrap(wrap, scaler);
@@ -11568,59 +11648,49 @@ def inject_compact_table_rows_css() -> None:
     """Global compact row height and vertical centering for all list/data tables."""
     st.markdown(
         f"""
-<style id="ips-compact-table-rows-v1">
+<style id="ips-compact-table-rows-v2">
 /* ── Streamlit column-based list tables ── */
-[class*="_table_wrap"] > [data-testid="stVerticalBlock"],
-[class*="_table_wrap"] [data-testid="stVerticalBlock"]:first-child {{
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) > [data-testid="stVerticalBlock"],
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) [data-testid="stVerticalBlock"]:first-child {{
   gap: 0 !important;
 }}
-[class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"],
-[class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"],
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"],
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] {{
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"],
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] {{
   display: flex !important;
   align-items: center !important;
   gap: 0.35rem !important;
   margin: 0 !important;
   box-sizing: border-box !important;
 }}
-[class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type,
-[class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:first-of-type,
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type,
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:first-of-type {{
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type,
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:first-of-type {{
   min-height: 36px !important;
   height: auto !important;
   padding: 5px 10px !important;
   background: #f8fafc !important;
 }}
-[class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:not(:first-of-type):not(:has(.ips-jobs-table-row)):not(:has(.timesheet-list-row-marker)):not(:has(.timekeeping-list-header-marker)):not(:has(.timekeeping-list-row-header-marker)):not(:has(.timekeeping-detail-row-marker)):not(:has(.timekeeping-detail-header-marker)):not(:has(.weekly-timesheet-row-marker)),
-[class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:not(:first-of-type):not(:has(.ips-jobs-table-row)):not(:has(.timesheet-list-row-marker)):not(:has(.timekeeping-list-header-marker)):not(:has(.timekeeping-list-row-header-marker)):not(:has(.timekeeping-detail-row-marker)):not(:has(.timekeeping-detail-header-marker)):not(:has(.weekly-timesheet-row-marker)),
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:not(:first-of-type),
-.st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:not(:first-of-type) {{
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:not(:first-of-type):not(:has(.ips-jobs-table-row)):not(:has(.timesheet-list-row-marker)):not(:has(.timekeeping-list-header-marker)):not(:has(.timekeeping-list-row-header-marker)):not(:has(.timekeeping-detail-row-marker)):not(:has(.timekeeping-detail-header-marker)):not(:has(.weekly-timesheet-row-marker)),
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:not(:first-of-type):not(:has(.ips-jobs-table-row)):not(:has(.timesheet-list-row-marker)):not(:has(.timekeeping-list-header-marker)):not(:has(.timekeeping-list-row-header-marker)):not(:has(.timekeeping-detail-row-marker)):not(:has(.timekeeping-detail-header-marker)):not(:has(.weekly-timesheet-row-marker)) {{
   min-height: 56px !important;
   height: auto !important;
   padding: 5px 10px !important;
 }}
 @media (min-width: 768px) and (max-width: 1024px) {{
-  [class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:not(:first-of-type):not(:has(.ips-jobs-table-row)):not(:has(.timesheet-list-row-marker)):not(:has(.timekeeping-list-header-marker)):not(:has(.timekeeping-list-row-header-marker)):not(:has(.timekeeping-detail-row-marker)):not(:has(.weekly-timesheet-row-marker)),
-  [class*="_table_wrap"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:not(:first-of-type):not(:has(.ips-jobs-table-row)):not(:has(.timesheet-list-row-marker)):not(:has(.timekeeping-list-header-marker)):not(:has(.timekeeping-list-row-header-marker)):not(:has(.timekeeping-detail-row-marker)):not(:has(.weekly-timesheet-row-marker)),
-  .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:not(:first-of-type),
-  .st-key-users_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:not(:first-of-type) {{
+  [class*="_table_wrap"]:not(.st-key-users_table_wrap) > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:not(:first-of-type):not(:has(.ips-jobs-table-row)):not(:has(.timesheet-list-row-marker)):not(:has(.timekeeping-list-header-marker)):not(:has(.timekeeping-list-row-header-marker)):not(:has(.timekeeping-detail-row-marker)):not(:has(.weekly-timesheet-row-marker)),
+  [class*="_table_wrap"]:not(.st-key-users_table_wrap) > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:not(:first-of-type):not(:has(.ips-jobs-table-row)):not(:has(.timesheet-list-row-marker)):not(:has(.timekeeping-list-header-marker)):not(:has(.timekeeping-list-row-header-marker)):not(:has(.timekeeping-detail-row-marker)):not(:has(.weekly-timesheet-row-marker)) {{
     min-height: 58px !important;
     padding: 6px 10px !important;
   }}
 }}
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"] > [data-testid="column"],
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
   display: flex !important;
   align-items: center !important;
   align-self: stretch !important;
   min-height: 0 !important;
   height: auto !important;
 }}
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stVerticalBlock"],
-[class*="_table_wrap"] [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stElementContainer"],
-.st-key-users_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stVerticalBlock"] {{
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stVerticalBlock"],
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stElementContainer"] {{
   display: flex !important;
   flex-direction: column !important;
   justify-content: center !important;
@@ -11632,22 +11702,19 @@ def inject_compact_table_rows_css() -> None:
   padding: 0 !important;
   gap: 0 !important;
 }}
-[class*="_table_wrap"] [data-testid="stElementContainer"],
-.st-key-users_table_wrap [data-testid="stElementContainer"] {{
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) [data-testid="stElementContainer"] {{
   margin-top: 0 !important;
   margin-bottom: 0 !important;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
 }}
-[class*="_table_wrap"] [data-testid="stCheckbox"],
-.st-key-users_table_wrap [data-testid="stCheckbox"] {{
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) [data-testid="stCheckbox"] {{
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   margin: 0 !important;
 }}
-[class*="_table_wrap"] [data-testid="stCheckbox"] label,
-.st-key-users_table_wrap [data-testid="stCheckbox"] label {{
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) [data-testid="stCheckbox"] label {{
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -11656,36 +11723,36 @@ def inject_compact_table_rows_css() -> None:
   margin: 0 !important;
   padding: 0 !important;
 }}
-[class*="_table_wrap"] [data-testid="stImage"],
-[class*="_table_wrap"] [data-testid="stImage"] img {{
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) [data-testid="stImage"],
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) [data-testid="stImage"] img {{
   margin: 0 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
 }}
-[class*="_table_wrap"] .stButton > button,
-[class*="_table_wrap"] button[data-testid="stBaseButton-secondary"],
-[class*="_table_wrap"] button[data-testid="stBaseButton-primary"],
-[class*="_table_wrap"] button[data-testid="stBaseButton-popover"] {{
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) .stButton > button,
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) button[data-testid="stBaseButton-secondary"],
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) button[data-testid="stBaseButton-primary"],
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) button[data-testid="stBaseButton-popover"] {{
   white-space: nowrap !important;
   word-break: keep-all !important;
   overflow-wrap: normal !important;
 }}
-[class*="_table_wrap"] [class*="-cell"],
-[class*="_table_wrap"] .ips-data-cell,
-[class*="_table_wrap"] .jobs-table-cell,
-[class*="_table_wrap"] .job-cell {{
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) [class*="-cell"],
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) .ips-data-cell,
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) .jobs-table-cell,
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) .job-cell {{
   display: flex !important;
   align-items: center !important;
   min-height: 0 !important;
   height: 100% !important;
 }}
-[class*="_table_wrap"] [class*="status-cell"],
-[class*="_table_wrap"] [class*="actions-cell"],
-[class*="_table_wrap"] [class*="checkbox-cell"],
-[class*="_table_wrap"] [class*="thumb-cell"],
-[class*="_table_wrap"] [class*="image-cell"],
-[class*="_table_wrap"] [class*="-actcol"] {{
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) [class*="status-cell"],
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) [class*="actions-cell"],
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) [class*="checkbox-cell"],
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) [class*="thumb-cell"],
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) [class*="image-cell"],
+[class*="_table_wrap"]:not(.st-key-users_table_wrap) [class*="-actcol"] {{
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
