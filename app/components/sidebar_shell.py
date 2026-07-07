@@ -18,7 +18,9 @@ IPS_SIDEBAR_COLLAPSED_STORAGE_KEY = "ips_sidebar_collapsed"
 IPS_SIDEBAR_COLLAPSED_HYDRATED_KEY = "_ips_sidebar_collapsed_hydrated"
 IPS_SIDEBAR_DESKTOP_MIN_PX = 900
 IPS_SIDEBAR_EXPANDED_WIDTH_PX = 232
-IPS_SIDEBAR_COLLAPSED_WIDTH_PX = 60
+IPS_SIDEBAR_COLLAPSED_WIDTH_PX = 48
+IPS_SIDEBAR_COLLAPSED_NAV_HEIGHT_PX = 44
+IPS_SIDEBAR_COLLAPSED_ICON_PX = 18
 
 
 def _collapsed_sidebar_selectors() -> str:
@@ -183,7 +185,7 @@ def inject_sidebar_nav_override_css() -> None:
 def _sidebar_nav_override_css() -> str:
     """Final cascade override for sidebar navigation rows (not button chrome)."""
     return """
-<style id="ips-sidebar-nav-override-v3">
+<style id="ips-sidebar-nav-override-v4">
 section[data-testid="stSidebar"] > div,
 section[data-testid="stSidebar"] [data-testid="stSidebarContent"],
 section[data-testid="stSidebar"] .block-container {
@@ -331,8 +333,8 @@ body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap i
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"] img,
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed img,
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {
-  max-width: 42px !important;
-  max-height: 42px !important;
+  max-width: 32px !important;
+  max-height: 32px !important;
 }
 section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"],
 section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] {
@@ -362,7 +364,7 @@ section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed {
 }
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed,
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) .sidebar-logo-wrap--collapsed {
-  align-items: flex-start !important;
+  align-items: center !important;
 }
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-header-anchor--collapsed),
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stElementContainer"]:has(.sidebar-header-anchor--collapsed) {
@@ -377,22 +379,22 @@ body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stHori
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed) {
   min-height: 0 !important;
   height: auto !important;
-  align-items: flex-start !important;
+  align-items: center !important;
   margin: 0 !important;
-  padding: 0.12rem 0.08rem 0.18rem !important;
+  padding: 0.08rem 0 0.1rem !important;
   gap: 0 !important;
 }
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed) [data-testid="column"],
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed) [data-testid="column"] {
   min-height: 0 !important;
   padding: 0 !important;
-  align-self: flex-start !important;
+  align-self: center !important;
 }
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed) [data-testid="column"]:first-child,
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed) [data-testid="column"]:first-child {
   display: flex !important;
   justify-content: center !important;
-  align-items: flex-start !important;
+  align-items: center !important;
 }
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-logo-wrap--collapsed),
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stElementContainer"]:has(.sidebar-logo-wrap--collapsed) {
@@ -448,13 +450,13 @@ body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button,
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"],
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"] {
-  width: 2.5rem !important;
-  min-width: 2.5rem !important;
-  max-width: 2.5rem !important;
-  height: 2.5rem !important;
-  min-height: 2.5rem !important;
+  width: 48px !important;
+  min-width: 48px !important;
+  max-width: 48px !important;
+  height: 44px !important;
+  min-height: 44px !important;
   padding: 0 !important;
-  margin: 0.15rem auto !important;
+  margin: 4px auto !important;
   border-radius: 10px !important;
   justify-content: center !important;
 }
@@ -466,13 +468,39 @@ section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] [data-testid="stButton"] > button,
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"],
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stElementContainer"]:has(.sidebar-nav-item.active) + [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"] {
-  width: 2.5rem !important;
-  min-width: 2.5rem !important;
-  max-width: 2.5rem !important;
-  height: 2.5rem !important;
-  min-height: 2.5rem !important;
+  width: 48px !important;
+  min-width: 48px !important;
+  max-width: 48px !important;
+  height: 44px !important;
+  min-height: 44px !important;
   background: #2563eb !important;
   color: #ffffff !important;
+}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] .sidebar-nav-icon,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [class*="st-key-nav_"] .sidebar-nav-icon {
+  width: 18px !important;
+  min-width: 18px !important;
+  max-width: 18px !important;
+  flex: 0 0 18px !important;
+  font-size: 18px !important;
+}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton > button p,
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button p,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [class*="st-key-nav_"] .stButton > button p,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [class*="st-key-nav_"] [data-testid="stButton"] > button p {
+  justify-content: center !important;
+  text-align: center !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+  width: auto !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+  gap: 0 !important;
+}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [class*="st-key-nav_"] [data-testid="stElementContainer"],
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [class*="st-key-nav_"] [data-testid="stElementContainer"] {
+  margin: 0 !important;
+  padding: 0 !important;
 }
 </style>
 """
@@ -614,10 +642,12 @@ def request_sidebar_toggle() -> None:
 def _shell_css() -> str:
     exp = IPS_SIDEBAR_EXPANDED_WIDTH_PX
     col = IPS_SIDEBAR_COLLAPSED_WIDTH_PX
+    nav_h = IPS_SIDEBAR_COLLAPSED_NAV_HEIGHT_PX
+    icon = IPS_SIDEBAR_COLLAPSED_ICON_PX
     mobile_max = IPS_SIDEBAR_DESKTOP_MIN_PX - 1
     collapsed_sel = _collapsed_sidebar_selectors()
     return f"""
-<style id="ips-sidebar-shell-v9">
+<style id="ips-sidebar-shell-v10">
 section[data-testid="stSidebar"].app-sidebar,
 [data-testid="stSidebar"].app-sidebar {{
   transition: width 0.2s ease, min-width 0.2s ease, max-width 0.2s ease, flex-basis 0.2s ease !important;
@@ -778,8 +808,8 @@ button.ips-header-menu-btn {{
   body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) .sidebar-logo-wrap:not(.sidebar-logo-wrap--collapsed) [data-testid="stImage"] img,
   section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) .sidebar-logo-wrap:not(.sidebar-logo-wrap--collapsed) img,
   section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) .sidebar-logo-wrap:not(.sidebar-logo-wrap--collapsed) [data-testid="stImage"] img {{
-    max-width: 42px !important;
-    max-height: 42px !important;
+    max-width: 32px !important;
+    max-height: 32px !important;
   }}
   body.ips-sidebar-collapsed section[data-testid="stSidebar"]:hover .sidebar-logo-wrap img,
   body.ips-sidebar-collapsed section[data-testid="stSidebar"]:hover .sidebar-logo-wrap [data-testid="stImage"] img,
@@ -826,6 +856,16 @@ button.ips-header-menu-btn {{
     padding-top: 0.35rem !important;
     padding-bottom: 0.5rem !important;
   }}
+  {collapsed_sel} > div {{
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    padding-top: 0.2rem !important;
+    padding-bottom: 0.25rem !important;
+  }}
+  {collapsed_sel} [data-testid="stSidebarContent"] {{
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }}
   section[data-testid="stMain"] {{
     flex: 1 1 auto !important;
     min-width: 0 !important;
@@ -856,20 +896,20 @@ button.ips-header-menu-btn {{
   }}
   .sidebar-header--collapsed {{
     min-height: 0 !important;
-    padding: 0.12rem 0.15rem 0.15rem !important;
+    padding: 0.06rem 0 0.08rem !important;
   }}
   {collapsed_sel} [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed) {{
     min-height: 0 !important;
     height: auto !important;
-    align-items: flex-start !important;
+    align-items: center !important;
     margin: 0 !important;
-    padding: 0.12rem 0.08rem 0.18rem !important;
+    padding: 0.06rem 0 0.08rem !important;
     gap: 0 !important;
   }}
   {collapsed_sel} [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed) [data-testid="column"] {{
     min-height: 0 !important;
     padding: 0 !important;
-    align-self: flex-start !important;
+    align-self: center !important;
   }}
   {collapsed_sel} [data-testid="stElementContainer"]:has(.sidebar-logo-wrap--collapsed) {{
     margin: 0 !important;
@@ -951,8 +991,8 @@ button.ips-header-menu-btn {{
   .sidebar-header--collapsed .sidebar-logo-wrap [data-testid="stImage"] img,
   .sidebar-header--collapsed .sidebar-logo-wrap--collapsed img,
   .sidebar-header--collapsed .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {{
-    max-width: 42px !important;
-    max-height: 42px !important;
+    max-width: 32px !important;
+    max-height: 32px !important;
   }}
   section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"],
   section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] {{
@@ -993,7 +1033,52 @@ button.ips-header-menu-btn {{
   body.ips-sidebar-collapsed .sidebar-nav-scroll,
   section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) .ips-sidebar-nav-scroll,
   section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) .sidebar-nav-scroll {{
-    padding: 0.15rem 0.2rem !important;
+    padding: 0 !important;
+  }}
+  body.ips-sidebar-collapsed .ips-sidebar-footer,
+  body.ips-sidebar-collapsed .sidebar-footer,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) .ips-sidebar-footer,
+  section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) .sidebar-footer {{
+    padding: 0.2rem 0 0.15rem !important;
+  }}
+  {collapsed_sel}:not(:hover) [class*="st-key-nav_"] .stButton > button,
+  {collapsed_sel}:not(:hover) [class*="st-key-nav_"] [data-testid="stButton"] > button,
+  {collapsed_sel}:not(:hover) [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"],
+  {collapsed_sel}:not(:hover) [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"] {{
+    width: {col}px !important;
+    min-width: {col}px !important;
+    max-width: {col}px !important;
+    height: {nav_h}px !important;
+    min-height: {nav_h}px !important;
+    padding: 0 !important;
+    margin: 4px auto !important;
+    justify-content: center !important;
+  }}
+  {collapsed_sel}:not(:hover) [class*="st-key-nav_"] .sidebar-nav-icon {{
+    width: {icon}px !important;
+    min-width: {icon}px !important;
+    max-width: {icon}px !important;
+    flex: 0 0 {icon}px !important;
+    font-size: {icon}px !important;
+  }}
+  {collapsed_sel}:not(:hover) [class*="st-key-nav_"] .stButton > button p,
+  {collapsed_sel}:not(:hover) [class*="st-key-nav_"] [data-testid="stButton"] > button p {{
+    justify-content: center !important;
+    text-align: center !important;
+    font-size: {icon}px !important;
+    line-height: 1 !important;
+    gap: 0 !important;
+  }}
+  {collapsed_sel}:not(:hover) [class*="st-key-ips_logout"] .stButton > button,
+  {collapsed_sel}:not(:hover) [class*="st-key-ips_logout"] [data-testid="stButton"] > button {{
+    width: {col}px !important;
+    min-width: {col}px !important;
+    max-width: {col}px !important;
+    height: {nav_h}px !important;
+    min-height: {nav_h}px !important;
+    padding: 0 !important;
+    margin: 4px auto 0 !important;
+    justify-content: center !important;
   }}
   .ips-sidebar-footer,
   .sidebar-footer {{
