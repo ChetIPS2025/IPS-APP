@@ -474,10 +474,6 @@ def ensure_modal_styles() -> None:
     _ems()
 
 
-# Backward-compatible alias
-render_modal = ensure_modal_styles
-
-
 def apply_global_css() -> None:
     """Design-system entry: theme tokens, layout, tables, density."""
     try:
@@ -485,8 +481,3 @@ def apply_global_css() -> None:
     except ImportError:
         from ui.theme import apply_global_css as _apply  # type: ignore
     _apply()
-
-
-def render_filters(*args: Any, **kwargs: Any) -> dict[str, Any]:
-    """Alias for :func:`render_filter_row`."""
-    return render_filter_row(*args, **kwargs)

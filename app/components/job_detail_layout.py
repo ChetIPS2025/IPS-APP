@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import html
-from typing import Any, Callable
+from typing import Any
 
 import streamlit as st
 
@@ -778,16 +778,6 @@ def render_job_detail_header_menu_slot() -> None:
 
 def close_job_detail_header_menu_slot() -> None:
     st.markdown("</div>", unsafe_allow_html=True)
-
-
-def render_job_detail_header_actions(
-    job: dict,
-    *,
-    on_edit: Callable[[dict], None],
-    edit_key: str,
-) -> None:
-    """Deprecated — use job_detail_header_menu.render_job_detail_header_menu."""
-    _ = (job, on_edit, edit_key)
 
 
 def render_job_detail_footer_shell() -> None:

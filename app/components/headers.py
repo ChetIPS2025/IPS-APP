@@ -293,12 +293,3 @@ def render_dashboard_quick_actions(
                     ):
                         if slug:
                             _navigate_ops_quick_action(slug)
-
-
-def render_quick_actions_grid(
-    actions: list[tuple[str, str, str]],
-    *,
-    key_prefix: str = "ips_qa",
-) -> None:
-    """Backward-compatible alias for ``render_dashboard_quick_actions``."""
-    render_dashboard_quick_actions(actions, key_prefix=key_prefix)
