@@ -2877,88 +2877,26 @@ def _list_table_checkbox_column_css(table_wrap_key: str) -> str:
 
 
 def inject_inventory_module_css() -> None:
-    """Inventory list custom table styling."""
-    checkbox_css = _list_table_checkbox_column_css("inventory_table_wrap")
+    """Inventory module styling (detail views, thumbnails, transactions)."""
     st.markdown(
         f"""
-<style id="ips-inventory-module-v7">
-.ips-inventory-table-wrap {{
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  overflow: hidden;
-  margin-bottom: 0.5rem;
-}}
-.ips-inventory-header-row {{
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
-  padding: 8px 10px;
-  font-size: 12px;
-  font-weight: 800;
-  color: #475569;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  min-height: 38px;
-  display: flex;
-  align-items: center;
-}}
-.ips-inventory-row {{
-  background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
-  padding: 6px 10px;
-  min-height: 52px;
-}}
-.ips-inventory-row:hover {{
-  background: #eef5ff;
-}}
-.ips-inventory-cell {{
-  color: {TEXT};
-  font-size: 0.8125rem;
-  line-height: 1.25;
-  min-width: 0;
-}}
-.ips-inventory-number {{
-  font-size: 14px;
-  font-weight: 800;
-  color: #2563eb;
-  line-height: 1.25;
-  white-space: nowrap;
-}}
-.ips-inventory-sku-cell {{
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}}
-.ips-inventory-sku {{
-  font-size: 12px;
-  font-weight: 800;
-  color: #1d4ed8;
-  line-height: 1.2;
-  word-break: break-word;
-}}
-.ips-inventory-title {{
-  font-size: 14px;
-  font-weight: 700;
-  color: #0f172a;
-  line-height: 1.25;
-  word-break: break-word;
-}}
+<style id="ips-inventory-module-v8">
 .ips-inventory-muted {{
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: #64748b;
 }}
 .ips-inventory-qty {{
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }}
 .ips-inventory-status-pill {{
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 26px;
-  padding: 0 12px;
+  height: 22px;
+  padding: 0 10px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   white-space: nowrap;
 }}
@@ -2982,83 +2920,14 @@ def inject_inventory_module_css() -> None:
   background: #f1f5f9;
   color: #475569;
 }}
-.st-key-inventory_table_wrap [data-testid="stVerticalBlock"] {{
-  gap: 0 !important;
-}}
-.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
-  display: flex !important;
-  align-items: center !important;
-  align-self: stretch !important;
-}}
-.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"] > [data-testid="stVerticalBlock"] {{
-  width: 100%;
-  justify-content: center !important;
-}}
-.st-key-inventory_table_wrap [data-testid="stMarkdownContainer"],
-.st-key-inventory_table_wrap .stMarkdown,
-.st-key-inventory_table_wrap .stMarkdown p {{
-  margin: 0 !important;
-  padding: 0 !important;
-}}
-.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) {{
-  flex: 0 0 80px !important;
-  min-width: 80px !important;
-  max-width: 80px !important;
-  width: 80px !important;
-}}
-.st-key-inventory_table_wrap .stMarkdown p:has(.ips-inventory-image-cell),
-.st-key-inventory_table_wrap .stMarkdown p:has(.ips-inventory-thumb-cell) {{
-  line-height: normal !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}}
-.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"] {{
-  gap: 0.35rem !important;
-  align-items: center !important;
-  border-bottom: 1px solid #e2e8f0;
-  padding: 6px 10px !important;
-  margin: 0 !important;
-  min-height: 56px;
-  max-height: 64px;
-}}
-.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
-  background: #f8fafc;
-  min-height: 36px;
-  max-height: none;
-  padding: 5px 10px !important;
-}}
-.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
-  background: #eef5ff;
-}}
-.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
-  background: #eaf2ff !important;
-}}
-.st-key-inventory_table_wrap [data-testid="stElementContainer"] {{
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-}}
-.st-key-inventory_table_wrap [data-testid="stCheckbox"] {{
-  margin: 0 !important;
-}}
-{checkbox_css}
 .image-cell,
 .ips-inventory-image-cell {{
-  width: 80px !important;
-  min-width: 80px !important;
-  max-width: 80px !important;
-  text-align: center !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  vertical-align: middle !important;
-  flex-shrink: 0 !important;
-  height: auto !important;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }}
 .inventory-thumb,
-.pricing-thumb,
 .table-image-preview,
 .ips-inventory-thumb-img,
 .ips-inventory-thumb-placeholder {{
@@ -3074,31 +2943,22 @@ def inject_inventory_module_css() -> None:
   background: #f8fafc !important;
   display: block !important;
   margin: 0 auto !important;
-  flex-shrink: 0 !important;
   box-sizing: border-box !important;
 }}
 .ips-inventory-thumb-cell {{
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: 52px !important;
-  height: 52px !important;
-  min-width: 52px !important;
-  max-width: 52px !important;
-  min-height: 52px !important;
-  max-height: 52px !important;
-  vertical-align: middle !important;
-  flex-shrink: 0 !important;
-  line-height: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
 }}
 .ips-inventory-thumb-placeholder {{
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  object-fit: none !important;
-  color: #94a3b8 !important;
-  font-size: 1.1rem !important;
-  line-height: 1 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 1.1rem;
+  line-height: 1;
 }}
 .ips-inventory-detail-image {{
   max-width: 260px;
@@ -3151,77 +3011,6 @@ def inject_inventory_module_css() -> None:
   height: 36px !important;
   object-fit: cover !important;
   border-radius: 6px !important;
-}}
-.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) {{
-  position: relative !important;
-  cursor: pointer !important;
-}}
-.st-key-inventory_table_wrap .ips-inventory-table-row {{
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
-  overflow: hidden !important;
-  pointer-events: none !important;
-}}
-.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) [class*="st-key-inv_open_"] {{
-  width: 100% !important;
-  max-width: 100% !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}}
-.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) [class*="st-key-inv_open_"] [data-testid="stButton"],
-.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) [class*="st-key-inv_open_"] .stButton {{
-  width: 100% !important;
-  max-width: 100% !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  display: flex !important;
-  justify-content: flex-start !important;
-  align-items: center !important;
-}}
-.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) [class*="st-key-inv_open_"] button,
-.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) [class*="st-key-inv_open_"] [data-testid="stButton"] > button,
-.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) [class*="st-key-inv_open_"] button[data-testid="stBaseButton-tertiary"] {{
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  min-height: 0 !important;
-  height: auto !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  background: transparent !important;
-  background-color: transparent !important;
-  border: none !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  color: #2563eb !important;
-  font-size: 14px !important;
-  font-weight: 700 !important;
-  line-height: 1.25 !important;
-  text-align: left !important;
-  cursor: pointer !important;
-  overflow: visible !important;
-  white-space: normal !important;
-  word-break: break-word !important;
-  text-overflow: clip !important;
-}}
-.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) [class*="st-key-inv_open_"] button:hover,
-.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) [class*="st-key-inv_open_"] [data-testid="stButton"] > button:hover,
-.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) [class*="st-key-inv_open_"] button[data-testid="stBaseButton-tertiary"]:hover {{
-  color: #1d4ed8 !important;
-  text-decoration: underline !important;
-  background: transparent !important;
-  background-color: transparent !important;
-}}
-.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) [class*="st-key-inv_open_"] button > div,
-.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row) [class*="st-key-inv_open_"] button p {{
-  margin: 0 !important;
-  padding: 0 !important;
-  text-align: left !important;
-  white-space: normal !important;
-  word-break: break-word !important;
 }}
 </style>
 """,

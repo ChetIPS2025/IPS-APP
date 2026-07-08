@@ -9,6 +9,21 @@ import streamlit as st
 
 try:
     from app.components.inventory_actions import render_inventory_action_buttons
+    from app.components.inventory_list_table import (
+        INVENTORY_TABLE_LAST_ACTION_KEY,
+        build_inventory_html_table,
+        inventory_category,
+        inventory_description,
+        inventory_location,
+        inventory_vendor,
+        normalize_inventory_status,
+        render_inventory_table_bridge,
+    )
+    from app.components.inventory_page_layout import (
+        close_inventory_filter_bar_shell,
+        inject_inventory_page_layout_css,
+        render_inventory_filter_bar_shell,
+    )
     from app.components.inventory_pricing_guide_actions import render_inventory_pricing_guide_actions
     from app.components.item_photo_manager import render_item_photo_manager
     from app.components.headers import render_page_brand_header
@@ -93,6 +108,21 @@ try:
 except ImportError:
     from components.qr_scan_history_ui import inject_qr_scan_history_css, render_qr_scan_history_table  # type: ignore
     from components.inventory_actions import render_inventory_action_buttons  # type: ignore
+    from components.inventory_list_table import (  # type: ignore
+        INVENTORY_TABLE_LAST_ACTION_KEY,
+        build_inventory_html_table,
+        inventory_category,
+        inventory_description,
+        inventory_location,
+        inventory_vendor,
+        normalize_inventory_status,
+        render_inventory_table_bridge,
+    )
+    from components.inventory_page_layout import (  # type: ignore
+        close_inventory_filter_bar_shell,
+        inject_inventory_page_layout_css,
+        render_inventory_filter_bar_shell,
+    )
     from components.inventory_pricing_guide_actions import render_inventory_pricing_guide_actions  # type: ignore
     from components.item_photo_manager import render_item_photo_manager  # type: ignore
     from components.headers import render_page_header  # type: ignore
@@ -186,25 +216,18 @@ _EXPORT_CACHE_KEY = "inv_label_export_cache_key"
 _EXPORT_ZIP_BYTES_KEY = "inv_label_export_zip_bytes"
 _EXPORT_CSV_BYTES_KEY = "inv_label_export_csv_bytes"
 _EXPORT_COUNT_KEY = "inv_label_export_item_count"
-_INV_COLS = [0.42, 0.9, 4.28, 1.8, 1.6, 1.1, 0.8, 1.0, 1.3, 1.8]
-_INV_HEADER_SPECS: list[tuple[str, str | None]] = [
-    ("", None),
-    ("IMAGE", None),
-    ("DESCRIPTION", None),
+_INVENTORY_FILTER_SPECS: list[tuple[str, str]] = [
     ("CATEGORY", "category"),
     ("LOCATION", "location"),
-    ("QTY ON HAND", None),
-    ("UNIT", None),
-    ("UNIT COST", None),
     ("STATUS", "status"),
     ("VENDOR", "vendor"),
 ]
 _FILTER_FIELDS = ["category", "location", "status", "vendor"]
 _COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
-    ("category", lambda r: _inventory_category(r)),
-    ("location", lambda r: _inventory_location(r)),
-    ("status", lambda r: _normalize_inventory_status(r.get("status"))),
-    ("vendor", lambda r: _inventory_vendor(r)),
+    ("category", lambda r: inventory_category(r)),
+    ("location", lambda r: inventory_location(r)),
+    ("status", lambda r: normalize_inventory_status(r.get("status"))),
+    ("vendor", lambda r: inventory_vendor(r)),
 ]
 
 _INV_TABS = [
@@ -218,25 +241,6 @@ _INV_TABS = [
 ]
 
 
-def _normalize_inventory_status(raw: object) -> str:
-    s = str(raw or "").strip().lower().replace("_", " ")
-    mapping = {
-        "": "In Stock",
-        "in stock": "In Stock",
-        "available": "In Stock",
-        "low stock": "Low Stock",
-        "needs reorder": "Needs Reorder",
-        "out of stock": "Out of Stock",
-        "depleted": "Out of Stock",
-        "on order": "On Order",
-        "discontinued": "Discontinued",
-    }
-    if s in mapping:
-        return mapping[s]
-    label = str(raw or "").strip()
-    return label if label else "In Stock"
-
-
 def _inventory_sku(row: dict) -> str:
     return resolve_inventory_sku(row)
 
@@ -246,31 +250,19 @@ def _inventory_item_number(row: dict) -> str:
 
 
 def _inventory_description(row: dict) -> str:
-    for key in ("description", "item_name", "name"):
-        val = str(row.get(key) or "").strip()
-        if val:
-            return val
-    return "—"
+    return inventory_description(row)
 
 
 def _inventory_category(row: dict) -> str:
-    return str(row.get("category") or "").strip() or "—"
+    return inventory_category(row)
 
 
 def _inventory_location(row: dict) -> str:
-    for key in ("location_name", "location"):
-        val = str(row.get(key) or "").strip()
-        if val:
-            return val
-    return "—"
+    return inventory_location(row)
 
 
 def _inventory_vendor(row: dict) -> str:
-    for key in ("vendor_name", "vendor"):
-        val = str(row.get(key) or "").strip()
-        if val:
-            return val
-    return "—"
+    return inventory_vendor(row)
 
 
 def _inventory_unit(row: dict) -> str:
@@ -287,19 +279,6 @@ def _inventory_qty(row: dict) -> str:
     return format_inventory_quantity(row.get("quantity_on_hand") or row.get("qty_on_hand") or row.get("quantity"))
 
 
-def _inventory_status_pill_html(status: str) -> str:
-    cls_map = {
-        "In Stock": "ips-inventory-status-in-stock",
-        "Low Stock": "ips-inventory-status-low-stock",
-        "Needs Reorder": "ips-inventory-status-low-stock",
-        "Out of Stock": "ips-inventory-status-out-of-stock",
-        "On Order": "ips-inventory-status-on-order",
-        "Discontinued": "ips-inventory-status-discontinued",
-    }
-    cls = cls_map.get(status, "ips-inventory-status-in-stock")
-    return f'<span class="ips-inventory-status-pill {cls}">{html.escape(status)}</span>'
-
-
 def _current_user_id() -> str | None:
     try:
         from app.auth import current_profile
@@ -307,14 +286,6 @@ def _current_user_id() -> str | None:
         from auth import current_profile  # type: ignore
     uid = str((current_profile() or {}).get("id") or "").strip()
     return uid or None
-
-
-def _render_inventory_thumbnail(item: dict) -> None:
-    try:
-        from app.services.inventory_images import render_inventory_item_thumbnail
-    except ImportError:
-        from services.inventory_images import render_inventory_item_thumbnail  # type: ignore
-    render_inventory_item_thumbnail(item, width=52)
 
 
 def _render_inventory_photo_manager(item: dict) -> None:
@@ -342,35 +313,10 @@ def _render_inventory_detail_image(item: dict) -> None:
     _render_inventory_photo_manager(item)
 
 
-def _inventory_select_key(item_id: str) -> str:
-    return f"inventory_select_{item_id}"
-
-
 def _clear_inventory_selection(item_ids: list[str] | None = None) -> None:
+    _ = item_ids
     st.session_state[SELECTED_INVENTORY_KEY] = None
     st.session_state[SHOW_INVENTORY_MODAL_KEY] = False
-    ids = list(item_ids or [])
-    for iid in ids:
-        st.session_state[_inventory_select_key(iid)] = False
-    for key in list(st.session_state.keys()):
-        if isinstance(key, str) and key.startswith("inventory_select_"):
-            st.session_state[key] = False
-
-
-def _on_inventory_checkbox_change(item_id: str, all_item_ids: list[str]) -> None:
-    key = _inventory_select_key(item_id)
-    if st.session_state.get(key):
-        for iid in all_item_ids:
-            if iid != item_id:
-                st.session_state[_inventory_select_key(iid)] = False
-        st.session_state[SELECTED_INVENTORY_KEY] = item_id
-        st.session_state[SHOW_INVENTORY_MODAL_KEY] = True
-        cache = st.session_state.get(_CACHE_KEY) or {}
-        item = cache.get(item_id) if isinstance(cache, dict) else None
-        _open_inventory_modal(item_id, item)
-    elif st.session_state.get(SELECTED_INVENTORY_KEY) == item_id:
-        st.session_state[SELECTED_INVENTORY_KEY] = None
-        st.session_state[SHOW_INVENTORY_MODAL_KEY] = False
 
 
 def _render_inventory_expand_panel(item: dict) -> None:
@@ -393,6 +339,30 @@ def _render_inventory_expand_panel(item: dict) -> None:
         st.rerun()
 
 
+def _render_inventory_table_column_filters(
+    *,
+    filter_options: dict[str, list[str]],
+) -> None:
+    if not _INVENTORY_FILTER_SPECS:
+        return
+    st.markdown('<div class="ips-inventory-table-filter-toolbar">', unsafe_allow_html=True)
+    cols = st.columns(len(_INVENTORY_FILTER_SPECS), gap="small")
+    for col, (label, field) in zip(cols, _INVENTORY_FILTER_SPECS):
+        with col:
+            render_table_header_cell(
+                label,
+                table_key=_TABLE_KEY,
+                filter_field=field,
+                filter_options=filter_options.get(field, []),
+                base_class="ips-inventory-filter-toolbar-cell",
+            )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def _on_inventory_table_expand(item_id: str, item: dict) -> None:
+    toggle_field_expanded(FIELD_EXPANDED_INVENTORY_KEY, item_id)
+
+
 def _render_custom_inventory_table(
     filtered: list[dict],
     *,
@@ -406,134 +376,39 @@ def _render_custom_inventory_table(
     all_item_ids = [str(i.get("id") or "").strip() for i in filtered if str(i.get("id") or "").strip()]
     st.session_state[_ALL_INVENTORY_IDS_KEY] = all_item_ids
 
-    with st.container(key="inventory_table_wrap"):
-        st.markdown('<div class="ips-inventory-table-wrap">', unsafe_allow_html=True)
-
-        header_cols = st.columns(_INV_COLS, gap="small", vertical_alignment="center")
-        for col, (label, field) in zip(header_cols, _INV_HEADER_SPECS):
-            with col:
-                if field:
-                    render_table_header_cell(
-                        label,
-                        table_key=_TABLE_KEY,
-                        filter_field=field,
-                        filter_options=filter_options.get(field, []),
-                        base_class="ips-inventory-header-row ips-inventory-cell",
-                    )
-                else:
-                    render_table_header_cell(
-                        label,
-                        base_class="ips-inventory-header-row ips-inventory-cell",
-                    )
-
-        for item in filtered:
-            iid = str(item.get("id") or "").strip()
-            if not iid:
-                continue
-
-            description = _inventory_description(item)
-            category = _inventory_category(item)
-            location = _inventory_location(item)
-            qty = _inventory_qty(item)
-            unit = _inventory_unit(item)
-            unit_cost = fmt_currency(item.get("unit_cost"))
-            status = _normalize_inventory_status(item.get("status"))
-            vendor = _inventory_vendor(item)
-            field_mode = is_field_context()
-            expanded = field_mode and field_expanded_id(FIELD_EXPANDED_INVENTORY_KEY) == iid
-
-            cols = st.columns(_INV_COLS, gap="small", vertical_alignment="center")
-
-            with cols[0]:
-                if field_mode:
-                    if st.button(
-                        "▾" if expanded else "▸",
-                        key=f"inv_expand_{iid}",
-                        help="Expand item details",
-                    ):
-                        toggle_field_expanded(FIELD_EXPANDED_INVENTORY_KEY, iid)
-                        st.rerun()
-                else:
-                    st.checkbox(
-                        "",
-                        key=_inventory_select_key(iid),
-                        label_visibility="collapsed",
-                        on_change=_on_inventory_checkbox_change,
-                        args=(iid, all_item_ids),
-                    )
-
-            with cols[1]:
-                _render_inventory_thumbnail(item)
-
-            with cols[2]:
-                open_label = _inventory_description_open_label(description)
-                if st.button(
-                    open_label,
-                    key=f"inv_open_{iid}",
-                    type="tertiary",
-                    help=f"View {open_label}",
-                    use_container_width=True,
-                ):
-                    _open_inventory_table_item(iid, item)
-
-            with cols[3]:
-                st.markdown(
-                    f'<div class="ips-inventory-cell">{html.escape(category)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[4]:
-                st.markdown(
-                    f'<div class="ips-inventory-cell">{html.escape(location)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[5]:
-                st.markdown(
-                    f'<div class="ips-inventory-cell ips-inventory-qty">{html.escape(qty)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[6]:
-                st.markdown(
-                    f'<div class="ips-inventory-muted ips-inventory-cell">{html.escape(unit)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[7]:
-                st.markdown(
-                    f'<div class="ips-inventory-cell">{html.escape(unit_cost)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[8]:
-                st.markdown(_inventory_status_pill_html(status), unsafe_allow_html=True)
-
-            with cols[9]:
-                st.markdown(
-                    f'<div class="ips-inventory-muted ips-inventory-cell">{html.escape(vendor)}</div>'
-                    f"{_inventory_row_marker_html(iid)}",
-                    unsafe_allow_html=True,
-                )
-
-            if expanded:
-                st.markdown('<div class="ips-field-row-expand">', unsafe_allow_html=True)
-                _render_inventory_expand_panel(item)
-                st.markdown("</div>", unsafe_allow_html=True)
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
     items_by_id = {
         str(i.get("id") or "").strip(): i
         for i in filtered
         if str(i.get("id") or "").strip()
     }
-    picked = _render_inventory_row_click_bridge()
-    if picked:
-        open_id = str(picked).strip()
-        open_item = items_by_id.get(open_id)
-        if open_item:
-            _open_inventory_table_item(open_id, open_item)
+    field_mode = is_field_context()
+    expanded_item_id = str(field_expanded_id(FIELD_EXPANDED_INVENTORY_KEY) or "").strip() if field_mode else ""
+
+    with st.container(key="inventory_table_wrap"):
+        _render_inventory_table_column_filters(filter_options=filter_options)
+        st.markdown(
+            build_inventory_html_table(
+                filtered,
+                field_mode=field_mode,
+                expanded_item_id=expanded_item_id,
+            ),
+            unsafe_allow_html=True,
+        )
+
+        if field_mode and expanded_item_id and expanded_item_id in items_by_id:
+            expanded_item = items_by_id[expanded_item_id]
+            st.markdown('<div class="ips-field-row-expand">', unsafe_allow_html=True)
+            _render_inventory_expand_panel(expanded_item)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        render_inventory_table_bridge(
+            items_by_id,
+            component_key="ips_inventory_list_bridge",
+            hook_key="ipsInvList::action",
+            open_item_fn=_open_inventory_table_item,
+            on_expand_fn=_on_inventory_table_expand if field_mode else None,
+            field_mode=field_mode,
+        )
 
     return all_item_ids
 
@@ -557,7 +432,7 @@ def _filter_rows(
             or ql in _inventory_category(r).lower()
             or ql in _inventory_location(r).lower()
             or ql in _inventory_vendor(r).lower()
-            or ql in _normalize_inventory_status(r.get("status")).lower()
+            or ql in normalize_inventory_status(r.get("status")).lower()
             or ql in str(r.get("stock_policy_label") or "").lower()
         ]
     return apply_column_filters(out, _TABLE_KEY, _COLUMN_FILTER_SPECS)
@@ -566,6 +441,7 @@ def _filter_rows(
 def _clear_inventory_modal() -> None:
     item_ids = st.session_state.get(_ALL_INVENTORY_IDS_KEY) or []
     _clear_inventory_selection([str(iid) for iid in item_ids])
+    st.session_state.pop(INVENTORY_TABLE_LAST_ACTION_KEY, None)
     clear_edit_modes(_MODULE)
     clear_record_modal(
         table_key="inventory_list",
@@ -593,102 +469,6 @@ def _open_inventory_modal(record_id: str, record: dict | None) -> None:
 def _open_inventory_table_item(item_id: str, item: dict | None = None) -> None:
     """Set selected inventory state; the page render opens the dialog once."""
     _open_inventory_modal(item_id, item)
-
-
-def _inventory_description_open_label(description: str) -> str:
-    return description if description and description != "—" else "View item"
-
-
-def _inventory_row_marker_html(item_id: str) -> str:
-    iid_attr = html.escape(item_id, quote=True)
-    return f'<span class="ips-inventory-table-row" data-row-id="{iid_attr}" aria-hidden="true"></span>'
-
-
-def _render_inventory_row_click_bridge() -> str | None:
-    try:
-        from app.ui.clean_table import _components_html
-    except ImportError:
-        from ui.clean_table import _components_html  # type: ignore
-
-    st.markdown(
-        '<span class="ips-inventory-row-click-bridge-marker" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
-    return _components_html(
-        """
-<script>
-(function () {
-  const w = window.parent || window;
-  const doc = w.document;
-  const hookKey = "ipsInventoryRowClick::list";
-  const tblSel = ".st-key-inventory_table_wrap";
-  const rowSel = '[data-testid="stHorizontalBlock"]:has(.ips-inventory-table-row)';
-
-  function sendValue(id) {
-    const payload = { type: "streamlit:setComponentValue", value: id };
-    const frames = [window, window.parent, w].filter(function (f, i, arr) {
-      return f && arr.indexOf(f) === i;
-    });
-    for (var i = 0; i < frames.length; i++) {
-      try {
-        if (frames[i].Streamlit && typeof frames[i].Streamlit.setComponentValue === "function") {
-          frames[i].Streamlit.setComponentValue(id);
-          return;
-        }
-      } catch (err) {}
-    }
-    for (var j = 0; j < frames.length; j++) {
-      try { frames[j].postMessage(payload, "*"); } catch (err) {}
-    }
-  }
-
-  function isInteractive(target) {
-    return !!(target && target.closest && target.closest(
-      "button, input, select, textarea, label, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox'], [class*='st-key-inv_open_']"
-    ));
-  }
-
-  function tableScope() {
-    const anchor = doc.querySelector(tblSel);
-    if (!anchor) return null;
-    return anchor.closest('[data-testid="stVerticalBlockBorderWrapper"]') || anchor.parentElement;
-  }
-
-  function bindRows() {
-    const scope = tableScope();
-    if (!scope) return;
-    scope.querySelectorAll(rowSel).forEach(function (row) {
-      if (row.dataset.ipsInventoryRowBound === "1") return;
-      row.dataset.ipsInventoryRowBound = "1";
-      row.addEventListener("click", function (e) {
-        if (isInteractive(e.target)) return;
-        const marker = row.querySelector(".ips-inventory-table-row[data-row-id]");
-        const id = marker && marker.getAttribute("data-row-id");
-        if (!id) return;
-        e.preventDefault();
-        e.stopPropagation();
-        sendValue(id);
-      });
-    });
-  }
-
-  if (!doc.ipsInventoryRowClickRegistry) doc.ipsInventoryRowClickRegistry = {};
-  doc.ipsInventoryRowClickRegistry[hookKey] = { bind: bindRows };
-  bindRows();
-  if (!doc.ipsInventoryRowBindObserver) {
-    doc.ipsInventoryRowBindObserver = new MutationObserver(function () {
-      Object.values(doc.ipsInventoryRowClickRegistry || {}).forEach(function (cfg) {
-        if (cfg && typeof cfg.bind === "function") cfg.bind();
-      });
-    });
-    doc.ipsInventoryRowBindObserver.observe(doc.body, { childList: true, subtree: true });
-  }
-})();
-</script>
-        """,
-        component_key="ips_inventory_row_click_bridge",
-        height=0,
-    )
 
 
 def _inventory_select_options(slug: str, current: str) -> list[str]:
@@ -1114,6 +894,7 @@ def render() -> None:
         render_inventory_scan_page()
         return
     inject_inventory_module_css()
+    inject_inventory_page_layout_css()
     if is_field_context():
         inject_field_row_expand_css()
     st.markdown(
@@ -1297,7 +1078,9 @@ def render() -> None:
     tab_items, tab_qr_history = st.tabs(["Items", "QR Scan History"])
 
     with tab_items:
+        render_inventory_filter_bar_shell()
         layout_filter_bar(_filters)
+        close_inventory_filter_bar_shell()
 
         filtered = _filter_rows(
             rows,
