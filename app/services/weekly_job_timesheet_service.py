@@ -399,6 +399,7 @@ def _build_charges_from_job_cost_transactions(
             COST_RENTAL,
             COST_SUBCONTRACT,
             fetch_job_cost_transactions,
+            transaction_show_on_invoice,
         )
     except ImportError:
         from services.job_cost_transaction_service import (  # type: ignore
@@ -409,6 +410,7 @@ def _build_charges_from_job_cost_transactions(
             COST_RENTAL,
             COST_SUBCONTRACT,
             fetch_job_cost_transactions,
+            transaction_show_on_invoice,
         )
     materials: list[TimesheetLine] = []
     equipment: list[TimesheetLine] = []
@@ -422,6 +424,8 @@ def _build_charges_from_job_cost_transactions(
             continue
         total = _num(txn.get("total_cost"))
         if total <= 0:
+            continue
+        if not transaction_show_on_invoice(txn):
             continue
         if cat == COST_MATERIAL:
             materials.append(_txn_to_charge_line(txn, "material"))

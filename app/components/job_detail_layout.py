@@ -538,6 +538,7 @@ def build_job_detail_tab_labels(job: dict[str, Any]) -> list[str]:
         _count_label("Tasks", open_subjobs),
         "Schedule",
         "Crew & Time",
+        "Cost",
         "Materials",
         "Equipment",
         _count_label("Documents", document_count),

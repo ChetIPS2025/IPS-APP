@@ -50,6 +50,7 @@ try:
     )
     from app.components.job_ips_forms import render_job_ips_forms_tab
     from app.components.job_materials_ui import render_job_materials_tab
+    from app.components.job_cost_tab import render_job_cost_tab
     from app.components.job_costing_tab import render_job_costing_tab
     from app.components.job_cost_summary_cards import (
         render_job_cost_breakdown,
@@ -135,6 +136,7 @@ except ImportError:
     )
     from components.job_ips_forms import render_job_ips_forms_tab  # type: ignore
     from components.job_materials_ui import render_job_materials_tab  # type: ignore
+    from components.job_cost_tab import render_job_cost_tab  # type: ignore
     from components.job_costing_tab import render_job_costing_tab  # type: ignore
     from services.job_financial_ui import (  # type: ignore
         BILLING_TYPE_OPTIONS,
@@ -2552,6 +2554,8 @@ def _render_job_detail_tabs(job: dict, *, cost_summary: dict | None = None) -> N
     idx += 1
     tab_crew = tabs[idx]
     idx += 1
+    tab_cost = tabs[idx]
+    idx += 1
     tab_materials = tabs[idx]
     idx += 1
     tab_equipment = tabs[idx]
@@ -2614,6 +2618,12 @@ def _render_job_detail_tabs(job: dict, *, cost_summary: dict | None = None) -> N
             )
         else:
             _render_dialog_placeholder("Save this job before viewing crew and time data.")
+
+    with tab_cost:
+        if jid:
+            render_job_cost_tab(job, key_prefix=f"job_cost_lines_{job_key}")
+        else:
+            _render_dialog_placeholder("Save this job before viewing cost lines.")
 
     with tab_materials:
         render_job_materials_tab(job, key_prefix=f"job_mat_{jid}")
@@ -2965,6 +2975,8 @@ def _focus_job_detail_tab_if_requested() -> None:
         return
     alias_map = {
         "job costing": "financial",
+        "cost lines": "cost",
+        "materials used": "cost",
         "labor summary": "crew & time",
         "weekly timesheets": "crew & time",
         "subjobs": "tasks",

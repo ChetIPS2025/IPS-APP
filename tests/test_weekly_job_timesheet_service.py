@@ -34,6 +34,37 @@ class TestWeeklyJobTimesheetCharges(unittest.TestCase):
         self.assertEqual(totals["charges"], 245.0)
 
     @patch("app.services.job_cost_transaction_service.fetch_job_cost_transactions")
+    def test_build_charges_skips_hidden_invoice_lines(self, fetch_mock) -> None:
+        fetch_mock.return_value = [
+            {
+                "transaction_date": "2026-05-28",
+                "cost_category": "material",
+                "quantity": 1,
+                "unit_cost": 10,
+                "total_cost": 10,
+                "description": "Visible",
+                "show_on_invoice": True,
+            },
+            {
+                "transaction_date": "2026-05-28",
+                "cost_category": "material",
+                "quantity": 1,
+                "unit_cost": 99,
+                "total_cost": 99,
+                "description": "Hidden",
+                "show_on_invoice": False,
+            },
+        ]
+        with patch("app.services.weekly_job_timesheet_service._safe_admin_fetch", return_value=[]):
+            materials, equipment, other = _build_charges_from_job_cost_transactions(
+                "job-1",
+                date(2026, 5, 25),
+                date(2026, 5, 31),
+            )
+        self.assertEqual(len(materials), 1)
+        self.assertEqual(materials[0].description, "Visible")
+
+    @patch("app.services.job_cost_transaction_service.fetch_job_cost_transactions")
     def test_build_charges_from_job_cost_transactions(self, fetch_mock) -> None:
         fetch_mock.return_value = [
             {

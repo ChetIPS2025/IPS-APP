@@ -530,10 +530,6 @@ def render_job_materials_tab(job: dict, *, key_prefix: str = "job_mat") -> None:
         return
 
     materials = fetch_job_materials(jid)
-    subjob_labels_list, subjob_map = _subjob_options(jid)
-    subjob_id_to_label = {v: k for k, v in subjob_map.items()}
-    emp_labels_list, emp_map = _employee_select_options()
-    emp_id_to_label = {v: k for k, v in emp_map.items() if v}
 
     _render_materials_summary(jid, materials)
 
@@ -547,11 +543,10 @@ def render_job_materials_tab(job: dict, *, key_prefix: str = "job_mat") -> None:
             open_jobs_job_costing(job_id=jid)
             st.rerun()
 
-    st.markdown("#### Materials used")
-    _render_materials_table(
-        materials,
-        subjob_labels=subjob_id_to_label,
-        employee_labels=emp_id_to_label,
+    st.markdown("#### Add materials")
+    st.caption(
+        "Record new materials, inventory issues, and scans here. "
+        "View all cost lines (including scans and labor) on the **Cost** tab."
     )
 
     _render_add_materials_form(job, key_prefix=key_prefix)

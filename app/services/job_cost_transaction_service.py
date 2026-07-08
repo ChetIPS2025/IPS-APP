@@ -210,12 +210,17 @@ def upsert_job_cost_transaction(payload: dict[str, Any]) -> bool:
     }
     if payload.get("created_by"):
         body["created_by"] = payload.get("created_by")
+    if payload.get("show_on_invoice") is not None:
+        body["show_on_invoice"] = bool(payload.get("show_on_invoice"))
     db = _db()
     try:
         existing = db.fetch_by_match(_TABLE, {"source_type": source_type, "source_id": source_id}, limit=1) or []
         if existing:
+            if "show_on_invoice" not in body:
+                body["show_on_invoice"] = bool(existing[0].get("show_on_invoice", True))
             db.update_rows(_TABLE, body, {"id": existing[0]["id"]})
         else:
+            body.setdefault("show_on_invoice", True)
             db.insert_row(_TABLE, body)
         refresh_job_actual_cost(job_id)
         return True
@@ -561,6 +566,109 @@ def fetch_job_cost_transactions(job_id: str, *, limit: int = 2000) -> list[dict[
         return []
     rows.sort(key=lambda r: (str(r.get("transaction_date") or ""), str(r.get("created_at") or "")), reverse=True)
     return rows
+
+
+def fetch_invoice_job_cost_transactions(job_id: str, *, limit: int = 2000) -> list[dict[str, Any]]:
+    """Ledger lines eligible for customer invoice / T&M billing output."""
+    return [t for t in fetch_job_cost_transactions(job_id, limit=limit) if transaction_show_on_invoice(t)]
+
+
+def transaction_show_on_invoice(row: dict[str, Any]) -> bool:
+    """Default true when column missing (pre-migration rows)."""
+    if row.get("show_on_invoice") is None:
+        return True
+    return bool(row.get("show_on_invoice"))
+
+
+def can_manage_cost_invoice_visibility() -> bool:
+    """Only admins may toggle per-line invoice visibility."""
+    return can_manage_manual_cost_adjustments()
+
+
+def update_job_cost_show_on_invoice(transaction_id: str, show_on_invoice: bool) -> bool:
+    """Admin-only: include or exclude a cost line from customer invoice output."""
+    if not can_manage_cost_invoice_visibility():
+        return False
+    tid = str(transaction_id or "").strip()
+    if not tid:
+        return False
+    try:
+        rows = _db().fetch_by_match(_TABLE, {"id": tid}, limit=1) or []
+    except Exception:
+        return False
+    if not rows:
+        return False
+    jid = str(rows[0].get("job_id") or "").strip()
+    try:
+        _db().update_rows(
+            _TABLE,
+            {
+                "show_on_invoice": bool(show_on_invoice),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+            {"id": tid},
+        )
+    except Exception as exc:
+        _LOG.warning("update_job_cost_show_on_invoice failed: %s", exc)
+        return False
+    if jid:
+        invalidate_job_cost_session(jid)
+    return True
+
+
+def transaction_cost_unit(row: dict[str, Any]) -> str:
+    notes = str(row.get("notes") or "").lower()
+    for token, unit in (
+        ("(hour)", "hr"),
+        ("(day)", "day"),
+        ("(week)", "week"),
+        ("(month)", "month"),
+    ):
+        if token in notes:
+            return unit
+    cat = str(row.get("cost_category") or "").strip().lower()
+    if cat == COST_LABOR:
+        return "hr"
+    if cat in {COST_EQUIPMENT, COST_RENTAL}:
+        return "day"
+    return "ea"
+
+
+def transaction_cost_tab_source(row: dict[str, Any]) -> str:
+    """Customer-facing source bucket for the Job Cost tab."""
+    source_type = str(row.get("source_type") or "").strip()
+    category = str(row.get("cost_category") or "").strip().lower()
+    notes = str(row.get("notes") or "").strip().lower()
+    if source_type in {SOURCE_TIME_ENTRY, SOURCE_TIMEKEEPING_DAY} or category == COST_LABOR:
+        return "Labor"
+    if "inventory scan" in notes or "qr_scan" in notes or "scan" in notes and "inventory" in notes:
+        return "QR Scan"
+    if source_type == SOURCE_JOB_MATERIAL and row.get("inventory_item_id"):
+        return "Inventory"
+    if source_type == SOURCE_JOB_MATERIAL:
+        return "Material"
+    if category == COST_MATERIAL:
+        if row.get("inventory_item_id"):
+            return "Inventory"
+        return "Material"
+    if source_type in {SOURCE_JOB_EQUIPMENT, SOURCE_ASSET_ASSIGNMENT} or category in {COST_EQUIPMENT, COST_RENTAL}:
+        return "Equipment"
+    if source_type == SOURCE_JOB_EXPENSE or category in {COST_SUBCONTRACT, COST_OTHER}:
+        return "Other"
+    if source_type == SOURCE_MANUAL_ADJUSTMENT:
+        return "Other"
+    return "Other"
+
+
+def transaction_datetime_display(row: dict[str, Any]) -> str:
+    txn_date = str(row.get("transaction_date") or "")[:10]
+    created = str(row.get("created_at") or "").strip()
+    time_part = ""
+    if created and "T" in created:
+        time_part = created.split("T", 1)[1][:5]
+    if txn_date and time_part:
+        return f"{txn_date} {time_part}"
+    return txn_date or created[:16] or "—"
 
 
 def _norm_estimate_status(status: Any) -> str:
@@ -1096,4 +1204,7 @@ def transaction_employee_name(row: dict[str, Any], employees_by_id: dict[str, di
     eid = str(row.get("employee_id") or "").strip()
     if eid and eid in employees_by_id:
         return str(employees_by_id[eid].get("name") or "—").strip() or "—"
+    created_by = str(row.get("created_by") or "").strip()
+    if created_by and created_by in employees_by_id:
+        return str(employees_by_id[created_by].get("name") or "—").strip() or "—"
     return "—"

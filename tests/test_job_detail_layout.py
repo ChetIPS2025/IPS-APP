@@ -13,6 +13,7 @@ def test_job_detail_tab_labels_include_core_tabs():
     assert labels[1].startswith("Tasks")
     assert "Schedule" in labels
     assert "Crew & Time" in labels
+    assert "Cost" in labels
     assert "Activity" in labels
 
 
