@@ -234,7 +234,7 @@ div[data-testid="stDialog"]:has(.ips-job-detail-control-page) .ips-jc-summary-ca
   min-height: 58px;
   padding: 8px 10px;
 }
-div[data-testid="stDialog"]:has(.ips-job-detail-header-menu-marker) [data-testid="stPopover"] > button {
+div[data-testid="stDialog"]:has(.ips-job-detail-header-menu-marker) button[data-testid="stBaseButton-secondary"] {
   min-width: 28px !important;
   width: 28px !important;
   height: 28px !important;
@@ -247,19 +247,45 @@ div[data-testid="stDialog"]:has(.ips-job-detail-header-menu-marker) [data-testid
   font-size: 1rem !important;
   font-weight: 700 !important;
 }
-div[data-testid="stDialog"]:has(.ips-job-detail-header-menu-marker) [data-testid="stPopover"] > button:hover {
+div[data-testid="stDialog"]:has(.ips-job-detail-header-menu-marker) button[data-testid="stBaseButton-secondary"]:hover {
   background: #f1f5f9 !important;
   border-color: #e2e8f0 !important;
   color: #0f172a !important;
 }
-div[data-testid="stPopoverBody"]:has(.job-detail-header-menu-panel) {
-  min-width: 210px !important;
+div[data-testid="stDialog"]:has(.job-detail-header-menu-marker) [data-testid="column"] {
+  position: relative !important;
+  overflow: visible !important;
 }
-div[data-testid="stPopoverBody"]:has(.job-detail-header-menu-panel) .stButton > button {
+div[data-testid="stDialog"]:has(.job-detail-header-menu-panel) [data-testid="stVerticalBlockBorderWrapper"] {
+  min-width: 210px !important;
+  margin-top: 0.25rem !important;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08) !important;
+  pointer-events: auto !important;
+}
+div[data-testid="stDialog"]:has(.job-detail-header-menu-panel) .stButton > button,
+div[data-testid="stDialog"]:has(.job-detail-header-menu-panel) [data-testid="stButton"] > button {
   justify-content: flex-start !important;
+  text-align: left !important;
   min-height: 34px !important;
+  height: 34px !important;
   border-radius: 8px !important;
   font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #0f172a !important;
+  pointer-events: auto !important;
+  width: 100% !important;
+}
+div[data-testid="stDialog"]:has(.job-detail-header-menu-panel) .stButton > button:hover,
+div[data-testid="stDialog"]:has(.job-detail-header-menu-panel) [data-testid="stButton"] > button:hover {
+  background: #f8fafc !important;
+}
+div[data-testid="stDialog"]:has(.job-detail-header-menu-panel) .job-detail-menu-divider {
+  border: none !important;
+  border-top: 1px solid #e8edf3 !important;
+  margin: 0.35rem 0 !important;
 }
 div[data-testid="stDialog"]:has(.ips-job-status-badge-editor-marker) [data-testid="stPopover"] > button {
   display: inline-flex !important;
@@ -331,8 +357,8 @@ div[data-testid="stDialog"]:has(.ips-job-detail-control-page) button[data-testid
   z-index: 5 !important;
   min-width: 0 !important;
 }
-body:has(div[data-testid="stDialog"]:has(.ips-job-detail-control-page)) div[data-baseweb="popover"],
-body:has(div[data-testid="stDialog"]:has(.ips-job-detail-control-page)) [data-testid="stPopoverBody"] {
+body:has(div[data-testid="stDialog"]:has(.ips-job-detail-control-page)) div[data-baseweb="popover"]:has(.ips-job-status-change-panel),
+body:has(div[data-testid="stDialog"]:has(.ips-job-detail-control-page)) [data-testid="stPopoverBody"]:has(.ips-job-status-change-panel) {
   z-index: 100001 !important;
   pointer-events: auto !important;
 }
