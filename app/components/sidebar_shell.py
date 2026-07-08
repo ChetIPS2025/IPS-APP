@@ -215,10 +215,10 @@ def _desktop_nav_rail_css() -> str:
     nav_h = IPS_SIDEBAR_COLLAPSED_NAV_HEIGHT_PX
     mobile_max = IPS_SIDEBAR_DESKTOP_MIN_PX - 1
     return f"""
-<style id="ips-desktop-nav-rail-v1">
+<style id="ips-desktop-nav-rail-v2">
 @media (min-width: {IPS_SIDEBAR_DESKTOP_MIN_PX}px) {{
-  body.ips-desktop-nav-rail [data-testid="stSidebar"],
-  body.ips-desktop-nav-rail section[data-testid="stSidebar"] {{
+  .stApp:has(.ips-desktop-nav-rail) [data-testid="stSidebar"],
+  .stApp:has(.ips-desktop-nav-rail) section[data-testid="stSidebar"] {{
     display: none !important;
     width: 0 !important;
     min-width: 0 !important;
@@ -227,12 +227,12 @@ def _desktop_nav_rail_css() -> str:
     overflow: hidden !important;
     visibility: hidden !important;
   }}
-  body.ips-desktop-nav-rail [data-testid="stAppViewContainer"] {{
+  .stApp:has(.ips-desktop-nav-rail) [data-testid="stAppViewContainer"] {{
     margin-left: {col}px !important;
     width: calc(100% - {col}px) !important;
     max-width: calc(100% - {col}px) !important;
   }}
-  body.ips-desktop-nav-rail [data-testid="stHeader"] {{
+  .stApp:has(.ips-desktop-nav-rail) [data-testid="stHeader"] {{
     margin-left: {col}px !important;
     width: calc(100% - {col}px) !important;
   }}
@@ -244,8 +244,8 @@ def _desktop_nav_rail_css() -> str:
   .ips-desktop-nav-rail {{
     display: none !important;
   }}
-  body.ips-desktop-nav-rail [data-testid="stAppViewContainer"],
-  body.ips-desktop-nav-rail [data-testid="stHeader"] {{
+  .stApp:has(.ips-desktop-nav-rail) [data-testid="stAppViewContainer"],
+  .stApp:has(.ips-desktop-nav-rail) [data-testid="stHeader"] {{
     margin-left: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
@@ -258,7 +258,7 @@ def _desktop_nav_rail_css() -> str:
   top: 0;
   bottom: 0;
   width: {col}px;
-  z-index: 100020;
+  z-index: 999999;
   background: #ffffff;
   border-right: 1px solid #e5eaf2;
   flex-direction: column;
@@ -378,7 +378,6 @@ def _desktop_nav_rail_html(rows: list[dict[str, str]], active_slug: str) -> str:
         )
     items_html = "\n".join(item_bits)
     return f"""
-<script>document.body.classList.add("ips-desktop-nav-rail");</script>
 <nav class="ips-desktop-nav-rail" aria-label="Main navigation">
   <div class="ips-desktop-nav-rail__header">{_desktop_rail_logo_html()}</div>
   <div class="ips-desktop-nav-rail__items">
@@ -394,8 +393,13 @@ def _desktop_nav_rail_html(rows: list[dict[str, str]], active_slug: str) -> str:
 """
 
 
-def inject_desktop_nav_rail(*, active_slug: str | None = None) -> None:
-    """Fixed desktop icon rail in the main document (Streamlit sidebar is unreliable on Cloud)."""
+def inject_desktop_nav_rail_css() -> None:
+    """Inject desktop rail layout CSS (safe inside hidden style containers)."""
+    st.markdown(_desktop_nav_rail_css(), unsafe_allow_html=True)
+
+
+def inject_desktop_nav_rail_markup(*, active_slug: str | None = None) -> None:
+    """Inject visible desktop nav markup without style/script tags."""
     rows = _nav_fallback_rows()
     if not rows:
         return
@@ -405,14 +409,24 @@ def inject_desktop_nav_rail(*, active_slug: str | None = None) -> None:
         except ImportError:
             from navigation import current_nav_slug  # type: ignore
         active_slug = current_nav_slug()
-    st.markdown(_desktop_nav_rail_css() + _desktop_nav_rail_html(rows, active_slug), unsafe_allow_html=True)
+    markup = _desktop_nav_rail_html(rows, active_slug)
+    try:
+        st.html(markup)
+    except Exception:
+        st.markdown(markup, unsafe_allow_html=True)
+
+
+def inject_desktop_nav_rail(*, active_slug: str | None = None) -> None:
+    """Fixed desktop icon rail in the main document (Streamlit sidebar is unreliable on Cloud)."""
+    inject_desktop_nav_rail_css()
+    inject_desktop_nav_rail_markup(active_slug=active_slug)
 
 
 def inject_sidebar_shell() -> None:
     """Inject sidebar layout CSS/JS on every authenticated render."""
     collapsed = True
     inject_sidebar_nav_override_css()
-    inject_desktop_nav_rail()
+    inject_desktop_nav_rail_markup()
     st.markdown(_shell_css(), unsafe_allow_html=True)
 
     nav_json = _fallback_nav_json()

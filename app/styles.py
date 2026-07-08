@@ -10273,6 +10273,11 @@ def inject_authenticated_shell_css() -> None:
         '<script>document.body.classList.remove("ips-auth-login");</script>',
         unsafe_allow_html=True,
     )
+    try:
+        from app.components.sidebar_shell import inject_desktop_nav_rail_css
+    except ImportError:
+        from components.sidebar_shell import inject_desktop_nav_rail_css  # type: ignore
+    inject_desktop_nav_rail_css()
 
 
 def inject_ips_dialog_styles() -> None:
@@ -12125,8 +12130,8 @@ section[data-testid="stMain"] [data-testid="stMainBlockContainer"] {{
   margin-top: 0 !important;
 }}
 /* CSS/script injections are flex rows with zero height but still consume vertical gap */
-section[data-testid="stMain"] [data-testid="stElementContainer"]:has(style),
-section[data-testid="stMain"] [data-testid="stElementContainer"]:has(script) {{
+section[data-testid="stMain"] [data-testid="stElementContainer"]:has(style):not(:has(.ips-desktop-nav-rail)),
+section[data-testid="stMain"] [data-testid="stElementContainer"]:has(script):not(:has(.ips-desktop-nav-rail)) {{
   display: none !important;
   height: 0 !important;
   min-height: 0 !important;

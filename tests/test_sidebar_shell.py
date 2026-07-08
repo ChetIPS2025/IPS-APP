@@ -119,6 +119,16 @@ def test_desktop_nav_rail_renders_icon_links_for_nav_items():
     assert "ips_logout=1" in markup
 
 
+def test_desktop_nav_rail_markup_has_no_inline_style_or_script():
+    from app.components.sidebar_shell import _desktop_nav_rail_html
+
+    rows = [{"slug": "jobs", "label": "Jobs", "icon": "💼"}]
+    markup = _desktop_nav_rail_html(rows, "dashboard")
+    assert "<style" not in markup
+    assert "<script" not in markup
+    assert "ips-desktop-nav-rail" in markup
+
+
 def test_employee_field_nav_is_restricted_without_legacy_access():
     items = filter_field_nav_for_role(FIELD_NAV_PAGES, "employee")
     labels = [label for _slug, label in items]
