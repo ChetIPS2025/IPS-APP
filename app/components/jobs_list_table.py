@@ -386,6 +386,10 @@ def render_jobs_table_bridge(
     except ImportError:
         from ui.clean_table import _components_html  # type: ignore
 
+    st.markdown(
+        '<span class="ips-jobs-table-link-bridge-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
     picked = _components_html(
         f"""
 <script>
@@ -393,7 +397,9 @@ def render_jobs_table_bridge(
   const w = window.parent || window;
   const doc = w.document;
   const hookKey = {hook_key!r};
-  const sel = "[data-job-id][data-job-action]";
+  const wrapSel = ".st-key-jobs_table_wrap";
+  const actionSel = wrapSel + " [data-job-id][data-job-action]";
+  const rowSel = wrapSel + " tbody tr[data-job-id]";
 
   function sendValue(action) {{
     const payload = {{ type: "streamlit:setComponentValue", value: action }};
@@ -413,17 +419,39 @@ def render_jobs_table_bridge(
     }}
   }}
 
+  function isInteractive(target) {{
+    return !!(target && target.closest && target.closest(
+      "button, input, select, textarea, label, [data-job-action]"
+    ));
+  }}
+
   function bindTargets() {{
-    doc.querySelectorAll(sel).forEach(function (el) {{
+    doc.querySelectorAll(actionSel).forEach(function (el) {{
       if (el.dataset.ipsJobsTableBound === "1") return;
       el.dataset.ipsJobsTableBound = "1";
-      el.addEventListener("click", function (e) {{
+      function onActivate(e) {{
         e.preventDefault();
         e.stopPropagation();
         const id = el.getAttribute("data-job-id");
         const action = el.getAttribute("data-job-action") || "open";
         if (!id) return;
         sendValue(action + ":" + id);
+      }}
+      el.addEventListener("click", onActivate);
+      el.addEventListener("keydown", function (e) {{
+        if (e.key === "Enter" || e.key === " ") onActivate(e);
+      }});
+    }});
+    doc.querySelectorAll(rowSel).forEach(function (row) {{
+      if (row.dataset.ipsJobsRowBound === "1") return;
+      row.dataset.ipsJobsRowBound = "1";
+      row.addEventListener("click", function (e) {{
+        if (isInteractive(e.target)) return;
+        const id = row.getAttribute("data-job-id");
+        if (!id) return;
+        e.preventDefault();
+        e.stopPropagation();
+        sendValue("open:" + id);
       }});
     }});
   }}
@@ -443,7 +471,7 @@ def render_jobs_table_bridge(
 </script>
         """,
         component_key=component_key,
-        height=0,
+        height=1,
     )
     action = str(picked or "").strip()
     if action:

@@ -59,7 +59,7 @@ def _summary_money(value: float, *, has_data: bool) -> str:
 def inject_jobs_page_layout_css() -> None:
     st.markdown(
         """
-<style id="ips-jobs-page-layout-v20">
+<style id="ips-jobs-page-layout-v21">
 section[data-testid="stMain"]:has(.ips-jobs-page) {
   background: #ffffff !important;
 }
@@ -189,6 +189,9 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap .stB
 }
 .st-key-jobs_table_wrap .ips-dash-est-html-table tbody tr:hover td {
   background: #f8fbff !important;
+}
+.st-key-jobs_table_wrap .ips-dash-est-html-table tbody tr[data-job-id] {
+  cursor: pointer !important;
 }
 .st-key-jobs_table_wrap .ips-dash-est-html-table .cell-wrapper {
   display: flex !important;
