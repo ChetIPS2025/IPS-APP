@@ -29,6 +29,7 @@ try:
     )
     from app.components.job_row_actions_ui import render_job_row_actions
     from app.components.jobs_list_table import (
+        JOBS_TABLE_LAST_ACTION_KEY,
         JOBS_TABLE_PENDING_MENU_KEY,
         JOBS_TABLE_PENDING_STATUS_KEY,
         build_jobs_html_table,
@@ -154,6 +155,7 @@ except ImportError:
     )
     from components.job_row_actions_ui import render_job_row_actions  # type: ignore
     from components.jobs_list_table import (  # type: ignore
+        JOBS_TABLE_LAST_ACTION_KEY,
         JOBS_TABLE_PENDING_MENU_KEY,
         JOBS_TABLE_PENDING_STATUS_KEY,
         build_jobs_html_table,
@@ -1141,6 +1143,7 @@ def _clear_job_selection() -> None:
 
 def _clear_jobs_detail_modal() -> None:
     _clear_job_selection()
+    st.session_state.pop(JOBS_TABLE_LAST_ACTION_KEY, None)
     clear_job_subjob_selection()
     _clear_job_detail_aux_panel()
     for key in list(st.session_state.keys()):
@@ -1288,9 +1291,12 @@ def _render_custom_jobs_table(
             jobs_by_id,
             component_key="ips_jobs_list_bridge",
             hook_key="ipsJobsList::action",
-            open_job_fn=_open_jobs_table_job,
+            open_job_fn=_activate_job_detail_modal,
             on_expand_fn=_on_jobs_table_expand if field_mode else None,
         )
+
+        if st.session_state.get(SHOW_MODAL_KEY):
+            show_modal_if_pending(_JOBS_MODAL_KEY, _show_jobs_detail_modal)
 
         if field_mode and expanded_job_id and expanded_job_id in jobs_by_id:
             expanded_job = jobs_by_id[expanded_job_id]

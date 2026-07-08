@@ -59,7 +59,7 @@ def _summary_money(value: float, *, has_data: bool) -> str:
 def inject_jobs_page_layout_css() -> None:
     st.markdown(
         """
-<style id="ips-jobs-page-layout-v19">
+<style id="ips-jobs-page-layout-v20">
 section[data-testid="stMain"]:has(.ips-jobs-page) {
   background: #ffffff !important;
 }
@@ -211,6 +211,9 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap .stB
   font-size: 0.8125rem !important;
   text-decoration: none !important;
   cursor: pointer !important;
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 2 !important;
 }
 .st-key-jobs_table_wrap .ips-dash-est-desc-link {
   display: inline-block !important;
@@ -287,6 +290,9 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap .stB
   white-space: nowrap !important;
   box-sizing: border-box !important;
   border: none !important;
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 2 !important;
 }
 .st-key-jobs_table_wrap .ips-dash-est-approve,
 .st-key-jobs_table_wrap .ips-jobs-expand-btn {
