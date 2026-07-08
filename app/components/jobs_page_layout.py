@@ -24,23 +24,27 @@ except ImportError:
     )
 
 _PAGE_SIZE_OPTIONS = (50, 75, 100, 150)
-_HIDE_IF_EMPTY_COLUMNS: frozenset[str] = frozenset({"estimated", "actual"})
-_JOB_COL_WEIGHTS = [0.72, 2.75, 1.15, 0.68, 0.95, 0.95]
+_HIDE_IF_EMPTY_COLUMNS: frozenset[str] = frozenset()
+_JOB_COL_WEIGHTS = [0.72, 2.55, 1.1, 0.68, 0.9, 0.9, 0.9, 0.72]
 _JOB_COL_MARKERS: tuple[str, ...] = (
     "num",
     "desc",
     "customer",
     "status",
-    "estimated",
+    "contract",
     "actual",
+    "profit",
+    "profit_pct",
 )
 _JOB_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("JOB #", None),
     ("PROJECT / DESCRIPTION", None),
     ("CUSTOMER", "customer"),
     ("STATUS", "status"),
-    ("ESTIMATED COST", None),
+    ("CONTRACT VALUE", None),
     ("ACTUAL COST", None),
+    ("EST. PROFIT", None),
+    ("PROFIT %", None),
 ]
 
 
@@ -48,12 +52,29 @@ def _money(value: float) -> str:
     return f"${float(value or 0):,.2f}"
 
 
-def _summary_money(value: float, *, has_data: bool) -> str:
+def _summary_money(value: float, *, has_data: bool, zero_as_dash: bool = True) -> str:
     if not has_data:
         return "—"
-    if abs(float(value or 0)) < 0.005:
+    if zero_as_dash and abs(float(value or 0)) < 0.005:
         return "—"
     return _money(value)
+
+
+def _summary_pct(value: float, *, has_data: bool) -> str:
+    if not has_data:
+        return "—"
+    return f"{float(value or 0):,.1f}%"
+
+
+def _profit_pct_summary_class(value: float) -> str:
+    margin = float(value or 0)
+    if margin < 0:
+        return "ips-jobs-stat-profit-pct-red"
+    if margin > 25:
+        return "ips-jobs-stat-profit-pct-green"
+    if margin >= 10:
+        return "ips-jobs-stat-profit-pct-yellow"
+    return "ips-jobs-stat-profit-pct-orange"
 
 
 def inject_jobs_page_layout_css() -> None:
@@ -688,13 +709,13 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap .stB
 }
 .ips-jobs-summary-cards {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(9, minmax(0, 1fr));
   gap: 0.4rem;
   margin: 0 0 0.35rem 0;
 }
 @media (max-width: 1500px) {
   .ips-jobs-summary-cards {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 @media (max-width: 900px) {
@@ -756,6 +777,18 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap .stB
 .ips-jobs-stat-contract .ips-jobs-stat-value { color: #15803d; }
 .ips-jobs-stat-actual { border-left-color: #2563eb; }
 .ips-jobs-stat-actual .ips-jobs-stat-value { color: #2563eb; }
+.ips-jobs-stat-profit { border-left-color: #0f766e; }
+.ips-jobs-stat-profit .ips-jobs-stat-value { color: #0f766e; }
+.ips-jobs-stat-profit-pct { border-left-color: #64748b; }
+.ips-jobs-stat-profit-pct .ips-jobs-stat-value { color: #0f172a; }
+.ips-jobs-stat-profit-pct-green .ips-jobs-stat-value { color: #15803d; }
+.ips-jobs-stat-profit-pct-yellow .ips-jobs-stat-value { color: #ca8a04; }
+.ips-jobs-stat-profit-pct-orange .ips-jobs-stat-value { color: #ea580c; }
+.ips-jobs-stat-profit-pct-red .ips-jobs-stat-value { color: #dc2626; }
+.st-key-jobs_table_wrap .ips-jobs-profit-pct-green { color: #15803d !important; }
+.st-key-jobs_table_wrap .ips-jobs-profit-pct-yellow { color: #ca8a04 !important; }
+.st-key-jobs_table_wrap .ips-jobs-profit-pct-orange { color: #ea580c !important; }
+.st-key-jobs_table_wrap .ips-jobs-profit-pct-red { color: #dc2626 !important; }
 .ips-jobs-summary-bar {
   display: flex;
   flex-wrap: wrap;
@@ -1330,6 +1363,10 @@ def jobs_column_has_data(
     cost_fields_fn,
     marker: str,
 ) -> bool:
+    if marker in {"contract", "profit", "profit_pct"}:
+        return any(bool(cost_fields_fn(job).get("has_contract")) for job in filtered)
+    if marker == "actual":
+        return bool(filtered)
     return any(
         (marker == "estimated" and bool(cost_fields_fn(job).get("has_estimated")))
         or (marker == "actual" and bool(cost_fields_fn(job).get("has_actual")))
@@ -1359,22 +1396,26 @@ def render_jobs_summary_cards(
     active: int,
     on_hold: int,
     completed: int,
-    cancelled: int,
     open_subjobs: int,
     total_contract: float,
     total_actual: float,
+    total_profit: float,
+    avg_profit_pct: float,
     has_contract_data: bool = False,
-    has_actual_data: bool = False,
 ) -> None:
+    profit_label = _summary_money(total_profit, has_data=has_contract_data, zero_as_dash=False)
+    profit_pct_label = _summary_pct(avg_profit_pct, has_data=has_contract_data)
+    profit_pct_cls = _profit_pct_summary_class(avg_profit_pct) if has_contract_data else ""
     cards = [
         ("Total Jobs", f"{total:,}", "ips-jobs-stat-total"),
-        ("Active", f"{active:,}", "ips-jobs-stat-active"),
+        ("Active Jobs", f"{active:,}", "ips-jobs-stat-active"),
         ("On Hold", f"{on_hold:,}", "ips-jobs-stat-on-hold"),
         ("Completed", f"{completed:,}", "ips-jobs-stat-completed"),
-        ("Cancelled", f"{cancelled:,}", "ips-jobs-stat-cancelled"),
         ("Open Subjobs", f"{open_subjobs:,}", "ips-jobs-stat-subjobs"),
-        ("Contract Value", _summary_money(total_contract, has_data=has_contract_data), "ips-jobs-stat-contract"),
-        ("Actual Cost", _summary_money(total_actual, has_data=has_actual_data), "ips-jobs-stat-actual"),
+        ("Total Contract Value", _summary_money(total_contract, has_data=has_contract_data), "ips-jobs-stat-contract"),
+        ("Total Actual Cost", _summary_money(total_actual, has_data=True, zero_as_dash=False), "ips-jobs-stat-actual"),
+        ("Total Est. Profit", profit_label, "ips-jobs-stat-profit"),
+        ("Avg Profit %", profit_pct_label, f"ips-jobs-stat-profit-pct {profit_pct_cls}".strip()),
     ]
     parts = ['<div class="ips-jobs-summary-cards">']
     for label, value, cls in cards:

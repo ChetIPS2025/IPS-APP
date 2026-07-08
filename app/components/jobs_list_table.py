@@ -34,18 +34,22 @@ JOBS_TABLE_HEADER_LABELS: dict[str, str] = {
     "desc": "PROJECT / DESCRIPTION",
     "customer": "CUSTOMER",
     "status": "STATUS",
-    "estimated": "ESTIMATED COST",
+    "contract": "CONTRACT VALUE",
     "actual": "ACTUAL COST",
+    "profit": "EST. PROFIT",
+    "profit_pct": "PROFIT %",
     "actions": "ACTIONS",
 }
 
 JOBS_TABLE_COL_WIDTHS_PX: dict[str, int] = {
     "num": 96,
-    "desc": 260,
-    "customer": 180,
-    "status": 120,
-    "estimated": 108,
-    "actual": 108,
+    "desc": 240,
+    "customer": 160,
+    "status": 112,
+    "contract": 104,
+    "actual": 104,
+    "profit": 104,
+    "profit_pct": 88,
     "actions": 132,
 }
 
@@ -90,45 +94,51 @@ def _cell_wrapper(inner: str, *, extra_class: str = "", align: str = "left") -> 
     return f'<div class="{html.escape(cls)}">{inner}</div>'
 
 
-def _money_cell(value: float, *, available: bool = True) -> str:
+def _money_cell(value: float, *, available: bool = True, zero_as_dash: bool = True) -> str:
     if not available:
         return "—"
-    if abs(float(value or 0)) < 0.005:
+    if zero_as_dash and abs(float(value or 0)) < 0.005:
         return "—"
     return f"${float(value):,.2f}"
 
 
-def _money_cell_class(value: float, *, available: bool = True) -> str:
-    return " ips-jobs-money-empty" if _money_cell(value, available=available) == "—" else ""
-
-
-def _actual_cost_cell_html(
-    actual_val: float,
-    *,
-    estimated_val: float,
-    has_actual: bool,
-    has_estimated: bool,
-) -> str:
-    display = _money_cell(actual_val, available=has_actual)
-    empty_cls = _money_cell_class(actual_val, available=has_actual)
-    over = (
-        has_actual
-        and has_estimated
-        and float(estimated_val or 0) > 0
-        and float(actual_val or 0) > float(estimated_val or 0)
-    )
-    over_cls = " ips-jobs-actual-over-estimate" if over else ""
-    warn = ""
-    if over:
-        warn = (
-            '<span class="ips-jobs-actual-over-icon" '
-            'title="Actual cost has exceeded the estimated cost." '
-            'aria-label="Actual cost has exceeded the estimated cost.">⚠</span>'
-        )
+def _money_cell_class(value: float, *, available: bool = True, zero_as_dash: bool = True) -> str:
     return (
-        f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money ips-jobs-money-actual'
-        f"{empty_cls}{over_cls}\">"
-        f"{html.escape(display)}{warn}</div>"
+        " ips-jobs-money-empty"
+        if _money_cell(value, available=available, zero_as_dash=zero_as_dash) == "—"
+        else ""
+    )
+
+
+def _profit_pct_color_class(pct: float) -> str:
+    margin = float(pct or 0)
+    if margin < 0:
+        return "ips-jobs-profit-pct-red"
+    if margin > 25:
+        return "ips-jobs-profit-pct-green"
+    if margin >= 10:
+        return "ips-jobs-profit-pct-yellow"
+    return "ips-jobs-profit-pct-orange"
+
+
+def _profit_pct_cell_html(margin_pct: float, *, has_contract: bool) -> str:
+    if not has_contract:
+        display = "—"
+        color_cls = " ips-jobs-money-empty"
+    else:
+        display = f"{float(margin_pct or 0):,.1f}%"
+        color_cls = f" {_profit_pct_color_class(margin_pct)}"
+    return (
+        f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money ips-jobs-profit-pct{color_cls}">'
+        f"{html.escape(display)}</div>"
+    )
+
+
+def _actual_cost_cell_html(actual_val: float) -> str:
+    display = _money_cell(actual_val, available=True, zero_as_dash=False)
+    return (
+        f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money ips-jobs-money-actual">'
+        f"{html.escape(display)}</div>"
     )
 
 
@@ -201,10 +211,11 @@ def build_jobs_html_table(
             continue
 
         costs = cost_fields_fn(job)
-        estimated_val = float(costs.get("estimated_cost") or 0)
+        contract_val = float(costs.get("contract_value") or 0)
         actual_val = float(costs.get("actual_cost") or 0)
-        has_estimated = bool(costs.get("has_estimated"))
-        has_actual = bool(costs.get("has_actual"))
+        profit_val = float(costs.get("profit") or 0)
+        margin_pct = float(costs.get("margin_pct") or 0)
+        has_contract = bool(costs.get("has_contract"))
         raw_summary = costs.get("raw_summary")
         health_html = ""
         if health_badge_fn is not None and isinstance(raw_summary, dict) and raw_summary:
@@ -275,13 +286,13 @@ def build_jobs_html_table(
                     align="center",
                 ),
             ),
-            "estimated": (
+            "contract": (
                 "right",
                 _cell_wrapper(
                     (
                         f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money'
-                        f'{_money_cell_class(estimated_val, available=has_estimated)}">'
-                        f"{html.escape(_money_cell(estimated_val, available=has_estimated))}</div>"
+                        f'{_money_cell_class(contract_val, available=has_contract)}">'
+                        f"{html.escape(_money_cell(contract_val, available=has_contract))}</div>"
                     ),
                     extra_class="ips-dash-est-total-cell",
                     align="right",
@@ -290,12 +301,27 @@ def build_jobs_html_table(
             "actual": (
                 "right",
                 _cell_wrapper(
-                    _actual_cost_cell_html(
-                        actual_val,
-                        estimated_val=estimated_val,
-                        has_actual=has_actual,
-                        has_estimated=has_estimated,
+                    _actual_cost_cell_html(actual_val),
+                    extra_class="ips-dash-est-total-cell",
+                    align="right",
+                ),
+            ),
+            "profit": (
+                "right",
+                _cell_wrapper(
+                    (
+                        f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money'
+                        f'{_money_cell_class(profit_val, available=has_contract)}">'
+                        f"{html.escape(_money_cell(profit_val, available=has_contract))}</div>"
                     ),
+                    extra_class="ips-dash-est-total-cell",
+                    align="right",
+                ),
+            ),
+            "profit_pct": (
+                "right",
+                _cell_wrapper(
+                    _profit_pct_cell_html(margin_pct, has_contract=has_contract),
                     extra_class="ips-dash-est-total-cell",
                     align="right",
                 ),

@@ -913,6 +913,8 @@ def _jobs_summary_counts(
         "open_subjobs": 0,
         "total_contract": 0.0,
         "total_actual": 0.0,
+        "total_profit": 0.0,
+        "avg_profit_pct": 0.0,
         "has_any_contract": False,
         "has_any_actual": False,
     }
@@ -928,13 +930,18 @@ def _jobs_summary_counts(
             counts["cancelled"] += 1
         jid = str(job.get("id") or "").strip()
         counts["open_subjobs"] += _job_open_subjobs_count(job, subjob_counts=subjob_counts)
-        costs = _job_list_financials_from_row(job)
+        costs = _job_list_cost_fields(job)
         counts["total_contract"] = float(counts["total_contract"]) + float(costs["contract_value"])
         counts["total_actual"] = float(counts["total_actual"]) + float(costs["actual_cost"])
+        counts["total_profit"] = float(counts["total_profit"]) + float(costs["profit"])
         if costs.get("has_contract"):
             counts["has_any_contract"] = True
         if costs.get("has_actual"):
             counts["has_any_actual"] = True
+    total_contract = float(counts["total_contract"])
+    total_profit = float(counts["total_profit"])
+    if total_contract > 0:
+        counts["avg_profit_pct"] = round((total_profit / total_contract) * 100.0, 1)
     return counts
 
 
@@ -3200,12 +3207,12 @@ def _render_jobs_page() -> None:
         active=int(summary["active"]),
         on_hold=int(summary["on_hold"]),
         completed=int(summary["completed"]),
-        cancelled=int(summary["cancelled"]),
         open_subjobs=int(summary["open_subjobs"]),
         total_contract=float(summary["total_contract"]),
         total_actual=float(summary["total_actual"]),
+        total_profit=float(summary["total_profit"]),
+        avg_profit_pct=float(summary["avg_profit_pct"]),
         has_contract_data=bool(summary.get("has_any_contract")),
-        has_actual_data=bool(summary.get("has_any_actual")),
     )
     render_jobs_summary_badge_bar(
         total=int(summary["total"]),

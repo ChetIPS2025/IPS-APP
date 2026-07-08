@@ -125,20 +125,35 @@ def estimate_total_from_record(row: dict[str, Any]) -> float:
     return 0.0
 
 
+def live_job_profit_margin(contract_value: float, actual_cost: float) -> tuple[float, float]:
+    """Estimated profit and margin from contract value minus posted actual cost."""
+    contract = float(contract_value or 0)
+    actual = round(float(actual_cost or 0), 2)
+    if contract <= 0:
+        return 0.0, 0.0
+    profit = round(contract - actual, 2)
+    margin = round((profit / contract) * 100.0, 1)
+    return profit, margin
+
+
 def job_table_list_financials_from_row(job: dict[str, Any]) -> dict[str, float | bool]:
     """
-    Jobs list table snapshot: Estimated Cost from linked estimate total;
-    Actual Cost from accumulated job cost on the job row.
+    Jobs list table snapshot: contract from award/approved estimate;
+    actual from accumulated job cost; profit/margin from contract minus actual.
     """
-    fin = job_list_financials_from_row(job)
+    fin = dict(job_list_financials_from_row(job))
     est = _linked_estimate_for_jobs_table(job)
-    if not est:
-        fin["estimated_cost"] = 0.0
-        fin["has_estimated"] = False
-        return fin
-    est_total = estimate_total_from_record(est)
-    fin["estimated_cost"] = est_total
-    fin["has_estimated"] = est_total > 0.005
+    try:
+        from app.services.job_cost_transaction_service import _contract_value
+    except ImportError:
+        from services.job_cost_transaction_service import _contract_value  # type: ignore
+    contract = _contract_value(job, est if est else None)
+    actual = float(fin["actual_cost"])
+    profit, margin = live_job_profit_margin(contract, actual)
+    fin["contract_value"] = contract
+    fin["has_contract"] = contract > 0.005
+    fin["profit"] = profit
+    fin["margin_pct"] = margin
     return fin
 
 

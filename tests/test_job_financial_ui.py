@@ -14,6 +14,7 @@ from app.services.job_financial_ui import (
     job_list_financials_from_row,
     job_manual_financials_editable,
     job_table_list_financials_from_row,
+    live_job_profit_margin,
     normalize_billing_type,
     projected_gross_profit,
     projected_margin_pct,
@@ -131,9 +132,15 @@ class TestJobFinancialUi(unittest.TestCase):
         self.assertEqual(fin["profit"], 6800)
         self.assertEqual(fin["margin_pct"], 68.0)
 
+    def test_live_job_profit_margin(self) -> None:
+        self.assertEqual(live_job_profit_margin(10000, 3200), (6800.0, 68.0))
+        self.assertEqual(live_job_profit_margin(0, 100), (0.0, 0.0))
+
     @patch("app.services.job_financial_ui._linked_estimate_for_jobs_table")
-    def test_job_table_list_uses_linked_estimate_total_not_job_estimated_cost(
+    @patch("app.services.job_cost_transaction_service._contract_value", return_value=12500.0)
+    def test_job_table_list_uses_contract_and_live_profit(
         self,
+        contract_mock,
         link_mock,
     ) -> None:
         link_mock.return_value = {"id": "e1", "customer_price": 12500.0}
@@ -141,21 +148,26 @@ class TestJobFinancialUi(unittest.TestCase):
             {
                 "id": "j1",
                 "estimate_id": "e1",
-                "estimated_cost": 4000,
                 "actual_cost": 5000,
             }
         )
-        self.assertEqual(fin["estimated_cost"], 12500.0)
-        self.assertTrue(fin["has_estimated"])
+        contract_mock.assert_called_once()
+        self.assertEqual(fin["contract_value"], 12500.0)
+        self.assertTrue(fin["has_contract"])
         self.assertEqual(fin["actual_cost"], 5000.0)
+        self.assertEqual(fin["profit"], 7500.0)
+        self.assertEqual(fin["margin_pct"], 60.0)
 
     @patch("app.services.job_financial_ui._linked_estimate_for_jobs_table", return_value=None)
-    def test_job_table_list_shows_dash_when_no_linked_estimate(self, _link_mock) -> None:
+    @patch("app.services.job_cost_transaction_service._contract_value", return_value=0.0)
+    def test_job_table_list_zero_contract_profit(self, _contract_mock, _link_mock) -> None:
         fin = job_table_list_financials_from_row(
             {"id": "j1", "estimated_cost": 9000, "actual_cost": 100}
         )
-        self.assertEqual(fin["estimated_cost"], 0.0)
-        self.assertFalse(fin["has_estimated"])
+        self.assertEqual(fin["contract_value"], 0.0)
+        self.assertFalse(fin["has_contract"])
+        self.assertEqual(fin["profit"], 0.0)
+        self.assertEqual(fin["margin_pct"], 0.0)
 
     def test_billing_type_normalization(self) -> None:
         self.assertEqual(normalize_billing_type("Time & Materials"), BILLING_TYPE_TM)
