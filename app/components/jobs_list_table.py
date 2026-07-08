@@ -355,7 +355,7 @@ def handle_jobs_table_action(
     val = str(raw or "").strip()
     if not val:
         return
-    if val == str(st.session_state.get(last_action_key) or ""):
+    if val == str(st.session_state.get(last_action_key) or "") and not val.startswith("open:"):
         return
     st.session_state[last_action_key] = val
 
@@ -392,7 +392,6 @@ def handle_jobs_table_action(
     st.session_state.pop(pending_status_key, None)
     st.session_state.pop(pending_menu_key, None)
     open_job_fn(job_id, open_job)
-    st.rerun()
 
 
 def render_jobs_table_open_buttons(
@@ -430,16 +429,14 @@ def render_jobs_table_bridge(
     pending_menu_key: str = JOBS_TABLE_PENDING_MENU_KEY,
     open_job_fn: Callable[[str, dict[str, Any]], None],
     on_expand_fn: Callable[[str, dict[str, Any]], None] | None = None,
+    field_mode: bool = False,
 ) -> None:
     try:
         from app.ui.clean_table import _components_html
     except ImportError:
         from ui.clean_table import _components_html  # type: ignore
 
-    st.markdown(
-        '<span class="ips-jobs-table-link-bridge-marker" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
+    field_mode_js = "true" if field_mode else "false"
     picked = _components_html(
         f"""
 <script>
@@ -447,32 +444,9 @@ def render_jobs_table_bridge(
   const w = window.parent || window;
   const doc = w.document;
   const hookKey = {hook_key!r};
-  const wrapSel = ".st-key-jobs_table_wrap";
-  const actionSel = wrapSel + " [data-job-id][data-job-action]:not([data-job-action='open'])";
-  const openSel = wrapSel + " .ips-row-open-link[data-row-id]";
-  const rowSel = wrapSel + " tbody tr[data-row-id]";
-
-  function clickBridgeButton(bridgeKey) {{
-    if (!bridgeKey) return false;
-    const needle = "st-key-" + bridgeKey;
-    const hosts = doc.querySelectorAll('[class*="' + needle + '"]');
-    for (var i = 0; i < hosts.length; i++) {{
-      const btn = hosts[i].querySelector("button");
-      if (btn) {{
-        btn.click();
-        return true;
-      }}
-    }}
-    return false;
-  }}
-
-  function openJob(jobId, bridgeKey) {{
-    if (jobId) {{
-      sendValue("open:" + jobId);
-      return;
-    }}
-    clickBridgeButton(bridgeKey);
-  }}
+  const fieldMode = {field_mode_js};
+  const actionSel = "[data-job-id][data-job-action]";
+  const rowSel = "tbody tr[data-job-id]";
 
   function sendValue(action) {{
     const payload = {{ type: "streamlit:setComponentValue", value: action }};
@@ -494,83 +468,35 @@ def render_jobs_table_bridge(
 
   function isInteractive(target) {{
     return !!(target && target.closest && target.closest(
-      "button, input, select, textarea, label, [data-job-action]:not([data-job-action='open'])"
+      "button, input, select, textarea, label, a[data-job-action], [data-job-action]"
     ));
   }}
 
   function bindTargets() {{
-    doc.querySelectorAll(openSel).forEach(function (el) {{
-      if (el.dataset.ipsJobsOpenBound === "1") return;
-      el.dataset.ipsJobsOpenBound = "1";
-      function onActivate(e) {{
-        e.preventDefault();
-        e.stopPropagation();
-        const id = el.getAttribute("data-row-id") || el.getAttribute("data-job-id");
-        const bridgeKey = el.getAttribute("data-bridge-key") || "";
-        openJob(id, bridgeKey);
-      }}
-      el.addEventListener("click", onActivate, true);
-      el.addEventListener("keydown", function (e) {{
-        if (e.key === "Enter" || e.key === " ") onActivate(e);
-      }}, true);
-    }});
     doc.querySelectorAll(actionSel).forEach(function (el) {{
       if (el.dataset.ipsJobsTableBound === "1") return;
       el.dataset.ipsJobsTableBound = "1";
-      function onActivate(e) {{
+      el.addEventListener("click", function (e) {{
         e.preventDefault();
         e.stopPropagation();
         const id = el.getAttribute("data-job-id");
         const action = el.getAttribute("data-job-action") || "open";
         if (!id) return;
         sendValue(action + ":" + id);
-      }}
-      el.addEventListener("click", onActivate);
-      el.addEventListener("keydown", function (e) {{
-        if (e.key === "Enter" || e.key === " ") onActivate(e);
-      }});
+      }}, true);
     }});
     doc.querySelectorAll(rowSel).forEach(function (row) {{
       if (row.dataset.ipsJobsRowBound === "1") return;
       row.dataset.ipsJobsRowBound = "1";
       row.addEventListener("click", function (e) {{
         if (isInteractive(e.target)) return;
-        const id = row.getAttribute("data-row-id") || row.getAttribute("data-job-id");
-        const bridgeKey = row.getAttribute("data-bridge-key") || "";
+        const id = row.getAttribute("data-job-id") || row.getAttribute("data-row-id");
         if (!id) return;
         e.preventDefault();
         e.stopPropagation();
-        openJob(id, bridgeKey);
+        sendValue((fieldMode ? "expand" : "open") + ":" + id);
       }}, true);
     }});
-  }}
-
-  if (!doc.ipsJobsTableDocClick) {{
-    doc.ipsJobsTableDocClick = true;
-    doc.addEventListener("click", function (e) {{
-      const t = e.target;
-      if (!t || !t.closest) return;
-      const wrap = doc.querySelector(wrapSel);
-      if (!wrap || !wrap.contains(t)) return;
-      const link = t.closest(".ips-row-open-link[data-row-id]");
-      if (link && wrap.contains(link)) {{
-        e.preventDefault();
-        e.stopPropagation();
-        const id = link.getAttribute("data-row-id") || link.getAttribute("data-job-id");
-        const bridgeKey = link.getAttribute("data-bridge-key") || "";
-        openJob(id, bridgeKey);
-        return;
-      }}
-      if (isInteractive(t)) return;
-      const row = t.closest("tbody tr[data-row-id]");
-      if (!row || !wrap.contains(row)) return;
-      const id = row.getAttribute("data-row-id") || row.getAttribute("data-job-id");
-      const bridgeKey = row.getAttribute("data-bridge-key") || "";
-      if (!id) return;
-      e.preventDefault();
-      e.stopPropagation();
-      openJob(id, bridgeKey);
-    }}, true);
   }}
 
   if (!doc.ipsJobsTableRegistry) doc.ipsJobsTableRegistry = {{}};
@@ -584,11 +510,14 @@ def render_jobs_table_bridge(
     }});
     doc.ipsJobsTableBindObserver.observe(doc.body, {{ childList: true, subtree: true }});
   }}
+  try {{
+    w.postMessage({{ type: "streamlit:componentReady", apiVersion: 1 }}, "*");
+  }} catch (err) {{}}
 }})();
 </script>
         """,
         component_key=component_key,
-        height=1,
+        height=0,
     )
     action = str(picked or "").strip()
     if action:

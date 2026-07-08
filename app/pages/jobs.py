@@ -35,7 +35,6 @@ try:
         build_jobs_html_table,
         job_list_link_html,
         render_jobs_table_bridge,
-        render_jobs_table_open_buttons,
     )
     from app.components.jobs_page_layout import (
         close_jobs_filter_bar_shell,
@@ -162,7 +161,6 @@ except ImportError:
         build_jobs_html_table,
         job_list_link_html,
         render_jobs_table_bridge,
-        render_jobs_table_open_buttons,
     )
     from components.jobs_page_layout import (  # type: ignore
         close_jobs_filter_bar_shell,
@@ -1156,11 +1154,6 @@ def _clear_jobs_detail_modal() -> None:
     st.session_state.pop(JOB_DOC_PENDING_DELETE_JOB_KEY, None)
 
 
-def _on_jobs_table_open_click(job_id: str, job: dict) -> None:
-    """Streamlit on_click handler for hidden per-row open buttons."""
-    _activate_job_detail_modal(job_id, job)
-
-
 def _render_jobs_list_fragment(
     filtered: list[dict],
     *,
@@ -1307,14 +1300,13 @@ def _render_custom_jobs_table(
                 ips_app_rerun()
             st.markdown("</div>", unsafe_allow_html=True)
 
-        render_jobs_table_open_buttons(filtered, open_job_fn=_on_jobs_table_open_click)
-
         render_jobs_table_bridge(
             jobs_by_id,
             component_key="ips_jobs_list_bridge",
             hook_key="ipsJobsList::action",
             open_job_fn=_activate_job_detail_modal,
             on_expand_fn=_on_jobs_table_expand if field_mode else None,
+            field_mode=field_mode,
         )
 
     return all_job_ids
@@ -3230,5 +3222,5 @@ def _render_jobs_page() -> None:
     )
     render_jobs_pagination_footer(len(filtered), _TABLE_KEY, item_label="job")
 
-    if st.session_state.get(SHOW_MODAL_KEY):
+    if st.session_state.get(SHOW_MODAL_KEY) or str(st.session_state.get(_JOBS_MODAL_KEY) or "").strip():
         show_modal_if_pending(_JOBS_MODAL_KEY, _show_jobs_detail_modal)
