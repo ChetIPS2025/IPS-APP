@@ -379,87 +379,152 @@ def _desktop_nav_rail_css() -> str:
   padding: 8px 0 12px;
   border-top: 1px solid #eef2f7;
 }}
+.st-key-ips_desktop_nav_rail_wrap {{
+  display: none !important;
+}}
+@media (min-width: {IPS_SIDEBAR_DESKTOP_MIN_PX}px) {{
+  .st-key-ips_desktop_nav_rail_wrap {{
+    display: flex !important;
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: {col}px !important;
+    z-index: 999999 !important;
+    flex-direction: column !important;
+    background: #ffffff !important;
+    border-right: 1px solid #e5eaf2 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    transition: width 0.2s ease, box-shadow 0.2s ease !important;
+    box-sizing: border-box !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: 0 !important;
+    pointer-events: auto !important;
+  }}
+  .st-key-ips_desktop_nav_rail_wrap:hover {{
+    width: {exp}px !important;
+    box-shadow: 4px 0 18px rgba(15, 23, 42, 0.12) !important;
+  }}
+  .st-key-ips_desktop_nav_rail_wrap .ips-desktop-nav-rail--streamlit {{
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
+    position: static !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    z-index: auto !important;
+    overflow: visible !important;
+  }}
+  .st-key-ips_desktop_nav_rail_wrap [data-testid="stVerticalBlock"] {{
+    gap: 2px !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }}
+  .st-key-ips_desktop_nav_rail_wrap [class*="st-key-ips_rail_nav_"],
+  .st-key-ips_desktop_nav_rail_wrap [class*="st-key-ips_rail_nav_"] [data-testid="stElementContainer"],
+  .st-key-ips_desktop_nav_rail_wrap .st-key-ips_rail_logout,
+  .st-key-ips_desktop_nav_rail_wrap .st-key-ips_rail_logout [data-testid="stElementContainer"] {{
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }}
+  .st-key-ips_desktop_nav_rail_wrap [class*="st-key-ips_rail_nav_"] .stButton,
+  .st-key-ips_desktop_nav_rail_wrap .st-key-ips_rail_logout .stButton {{
+    width: 100% !important;
+    margin: 0 !important;
+  }}
+  .st-key-ips_desktop_nav_rail_wrap [class*="st-key-ips_rail_nav_"] .stButton > button,
+  .st-key-ips_desktop_nav_rail_wrap .st-key-ips_rail_logout .stButton > button {{
+    width: 100% !important;
+    min-height: {nav_h}px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 10px !important;
+    margin: 0 4px !important;
+    padding: 0 10px !important;
+    border: none !important;
+    border-radius: 10px !important;
+    background: transparent !important;
+    color: #0f172a !important;
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    box-shadow: none !important;
+  }}
+  .st-key-ips_desktop_nav_rail_wrap:not(:hover) [class*="st-key-ips_rail_nav_"] .stButton > button,
+  .st-key-ips_desktop_nav_rail_wrap:not(:hover) .st-key-ips_rail_logout .stButton > button {{
+    justify-content: center !important;
+    padding: 0 !important;
+    width: {col}px !important;
+    margin: 0 !important;
+  }}
+  .st-key-ips_desktop_nav_rail_wrap:not(:hover) .ips-rail-nav-label {{
+    display: none !important;
+  }}
+  .st-key-ips_desktop_nav_rail_wrap [class*="st-key-ips_rail_nav_"] .stButton > button:hover,
+  .st-key-ips_desktop_nav_rail_wrap .st-key-ips_rail_logout .stButton > button:hover {{
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
+  }}
+  .st-key-ips_desktop_nav_rail_wrap [class*="st-key-ips_rail_nav_"] button[data-testid="stBaseButton-primary"],
+  .st-key-ips_desktop_nav_rail_wrap [class*="st-key-ips_rail_nav_"] button[data-testid="baseButton-primary"] {{
+    background: #eff6ff !important;
+    color: #2563eb !important;
+    font-weight: 600 !important;
+  }}
+  .st-key-ips_desktop_nav_rail_wrap .ips-rail-nav-icon {{
+    flex: 0 0 {IPS_SIDEBAR_COLLAPSED_ICON_PX}px !important;
+    width: {IPS_SIDEBAR_COLLAPSED_ICON_PX}px !important;
+    min-width: {IPS_SIDEBAR_COLLAPSED_ICON_PX}px !important;
+    text-align: center !important;
+    font-size: {IPS_SIDEBAR_COLLAPSED_ICON_PX}px !important;
+    line-height: 1 !important;
+    font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif !important;
+  }}
+  .st-key-ips_desktop_nav_rail_wrap .ips-rail-nav-label {{
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }}
+  .st-key-ips_desktop_nav_rail_wrap .st-key-ips_rail_logout {{
+    margin-top: auto !important;
+    padding-top: 8px !important;
+    border-top: 1px solid #eef2f7 !important;
+  }}
+}}
+@media (max-width: {mobile_max}px) {{
+  .st-key-ips_desktop_nav_rail_wrap {{
+    display: none !important;
+  }}
+}}
 </style>
 """
 
 
-def _desktop_nav_rail_html(rows: list[dict[str, str]], active_slug: str) -> str:
+def _rail_nav_button_label(slug: str, label: str) -> str:
     try:
         from app.components.sidebar_nav_icons import nav_icon_for_slug
     except ImportError:
         from components.sidebar_nav_icons import nav_icon_for_slug  # type: ignore
+    return f"{nav_icon_for_slug(slug)}\u2002{label}"
+
+
+def _desktop_nav_rail_item_is_active(slug: str, active_slug: str) -> bool:
     scan_slugs = frozenset({"scan_inventory", "scan_asset"})
-    item_bits: list[str] = []
-    for row in rows:
-        slug = row["slug"]
-        label = html.escape(row["label"])
-        icon = html.escape(nav_icon_for_slug(slug))
-        is_active = slug == active_slug or (slug in scan_slugs and active_slug in {"inventory", "assets"})
-        if slug == "employee_qr_scan" and active_slug in {"inventory", "assets"}:
-            is_active = True
-        active_cls = " is-active" if is_active else ""
-        slug_attr = html.escape(slug, quote=True)
-        item_bits.append(
-            f'<button type="button" class="ips-desktop-nav-rail__link{active_cls}" '
-            f'data-ips-nav-slug="{slug_attr}" '
-            f'title="{label}" aria-label="{label}">'
-            f'<span class="ips-desktop-nav-rail__icon" aria-hidden="true">{icon}</span>'
-            f'<span class="ips-desktop-nav-rail__label">{label}</span>'
-            f"</button>"
-        )
-    items_html = "\n".join(item_bits)
-    return f"""
-<nav class="ips-desktop-nav-rail" aria-label="Main navigation">
-  <div class="ips-desktop-nav-rail__header">{_desktop_rail_logo_html()}</div>
-  <div class="ips-desktop-nav-rail__items">
-    {items_html}
-  </div>
-  <div class="ips-desktop-nav-rail__footer">
-    <button type="button" class="ips-desktop-nav-rail__link ips-desktop-nav-rail__link--logout" data-ips-nav-slug="logout" title="Log out" aria-label="Log out">
-      <span class="ips-desktop-nav-rail__icon" aria-hidden="true">⎋</span>
-      <span class="ips-desktop-nav-rail__label">Log out</span>
-    </button>
-  </div>
-</nav>
-"""
-
-
-def _desktop_nav_rail_wire_script() -> str:
-    """Bind rail clicks in the main document (components.html cannot reach parent on Cloud)."""
-    return """
-<script>
-(function () {
-  function navigateRail(slug) {
-    var top = window.top || window;
-    var url = new URL(top.location.href);
-    url.searchParams.delete("ips_nav");
-    url.searchParams.delete("ips_logout");
-    if (slug === "logout") {
-      url.searchParams.set("ips_logout", "1");
-    } else {
-      url.searchParams.set("ips_nav", slug);
-    }
-    top.location.assign(url.toString());
-  }
-  function bind() {
-    document.querySelectorAll(".ips-desktop-nav-rail__link[data-ips-nav-slug]").forEach(function (el) {
-      if (el.dataset.ipsNavRailBound === "1") return;
-      el.dataset.ipsNavRailBound = "1";
-      el.addEventListener("click", function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        var slug = el.getAttribute("data-ips-nav-slug");
-        if (!slug) return;
-        navigateRail(slug);
-      });
-    });
-  }
-  bind();
-  setTimeout(bind, 40);
-  setTimeout(bind, 180);
-})();
-</script>
-"""
+    if slug == active_slug:
+        return True
+    if slug in scan_slugs and active_slug in {"inventory", "assets"}:
+        return True
+    if slug == "employee_qr_scan" and active_slug in {"inventory", "assets"}:
+        return True
+    return False
 
 
 def inject_desktop_nav_rail_css() -> None:
@@ -468,7 +533,7 @@ def inject_desktop_nav_rail_css() -> None:
 
 
 def inject_desktop_nav_rail_markup(*, active_slug: str | None = None) -> None:
-    """Inject visible desktop nav markup and same-document click wiring."""
+    """Inject desktop nav rail using Streamlit buttons (reliable on Cloud; no JS bridge)."""
     rows = _nav_fallback_rows()
     if not rows:
         return
@@ -478,8 +543,54 @@ def inject_desktop_nav_rail_markup(*, active_slug: str | None = None) -> None:
         except ImportError:
             from navigation import current_nav_slug  # type: ignore
         active_slug = current_nav_slug()
-    markup = _desktop_nav_rail_html(rows, active_slug) + _desktop_nav_rail_wire_script()
-    st.markdown(markup, unsafe_allow_html=True)
+
+    try:
+        from app.auth import sign_out
+    except ImportError:
+        from auth import sign_out  # type: ignore
+    try:
+        from app.navigation import set_nav_slug
+    except ImportError:
+        from navigation import set_nav_slug  # type: ignore
+
+    scan_slugs = frozenset({"scan_inventory", "scan_asset"})
+
+    with st.container(key="ips_desktop_nav_rail_wrap"):
+        st.markdown(
+            (
+                '<nav class="ips-desktop-nav-rail ips-desktop-nav-rail--streamlit" '
+                'aria-label="Main navigation">'
+                f'<div class="ips-desktop-nav-rail__header">{_desktop_rail_logo_html()}</div>'
+                '<span class="ips-desktop-nav-rail__items-marker" aria-hidden="true"></span>'
+                "</nav>"
+            ),
+            unsafe_allow_html=True,
+        )
+        for row in rows:
+            slug = row["slug"]
+            label = row["label"]
+            is_active = _desktop_nav_rail_item_is_active(slug, active_slug)
+            if st.button(
+                _rail_nav_button_label(slug, label),
+                key=f"ips_rail_nav_{slug}",
+                use_container_width=True,
+                type="primary" if is_active else "secondary",
+                help=label,
+            ):
+                if not is_active or slug in scan_slugs:
+                    set_nav_slug(slug)
+                    request_sidebar_collapse_after_nav()
+                    st.rerun()
+
+        if st.button(
+            "⎋\u2002Log out",
+            key="ips_rail_logout",
+            use_container_width=True,
+            type="secondary",
+            help="Log out",
+        ):
+            sign_out()
+            st.rerun()
 
 
 def inject_desktop_nav_rail(*, active_slug: str | None = None) -> None:
@@ -500,6 +611,7 @@ def inject_sidebar_shell() -> None:
 
     inject_sidebar_menu_wire()
     inject_sidebar_nav_align()
+    inject_desktop_nav_rail_align()
     inject_sidebar_layout_state(collapsed)
 
     if st.session_state.pop(IPS_SIDEBAR_TOGGLE_REQUEST_KEY, False):
@@ -1003,6 +1115,53 @@ def inject_sidebar_nav_align() -> None:
 </script>
         """,
         height=0,
+    )
+
+
+def inject_desktop_nav_rail_align() -> None:
+    """Split desktop rail button labels into icon + text (main document script)."""
+    st.markdown(
+        """
+<script>
+(function () {
+  function esc(s) {
+    return String(s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+  function splitNavLabel(text) {
+    var raw = String(text || '').trim();
+    if (!raw) return null;
+    var sep = raw.indexOf('\u2002');
+    if (sep < 0) sep = raw.indexOf('  ');
+    if (sep >= 0) {
+      return { icon: raw.slice(0, sep).trim(), label: raw.slice(sep + 1).trim() };
+    }
+    var m = raw.match(/^(\\S+)\\s+(.+)$/);
+    if (m) return { icon: m[1], label: m[2] };
+    return null;
+  }
+  function align() {
+    document.querySelectorAll('.st-key-ips_desktop_nav_rail_wrap [class*="st-key-ips_rail_nav_"] button, .st-key-ips_desktop_nav_rail_wrap .st-key-ips_rail_logout button').forEach(function (btn) {
+      var p = btn.querySelector('p');
+      if (!p) return;
+      if (p.querySelector('.ips-rail-nav-icon') && p.querySelector('.ips-rail-nav-label')) return;
+      var parts = splitNavLabel(p.textContent || '');
+      if (!parts || !parts.label) return;
+      p.innerHTML =
+        '<span class="ips-rail-nav-icon">' + esc(parts.icon) + '</span>' +
+        '<span class="ips-rail-nav-label">' + esc(parts.label) + '</span>';
+    });
+  }
+  align();
+  setTimeout(align, 40);
+  setTimeout(align, 180);
+})();
+</script>
+        """,
+        unsafe_allow_html=True,
     )
 
 
@@ -1790,19 +1949,12 @@ def _shell_script(nav_json: str) -> str:
     el.id = 'ips-nav-fallback';
     el.innerHTML = '<p class="ips-nav-fallback-title">Navigation</p>';
     NAV.forEach(function (item) {{
-      var btn = d.createElement('button');
-      btn.type = 'button';
-      btn.className = 'ips-nav-fallback-link';
-      btn.setAttribute('data-ips-nav-slug', item.slug);
-      btn.textContent = item.label;
-      btn.addEventListener('click', function (ev) {{
-        ev.preventDefault();
-        var top = window.top || window.parent || window;
-        var url = new URL(top.location.href);
-        url.searchParams.set('ips_nav', item.slug);
-        top.location.assign(url.toString());
-      }});
-      el.appendChild(btn);
+      var a = d.createElement('a');
+      a.href = '?ips_nav=' + encodeURIComponent(item.slug);
+      a.target = '_top';
+      a.rel = 'noopener noreferrer';
+      a.textContent = item.label;
+      el.appendChild(a);
     }});
     d.body.appendChild(el);
     return el;

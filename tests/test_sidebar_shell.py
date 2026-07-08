@@ -12,7 +12,9 @@ from app.components.sidebar_shell import (
     IPS_SIDEBAR_COLLAPSE_AFTER_NAV_KEY,
     IPS_SIDEBAR_EXPANDED_WIDTH_PX,
     IPS_SIDEBAR_NAV_FALLBACK_KEY,
+    _desktop_nav_rail_item_is_active,
     _fallback_nav_json,
+    _rail_nav_button_label,
     apply_pending_sidebar_collapse,
     capture_sidebar_collapsed_from_query,
     ensure_sidebar_collapsed_hydrated,
@@ -114,35 +116,22 @@ def test_inject_sidebar_shell_injects_layout_on_every_render():
     assert "if st.session_state.get(IPS_SIDEBAR_SHELL_KEY)" not in source
 
 
-def test_desktop_nav_rail_renders_icon_links_for_nav_items():
-    from app.components.sidebar_shell import _desktop_nav_rail_html
-
-    rows = [{"slug": "jobs", "label": "Jobs", "icon": "💼"}]
-    markup = _desktop_nav_rail_html(rows, "dashboard")
-    assert "ips-desktop-nav-rail" in markup
-    assert 'data-ips-nav-slug="jobs"' in markup
-    assert "<button" in markup
-    assert "?ips_nav=jobs" not in markup
-    assert 'data-ips-nav-slug="logout"' in markup
+def test_rail_nav_button_label_matches_sidebar_pattern():
+    assert _rail_nav_button_label("jobs", "Jobs") == "💼\u2002Jobs"
 
 
-def test_desktop_nav_rail_markup_has_no_inline_style():
-    from app.components.sidebar_shell import _desktop_nav_rail_html
-
-    rows = [{"slug": "jobs", "label": "Jobs", "icon": "💼"}]
-    markup = _desktop_nav_rail_html(rows, "dashboard")
-    assert "<style" not in markup
-    assert "ips-desktop-nav-rail" in markup
+def test_desktop_nav_rail_item_active_for_scan_aliases():
+    assert _desktop_nav_rail_item_is_active("scan_inventory", "inventory") is True
+    assert _desktop_nav_rail_item_is_active("employee_qr_scan", "assets") is True
+    assert _desktop_nav_rail_item_is_active("jobs", "dashboard") is False
 
 
-def test_desktop_nav_rail_wire_script_navigates_in_same_window():
-    from app.components.sidebar_shell import _desktop_nav_rail_wire_script
+def test_desktop_nav_rail_css_targets_streamlit_wrap():
+    from app.components.sidebar_shell import _desktop_nav_rail_css
 
-    script = _desktop_nav_rail_wire_script()
-    assert "ips_nav" in script
-    assert "ips_logout" in script
-    assert "location.assign" in script
-    assert "window.top" in script
+    css = _desktop_nav_rail_css()
+    assert "st-key-ips_desktop_nav_rail_wrap" in css
+    assert "ips-rail-nav-label" in css
 
 
 def test_employee_field_nav_is_restricted_without_legacy_access():
