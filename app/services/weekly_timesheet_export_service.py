@@ -33,12 +33,12 @@ try:
         TimesheetLine,
         WeeklyJobTimesheetData,
         TIMESHEET_LABOR_MIN_ROWS,
-        TIMESHEET_MATERIAL_MIN_ROWS,
+        TIMESHEET_CHARGE_MIN_ROWS,
         _day_labels,
+        _pad_charge_rows,
         _pad_labor_rows,
-        _pad_material_rows,
         _parse_date,
-        _split_materials,
+        _weekly_summary,
         load_timesheet_data,
         render_timesheet_html,
     )
@@ -50,12 +50,12 @@ except ImportError:
         TimesheetLine,
         WeeklyJobTimesheetData,
         TIMESHEET_LABOR_MIN_ROWS,
-        TIMESHEET_MATERIAL_MIN_ROWS,
+        TIMESHEET_CHARGE_MIN_ROWS,
         _day_labels,
+        _pad_charge_rows,
         _pad_labor_rows,
-        _pad_material_rows,
         _parse_date,
-        _split_materials,
+        _weekly_summary,
         load_timesheet_data,
         render_timesheet_html,
     )
@@ -228,6 +228,65 @@ def ensure_excel_template() -> Path:
     return _TEMPLATE_PATH
 
 
+def _charge_grid_rows(lines: list[TimesheetLine]) -> list[list[str]]:
+    rows: list[list[str]] = []
+    for ln in lines:
+        unit_cost = ln.unit_cost
+        if not unit_cost and ln.qty > 0 and ln.line_total > 0:
+            unit_cost = round(ln.line_total / ln.qty, 4)
+        rows.append(
+            [
+                ln.description,
+                fmt_hours(ln.qty, empty_zero=True),
+                ln.charge_unit,
+                fmt_money(unit_cost, empty="", zero_as_empty=True),
+                ln.markup_label(),
+                fmt_money(ln.line_total, empty="", zero_as_empty=True),
+            ]
+        )
+    return rows
+
+
+def _charge_table(
+    title: str,
+    lines: list[TimesheetLine],
+    *,
+    content_w: float,
+) -> Table:
+    header = ["Description", "Qty", "Unit", "Unit cost", "Markup", "Total"]
+    grid: list[list[str]] = [header]
+    grid.extend(_charge_grid_rows(lines))
+    col_fracs = [0.34, 0.10, 0.10, 0.14, 0.12, 0.20]
+    col_w = [content_w * f for f in col_fracs]
+    row_heights = [_PDF_HEAD_HEIGHT] + [_PDF_ROW_HEIGHT] * max(len(lines), 1)
+    tbl = Table(grid, colWidths=col_w, rowHeights=row_heights, repeatRows=1)
+    tbl.setStyle(
+        TableStyle(
+            [
+                ("GRID", (0, 0), (-1, -1), 0.35, colors.black),
+                ("FONTSIZE", (0, 0), (-1, -1), 6.5),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#dbeafe")),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("ALIGN", (1, 1), (-1, -1), "CENTER"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
+    title_tbl = Table([[title]], colWidths=[content_w], rowHeights=[0.22 * inch])
+    title_tbl.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#dbeafe")),
+                ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 7),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("BOX", (0, 0), (-1, -1), 0.35, colors.black),
+            ]
+        )
+    )
+    return Table([[title_tbl], [tbl]], colWidths=[content_w])
+
+
 def build_timesheet_template_context(timesheet_id: str) -> dict[str, Any]:
     """Load timesheet + computed export context."""
     data = load_timesheet_data(timesheet_id)
@@ -235,21 +294,23 @@ def build_timesheet_template_context(timesheet_id: str) -> dict[str, Any]:
         raise ValueError("Timesheet not found.")
     ws = _parse_date(data.week_start) or date.today()
     ws = monday_of_week(ws)
-    labor = _pad_labor_rows([ln for ln in data.labor_lines if ln.line_type in {"labor", "equipment"}], min_rows=_LABOR_ROW_COUNT)
-    mats_left, mats_right = _split_materials(data.material_lines)
-    mat_left = _pad_material_rows(mats_left, _MATERIAL_ROW_COUNT)
-    mat_right = _pad_material_rows(mats_right, _MATERIAL_ROW_COUNT)
+    labor = _pad_labor_rows([ln for ln in data.labor_lines if ln.line_type == "labor"], min_rows=_LABOR_ROW_COUNT)
     week_label = f"{data.week_start} – {data.week_end}" if data.week_end else data.sheet_date
+    totals = _weekly_summary(data)
     return {
         "data": data,
         "week_start": ws,
         "day_labels": _day_labels(ws),
         "labor_lines": labor,
-        "materials_left": mat_left,
-        "materials_right": mat_right,
+        "materials_lines": _pad_charge_rows(data.material_lines, TIMESHEET_CHARGE_MIN_ROWS),
+        "equipment_lines": _pad_charge_rows(data.equipment_lines, TIMESHEET_CHARGE_MIN_ROWS),
+        "other_lines": _pad_charge_rows(data.other_lines, TIMESHEET_CHARGE_MIN_ROWS),
         "week_label": week_label,
-        "total_hours": round(sum(ln.total_hours for ln in labor), 2),
-        "materials_total": round(sum(ln.cost for ln in data.material_lines), 2),
+        "total_hours": totals["labor_hours"],
+        "materials_total": totals["materials"],
+        "equipment_total": totals["equipment"],
+        "other_total": totals["other"],
+        "charges_total": totals["charges"],
     }
 
 
@@ -296,11 +357,12 @@ def export_data_to_excel_bytes(data: WeeklyJobTimesheetData) -> bytes:
         "week_start": ws_date,
         "day_labels": _day_labels(ws_date),
         "labor_lines": _pad_labor_rows(
-            [ln for ln in data.labor_lines if ln.line_type in {"labor", "equipment"}],
+            [ln for ln in data.labor_lines if ln.line_type == "labor"],
             min_rows=_LABOR_ROW_COUNT,
         ),
-        "materials_left": _pad_material_rows(_split_materials(data.material_lines)[0], _MATERIAL_ROW_COUNT),
-        "materials_right": _pad_material_rows(_split_materials(data.material_lines)[1], _MATERIAL_ROW_COUNT),
+        "materials_lines": _pad_charge_rows(data.material_lines, TIMESHEET_CHARGE_MIN_ROWS),
+        "equipment_lines": _pad_charge_rows(data.equipment_lines, TIMESHEET_CHARGE_MIN_ROWS),
+        "other_lines": _pad_charge_rows(data.other_lines, TIMESHEET_CHARGE_MIN_ROWS),
         "week_label": f"{data.week_start} – {data.week_end}" if data.week_end else data.sheet_date,
     }
     return _fill_workbook_bytes(ctx)
@@ -342,8 +404,10 @@ def _fill_workbook_bytes(ctx: dict[str, Any]) -> bytes:
             continue
         _fill_labor_row(ws, row, ln)
 
-    left = ctx["materials_left"]
-    right = ctx["materials_right"]
+    mats = ctx.get("materials_lines") or []
+    mid = (len(mats) + 1) // 2
+    left = mats[:mid]
+    right = mats[mid:]
     for i in range(_MATERIAL_ROW_COUNT):
         row = _FIRST_MATERIAL_ROW + i
         l = left[i] if i < len(left) else None
@@ -351,11 +415,11 @@ def _fill_workbook_bytes(ctx: dict[str, Any]) -> bytes:
         if l:
             ws[f"A{row}"] = l.description
             ws[f"B{row}"] = l.qty or None
-            ws[f"C{row}"] = l.cost or None
+            ws[f"C{row}"] = l.line_total or None
         if r:
             ws[f"E{row}"] = r.description
             ws[f"F{row}"] = r.qty or None
-            ws[f"G{row}"] = r.cost or None
+            ws[f"G{row}"] = r.line_total or None
 
     ws[_CELL["work_performed"]] = data.work_performed
     ws[_CELL["approved_by"]] = data.approved_by
@@ -452,11 +516,11 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
     story.append(header_tbl)
 
     labor = _pad_labor_rows(
-        [ln for ln in data.labor_lines if ln.line_type in {"labor", "equipment"}],
-        min_rows=TIMESHEET_LABOR_MIN_ROWS,
+        [ln for ln in data.labor_lines if ln.line_type == "labor"],
+        min_rows=min(TIMESHEET_LABOR_MIN_ROWS, 6),
     )
-    header = ["Employee / Equipment", "Class"] + [lbl.replace("<br>", "\n") for lbl in labels] + ["ST", "OT", "Total"]
-    grid: list[list[str]] = [header]
+    header = ["Employee", "Class"] + [lbl.replace("<br>", "\n") for lbl in labels] + ["ST", "OT", "Total"]
+    grid: list[list[str]] = [[f"1. LABOR — APPROVED TIMEKEEPING"]] + [header]
     for ln in labor:
         grid.append(
             [
@@ -482,75 +546,65 @@ def _build_portrait_pdf(data: WeeklyJobTimesheetData, *, week_start: date) -> by
         content_w * 0.05,
         content_w * 0.08,
     ]
-    labor_heights = [_PDF_HEAD_HEIGHT] + [_PDF_ROW_HEIGHT] * len(labor)
-    labor_tbl = Table(grid, colWidths=col_w, rowHeights=labor_heights, repeatRows=1)
+    labor_heights = [0.22 * inch, _PDF_HEAD_HEIGHT] + [_PDF_ROW_HEIGHT] * len(labor)
+    labor_tbl = Table(grid, colWidths=col_w, rowHeights=labor_heights, repeatRows=2)
     labor_tbl.setStyle(
         TableStyle(
             [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e8eef7")),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("SPAN", (0, 0), (-1, 0)),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#dbeafe")),
+                ("BACKGROUND", (0, 1), (-1, 1), colors.HexColor("#e8eef7")),
+                ("FONTNAME", (0, 0), (-1, 1), "Helvetica-Bold"),
                 ("FONTSIZE", (0, 0), (-1, -1), 6.5),
                 ("GRID", (0, 0), (-1, -1), 0.35, colors.black),
-                ("ALIGN", (2, 1), (-1, -1), "CENTER"),
+                ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+                ("ALIGN", (2, 2), (-1, -1), "CENTER"),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ]
         )
     )
     story.append(labor_tbl)
 
-    mats_left, mats_right = _split_materials(data.material_lines)
-    mats_left = _pad_material_rows(mats_left, TIMESHEET_MATERIAL_MIN_ROWS)
-    mats_right = _pad_material_rows(mats_right, TIMESHEET_MATERIAL_MIN_ROWS)
-    mat_grid = [["Materials / Expenses", "Qty", "Cost", "Materials / Expenses (cont.)", "Qty", "Cost"]]
-    empty_mat = TimesheetLine(line_type="material")
-    for i in range(max(len(mats_left), len(mats_right))):
-        l = mats_left[i] if i < len(mats_left) else empty_mat
-        r = mats_right[i] if i < len(mats_right) else empty_mat
-        mat_grid.append(
-            [
-                l.description,
-                fmt_hours(l.qty, empty_zero=True),
-                fmt_money(l.cost, empty="", zero_as_empty=True),
-                r.description,
-                fmt_hours(r.qty, empty_zero=True),
-                fmt_money(r.cost, empty="", zero_as_empty=True),
-            ]
-        )
-    half_w = content_w / 2.0
-    mat_row_count = max(len(mats_left), len(mats_right))
-    mat_heights = [_PDF_HEAD_HEIGHT] + [_PDF_ROW_HEIGHT] * mat_row_count
-    mat_tbl = Table(
-        mat_grid,
-        colWidths=[half_w * 0.72, half_w * 0.14, half_w * 0.14, half_w * 0.72, half_w * 0.14, half_w * 0.14],
-        rowHeights=mat_heights,
-    )
-    mat_tbl.setStyle(
+    materials = _pad_charge_rows(data.material_lines, TIMESHEET_CHARGE_MIN_ROWS)
+    equipment = _pad_charge_rows(data.equipment_lines, TIMESHEET_CHARGE_MIN_ROWS)
+    other = _pad_charge_rows(data.other_lines, TIMESHEET_CHARGE_MIN_ROWS)
+    story.append(_charge_table("2. INVENTORY / MATERIALS", materials, content_w=content_w))
+    story.append(_charge_table("3. EQUIPMENT", equipment, content_w=content_w))
+    story.append(_charge_table("4. OTHER CHARGES", other, content_w=content_w))
+
+    totals = _weekly_summary(data)
+    summary_grid = [
+        ["5. WEEKLY SUMMARY / TOTALS", ""],
+        ["Description", "Amount"],
+        ["Approved labor hours", fmt_hours(totals["labor_hours"], empty_zero=True)],
+        ["Inventory / materials", fmt_money(totals["materials"], empty="", zero_as_empty=True)],
+        ["Equipment", fmt_money(totals["equipment"], empty="", zero_as_empty=True)],
+        ["Other charges", fmt_money(totals["other"], empty="", zero_as_empty=True)],
+        ["Weekly charges total", fmt_money(totals["charges"], empty="", zero_as_empty=True)],
+    ]
+    summary_tbl = Table(summary_grid, colWidths=[content_w * 0.70, content_w * 0.30])
+    summary_tbl.setStyle(
         TableStyle(
             [
-                ("GRID", (0, 0), (-1, -1), 0.35, colors.black),
-                ("FONTSIZE", (0, 0), (-1, -1), 6.5),
+                ("SPAN", (0, 0), (-1, 0)),
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#dbeafe")),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("BACKGROUND", (0, 1), (-1, 1), colors.HexColor("#e8eef7")),
+                ("FONTNAME", (0, 0), (-1, 1), "Helvetica-Bold"),
+                ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 6.5),
+                ("GRID", (0, 0), (-1, -1), 0.35, colors.black),
+                ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+                ("ALIGN", (1, 2), (1, -1), "CENTER"),
             ]
         )
     )
-    story.append(mat_tbl)
-
-    work_h = (
-        content_h
-        - _PDF_HEADER_HEIGHT
-        - sum(labor_heights)
-        - sum(mat_heights)
-        - _PDF_APPROVAL_HEIGHT
-    )
-    work_h = max(work_h, 1.0 * inch)
-    work_label_h = 0.24 * inch
+    story.append(summary_tbl)
 
     work_body = html.escape(data.work_performed or " ").replace("\n", "<br/>") or "&nbsp;"
     work_tbl = Table(
         [[Paragraph("<b>WORK PERFORMED</b>", styles["Heading4"])], [Paragraph(work_body, styles["BodyText"])]],
         colWidths=[content_w],
-        rowHeights=[work_label_h, max(work_h - work_label_h, 0.75 * inch)],
+        rowHeights=[0.24 * inch, 1.0 * inch],
     )
     work_tbl.setStyle(
         TableStyle(

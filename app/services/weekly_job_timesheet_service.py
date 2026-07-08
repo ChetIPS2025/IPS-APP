@@ -50,8 +50,9 @@ _STORAGE_PREFIX = "weekly_timesheets"
 _table_available: bool | None = None
 
 _DAY_KEYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
-TIMESHEET_LABOR_MIN_ROWS = 15
-TIMESHEET_MATERIAL_MIN_ROWS = 10
+TIMESHEET_LABOR_MIN_ROWS = 10
+TIMESHEET_MATERIAL_MIN_ROWS = 6
+TIMESHEET_CHARGE_MIN_ROWS = 4
 TIMESHEET_PAGE_MIN_HEIGHT = "10.5in"
 TIMESHEET_CONTENT_WIDTH = "8in"
 TIMESHEET_GRID_ROW_HEIGHT = "0.26in"
@@ -140,7 +141,27 @@ class TimesheetLine:
     dt_hours: float = 0.0
     qty: float = 0.0
     cost: float = 0.0
+    unit: str = ""
+    unit_cost: float = 0.0
+    markup_pct: float = 0.0
     sort_order: int = 0
+
+    @property
+    def charge_unit(self) -> str:
+        return str(self.unit or self.class_name or "").strip()
+
+    @property
+    def line_total(self) -> float:
+        if self.cost > 0:
+            return round(self.cost, 2)
+        if self.qty > 0 and self.unit_cost > 0:
+            return round(self.qty * self.unit_cost, 2)
+        return 0.0
+
+    def markup_label(self) -> str:
+        if self.markup_pct > 0.005:
+            return f"{self.markup_pct:.1f}%"
+        return "—"
 
     @property
     def total_hours(self) -> float:
@@ -171,6 +192,8 @@ class WeeklyJobTimesheetData:
     signed_at: str = ""
     labor_lines: list[TimesheetLine] = field(default_factory=list)
     material_lines: list[TimesheetLine] = field(default_factory=list)
+    equipment_lines: list[TimesheetLine] = field(default_factory=list)
+    other_lines: list[TimesheetLine] = field(default_factory=list)
 
     def to_snapshot(self) -> dict[str, Any]:
         return {
@@ -189,6 +212,8 @@ class WeeklyJobTimesheetData:
             },
             "labor_lines": [ln.to_dict() for ln in self.labor_lines],
             "material_lines": [ln.to_dict() for ln in self.material_lines],
+            "equipment_lines": [ln.to_dict() for ln in self.equipment_lines],
+            "other_lines": [ln.to_dict() for ln in self.other_lines],
         }
 
     @classmethod
@@ -196,6 +221,14 @@ class WeeklyJobTimesheetData:
         hdr = dict(snap.get("header") or {})
         labor = [TimesheetLine(**{k: v for k, v in ln.items() if k in TimesheetLine.__dataclass_fields__}) for ln in snap.get("labor_lines") or []]
         mats = [TimesheetLine(**{k: v for k, v in ln.items() if k in TimesheetLine.__dataclass_fields__}) for ln in snap.get("material_lines") or []]
+        equip = [TimesheetLine(**{k: v for k, v in ln.items() if k in TimesheetLine.__dataclass_fields__}) for ln in snap.get("equipment_lines") or []]
+        other = [TimesheetLine(**{k: v for k, v in ln.items() if k in TimesheetLine.__dataclass_fields__}) for ln in snap.get("other_lines") or []]
+        if not equip:
+            equip = [ln for ln in labor if ln.line_type == "equipment"]
+            labor = [ln for ln in labor if ln.line_type == "labor"]
+        if not other:
+            other = [ln for ln in mats if ln.line_type == "expense"]
+            mats = [ln for ln in mats if ln.line_type != "expense"]
         return cls(
             job_id=str(hdr.get("job_id") or ""),
             job_number=str(hdr.get("job_number") or ""),
@@ -210,6 +243,8 @@ class WeeklyJobTimesheetData:
             status=str(hdr.get("status") or "Draft"),
             labor_lines=labor,
             material_lines=mats,
+            equipment_lines=equip,
+            other_lines=other,
         )
 
 
@@ -229,6 +264,179 @@ def _pad_material_rows(lines: list[TimesheetLine], min_rows: int = 6) -> list[Ti
     while len(out) < min_rows:
         out.append(TimesheetLine(line_type="material"))
     return out
+
+
+def _pad_charge_rows(lines: list[TimesheetLine], min_rows: int = TIMESHEET_CHARGE_MIN_ROWS) -> list[TimesheetLine]:
+    out = [ln for ln in lines if ln.description or ln.qty or ln.line_total]
+    while len(out) < min_rows:
+        out.append(TimesheetLine(line_type="material"))
+    return out
+
+
+def _weekly_summary(data: WeeklyJobTimesheetData) -> dict[str, float]:
+    labor_hours = round(
+        sum(ln.total_hours for ln in data.labor_lines if ln.line_type == "labor"),
+        2,
+    )
+    materials = round(sum(ln.line_total for ln in data.material_lines), 2)
+    equipment = round(sum(ln.line_total for ln in data.equipment_lines), 2)
+    other = round(sum(ln.line_total for ln in data.other_lines), 2)
+    charges = round(materials + equipment + other, 2)
+    return {
+        "labor_hours": labor_hours,
+        "materials": materials,
+        "equipment": equipment,
+        "other": other,
+        "charges": charges,
+        "grand_total": charges,
+    }
+
+
+def _charge_row_html(ln: TimesheetLine) -> str:
+    unit_cost = ln.unit_cost
+    if not unit_cost and ln.qty > 0 and ln.line_total > 0:
+        unit_cost = round(ln.line_total / ln.qty, 4)
+    return (
+        f"<tr>"
+        f'<td class="left">{html.escape(ln.description)}</td>'
+        f'<td class="num">{html.escape(fmt_hours(ln.qty, empty_zero=True))}</td>'
+        f'<td class="left">{html.escape(ln.charge_unit)}</td>'
+        f'<td class="num">{html.escape(fmt_money(unit_cost, empty="", zero_as_empty=True))}</td>'
+        f'<td class="num">{html.escape(ln.markup_label())}</td>'
+        f'<td class="num">{html.escape(fmt_money(ln.line_total, empty="", zero_as_empty=True))}</td>'
+        f"</tr>"
+    )
+
+
+def _summary_row_html(label: str, value: str, *, bold: bool = False) -> str:
+    weight = "font-weight:800;" if bold else ""
+    return (
+        f"<tr>"
+        f'<td class="left" style="{weight}">{html.escape(label)}</td>'
+        f'<td class="num" style="{weight}">{html.escape(value)}</td>'
+        f"</tr>"
+    )
+
+
+def _summary_table_html(data: WeeklyJobTimesheetData) -> str:
+    totals = _weekly_summary(data)
+    rows = [
+        _summary_row_html("Approved labor hours", fmt_hours(totals["labor_hours"], empty_zero=True)),
+        _summary_row_html("Inventory / materials", fmt_money(totals["materials"], empty="", zero_as_empty=True)),
+        _summary_row_html("Equipment", fmt_money(totals["equipment"], empty="", zero_as_empty=True)),
+        _summary_row_html("Other charges", fmt_money(totals["other"], empty="", zero_as_empty=True)),
+        _summary_row_html("Weekly charges total", fmt_money(totals["charges"], empty="", zero_as_empty=True), bold=True),
+    ]
+    return "".join(rows)
+
+
+def _infer_charge_unit(txn: dict[str, Any]) -> str:
+    notes = str(txn.get("notes") or "").lower()
+    for token, unit in (
+        ("(hour)", "hr"),
+        ("(day)", "day"),
+        ("(week)", "week"),
+        ("(month)", "month"),
+    ):
+        if token in notes:
+            return unit
+    cat = str(txn.get("cost_category") or "").strip().lower()
+    qty = _num(txn.get("quantity"))
+    if cat in {"equipment", "rental"}:
+        if qty and qty <= 24 and "hour" in notes:
+            return "hr"
+        if qty and qty >= 1 and qty <= 31:
+            return "day"
+        return "ea"
+    if cat == "material":
+        return "ea"
+    if cat in {"subcontract", "other"}:
+        return "ea"
+    return "ea"
+
+
+def _markup_from_txn(txn: dict[str, Any]) -> float:
+    asset_id = str(txn.get("asset_id") or "").strip()
+    if not asset_id:
+        return 0.0
+    rows = _safe_admin_fetch("assets", {"id": asset_id}, limit=1)
+    if not rows:
+        return 0.0
+    return _num(rows[0].get("rental_default_markup_percent"))
+
+
+def _txn_to_charge_line(txn: dict[str, Any], line_type: str) -> TimesheetLine:
+    qty = _num(txn.get("quantity"))
+    unit_cost = _num(txn.get("unit_cost"))
+    total = _num(txn.get("total_cost"))
+    if total <= 0 and qty > 0 and unit_cost > 0:
+        total = round(qty * unit_cost, 2)
+    desc = str(txn.get("description") or txn.get("item_name") or "").strip()
+    if not desc:
+        desc = str(txn.get("cost_category") or "Charge").strip().title()
+    return TimesheetLine(
+        line_type=line_type,
+        description=desc,
+        unit=_infer_charge_unit(txn),
+        qty=qty or (1.0 if total > 0 else 0.0),
+        unit_cost=unit_cost or (round(total / qty, 4) if qty > 0 else total),
+        markup_pct=_markup_from_txn(txn),
+        cost=total,
+    )
+
+
+def _build_charges_from_job_cost_transactions(
+    job_id: str,
+    ws: date,
+    we: date,
+) -> tuple[list[TimesheetLine], list[TimesheetLine], list[TimesheetLine]]:
+    try:
+        from app.services.job_cost_transaction_service import (
+            COST_EQUIPMENT,
+            COST_LABOR,
+            COST_MATERIAL,
+            COST_OTHER,
+            COST_RENTAL,
+            COST_SUBCONTRACT,
+            fetch_job_cost_transactions,
+        )
+    except ImportError:
+        from services.job_cost_transaction_service import (  # type: ignore
+            COST_EQUIPMENT,
+            COST_LABOR,
+            COST_MATERIAL,
+            COST_OTHER,
+            COST_RENTAL,
+            COST_SUBCONTRACT,
+            fetch_job_cost_transactions,
+        )
+    materials: list[TimesheetLine] = []
+    equipment: list[TimesheetLine] = []
+    other: list[TimesheetLine] = []
+    for txn in fetch_job_cost_transactions(job_id):
+        txn_date = _parse_date(txn.get("transaction_date"))
+        if txn_date is None or txn_date < ws or txn_date > we:
+            continue
+        cat = str(txn.get("cost_category") or "").strip().lower()
+        if cat == COST_LABOR:
+            continue
+        total = _num(txn.get("total_cost"))
+        if total <= 0:
+            continue
+        if cat == COST_MATERIAL:
+            materials.append(_txn_to_charge_line(txn, "material"))
+        elif cat in {COST_EQUIPMENT, COST_RENTAL}:
+            equipment.append(_txn_to_charge_line(txn, "equipment"))
+        elif cat in {COST_SUBCONTRACT, COST_OTHER}:
+            other.append(_txn_to_charge_line(txn, "expense"))
+        else:
+            other.append(_txn_to_charge_line(txn, "expense"))
+    key_fn = lambda ln: ln.description.lower()
+    return (
+        sorted(materials, key=key_fn),
+        sorted(equipment, key=key_fn),
+        sorted(other, key=key_fn),
+    )
 
 
 def _split_materials(lines: list[TimesheetLine]) -> tuple[list[TimesheetLine], list[TimesheetLine]]:
@@ -258,13 +466,7 @@ def _labor_row_html(ln: TimesheetLine) -> str:
 
 
 def _material_row_html(ln: TimesheetLine) -> str:
-    return (
-        f"<tr>"
-        f'<td class="left">{html.escape(ln.description)}</td>'
-        f'<td class="num">{html.escape(fmt_hours(ln.qty, empty_zero=True))}</td>'
-        f'<td class="num">{html.escape(fmt_money(ln.cost, empty="", zero_as_empty=True))}</td>'
-        f"</tr>"
-    )
+    return _charge_row_html(ln)
 
 
 def _signature_html(signature_data: str) -> str:
@@ -281,19 +483,19 @@ def render_timesheet_html(
     week_start: date | None = None,
     embed: bool = False,
 ) -> str:
-    """Render printable HTML from template. Edit app/templates/weekly_timesheet_form.html to adjust layout."""
+    """Render printable HTML from template."""
     ws = _parse_date(data.week_start) or week_start or date.today()
     ws = monday_of_week(ws)
     labels = _day_labels(ws)
     template_path = _TEMPLATE_PATH if _TEMPLATE_PATH.is_file() else _FALLBACK_TEMPLATE
     template = template_path.read_text(encoding="utf-8")
     labor = _pad_labor_rows(
-        [ln for ln in data.labor_lines if ln.line_type in {"labor", "equipment"}],
+        [ln for ln in data.labor_lines if ln.line_type == "labor"],
         min_rows=TIMESHEET_LABOR_MIN_ROWS,
     )
-    mats_left, mats_right = _split_materials(data.material_lines)
-    mats_left = _pad_material_rows(mats_left, TIMESHEET_MATERIAL_MIN_ROWS)
-    mats_right = _pad_material_rows(mats_right, TIMESHEET_MATERIAL_MIN_ROWS)
+    materials = _pad_charge_rows(data.material_lines, TIMESHEET_CHARGE_MIN_ROWS)
+    equipment = _pad_charge_rows(data.equipment_lines, TIMESHEET_CHARGE_MIN_ROWS)
+    other = _pad_charge_rows(data.other_lines, TIMESHEET_CHARGE_MIN_ROWS)
     logo = header_logo_html(height=48) or "IPS"
     replacements = {
         "{{body_class}}": "ips-wt-embed" if embed else "",
@@ -311,8 +513,10 @@ def render_timesheet_html(
         "{{day_sat_label}}": labels[5],
         "{{day_sun_label}}": labels[6],
         "{{labor_rows_html}}": "".join(_labor_row_html(ln) for ln in labor),
-        "{{materials_left_html}}": "".join(_material_row_html(ln) for ln in mats_left),
-        "{{materials_right_html}}": "".join(_material_row_html(ln) for ln in mats_right),
+        "{{materials_rows_html}}": "".join(_charge_row_html(ln) for ln in materials),
+        "{{equipment_rows_html}}": "".join(_charge_row_html(ln) for ln in equipment),
+        "{{other_rows_html}}": "".join(_charge_row_html(ln) for ln in other),
+        "{{summary_rows_html}}": _summary_table_html(data),
         "{{work_performed}}": html.escape(data.work_performed),
         "{{approved_by}}": html.escape(data.approved_by),
         "{{signature_html}}": _signature_html(data.signature_data),
@@ -478,16 +682,34 @@ def _build_equipment_lines(job_id: str, ws: date, we: date) -> list[TimesheetLin
         label = str(row.get("asset_label") or "Equipment").strip()
         hrs = _num(row.get("usage_hours"))
         days = _num(row.get("usage_days"))
-        total = hrs if hrs else days
+        rate_h = _num(row.get("rate_per_hour"))
+        rate_d = _num(row.get("rate_per_day"))
+        total = _num(row.get("line_total"))
+        if hrs > 0:
+            qty, unit, unit_cost = hrs, "hr", rate_h or (total / hrs if hrs and total else 0.0)
+        elif days > 0:
+            qty, unit, unit_cost = days, "day", rate_d or (total / days if days and total else 0.0)
+        else:
+            qty, unit, unit_cost = 1.0, "ea", total
+        if not total and qty > 0 and unit_cost > 0:
+            total = round(qty * unit_cost, 2)
         if not total and not label:
             continue
+        markup = 0.0
+        asset_id = str(row.get("asset_id") or "").strip()
+        if asset_id:
+            asset_rows = _safe_admin_fetch("assets", {"id": asset_id}, limit=1)
+            if asset_rows:
+                markup = _num(asset_rows[0].get("rental_default_markup_percent"))
         lines.append(
             TimesheetLine(
                 line_type="equipment",
                 description=label,
-                class_name="Equipment Rental",
-                mon=total,
-                st_hours=total,
+                unit=unit,
+                qty=qty,
+                unit_cost=unit_cost,
+                markup_pct=markup,
+                cost=total,
             )
         )
     return lines
@@ -496,15 +718,20 @@ def _build_equipment_lines(job_id: str, ws: date, we: date) -> list[TimesheetLin
 def _build_material_lines(job_id: str, ws: date, we: date) -> list[TimesheetLine]:
     lines: list[TimesheetLine] = []
     for row in _safe_admin_fetch("job_materials", {"job_id": job_id}, limit=500):
-        created = _parse_date(row.get("created_at"))
-        if created and (created < ws or created > we):
+        used = _parse_date(row.get("used_at") or row.get("created_at"))
+        if used and (used < ws or used > we):
             continue
+        qty = _num(row.get("quantity"))
+        unit_cost = _num(row.get("unit_cost"))
+        total = _num(row.get("line_total") or (qty * unit_cost))
         lines.append(
             TimesheetLine(
                 line_type="material",
                 description=str(row.get("item_name") or "Material").strip(),
-                qty=_num(row.get("quantity")),
-                cost=_num(row.get("line_total") or (_num(row.get("quantity")) * _num(row.get("unit_cost")))),
+                unit="ea",
+                qty=qty,
+                unit_cost=unit_cost,
+                cost=total,
             )
         )
     try:
@@ -520,14 +747,44 @@ def _build_material_lines(job_id: str, ws: date, we: date) -> list[TimesheetLine
         qty = abs(_num(row.get("quantity")))
         if not qty:
             continue
+        unit_cost = _num(row.get("unit_cost"))
+        total = _num(row.get("line_total") or (qty * unit_cost))
         lines.append(
             TimesheetLine(
                 line_type="material",
                 description=str(row.get("item_name") or row.get("notes") or "Inventory issue").strip(),
+                unit="ea",
                 qty=qty,
-                cost=_num(row.get("line_total") or row.get("unit_cost")),
+                unit_cost=unit_cost or (total / qty if qty else 0.0),
+                cost=total,
             )
         )
+    try:
+        for row in _safe_admin_fetch("job_expenses", {"job_id": job_id}, limit=500):
+            status = str(row.get("status") or "").strip()
+            if status in {"Rejected", "Open"}:
+                continue
+            exp_date = _parse_date(row.get("expense_date") or row.get("created_at"))
+            if exp_date and (exp_date < ws or exp_date > we):
+                continue
+            amount = _num(row.get("amount"))
+            if amount <= 0:
+                continue
+            category = str(row.get("category") or "").strip()
+            desc = str(row.get("description") or row.get("vendor") or category or "Expense").strip()
+            line_type = "material" if category == "Materials" else "expense"
+            lines.append(
+                TimesheetLine(
+                    line_type=line_type,
+                    description=desc,
+                    unit="ea",
+                    qty=1.0,
+                    unit_cost=amount,
+                    cost=amount,
+                )
+            )
+    except Exception:
+        pass
     return lines
 
 
@@ -631,13 +888,23 @@ def build_timesheet_data(
         )
         if not labor and not approved_timekeeping_only:
             labor = _build_labor_from_time_entries(job_id, ws, we, emp_map)
-        labor.extend(_build_equipment_lines(job_id, ws, we))
     except Exception:
         labor = []
+    materials: list[TimesheetLine] = []
+    equipment: list[TimesheetLine] = []
+    other: list[TimesheetLine] = []
     try:
-        materials = _build_material_lines(job_id, ws, we)
+        materials, equipment, other = _build_charges_from_job_cost_transactions(job_id, ws, we)
     except Exception:
-        materials = []
+        materials, equipment, other = [], [], []
+    if not materials and not equipment and not other:
+        try:
+            legacy_materials = _build_material_lines(job_id, ws, we)
+            materials = [ln for ln in legacy_materials if ln.line_type == "material"]
+            other = [ln for ln in legacy_materials if ln.line_type == "expense"]
+            equipment = _build_equipment_lines(job_id, ws, we)
+        except Exception:
+            materials, equipment, other = [], [], []
     po = po_number.strip() or str(header.get("po_number") or "").strip() or _fetch_po_for_job(job)
     wp = work_performed.strip() or _build_work_performed(job_id, ws, we)
     return WeeklyJobTimesheetData(
@@ -652,18 +919,24 @@ def build_timesheet_data(
         approved_by=approved_by.strip(),
         work_performed=wp,
         labor_lines=labor or [_empty_labor_row()],
-        material_lines=materials or [TimesheetLine(line_type="material")],
+        material_lines=materials,
+        equipment_lines=equipment,
+        other_lines=other,
     )
 
 
 def _line_to_db(line: TimesheetLine, timesheet_id: str, sort_order: int) -> dict[str, Any]:
     total_h = round(line.st_hours + line.ot_hours + line.dt_hours, 2)
+    class_name = line.class_name
+    if line.line_type != "labor" and line.charge_unit:
+        class_name = line.charge_unit
+    line_cost = line.line_total
     return {
         "timesheet_id": timesheet_id,
         "line_type": line.line_type,
         "sort_order": sort_order,
         "description": line.description,
-        "class_name": line.class_name,
+        "class_name": class_name,
         "hours_mon": line.mon,
         "hours_tue": line.tue,
         "hours_wed": line.wed,
@@ -675,7 +948,7 @@ def _line_to_db(line: TimesheetLine, timesheet_id: str, sort_order: int) -> dict
         "ot_hours": line.ot_hours,
         "dt_hours": line.dt_hours,
         "qty": line.qty,
-        "cost": line.cost,
+        "cost": line_cost,
         "monday_st": line.mon,
         "tuesday_st": line.tue,
         "wednesday_st": line.wed,
@@ -688,7 +961,7 @@ def _line_to_db(line: TimesheetLine, timesheet_id: str, sort_order: int) -> dict
         "total_dt": line.dt_hours,
         "total_hours": total_h,
         "quantity": line.qty,
-        "total_cost": line.cost,
+        "total_cost": line_cost,
     }
 
 
@@ -698,10 +971,21 @@ def _line_from_db(row: dict[str, Any]) -> TimesheetLine:
     )
     qty = _num(row.get("qty") or row.get("quantity"))
     cost = _num(row.get("cost") or row.get("total_cost"))
+    lt = str(row.get("line_type") or "labor")
+    class_name = str(row.get("class_name") or "")
+    unit = ""
+    if lt != "labor":
+        unit = class_name
+        class_name = ""
+    unit_cost = _num(row.get("unit_cost"))
+    if not unit_cost and qty > 0 and cost > 0:
+        unit_cost = round(cost / qty, 4)
     return TimesheetLine(
-        line_type=str(row.get("line_type") or "labor"),
+        line_type=lt,
         description=str(row.get("description") or row.get("employee_equipment") or ""),
-        class_name=str(row.get("class_name") or ""),
+        class_name=class_name,
+        unit=unit,
+        unit_cost=unit_cost,
         mon=mon,
         tue=tue,
         wed=wed,
@@ -718,7 +1002,13 @@ def _line_from_db(row: dict[str, Any]) -> TimesheetLine:
     )
 
 
-def _header_from_db(row: dict[str, Any], labor: list[TimesheetLine], materials: list[TimesheetLine]) -> WeeklyJobTimesheetData:
+def _header_from_db(
+    row: dict[str, Any],
+    labor: list[TimesheetLine],
+    materials: list[TimesheetLine],
+    equipment: list[TimesheetLine],
+    other: list[TimesheetLine],
+) -> WeeklyJobTimesheetData:
     snap = row.get("locked_snapshot")
     if snap and isinstance(snap, dict):
         data = WeeklyJobTimesheetData.from_snapshot(snap)
@@ -742,6 +1032,8 @@ def _header_from_db(row: dict[str, Any], labor: list[TimesheetLine], materials: 
         signed_at=str(row.get("signed_at") or "")[:19],
         labor_lines=labor,
         material_lines=materials,
+        equipment_lines=equipment,
+        other_lines=other,
     )
 
 
@@ -779,9 +1071,11 @@ def load_timesheet_data(timesheet_id: str) -> WeeklyJobTimesheetData | None:
             raise
     line_rows = [r for r in all_lines if str(r.get("timesheet_id") or "") == str(timesheet_id)]
     line_rows = sorted(line_rows, key=lambda r: int(r.get("sort_order") or 0))
-    labor = [_line_from_db(r) for r in line_rows if str(r.get("line_type") or "") in {"labor", "equipment"}]
-    materials = [_line_from_db(r) for r in line_rows if str(r.get("line_type") or "") in {"material", "expense"}]
-    return _header_from_db(row, labor, materials)
+    labor = [_line_from_db(r) for r in line_rows if str(r.get("line_type") or "") == "labor"]
+    equipment = [_line_from_db(r) for r in line_rows if str(r.get("line_type") or "") == "equipment"]
+    materials = [_line_from_db(r) for r in line_rows if str(r.get("line_type") or "") == "material"]
+    other = [_line_from_db(r) for r in line_rows if str(r.get("line_type") or "") == "expense"]
+    return _header_from_db(row, labor, materials, equipment, other)
 
 
 def list_timesheets_for_job(job_id: str, *, limit: int = 50) -> list[dict[str, Any]]:
@@ -885,7 +1179,17 @@ def save_timesheet(
         insert_row_admin(_LINES_TABLE, _line_to_db(ln, tid, sort_i))
         sort_i += 1
     for ln in data.material_lines:
-        if not ln.description and ln.qty == 0 and ln.cost == 0:
+        if not ln.description and ln.qty == 0 and ln.line_total == 0:
+            continue
+        insert_row_admin(_LINES_TABLE, _line_to_db(ln, tid, sort_i))
+        sort_i += 1
+    for ln in data.equipment_lines:
+        if not ln.description and ln.qty == 0 and ln.line_total == 0:
+            continue
+        insert_row_admin(_LINES_TABLE, _line_to_db(ln, tid, sort_i))
+        sort_i += 1
+    for ln in data.other_lines:
+        if not ln.description and ln.qty == 0 and ln.line_total == 0:
             continue
         insert_row_admin(_LINES_TABLE, _line_to_db(ln, tid, sort_i))
         sort_i += 1

@@ -191,7 +191,8 @@ def render_job_weekly_timesheets_tab(job: dict[str, Any], *, key_prefix: str) ->
         unsafe_allow_html=True,
     )
     st.caption(
-        "Customer weekly timesheets for this job only — built from approved Timekeeping. "
+        "Customer weekly timesheets for this job — built from **approved Timekeeping** plus "
+        "inventory, materials, equipment, and other job charges for the selected week. "
         "Supervisors enter hours in Timekeeping; edit time here via **Edit Time in Timekeeping**."
     )
 
@@ -243,7 +244,25 @@ def render_job_weekly_timesheets_tab(job: dict[str, Any], *, key_prefix: str) ->
         st.warning(f"Could not build timesheet preview: {html.escape(str(exc))}")
         return
 
-    labor_count = sum(1 for ln in data.labor_lines if ln.total_hours > 0)
+    labor_count = sum(1 for ln in data.labor_lines if ln.line_type == "labor" and ln.total_hours > 0)
+    charge_count = sum(
+        1
+        for ln in (data.material_lines + data.equipment_lines + data.other_lines)
+        if ln.description and ln.line_total > 0
+    )
+    can_generate = labor_count > 0 or charge_count > 0
+
+    try:
+        from app.services.weekly_job_timesheet_service import _weekly_summary
+    except ImportError:
+        from services.weekly_job_timesheet_service import _weekly_summary  # type: ignore
+    totals = _weekly_summary(data)
+    m1, m2, m3, m4, m5 = st.columns(5, gap="small")
+    m1.metric("Approved labor hrs", fmt_hours(totals["labor_hours"]))
+    m2.metric("Materials", fmt_currency(totals["materials"]))
+    m3.metric("Equipment", fmt_currency(totals["equipment"]))
+    m4.metric("Other charges", fmt_currency(totals["other"]))
+    m5.metric("Weekly charges", fmt_currency(totals["charges"]))
 
     gen1, gen2 = st.columns([1.2, 2], gap="small")
     with gen1:
@@ -252,23 +271,24 @@ def render_job_weekly_timesheets_tab(job: dict[str, Any], *, key_prefix: str) ->
             type="primary",
             use_container_width=True,
             key=f"{kp}_generate",
-            disabled=labor_count == 0,
-            help="Save a weekly timesheet from approved Timekeeping for this job and week.",
+            disabled=not can_generate,
+            help="Save a weekly timesheet from approved labor and job charges for this week.",
         ):
             try:
                 prof = current_profile() or {}
                 uid = str(prof.get("id") or "")
                 data.status = "Generated"
                 save_timesheet(data, created_by=uid, lock=False)
-                st.success("Weekly timesheet generated from approved Timekeeping.")
+                st.success("Weekly timesheet generated from approved labor and job charges.")
                 st.rerun()
             except Exception as exc:
                 st.error(str(exc))
 
-    if labor_count == 0:
+    if not can_generate:
         st.info(
-            "No **approved** timekeeping hours for this job and week. "
-            "Supervisors enter crew time in Timekeeping; customer timesheets update after approval."
+            "No **approved** timekeeping hours or job charges for this job and week. "
+            "Labor comes from approved Timekeeping; charges pull from inventory, materials, "
+            "equipment, and expenses assigned to this job during the week."
         )
         if _can_edit_time_in_timekeeping():
             if st.button("Enter time in Timekeeping", key=f"{kp}_enter_tk_empty"):
