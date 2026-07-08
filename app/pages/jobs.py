@@ -31,10 +31,11 @@ try:
     from app.components.jobs_list_table import (
         JOBS_TABLE_LAST_ACTION_KEY,
         JOBS_TABLE_PENDING_MENU_KEY,
+        JOBS_TABLE_PENDING_OPEN_KEY,
         JOBS_TABLE_PENDING_STATUS_KEY,
         build_jobs_html_table,
         job_list_link_html,
-        render_jobs_table_bridge,
+        render_jobs_table_bridge_legacy,
     )
     from app.components.jobs_page_layout import (
         close_jobs_filter_bar_shell,
@@ -157,10 +158,11 @@ except ImportError:
     from components.jobs_list_table import (  # type: ignore
         JOBS_TABLE_LAST_ACTION_KEY,
         JOBS_TABLE_PENDING_MENU_KEY,
+        JOBS_TABLE_PENDING_OPEN_KEY,
         JOBS_TABLE_PENDING_STATUS_KEY,
         build_jobs_html_table,
         job_list_link_html,
-        render_jobs_table_bridge,
+        render_jobs_table_bridge_legacy,
     )
     from components.jobs_page_layout import (  # type: ignore
         close_jobs_filter_bar_shell,
@@ -1144,6 +1146,7 @@ def _clear_job_selection() -> None:
 def _clear_jobs_detail_modal() -> None:
     _clear_job_selection()
     st.session_state.pop(JOBS_TABLE_LAST_ACTION_KEY, None)
+    st.session_state.pop(JOBS_TABLE_PENDING_OPEN_KEY, None)
     clear_job_subjob_selection()
     _clear_job_detail_aux_panel()
     for key in list(st.session_state.keys()):
@@ -1160,7 +1163,7 @@ def _render_jobs_list_fragment(
     filter_options: dict[str, list[str]],
     cost_cache: dict[str, dict[str, float | dict | bool]],
     subjob_counts: dict[str, int],
-) -> list[str]:
+) -> tuple[list[str], dict[str, dict]]:
     """Jobs table list (filters, HTML table, bridge)."""
     return _render_custom_jobs_table(
         filtered,
@@ -1251,11 +1254,11 @@ def _render_custom_jobs_table(
     filter_options: dict[str, list[str]],
     cost_cache: dict[str, dict[str, float | dict | bool]],
     subjob_counts: dict[str, int],
-) -> list[str]:
+) -> tuple[list[str], dict[str, dict]]:
     if not filtered:
         st.info("No jobs match your filters.")
         st.session_state[_ALL_JOB_IDS_KEY] = []
-        return []
+        return [], {}
 
     all_job_ids = [str(j.get("id") or "").strip() for j in filtered if str(j.get("id") or "").strip()]
     st.session_state[_ALL_JOB_IDS_KEY] = all_job_ids
@@ -1300,7 +1303,7 @@ def _render_custom_jobs_table(
                 ips_app_rerun()
             st.markdown("</div>", unsafe_allow_html=True)
 
-        render_jobs_table_bridge(
+        render_jobs_table_bridge_legacy(
             jobs_by_id,
             component_key="ips_jobs_list_bridge",
             hook_key="ipsJobsList::action",
@@ -1309,7 +1312,7 @@ def _render_custom_jobs_table(
             field_mode=field_mode,
         )
 
-    return all_job_ids
+    return all_job_ids, jobs_by_id
 
 
 def _job_session_key(job: dict) -> str:
@@ -3220,7 +3223,8 @@ def _render_jobs_page() -> None:
         cost_cache=None,
         subjob_counts=subjob_counts,
     )
+
     render_jobs_pagination_footer(len(filtered), _TABLE_KEY, item_label="job")
 
-    if st.session_state.get(SHOW_MODAL_KEY) or str(st.session_state.get(_JOBS_MODAL_KEY) or "").strip():
+    if st.session_state.get(SHOW_MODAL_KEY):
         show_modal_if_pending(_JOBS_MODAL_KEY, _show_jobs_detail_modal)

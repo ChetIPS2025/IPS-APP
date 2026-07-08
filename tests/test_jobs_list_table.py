@@ -24,7 +24,8 @@ def test_job_list_link_html_includes_action_and_id():
     assert "ips-jobs-number-link" in html_out
     assert "ips-dash-est-link" in html_out
     assert "ips-row-open-link" in html_out
-    assert '<a href="#"' in html_out
+    assert '<button type="button"' in html_out
+    assert "ips-jobs-open-link" in html_out
 
 
 def test_handle_jobs_table_action_strips_open_prefix():

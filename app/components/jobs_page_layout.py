@@ -208,6 +208,30 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap .stB
   justify-content: center !important;
   text-align: center !important;
 }
+.st-key-jobs_table_wrap .ips-dash-est-link,
+.st-key-jobs_table_wrap .ips-jobs-open-link {
+  color: #2563eb !important;
+  font-weight: 800 !important;
+  font-size: 0.8125rem !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 2 !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  font-family: inherit !important;
+  line-height: inherit !important;
+  text-align: left !important;
+}
+.st-key-jobs_table_wrap .ips-jobs-open-link:hover,
+.st-key-jobs_table_wrap .ips-jobs-open-link:focus {
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
+  outline: none !important;
+}
 .st-key-jobs_table_wrap .ips-dash-est-link {
   color: #2563eb !important;
   font-weight: 800 !important;

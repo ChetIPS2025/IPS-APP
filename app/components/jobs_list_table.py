@@ -20,6 +20,9 @@ JOBS_TABLE_PENDING_STATUS_KEY = "jobs_table_pending_status_id"
 JOBS_TABLE_PENDING_MENU_KEY = "jobs_table_pending_menu_id"
 
 
+JOBS_TABLE_PENDING_OPEN_KEY = "jobs_table_pending_open_id"
+
+
 def jobs_bridge_button_key(job: dict[str, Any]) -> str:
     raw = str(job.get("id") or job.get("job_number") or "job").strip()
     safe = "".join(ch if ch.isalnum() else "_" for ch in raw) or "job"
@@ -76,8 +79,9 @@ def job_list_link_html(
     if bridge_key:
         bridge_attr = f' data-bridge-key="{html.escape(bridge_key, quote=True)}"'
     return (
-        f'<a href="#" class="{html.escape(cls)}" data-row-id="{jid}" data-job-id="{jid}" '
-        f'data-job-action="open"{bridge_attr} title="{title}">{text}</a>'
+        f'<button type="button" class="{html.escape(cls)} ips-jobs-open-link" '
+        f'data-row-id="{jid}" data-job-id="{jid}" data-job-action="open"{bridge_attr} '
+        f'title="{title}">{text}</button>'
     )
 
 
@@ -391,7 +395,9 @@ def handle_jobs_table_action(
         return
     st.session_state.pop(pending_status_key, None)
     st.session_state.pop(pending_menu_key, None)
+    st.session_state[JOBS_TABLE_PENDING_OPEN_KEY] = job_id
     open_job_fn(job_id, open_job)
+    st.rerun()
 
 
 def render_jobs_table_open_buttons(
@@ -420,24 +426,18 @@ def render_jobs_table_open_buttons(
 
 
 def render_jobs_table_bridge(
-    jobs_by_id: dict[str, dict[str, Any]],
     *,
     component_key: str = "ips_jobs_list_bridge",
     hook_key: str = "ipsJobsList::action",
-    last_action_key: str = JOBS_TABLE_LAST_ACTION_KEY,
-    pending_status_key: str = JOBS_TABLE_PENDING_STATUS_KEY,
-    pending_menu_key: str = JOBS_TABLE_PENDING_MENU_KEY,
-    open_job_fn: Callable[[str, dict[str, Any]], None],
-    on_expand_fn: Callable[[str, dict[str, Any]], None] | None = None,
     field_mode: bool = False,
-) -> None:
+) -> str | None:
     try:
         from app.ui.clean_table import _components_html
     except ImportError:
         from ui.clean_table import _components_html  # type: ignore
 
     field_mode_js = "true" if field_mode else "false"
-    picked = _components_html(
+    return _components_html(
         f"""
 <script>
 (function () {{
@@ -445,8 +445,23 @@ def render_jobs_table_bridge(
   const doc = w.document;
   const hookKey = {hook_key!r};
   const fieldMode = {field_mode_js};
+  const wrapSel = ".st-key-jobs_table_wrap";
   const actionSel = "[data-job-id][data-job-action]";
   const rowSel = "tbody tr[data-job-id]";
+
+  function clickBridgeButton(bridgeKey) {{
+    if (!bridgeKey) return false;
+    const needle = "st-key-" + bridgeKey;
+    const hosts = doc.querySelectorAll('[class*="' + needle + '"]');
+    for (var i = 0; i < hosts.length; i++) {{
+      const btn = hosts[i].querySelector("button");
+      if (btn) {{
+        btn.click();
+        return true;
+      }}
+    }}
+    return false;
+  }}
 
   function sendValue(action) {{
     const payload = {{ type: "streamlit:setComponentValue", value: action }};
@@ -466,14 +481,21 @@ def render_jobs_table_bridge(
     }}
   }}
 
+  function openJob(jobId, bridgeKey) {{
+    if (bridgeKey) clickBridgeButton(bridgeKey);
+    if (jobId) sendValue("open:" + jobId);
+  }}
+
   function isInteractive(target) {{
     return !!(target && target.closest && target.closest(
-      "button, input, select, textarea, label, a[data-job-action], [data-job-action]"
+      "button:not(.ips-jobs-open-link), input, select, textarea, label, [data-job-action]:not([data-job-action='open'])"
     ));
   }}
 
   function bindTargets() {{
-    doc.querySelectorAll(actionSel).forEach(function (el) {{
+    const wrap = doc.querySelector(wrapSel);
+    if (!wrap) return;
+    wrap.querySelectorAll(actionSel).forEach(function (el) {{
       if (el.dataset.ipsJobsTableBound === "1") return;
       el.dataset.ipsJobsTableBound = "1";
       el.addEventListener("click", function (e) {{
@@ -481,22 +503,50 @@ def render_jobs_table_bridge(
         e.stopPropagation();
         const id = el.getAttribute("data-job-id");
         const action = el.getAttribute("data-job-action") || "open";
+        const bridgeKey = el.getAttribute("data-bridge-key") || "";
         if (!id) return;
+        if (action === "open") {{
+          openJob(id, bridgeKey);
+          return;
+        }}
         sendValue(action + ":" + id);
       }}, true);
     }});
-    doc.querySelectorAll(rowSel).forEach(function (row) {{
+    wrap.querySelectorAll(rowSel).forEach(function (row) {{
       if (row.dataset.ipsJobsRowBound === "1") return;
       row.dataset.ipsJobsRowBound = "1";
       row.addEventListener("click", function (e) {{
         if (isInteractive(e.target)) return;
         const id = row.getAttribute("data-job-id") || row.getAttribute("data-row-id");
+        const bridgeKey = row.getAttribute("data-bridge-key") || "";
         if (!id) return;
         e.preventDefault();
         e.stopPropagation();
-        sendValue((fieldMode ? "expand" : "open") + ":" + id);
+        if (fieldMode) {{
+          sendValue("expand:" + id);
+          return;
+        }}
+        openJob(id, bridgeKey);
       }}, true);
     }});
+  }}
+
+  if (!doc.ipsJobsTableDocClick) {{
+    doc.ipsJobsTableDocClick = true;
+    doc.addEventListener("click", function (e) {{
+      const t = e.target;
+      if (!t || !t.closest) return;
+      const wrap = doc.querySelector(wrapSel);
+      if (!wrap || !wrap.contains(t)) return;
+      const openEl = t.closest("[data-job-action='open'][data-job-id]");
+      if (openEl && wrap.contains(openEl)) {{
+        e.preventDefault();
+        e.stopPropagation();
+        const id = openEl.getAttribute("data-job-id");
+        const bridgeKey = openEl.getAttribute("data-bridge-key") || "";
+        openJob(id, bridgeKey);
+      }}
+    }}, true);
   }}
 
   if (!doc.ipsJobsTableRegistry) doc.ipsJobsTableRegistry = {{}};
@@ -519,17 +569,64 @@ def render_jobs_table_bridge(
         component_key=component_key,
         height=0,
     )
-    action = str(picked or "").strip()
-    if action:
-        handle_jobs_table_action(
-            action,
-            jobs_by_id,
-            last_action_key=last_action_key,
-            pending_status_key=pending_status_key,
-            pending_menu_key=pending_menu_key,
-            open_job_fn=open_job_fn,
-            on_expand_fn=on_expand_fn,
-        )
+
+
+def apply_jobs_table_bridge_action(
+    action: str | None,
+    jobs_by_id: dict[str, dict[str, Any]],
+    *,
+    last_action_key: str = JOBS_TABLE_LAST_ACTION_KEY,
+    pending_status_key: str = JOBS_TABLE_PENDING_STATUS_KEY,
+    pending_menu_key: str = JOBS_TABLE_PENDING_MENU_KEY,
+    open_job_fn: Callable[[str, dict[str, Any]], None],
+    on_expand_fn: Callable[[str, dict[str, Any]], None] | None = None,
+) -> bool:
+    """Apply a bridge action at page level. Returns True when an open action was handled."""
+    raw = str(action or "").strip()
+    if not raw:
+        return False
+    handle_jobs_table_action(
+        raw,
+        jobs_by_id,
+        last_action_key=last_action_key,
+        pending_status_key=pending_status_key,
+        pending_menu_key=pending_menu_key,
+        open_job_fn=open_job_fn,
+        on_expand_fn=on_expand_fn,
+    )
+    return raw.startswith("open:")
+
+
+def render_jobs_table_bridge_legacy(
+    jobs_by_id: dict[str, dict[str, Any]],
+    *,
+    component_key: str = "ips_jobs_list_bridge",
+    hook_key: str = "ipsJobsList::action",
+    last_action_key: str = JOBS_TABLE_LAST_ACTION_KEY,
+    pending_status_key: str = JOBS_TABLE_PENDING_STATUS_KEY,
+    pending_menu_key: str = JOBS_TABLE_PENDING_MENU_KEY,
+    open_job_fn: Callable[[str, dict[str, Any]], None],
+    on_expand_fn: Callable[[str, dict[str, Any]], None] | None = None,
+    field_mode: bool = False,
+) -> None:
+    st.markdown(
+        '<span class="ips-jobs-table-link-bridge-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    picked = render_jobs_table_bridge(
+        component_key=component_key,
+        hook_key=hook_key,
+        field_mode=field_mode,
+    )
+    apply_jobs_table_bridge_action(
+        picked,
+        jobs_by_id,
+        last_action_key=last_action_key,
+        pending_status_key=pending_status_key,
+        pending_menu_key=pending_menu_key,
+        open_job_fn=open_job_fn,
+        on_expand_fn=on_expand_fn,
+    )
 
 
 def render_jobs_table_link_bridge(
@@ -541,7 +638,7 @@ def render_jobs_table_link_bridge(
     open_job_fn: Callable[[str, dict[str, Any]], None],
 ) -> None:
     """Backward-compatible alias for the unified jobs table bridge."""
-    render_jobs_table_bridge(
+    render_jobs_table_bridge_legacy(
         jobs_by_id,
         component_key=component_key,
         hook_key=hook_key,
