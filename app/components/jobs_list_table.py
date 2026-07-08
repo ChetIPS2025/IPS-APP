@@ -421,7 +421,6 @@ def render_jobs_table_open_buttons(
                 key=bridge_key,
                 type="tertiary",
                 on_click=_open,
-                label_visibility="collapsed",
             )
 
 
