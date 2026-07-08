@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import html
 import json
+from pathlib import Path
 from typing import Any
 
 import streamlit as st
@@ -92,29 +94,47 @@ def capture_sidebar_collapsed_from_query() -> None:
 
 
 def ensure_sidebar_collapsed_hydrated() -> None:
-    """Load collapsed preference from localStorage into session on fresh Streamlit sessions."""
+    """Default desktop rail to collapsed without a client redirect."""
     capture_sidebar_collapsed_from_query()
     if st.session_state.get(IPS_SIDEBAR_COLLAPSED_HYDRATED_KEY):
         return
     st.session_state[IPS_SIDEBAR_COLLAPSED_HYDRATED_KEY] = True
-    if IPS_SIDEBAR_COLLAPSED_SESSION_KEY in st.session_state:
+    if IPS_SIDEBAR_COLLAPSED_SESSION_KEY not in st.session_state:
+        set_sidebar_collapsed(True)
+
+
+def capture_logout_from_query() -> None:
+    """Support ``?ips_logout=1`` from the desktop nav rail."""
+    try:
+        raw = st.query_params.get("ips_logout")
+    except Exception:
         return
-    components.html(
-        f"""
-<script>
-(function () {{
-  try {{
-    var url = new URL(window.location.href);
-    if (url.searchParams.has('ips_sb')) return;
-    var collapsed = localStorage.getItem('{IPS_SIDEBAR_COLLAPSED_STORAGE_KEY}') === '1';
-    url.searchParams.set('ips_sb', collapsed ? 'c' : 'e');
-    window.location.replace(url.toString());
-  }} catch (e) {{}}
-}})();
-</script>
-        """,
-        height=0,
-    )
+    if not raw:
+        return
+    if isinstance(raw, list):
+        raw = raw[0] if raw else ""
+    if str(raw or "").strip().lower() not in {"1", "true", "yes"}:
+        return
+    try:
+        from app.auth import is_authenticated
+    except ImportError:
+        from auth import is_authenticated  # type: ignore
+    if not is_authenticated():
+        try:
+            del st.query_params["ips_logout"]
+        except Exception:
+            pass
+        return
+    try:
+        del st.query_params["ips_logout"]
+    except Exception:
+        pass
+    try:
+        from app.auth import sign_out
+    except ImportError:
+        from auth import sign_out  # type: ignore
+    sign_out()
+    st.rerun()
 
 
 def capture_nav_slug_from_query() -> None:
@@ -155,10 +175,244 @@ def _fallback_nav_json() -> str:
     return json.dumps(safe)
 
 
+def _nav_fallback_rows() -> list[dict[str, str]]:
+    raw = st.session_state.get(IPS_SIDEBAR_NAV_FALLBACK_KEY)
+    rows = raw if isinstance(raw, list) else []
+    safe: list[dict[str, str]] = []
+    for row in rows:
+        if isinstance(row, dict):
+            slug = str(row.get("slug") or "").strip()
+            label = str(row.get("label") or "").strip()
+            icon = str(row.get("icon") or "").strip()
+            if slug and label:
+                safe.append({"slug": slug, "label": label, "icon": icon or "•"})
+    return safe
+
+
+def _desktop_rail_logo_html() -> str:
+    try:
+        from app.config import ROOT_DIR
+        from app.branding import _logo_data_uri
+    except ImportError:
+        from config import ROOT_DIR  # type: ignore
+        from branding import _logo_data_uri  # type: ignore
+    logo_px = IPS_SIDEBAR_COLLAPSED_LOGO_PX
+    for name in ("IPS Icon.png", "ips_logo_round.png", "ips_logo_header.png", "company_logo.png"):
+        path = Path(ROOT_DIR) / "assets" / name
+        if path.is_file():
+            src = html.escape(_logo_data_uri(str(path)), quote=True)
+            return (
+                f'<img class="ips-desktop-nav-rail__logo" src="{src}" alt="IPS" '
+                f'width="{logo_px}" height="{logo_px}" />'
+            )
+    return '<span class="ips-desktop-nav-rail__logo-fallback">IPS</span>'
+
+
+def _desktop_nav_rail_css() -> str:
+    col = IPS_SIDEBAR_COLLAPSED_WIDTH_PX
+    exp = IPS_SIDEBAR_EXPANDED_WIDTH_PX
+    header_h = IPS_SIDEBAR_COLLAPSED_HEADER_HEIGHT_PX
+    nav_h = IPS_SIDEBAR_COLLAPSED_NAV_HEIGHT_PX
+    mobile_max = IPS_SIDEBAR_DESKTOP_MIN_PX - 1
+    return f"""
+<style id="ips-desktop-nav-rail-v1">
+@media (min-width: {IPS_SIDEBAR_DESKTOP_MIN_PX}px) {{
+  body.ips-desktop-nav-rail [data-testid="stSidebar"],
+  body.ips-desktop-nav-rail section[data-testid="stSidebar"] {{
+    display: none !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    flex: 0 0 0 !important;
+    overflow: hidden !important;
+    visibility: hidden !important;
+  }}
+  body.ips-desktop-nav-rail [data-testid="stAppViewContainer"] {{
+    margin-left: {col}px !important;
+    width: calc(100% - {col}px) !important;
+    max-width: calc(100% - {col}px) !important;
+  }}
+  body.ips-desktop-nav-rail [data-testid="stHeader"] {{
+    margin-left: {col}px !important;
+    width: calc(100% - {col}px) !important;
+  }}
+  .ips-desktop-nav-rail {{
+    display: flex !important;
+  }}
+}}
+@media (max-width: {mobile_max}px) {{
+  .ips-desktop-nav-rail {{
+    display: none !important;
+  }}
+  body.ips-desktop-nav-rail [data-testid="stAppViewContainer"],
+  body.ips-desktop-nav-rail [data-testid="stHeader"] {{
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }}
+}}
+.ips-desktop-nav-rail {{
+  display: none;
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: {col}px;
+  z-index: 100020;
+  background: #ffffff;
+  border-right: 1px solid #e5eaf2;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  transition: width 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+}}
+.ips-desktop-nav-rail:hover {{
+  width: {exp}px;
+  box-shadow: 4px 0 18px rgba(15, 23, 42, 0.12);
+}}
+.ips-desktop-nav-rail__header {{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: {header_h}px;
+  min-height: {header_h}px;
+  max-height: {header_h}px;
+  flex: 0 0 {header_h}px;
+  border-bottom: 1px solid #eef2f7;
+}}
+.ips-desktop-nav-rail__logo {{
+  width: {IPS_SIDEBAR_COLLAPSED_LOGO_PX}px;
+  height: {IPS_SIDEBAR_COLLAPSED_LOGO_PX}px;
+  object-fit: contain;
+  display: block;
+}}
+.ips-desktop-nav-rail__logo-fallback {{
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #2563eb;
+  letter-spacing: 0.04em;
+}}
+.ips-desktop-nav-rail__items {{
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0 10px;
+  flex: 1 1 auto;
+  min-height: 0;
+}}
+.ips-desktop-nav-rail__link {{
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  width: calc(100% - 8px);
+  min-height: {nav_h}px;
+  margin: 0 4px;
+  padding: 0 10px;
+  border-radius: 10px;
+  color: #0f172a;
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.2;
+  box-sizing: border-box;
+}}
+.ips-desktop-nav-rail__link:hover {{
+  background: #f1f5f9;
+  color: #0f172a;
+}}
+.ips-desktop-nav-rail__link.is-active {{
+  background: #eff6ff;
+  color: #2563eb;
+  font-weight: 600;
+}}
+.ips-desktop-nav-rail__icon {{
+  flex: 0 0 {IPS_SIDEBAR_COLLAPSED_ICON_PX}px;
+  width: {IPS_SIDEBAR_COLLAPSED_ICON_PX}px;
+  min-width: {IPS_SIDEBAR_COLLAPSED_ICON_PX}px;
+  text-align: center;
+  font-size: {IPS_SIDEBAR_COLLAPSED_ICON_PX}px;
+  line-height: 1;
+}}
+.ips-desktop-nav-rail__label {{
+  opacity: 0;
+  width: 0;
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: opacity 0.15s ease;
+}}
+.ips-desktop-nav-rail:hover .ips-desktop-nav-rail__label {{
+  opacity: 1;
+  width: auto;
+  max-width: none;
+}}
+.ips-desktop-nav-rail__footer {{
+  margin-top: auto;
+  padding: 8px 0 12px;
+  border-top: 1px solid #eef2f7;
+}}
+</style>
+"""
+
+
+def _desktop_nav_rail_html(rows: list[dict[str, str]], active_slug: str) -> str:
+    scan_slugs = frozenset({"scan_inventory", "scan_asset"})
+    item_bits: list[str] = []
+    for row in rows:
+        slug = row["slug"]
+        label = html.escape(row["label"])
+        icon = html.escape(row["icon"])
+        is_active = slug == active_slug or (slug in scan_slugs and active_slug in {"inventory", "assets"})
+        if slug == "employee_qr_scan" and active_slug in {"inventory", "assets"}:
+            is_active = True
+        active_cls = " is-active" if is_active else ""
+        href = html.escape(f"?ips_nav={slug}", quote=True)
+        item_bits.append(
+            f'<a class="ips-desktop-nav-rail__link{active_cls}" href="{href}" '
+            f'title="{label}" aria-label="{label}">'
+            f'<span class="ips-desktop-nav-rail__icon" aria-hidden="true">{icon}</span>'
+            f'<span class="ips-desktop-nav-rail__label">{label}</span>'
+            f"</a>"
+        )
+    items_html = "\n".join(item_bits)
+    return f"""
+<script>document.body.classList.add("ips-desktop-nav-rail");</script>
+<nav class="ips-desktop-nav-rail" aria-label="Main navigation">
+  <div class="ips-desktop-nav-rail__header">{_desktop_rail_logo_html()}</div>
+  <div class="ips-desktop-nav-rail__items">
+    {items_html}
+  </div>
+  <div class="ips-desktop-nav-rail__footer">
+    <a class="ips-desktop-nav-rail__link ips-desktop-nav-rail__link--logout" href="?ips_logout=1" title="Log out" aria-label="Log out">
+      <span class="ips-desktop-nav-rail__icon" aria-hidden="true">⎋</span>
+      <span class="ips-desktop-nav-rail__label">Log out</span>
+    </a>
+  </div>
+</nav>
+"""
+
+
+def inject_desktop_nav_rail(*, active_slug: str | None = None) -> None:
+    """Fixed desktop icon rail in the main document (Streamlit sidebar is unreliable on Cloud)."""
+    rows = _nav_fallback_rows()
+    if not rows:
+        return
+    if active_slug is None:
+        try:
+            from app.navigation import current_nav_slug
+        except ImportError:
+            from navigation import current_nav_slug  # type: ignore
+        active_slug = current_nav_slug()
+    st.markdown(_desktop_nav_rail_css() + _desktop_nav_rail_html(rows, active_slug), unsafe_allow_html=True)
+
+
 def inject_sidebar_shell() -> None:
     """Inject sidebar layout CSS/JS on every authenticated render."""
     collapsed = True
     inject_sidebar_nav_override_css()
+    inject_desktop_nav_rail()
     st.markdown(_shell_css(), unsafe_allow_html=True)
 
     nav_json = _fallback_nav_json()

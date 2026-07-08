@@ -309,9 +309,20 @@ def main() -> None:
     log_auth_state("app_authenticated")
 
     try:
-        from app.components.sidebar_shell import capture_nav_slug_from_query, ensure_sidebar_collapsed_hydrated, inject_sidebar_shell
+        from app.components.sidebar_shell import (
+            capture_logout_from_query,
+            capture_nav_slug_from_query,
+            ensure_sidebar_collapsed_hydrated,
+            inject_sidebar_shell,
+        )
     except ImportError:
-        from components.sidebar_shell import capture_nav_slug_from_query, ensure_sidebar_collapsed_hydrated, inject_sidebar_shell  # type: ignore
+        from components.sidebar_shell import (  # type: ignore
+            capture_logout_from_query,
+            capture_nav_slug_from_query,
+            ensure_sidebar_collapsed_hydrated,
+            inject_sidebar_shell,
+        )
+    capture_logout_from_query()
     capture_nav_slug_from_query()
     ensure_sidebar_collapsed_hydrated()
 
