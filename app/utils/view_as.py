@@ -152,11 +152,40 @@ def inject_view_as_styles() -> None:
 .ips-view-as-banner-text strong {
   color: #1d4ed8;
 }
-.ips-view-as-banner-sub {
-  margin: 0.1rem 0 0;
-  font-size: 0.72rem;
-  font-weight: 600;
+.ips-view-as-admin-panel {
+  background: #f8fafc;
+  border: 1px solid #dbeafe;
+  border-left: 4px solid #2563eb;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  margin: 0 0 0.85rem 0;
+}
+.ips-view-as-admin-title {
+  margin: 0 0 0.2rem 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #1e3a8a;
+}
+.ips-view-as-admin-copy {
+  margin: 0 0 0.65rem 0;
+  font-size: 0.78rem;
   color: #475569;
+  line-height: 1.4;
+}
+.ips-view-as-header-bar {
+  margin: 0 0 0.35rem 0;
+  padding: 0.35rem 0.5rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+.ips-view-as-header-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 0.15rem 0;
 }
 .ips-view-as-mobile-nav {
   position: fixed;
@@ -256,12 +285,7 @@ def render_view_as_banner() -> None:
             st.rerun()
 
 
-def render_view_as_selector() -> None:
-    """Sidebar control — admin only."""
-    if not is_real_admin():
-        return
-    inject_view_as_styles()
-    st.markdown('<p class="sidebar-section-title sidebar-footer-label section-header">View As</p>', unsafe_allow_html=True)
+def _render_view_as_picker(*, key_suffix: str, show_help: bool = False) -> None:
     labels = [label for _, label in VIEW_AS_OPTIONS]
     values = [value for value, _ in VIEW_AS_OPTIONS]
     if is_view_as_active():
@@ -272,7 +296,12 @@ def render_view_as_selector() -> None:
         "View As",
         labels,
         index=current_ix,
-        key="ips_view_as_select",
+        key=f"ips_view_as_select_{key_suffix}",
+        help=(
+            "Preview the app as another role without changing your signed-in account."
+            if show_help
+            else None
+        ),
         label_visibility="collapsed",
     )
     picked_mode = values[labels.index(picked_label)]
@@ -280,6 +309,48 @@ def render_view_as_selector() -> None:
     if picked_mode != active_mode:
         set_view_as(picked_mode)
         st.rerun()
+
+
+def render_view_as_admin_panel() -> None:
+    """Prominent View As control on the Admin page."""
+    if not is_real_admin():
+        return
+    inject_view_as_styles()
+    st.markdown(
+        """
+<div class="ips-view-as-admin-panel">
+  <p class="ips-view-as-admin-title">View As (Preview Mode)</p>
+  <p class="ips-view-as-admin-copy">
+    Safely preview Supervisor, Employee, or mobile field workflows. This only changes what you see in the UI —
+    your account stays Admin and nothing is written to the database.
+  </p>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+    _render_view_as_picker(key_suffix="admin_page", show_help=True)
+
+
+def render_view_as_header_bar() -> None:
+    """Compact View As picker below the main brand bar (admin only)."""
+    if not is_real_admin():
+        return
+    inject_view_as_styles()
+    with st.container(key="ips_view_as_header_bar"):
+        st.markdown(
+            '<p class="ips-view-as-header-label">Admin preview</p>',
+            unsafe_allow_html=True,
+        )
+        _render_view_as_picker(key_suffix="header_bar", show_help=True)
+
+
+def render_view_as_selector() -> None:
+    """Sidebar control — admin only."""
+    if not is_real_admin():
+        return
+    inject_view_as_styles()
+    st.markdown('<p class="sidebar-section-title sidebar-footer-label section-header">View As</p>', unsafe_allow_html=True)
+    _render_view_as_picker(key_suffix="sidebar")
 
 
 def render_view_as_mobile_bottom_nav(active_slug: str) -> None:

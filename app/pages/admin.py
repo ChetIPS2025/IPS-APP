@@ -391,34 +391,63 @@ def _render_app_settings(*, key_prefix: str) -> None:
     render_install_share_settings()
 
 
-def render() -> None:
-    slug = nav_slug()
+def render_settings_page() -> None:
+    """Application preferences — available to supervisors and admins."""
     try:
         from app.pages._core._access import begin_module
     except ImportError:
         from pages._core._access import begin_module  # type: ignore
-    if not begin_module(slug):
+    if not begin_module("settings"):
         return
-    is_settings = slug == "settings"
-    title = "Settings" if is_settings else "Admin"
-    subtitle = (
-        "Application preferences and notifications."
-        if is_settings
-        else "Manage lookup tables, roles, and system configuration."
+    render_page_header(
+        "Settings",
+        "Application preferences, notifications, and install options.",
     )
-    render_page_header(title, subtitle)
+    try:
+        from app.auth import current_role
+        from app.utils.permissions import normalize_role
+    except ImportError:
+        from auth import current_role  # type: ignore
+        from utils.permissions import normalize_role  # type: ignore
+    if normalize_role(current_role()) == "admin":
+        st.caption("Lookup tables and **View As** role preview are on the **Admin** page.")
+    _render_app_settings(key_prefix="ips_app_settings_settings")
 
-    if is_settings:
-        st.caption("Lookup tables are managed under **Admin**.")
+
+def render_admin_page() -> None:
+    """System administration — lookup tables and role preview."""
+    try:
+        from app.pages._core._access import begin_module
+    except ImportError:
+        from pages._core._access import begin_module  # type: ignore
+    if not begin_module("admin"):
+        return
+    render_page_header(
+        "Admin",
+        "Manage lookup tables, system configuration, and preview other roles.",
+    )
+    try:
+        from app.utils.view_as import render_view_as_admin_panel
+    except ImportError:
+        from utils.view_as import render_view_as_admin_panel  # type: ignore
+    render_view_as_admin_panel()
 
     main_tab = render_tabs(
-        ["Lookup Tables", "Application Settings"] if not is_settings else ["Application Settings", "Lookup Tables"],
+        ["Lookup Tables", "Application Settings"],
         session_key=_ADMIN_TAB,
-        default="Application Settings" if is_settings else "Lookup Tables",
+        default="Lookup Tables",
     )
-
-    settings_key = f"ips_app_settings_{slug or 'admin'}"
+    settings_key = "ips_app_settings_admin"
     if main_tab == "Lookup Tables":
         _render_lookup_editor()
     else:
+        st.caption("Company-wide preferences also appear under **Settings** in the sidebar.")
         _render_app_settings(key_prefix=settings_key)
+
+
+def render() -> None:
+    slug = nav_slug()
+    if slug == "settings":
+        render_settings_page()
+    else:
+        render_admin_page()

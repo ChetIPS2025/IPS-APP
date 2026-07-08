@@ -177,9 +177,15 @@ def render_module(slug: str | None = None) -> None:
             if active not in {"employees", "users"}:
                 render_main_brand_bar()
             try:
-                from app.utils.view_as import render_view_as_banner
+                from app.auth import current_role
+                from app.utils.permissions import normalize_role
+                from app.utils.view_as import render_view_as_banner, render_view_as_header_bar
             except ImportError:
-                from utils.view_as import render_view_as_banner  # type: ignore
+                from auth import current_role  # type: ignore
+                from utils.permissions import normalize_role  # type: ignore
+                from utils.view_as import render_view_as_banner, render_view_as_header_bar  # type: ignore
+            if normalize_role(current_role()) == "admin":
+                render_view_as_header_bar()
             render_view_as_banner()
             with perf_span(f"module.render:{active}"):
                 fn()  # type: ignore[operator]
