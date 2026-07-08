@@ -40,6 +40,15 @@ def test_handle_jobs_table_action_strips_open_prefix():
 
     assert opened == [("j-123", {"id": "j-123", "job_number": "J26015"})]
 
+    handle_jobs_table_action(
+        "open:j-123",
+        {"j-123": {"id": "j-123", "job_number": "J26015"}},
+        last_action_key="jobs_test_last_action",
+        open_job_fn=lambda job_id, job: opened.append((job_id, job)),
+    )
+
+    assert opened == [("j-123", {"id": "j-123", "job_number": "J26015"})]
+
 
 def test_build_jobs_html_table_includes_actions_and_links():
     rows = [

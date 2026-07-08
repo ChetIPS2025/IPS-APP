@@ -359,7 +359,7 @@ def handle_jobs_table_action(
     val = str(raw or "").strip()
     if not val:
         return
-    if val == str(st.session_state.get(last_action_key) or "") and not val.startswith("open:"):
+    if val == str(st.session_state.get(last_action_key) or ""):
         return
     st.session_state[last_action_key] = val
 
@@ -397,7 +397,6 @@ def handle_jobs_table_action(
     st.session_state.pop(pending_menu_key, None)
     st.session_state[JOBS_TABLE_PENDING_OPEN_KEY] = job_id
     open_job_fn(job_id, open_job)
-    st.rerun()
 
 
 def render_jobs_table_open_buttons(
@@ -449,20 +448,6 @@ def render_jobs_table_bridge(
   const actionSel = "[data-job-id][data-job-action]";
   const rowSel = "tbody tr[data-job-id]";
 
-  function clickBridgeButton(bridgeKey) {{
-    if (!bridgeKey) return false;
-    const needle = "st-key-" + bridgeKey;
-    const hosts = doc.querySelectorAll('[class*="' + needle + '"]');
-    for (var i = 0; i < hosts.length; i++) {{
-      const btn = hosts[i].querySelector("button");
-      if (btn) {{
-        btn.click();
-        return true;
-      }}
-    }}
-    return false;
-  }}
-
   function sendValue(action) {{
     const payload = {{ type: "streamlit:setComponentValue", value: action }};
     const frames = [window, window.parent, w].filter(function (f, i, arr) {{
@@ -481,8 +466,7 @@ def render_jobs_table_bridge(
     }}
   }}
 
-  function openJob(jobId, bridgeKey) {{
-    if (bridgeKey) clickBridgeButton(bridgeKey);
+  function openJob(jobId) {{
     if (jobId) sendValue("open:" + jobId);
   }}
 
@@ -503,10 +487,9 @@ def render_jobs_table_bridge(
         e.stopPropagation();
         const id = el.getAttribute("data-job-id");
         const action = el.getAttribute("data-job-action") || "open";
-        const bridgeKey = el.getAttribute("data-bridge-key") || "";
         if (!id) return;
         if (action === "open") {{
-          openJob(id, bridgeKey);
+          openJob(id);
           return;
         }}
         sendValue(action + ":" + id);
@@ -518,7 +501,6 @@ def render_jobs_table_bridge(
       row.addEventListener("click", function (e) {{
         if (isInteractive(e.target)) return;
         const id = row.getAttribute("data-job-id") || row.getAttribute("data-row-id");
-        const bridgeKey = row.getAttribute("data-bridge-key") || "";
         if (!id) return;
         e.preventDefault();
         e.stopPropagation();
@@ -526,7 +508,7 @@ def render_jobs_table_bridge(
           sendValue("expand:" + id);
           return;
         }}
-        openJob(id, bridgeKey);
+        openJob(id);
       }}, true);
     }});
   }}
@@ -543,8 +525,7 @@ def render_jobs_table_bridge(
         e.preventDefault();
         e.stopPropagation();
         const id = openEl.getAttribute("data-job-id");
-        const bridgeKey = openEl.getAttribute("data-bridge-key") || "";
-        openJob(id, bridgeKey);
+        openJob(id);
       }}
     }}, true);
   }}

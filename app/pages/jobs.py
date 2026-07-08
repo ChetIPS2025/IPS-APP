@@ -35,7 +35,8 @@ try:
         JOBS_TABLE_PENDING_STATUS_KEY,
         build_jobs_html_table,
         job_list_link_html,
-        render_jobs_table_bridge_legacy,
+        apply_jobs_table_bridge_action,
+        render_jobs_table_bridge,
     )
     from app.components.jobs_page_layout import (
         close_jobs_filter_bar_shell,
@@ -162,7 +163,8 @@ except ImportError:
         JOBS_TABLE_PENDING_STATUS_KEY,
         build_jobs_html_table,
         job_list_link_html,
-        render_jobs_table_bridge_legacy,
+        apply_jobs_table_bridge_action,
+        render_jobs_table_bridge,
     )
     from components.jobs_page_layout import (  # type: ignore
         close_jobs_filter_bar_shell,
@@ -1302,15 +1304,6 @@ def _render_custom_jobs_table(
                 _open_jobs_detail_modal(expanded_job_id, expanded_job)
                 ips_app_rerun()
             st.markdown("</div>", unsafe_allow_html=True)
-
-        render_jobs_table_bridge_legacy(
-            jobs_by_id,
-            component_key="ips_jobs_list_bridge",
-            hook_key="ipsJobsList::action",
-            open_job_fn=_activate_job_detail_modal,
-            on_expand_fn=_on_jobs_table_expand if field_mode else None,
-            field_mode=field_mode,
-        )
 
     return all_job_ids, jobs_by_id
 
@@ -3224,7 +3217,29 @@ def _render_jobs_page() -> None:
         subjob_counts=subjob_counts,
     )
 
+    page_jobs_by_id = {
+        str(j.get("id") or "").strip(): j
+        for j in page_rows
+        if str(j.get("id") or "").strip()
+    }
+    field_mode = is_field_context()
+    st.markdown(
+        '<span class="ips-jobs-table-link-bridge-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    table_action = render_jobs_table_bridge(
+        component_key="ips_jobs_list_bridge",
+        hook_key="ipsJobsList::action",
+        field_mode=field_mode,
+    )
+    apply_jobs_table_bridge_action(
+        table_action,
+        page_jobs_by_id,
+        open_job_fn=_activate_job_detail_modal,
+        on_expand_fn=_on_jobs_table_expand if field_mode else None,
+    )
+
     render_jobs_pagination_footer(len(filtered), _TABLE_KEY, item_label="job")
 
-    if st.session_state.get(SHOW_MODAL_KEY):
+    if st.session_state.get(SHOW_MODAL_KEY) or str(st.session_state.get(_JOBS_MODAL_KEY) or "").strip():
         show_modal_if_pending(_JOBS_MODAL_KEY, _show_jobs_detail_modal)
