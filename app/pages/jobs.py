@@ -968,8 +968,9 @@ def _normalize_job_open_id(raw: object) -> str:
 
 
 def _open_jobs_table_job(job_id: str, job: dict) -> None:
-    """Set selected job state; the page render opens the dialog once."""
+    """Set selected job state; full rerun opens the detail dialog (fragment-safe)."""
     _open_jobs_detail_modal(job_id, job)
+    ips_app_rerun()
 
 
 def _open_job_detail_task_form(job: dict) -> None:
