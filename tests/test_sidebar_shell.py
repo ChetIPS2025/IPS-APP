@@ -89,6 +89,15 @@ def test_employee_nav_is_simplified_portal_menu():
     assert "Jobs" not in labels
 
 
+def test_sidebar_shell_script_targets_streamlit_156_collapse_button():
+    from app.components.sidebar_shell import _shell_script
+
+    script = _shell_script("[]")
+    assert "stSidebarCollapseButton" in script
+    assert "stSidebarCollapsed-" in script
+    assert "forceExpandSidebar" in script
+
+
 def test_employee_field_nav_is_restricted_without_legacy_access():
     items = filter_field_nav_for_role(FIELD_NAV_PAGES, "employee")
     labels = [label for _slug, label in items]

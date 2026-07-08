@@ -57,7 +57,7 @@ def ensure_narrow_viewport_detected() -> None:
 # Main content only — sidebar nav styling stays in sidebar_shell.py
 _IPS_GLOBAL_MOBILE_CSS = """
 <style>
-/* Sidebar chrome only; width tokens live in sidebar_shell (230 expanded / 64 collapsed) */
+/* Sidebar chrome only; width tokens live in sidebar_shell (232 expanded / 48 collapsed) */
 [data-testid="stSidebar"],
 section[data-testid="stSidebar"],
 .stSidebar {
@@ -70,16 +70,16 @@ section[data-testid="stSidebar"],
   body:not(.ips-sidebar-collapsed) [data-testid="stSidebar"],
   body:not(.ips-sidebar-collapsed) section[data-testid="stSidebar"],
   body:not(.ips-sidebar-collapsed) .stSidebar {
-    width: 230px !important;
-    min-width: 230px !important;
-    max-width: 230px !important;
+    width: 232px !important;
+    min-width: 232px !important;
+    max-width: 232px !important;
   }
   body.ips-sidebar-collapsed [data-testid="stSidebar"],
   body.ips-sidebar-collapsed section[data-testid="stSidebar"],
   body.ips-sidebar-collapsed .stSidebar {
-    width: 64px !important;
-    min-width: 64px !important;
-    max-width: 64px !important;
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
   }
 }
 
@@ -224,6 +224,7 @@ section[data-testid="stSidebar"],
     font-size: 1.1rem !important;
   }
   /* Sidebar toggle: thumb-friendly on phones */
+  button[data-testid="stSidebarCollapseButton"],
   button[data-testid="collapsedControl"] {
     min-width: 2.75rem !important;
     min-height: 2.75rem !important;
@@ -293,7 +294,7 @@ IPS_SIDEBAR_MOBILE_COLLAPSE_KEY = "_ips_sidebar_mobile_collapse_script"
 def inject_sidebar_mobile_auto_collapse_once() -> None:
     """
     First load on narrow viewports: collapse the Streamlit sidebar so main content is visible.
-    User can still open it via the header control (collapsedControl).
+    User can still open it via the header control (stSidebarCollapseButton).
     """
     if st.session_state.get(IPS_SIDEBAR_MOBILE_COLLAPSE_KEY):
         return
@@ -330,7 +331,9 @@ def inject_sidebar_mobile_auto_collapse_once() -> None:
       sessionStorage.setItem("ips_mobile_sidebar_init", "1");
       return;
     }
-    var btn = d.querySelector('button[data-testid="collapsedControl"]');
+    var btn = d.querySelector('button[data-testid="stSidebarCollapseButton"]')
+      || d.querySelector('[data-testid="stSidebarCollapseButton"] button')
+      || d.querySelector('button[data-testid="collapsedControl"]');
     if (btn) {
       try {
         btn.click();

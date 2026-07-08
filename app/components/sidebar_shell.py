@@ -187,7 +187,7 @@ def inject_sidebar_nav_override_css() -> None:
 def _sidebar_nav_override_css() -> str:
     """Final cascade override for sidebar navigation rows (not button chrome)."""
     return """
-<style id="ips-sidebar-nav-override-v7">
+<style id="ips-sidebar-nav-override-v8">
 section[data-testid="stSidebar"] > div,
 section[data-testid="stSidebar"] [data-testid="stSidebarContent"],
 section[data-testid="stSidebar"] .block-container {
@@ -720,7 +720,7 @@ def _shell_css() -> str:
     mobile_max = IPS_SIDEBAR_DESKTOP_MIN_PX - 1
     collapsed_sel = _collapsed_sidebar_selectors()
     return f"""
-<style id="ips-sidebar-shell-v13">
+<style id="ips-sidebar-shell-v14">
 section[data-testid="stSidebar"].app-sidebar,
 [data-testid="stSidebar"].app-sidebar {{
   transition: width 0.2s ease, min-width 0.2s ease, max-width 0.2s ease, flex-basis 0.2s ease !important;
@@ -1056,12 +1056,21 @@ button.ips-header-menu-btn {{
   }}
   section[data-testid="stSidebar"][aria-expanded="false"],
   [data-testid="stSidebar"][aria-expanded="false"] {{
+    flex: 0 0 {col}px !important;
+    width: {col}px !important;
+    min-width: {col}px !important;
+    max-width: {col}px !important;
+    display: flex !important;
     transform: none !important;
     margin-left: 0 !important;
     visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
   }}
   [data-testid="stSidebarCollapsedControl"],
-  button[data-testid="collapsedControl"] {{
+  button[data-testid="collapsedControl"],
+  [data-testid="stSidebarCollapseButton"],
+  button[data-testid="stSidebarCollapseButton"] {{
     display: none !important;
   }}
   #ips-sidebar-backdrop {{
@@ -1343,7 +1352,9 @@ button.ips-header-menu-btn {{
     flex: 1 1 100% !important;
   }}
   [data-testid="stSidebarCollapsedControl"],
-  button[data-testid="collapsedControl"] {{
+  button[data-testid="collapsedControl"],
+  [data-testid="stSidebarCollapseButton"],
+  button[data-testid="stSidebarCollapseButton"] {{
     display: none !important;
   }}
 }}
@@ -1401,7 +1412,32 @@ def _shell_script(nav_json: str) -> str:
   }}
   function isDesktop() {{ return vpW() >= DESKTOP_MIN; }}
   function sidebarEl(d) {{ return d.querySelector('[data-testid="stSidebar"]'); }}
-  function toggleBtn(d) {{ return d.querySelector('button[data-testid="collapsedControl"]'); }}
+  function toggleBtn(d) {{
+    return d.querySelector('button[data-testid="stSidebarCollapseButton"]')
+      || d.querySelector('[data-testid="stSidebarCollapseButton"] button')
+      || d.querySelector('button[data-testid="collapsedControl"]')
+      || d.querySelector('[data-testid="stSidebarCollapsedControl"] button');
+  }}
+  function clearStreamlitCollapsedStorage() {{
+    try {{
+      Object.keys(localStorage).forEach(function (key) {{
+        if (key.indexOf('stSidebarCollapsed-') === 0) localStorage.removeItem(key);
+      }});
+    }} catch (e0) {{}}
+  }}
+  function forceExpandSidebar(side) {{
+    if (!side) return;
+    var col = {IPS_SIDEBAR_COLLAPSED_WIDTH_PX};
+    side.setAttribute('aria-expanded', 'true');
+    side.style.setProperty('width', col + 'px', 'important');
+    side.style.setProperty('min-width', col + 'px', 'important');
+    side.style.setProperty('max-width', col + 'px', 'important');
+    side.style.setProperty('flex', '0 0 ' + col + 'px', 'important');
+    side.style.setProperty('transform', 'none', 'important');
+    side.style.setProperty('visibility', 'visible', 'important');
+    side.style.setProperty('opacity', '1', 'important');
+    side.style.setProperty('display', 'flex', 'important');
+  }}
   function backdropEl(d) {{
     var el = d.getElementById('ips-sidebar-backdrop');
     if (el) return el;
@@ -1460,8 +1496,13 @@ def _shell_script(nav_json: str) -> str:
     var side = sidebarEl(d);
     if (!side) return;
     if (side.getAttribute('aria-expanded') !== 'true') {{
+      clearStreamlitCollapsedStorage();
       var btn = toggleBtn(d);
       if (btn) btn.click();
+      side = sidebarEl(d);
+      if (side && side.getAttribute('aria-expanded') !== 'true') {{
+        forceExpandSidebar(side);
+      }}
     }}
     syncBackdrop(d);
   }}
@@ -1518,7 +1559,8 @@ def _shell_script(nav_json: str) -> str:
       if (btn.closest('.sidebar-collapse-btn') || btn.closest('[class*="st-key-ips_sidebar_collapse_toggle"]')) return;
       var txt = (btn.textContent || '').toLowerCase();
       if (txt.indexOf('log out') >= 0 || txt.indexOf('logout') >= 0) return;
-      if (btn.getAttribute('data-testid') === 'collapsedControl') return;
+      var testId = btn.getAttribute('data-testid') || '';
+      if (testId === 'collapsedControl' || testId === 'stSidebarCollapseButton') return;
       setTimeout(function () {{ window.IPS.collapseAfterNav(); }}, 60);
     }});
   }}
