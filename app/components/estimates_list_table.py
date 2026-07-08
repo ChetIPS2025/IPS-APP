@@ -9,7 +9,7 @@ from typing import Any
 import streamlit as st
 
 try:
-    from app.auth import current_role
+    from app.auth import current_role, effective_role
     from app.pages._core._crud import is_demo_id
     from app.services.estimate_job_workflow_service import (
         can_approve_estimates,
@@ -18,7 +18,7 @@ try:
     )
     from app.utils.formatting import fmt_currency, fmt_date
 except ImportError:
-    from auth import current_role  # type: ignore
+    from auth import current_role, effective_role  # type: ignore
     from pages._core._crud import is_demo_id  # type: ignore
     from services.estimate_job_workflow_service import (  # type: ignore
         can_approve_estimates,
@@ -133,7 +133,7 @@ def filter_waiting_approval_rows(rows: list[dict[str, Any]]) -> list[dict[str, A
 
 
 def can_show_approve_action(row: dict[str, Any]) -> bool:
-    if not can_approve_estimates(current_role()):
+    if not can_approve_estimates(effective_role()):
         return False
     eid = str(row.get("id") or "").strip()
     if not eid or is_demo_id(eid):

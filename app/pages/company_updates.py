@@ -102,9 +102,9 @@ except ImportError:
     from services.updates_service import BANNER_UPLOAD_TYPES, resolve_company_update_banner_url  # type: ignore
 
 try:
-    from app.auth import current_role
+    from app.auth import current_role, effective_role
 except ImportError:
-    from auth import current_role  # type: ignore
+    from auth import current_role, effective_role  # type: ignore
 
 _SEL = select_key("company_updates")
 _MODULE = "company_updates"
@@ -153,7 +153,7 @@ _SORT_OPTS = ("Newest First", "Oldest First", "Title A–Z")
 
 
 def _can_manage_company_updates() -> bool:
-    return can_manage_company_updates(current_role())
+    return can_manage_company_updates(effective_role())
 
 
 def _update_banner_url(update: dict) -> str:

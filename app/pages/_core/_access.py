@@ -5,11 +5,11 @@ from __future__ import annotations
 import streamlit as st
 
 try:
-    from app.auth import current_role
+    from app.auth import current_role, effective_role
     from app.styles import inject_global_css
     from app.utils.permissions import role_can_access_page
 except ImportError:
-    from auth import current_role  # type: ignore
+    from auth import current_role, effective_role  # type: ignore
     from styles import inject_global_css  # type: ignore
     from utils.permissions import role_can_access_page  # type: ignore
 
@@ -29,7 +29,7 @@ def begin_module(slug: str, *, inject_css: bool = False) -> bool:
     """
     if inject_css:
         inject_global_css()
-    role = current_role()
+    role = effective_role()
     if not role_can_access_page(role, slug):
         st.error("You do not have access to this page.")
         return False

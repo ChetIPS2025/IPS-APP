@@ -101,7 +101,7 @@ try:
         estimate_visible_in_rejected_view,
         estimate_visible_in_sent_view,
     )
-    from app.auth import current_role
+    from app.auth import current_role, effective_role
     from app.components.quote_job_number_autofill import (
         clear_new_estimate_number_state,
         linked_job_number_preview,
@@ -211,7 +211,7 @@ except ImportError:
         estimate_visible_in_rejected_view,
         estimate_visible_in_sent_view,
     )
-    from auth import current_role  # type: ignore
+    from auth import current_role, effective_role  # type: ignore
     from components.quote_job_number_autofill import (  # type: ignore
         clear_new_estimate_number_state,
         linked_job_number_preview,
@@ -1024,7 +1024,7 @@ def _apply_estimate_view_filter(rows: list[dict], view_filter: str) -> list[dict
 
 
 def _can_revise_approved_estimate() -> bool:
-    return can_revise_approved_estimates(current_role())
+    return can_revise_approved_estimates(effective_role())
 
 
 def _estimates_summary_counts(rows: list[dict]) -> dict[str, float | int | bool]:
@@ -1054,7 +1054,7 @@ def _estimates_summary_counts(rows: list[dict]) -> dict[str, float | int | bool]
 
 
 def _can_show_approve_job(est: dict) -> bool:
-    if not can_approve_estimates(current_role()):
+    if not can_approve_estimates(effective_role()):
         return False
     eid = str(est.get("id") or "").strip()
     if not eid or is_demo_id(eid):
@@ -1400,7 +1400,7 @@ def _estimate_documents_for(est: dict, eid: str) -> list[dict]:
     ref = _estimate_documents_link_ref(est)
     num = str(est.get("estimate_number") or "").strip()
     rows: list[dict] = []
-    for doc in load_documents_hub(role=normalize_role(current_role())):
+    for doc in load_documents_hub(role=normalize_role(effective_role())):
         mod = str(doc.get("linked_module") or "").strip().lower()
         if mod not in {"estimates", "estimate"}:
             continue

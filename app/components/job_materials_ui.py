@@ -9,7 +9,7 @@ from typing import Any
 import streamlit as st
 
 try:
-    from app.auth import current_profile, current_role, is_authenticated
+    from app.auth import current_profile, current_role, effective_role, is_authenticated
     from app.pages._core._data import load_employees, load_inventory
     from app.services.inventory_service import get_inventory_transactions, list_inventory
     from app.services.job_materials_service import (
@@ -27,7 +27,7 @@ try:
     from app.utils.formatting import fmt_currency, fmt_date
     from app.utils.inventory_quantity import format_inventory_quantity, inventory_qty_input_kwargs
 except ImportError:
-    from auth import current_profile, current_role, is_authenticated  # type: ignore
+    from auth import current_profile, current_role, effective_role, is_authenticated  # type: ignore
     from pages._core._data import load_employees, load_inventory  # type: ignore
     from services.inventory_service import get_inventory_transactions, list_inventory  # type: ignore
     from services.job_materials_service import (  # type: ignore
@@ -351,7 +351,7 @@ def _render_add_materials_form(job: dict, *, key_prefix: str) -> None:
         ["Pricing Guide", "Inventory", "Manual Entry", "Scan / Lookup"]
     )
 
-    allow_over = str(current_role() or "").lower() == "admin"
+    allow_over = str(effective_role() or "").lower() == "admin"
 
     with tab_pg:
         st.caption(

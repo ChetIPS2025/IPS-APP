@@ -8,7 +8,7 @@ from typing import Any
 import streamlit as st
 
 try:
-    from app.auth import current_role
+    from app.auth import current_role, effective_role
     from app.components.catalog_presence_panel import render_catalog_presence_panel
     from app.components.catalog_stock_policy_panel import render_catalog_stock_policy_panel
     from app.components.pricing_guide_actions import render_pricing_guide_action_buttons
@@ -93,7 +93,7 @@ try:
     from app.styles import inject_pricing_guide_module_css
     from app.utils.formatting import fmt_currency
 except ImportError:
-    from auth import current_role  # type: ignore
+    from auth import current_role, effective_role  # type: ignore
     from components.catalog_presence_panel import render_catalog_presence_panel  # type: ignore
     from components.catalog_stock_policy_panel import render_catalog_stock_policy_panel  # type: ignore
     from components.pricing_guide_actions import render_pricing_guide_action_buttons  # type: ignore
@@ -514,7 +514,7 @@ def _render_pg_thumbnail(row: dict[str, Any]) -> None:
 
 
 def _can_manage_pricing() -> bool:
-    return str(current_role() or "").strip().lower() in {"admin", "supervisor", "manager"}
+    return str(effective_role() or "").strip().lower() in {"admin", "supervisor", "manager"}
 
 
 def _render_pg_photo_manager(row: dict[str, Any]) -> None:
@@ -1180,7 +1180,7 @@ def _show_detail_modal() -> None:
         subtitle=str(row.get("item_code") or row.get("item_key") or ""),
         status=str(row.get("status") or ""),
     )
-    if current_role() in {"admin", "supervisor", "manager"}:
+    if effective_role() in {"admin", "supervisor", "manager"}:
         render_modal_edit_button(module=_MODULE, record_key=rk)
     render_modal_meta_grid(
         [

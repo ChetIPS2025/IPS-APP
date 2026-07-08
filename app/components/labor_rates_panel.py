@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 
 try:
-    from app.auth import current_role
+    from app.auth import current_role, effective_role
     from app.confirm_delete import (
         close_destructive_confirmation,
         destructive_confirm_open_key,
@@ -32,7 +32,7 @@ try:
     )
     from app.ui.page_shell import render_page_header
 except ImportError:
-    from auth import current_role  # type: ignore
+    from auth import current_role, effective_role  # type: ignore
     from confirm_delete import (  # type: ignore
         close_destructive_confirmation,
         destructive_confirm_open_key,
@@ -389,7 +389,7 @@ def render_labor_rates_panel(*, key_prefix: str = "labor", show_header: bool = T
             "saved lines keep the rate stored on the line."
         )
 
-    can_add = current_role() == "admin"
+    can_add = effective_role() == "admin"
     mode_key = _panel_mode_key(prefix)
     if st.session_state.get(mode_key) in ("add", "edit") and not can_add:
         _clear_panel(prefix)

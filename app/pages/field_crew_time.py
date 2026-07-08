@@ -6,7 +6,7 @@ from datetime import date, datetime
 
 import streamlit as st
 
-from auth import current_profile, current_role
+from auth import current_profile, current_role, effective_role
 
 try:
     from app.components.headers import render_page_brand_header
@@ -45,7 +45,7 @@ except ImportError:
 
 
 def _admin() -> bool:
-    return current_role() in {"admin", "manager"}
+    return effective_role() in {"admin", "manager"}
 
 
 def render_crew_time_for_job(
@@ -229,7 +229,7 @@ def render() -> None:
     except ImportError:
         from utils.permissions import can_submit_timekeeping  # type: ignore
 
-    if not can_submit_timekeeping(current_role()):
+    if not can_submit_timekeeping(effective_role()):
         render_page_brand_header(
             "Crew Time",
             "Supervisors enter crew hours in Timekeeping.",

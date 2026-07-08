@@ -8,13 +8,13 @@ from typing import Any
 import streamlit as st
 
 try:
-    from app.auth import current_profile, current_role
+    from app.auth import current_profile, current_role, effective_role
     from app.components.qr_scan_history_ui import inject_qr_scan_history_css
     from app.pages._core._data import load_recent_qr_scans, load_tasks
     from app.services.management_reminders_service import due_date_badge, filter_dashboard_reminders
     from app.utils.formatting import fmt_date, fmt_datetime
 except ImportError:
-    from auth import current_profile, current_role  # type: ignore
+    from auth import current_profile, current_role, effective_role  # type: ignore
     from components.qr_scan_history_ui import inject_qr_scan_history_css  # type: ignore
     from pages._core._data import load_recent_qr_scans, load_tasks  # type: ignore
     from services.management_reminders_service import due_date_badge, filter_dashboard_reminders  # type: ignore
@@ -80,7 +80,7 @@ def _todo_preview_rows(limit: int = 5) -> list[dict[str, Any]]:
     return filter_dashboard_reminders(
         load_tasks(),
         profile=profile,
-        role=current_role(),
+        role=effective_role(),
         limit=limit,
     )
 

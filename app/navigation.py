@@ -274,13 +274,13 @@ def apply_pending_navigation() -> None:
 def default_nav_slug() -> str:
     """Safe fallback when ``ips_nav_page`` cannot be resolved to a built module."""
     try:
-        from app.auth import current_role
+        from app.auth import effective_role
         from app.utils.permissions import role_default_nav_slug
     except ImportError:
-        from auth import current_role  # type: ignore
+        from auth import effective_role  # type: ignore
         from utils.permissions import role_default_nav_slug  # type: ignore
     return role_default_nav_slug(
-        current_role(),
+        effective_role(),
         field_mode=bool(st.session_state.get("ips_field_mode")),
     )
 

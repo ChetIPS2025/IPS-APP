@@ -9,7 +9,7 @@ from typing import Any
 import streamlit as st
 
 try:
-    from app.auth import current_profile, current_role
+    from app.auth import current_profile, current_role, effective_role
     from app.components.company_updates_feed import (
         _mark_dashboard_update_read,
         _is_update_unread,
@@ -31,7 +31,7 @@ try:
     from app.styles import inject_employee_portal_css, inject_global_css
     from app.utils.formatting import fmt_date
 except ImportError:
-    from auth import current_profile, current_role  # type: ignore
+    from auth import current_profile, current_role, effective_role  # type: ignore
     from components.company_updates_feed import (  # type: ignore
         _mark_dashboard_update_read,
         _is_update_unread,
@@ -288,7 +288,7 @@ def render() -> None:
     )
 
     profile = current_profile() or {}
-    role = current_role()
+    role = effective_role()
     employee_id = resolve_logged_in_employee_id(profile)
 
     _render_portal_header(profile, role)

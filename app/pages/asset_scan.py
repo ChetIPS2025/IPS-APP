@@ -11,7 +11,7 @@ from typing import Any
 import streamlit as st
 
 try:
-    from app.auth import current_profile, current_role, is_authenticated
+    from app.auth import current_profile, current_role, effective_role, is_authenticated
     from app.services.assets_service import (
         create_asset_inspection,
         create_asset_issue,
@@ -30,7 +30,7 @@ try:
     from app.services.rental_equipment_inspection_service import is_rental_equipment
     from app.pages.rental_equipment_dashboard import render_rental_equipment_dashboard
 except ImportError:
-    from auth import current_profile, current_role, is_authenticated  # type: ignore
+    from auth import current_profile, current_role, effective_role, is_authenticated  # type: ignore
     from services.assets_service import (  # type: ignore
         create_asset_inspection,
         create_asset_issue,
@@ -270,7 +270,7 @@ def _profile_employee_id() -> str | None:
 def _can_view_restricted_docs() -> bool:
     if not is_authenticated():
         return False
-    return str(current_role() or "").lower() in {"admin", "supervisor", "manager"}
+    return str(effective_role() or "").lower() in {"admin", "supervisor", "manager"}
 
 
 def _load_scan_asset() -> tuple[dict[str, Any] | None, str, dict[str, str]]:

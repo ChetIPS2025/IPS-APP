@@ -24,9 +24,9 @@ except ImportError:
     from utils.permissions import can_manage_company_updates  # type: ignore
 
 try:
-    from app.auth import current_role
+    from app.auth import current_role, effective_role
 except ImportError:
-    from auth import current_role  # type: ignore
+    from auth import current_role, effective_role  # type: ignore
 
 _CATEGORY_DISPLAY: dict[str, str] = {
     "General": "Announcements",
@@ -464,7 +464,7 @@ def _dashboard_item_key(uid: str, idx: int) -> str:
 
 
 def _can_post_company_updates() -> bool:
-    return can_manage_company_updates(current_role())
+    return can_manage_company_updates(effective_role())
 
 
 def render_dashboard_company_updates_section(

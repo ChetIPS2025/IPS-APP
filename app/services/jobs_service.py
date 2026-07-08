@@ -112,10 +112,10 @@ def _current_user_id() -> str | None:
 def can_manage_job_actions() -> bool:
     """Admin, supervisor, project manager, or PM may complete/cancel/soft-delete jobs."""
     try:
-        from app.auth import current_role
+        from app.auth import effective_role
     except ImportError:
-        from auth import current_role  # type: ignore
-    role = str(current_role() or "").strip().lower()
+        from auth import effective_role  # type: ignore
+    role = str(effective_role() or "").strip().lower()
     return role in _JOB_ACTION_ROLES
 
 

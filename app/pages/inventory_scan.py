@@ -44,7 +44,7 @@ except ImportError:
     )
 
 try:
-    from app.auth import current_profile, current_role, is_authenticated
+    from app.auth import current_profile, current_role, effective_role, is_authenticated
     from app.ui.page_shell import render_page_header
     from app.ui import role_can_open_page
     from app.db import (
@@ -63,7 +63,7 @@ try:
     )
     from app.ui.streamlit_perf import fragment
 except ImportError:
-    from auth import current_profile, current_role, is_authenticated  # type: ignore
+    from auth import current_profile, current_role, effective_role, is_authenticated  # type: ignore
     from branding import render_header  # type: ignore
     from ui import role_can_open_page  # type: ignore
     from db import (  # type: ignore
@@ -927,7 +927,7 @@ def _render_inventory_scan_inner() -> None:
 
     _merge_inv_scan_code_from_query()
 
-    can_use = role_can_open_page(current_role(), "Scan Inventory")
+    can_use = role_can_open_page(effective_role(), "Scan Inventory")
     if not can_use:
         st.info(
             "You do not have access to this page. Ask an admin to enable **Scan Inventory** "
@@ -1256,7 +1256,7 @@ def _render_inventory_scan_inner() -> None:
         )
 
     allow_neg = False
-    if current_role() == "admin":
+    if effective_role() == "admin":
         allow_neg = st.checkbox("Allow issue over on-hand (admin)", key="inv_scan_allow_neg")
 
     with st.form("inv_scan_issue_form", clear_on_submit=True):
@@ -1699,7 +1699,7 @@ def _record_mobile_shop_use(
 def _scan_can_submit() -> bool:
     if not is_authenticated():
         return True
-    return str(current_role() or "viewer").lower() != "viewer"
+    return str(effective_role() or "viewer").lower() != "viewer"
 
 
 def _mobile_scan_qty_step(delta: int) -> None:
@@ -1762,7 +1762,7 @@ def _submit_mobile_inventory_scan(
     device_label = str(actor.get("device_label") or "").strip()
     scan_user_id = str(actor.get("scanned_by_user_id") or "").strip() or None
     employee_id = str(actor.get("employee_id") or "").strip() or _profile_employee_id()
-    allow_over = str(current_role() or "").lower() == "admin"
+    allow_over = str(effective_role() or "").lower() == "admin"
 
     if destination_type == "shop":
         ok, err = _record_mobile_shop_use(item=item, qty=qv, qoh=qoh, allow_over=allow_over)

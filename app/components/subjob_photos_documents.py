@@ -72,10 +72,10 @@ def _scope_key(job_id: str, task_id: str) -> str:
 
 def _admin_read() -> bool:
     try:
-        from app.auth import current_role
+        from app.auth import current_role, effective_role
     except ImportError:
-        from auth import current_role  # type: ignore
-    return current_role() in {"admin", "manager"}
+        from auth import current_role, effective_role  # type: ignore
+    return effective_role() in {"admin", "manager"}
 
 
 def _photo_bucket() -> str:

@@ -7,7 +7,7 @@ import html
 import streamlit as st
 
 try:
-    from app.auth import current_role
+    from app.auth import current_role, effective_role
     from app.components.headers import render_page_brand_header
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_pagination import paginate_rows, reset_table_page
@@ -27,7 +27,7 @@ try:
     from app.services.repository import clear_data_cache_for_table
     from app.utils.formatting import fmt_currency
 except ImportError:
-    from auth import current_role  # type: ignore
+    from auth import current_role, effective_role  # type: ignore
     from components.headers import render_page_brand_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_pagination import paginate_rows, reset_table_page  # type: ignore
@@ -108,7 +108,7 @@ def _can_show_approve(row: dict) -> bool:
     eid = str(row.get("estimate_id") or "").strip()
     if not eid:
         return False
-    if not can_approve_estimates(current_role()):
+    if not can_approve_estimates(effective_role()):
         return False
     return estimate_status_approvable(row.get("estimate_status"))
 

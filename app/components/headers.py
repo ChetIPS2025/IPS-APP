@@ -243,16 +243,16 @@ def _navigate_ops_quick_action(slug: str) -> None:
     if not picked:
         return
     try:
-        from app.auth import current_role
+        from app.auth import effective_role
         from app.navigation import normalize_nav_slug, set_nav_slug
         from app.utils.permissions import role_can_access_page
     except ImportError:
-        from auth import current_role  # type: ignore
+        from auth import effective_role  # type: ignore
         from navigation import normalize_nav_slug, set_nav_slug  # type: ignore
         from utils.permissions import role_can_access_page  # type: ignore
 
     if picked == "job_costing":
-        if not role_can_access_page(current_role(), "jobs"):
+        if not role_can_access_page(effective_role(), "jobs"):
             st.warning("You do not have access to that page.")
             return
         try:
@@ -264,7 +264,7 @@ def _navigate_ops_quick_action(slug: str) -> None:
         return
 
     target = normalize_nav_slug(picked)
-    if not role_can_access_page(current_role(), target):
+    if not role_can_access_page(effective_role(), target):
         st.warning("You do not have access to that page.")
         return
     set_nav_slug(target)

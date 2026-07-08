@@ -20,7 +20,7 @@ import html
 import pandas as pd
 import streamlit as st
 
-from auth import current_role
+from auth import current_role, effective_role
 
 from db import fetch_one, fetch_table, fetch_table_admin, insert_row, insert_row_admin
 
@@ -54,7 +54,7 @@ def _money_str(value: float) -> str:
 
 
 def _job_costing_admin_read() -> bool:
-    return current_role() in {"admin", "manager"}
+    return effective_role() in {"admin", "manager"}
 
 
 def _sort_jobs(jobs: list[dict]) -> list[dict]:
@@ -449,7 +449,7 @@ def _render_standalone_job_costing_page() -> None:
             st.info("No **time_entries** rows for this job yet.")
         st.markdown(f"**Labor total:** {_money_str(labor_total)}")
 
-    can_edit = current_role() in {"admin", "pm"}
+    can_edit = effective_role() in {"admin", "pm"}
 
     # --- Materials ---
     mat_c = _render_bordered_section("Materials")

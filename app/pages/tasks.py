@@ -416,10 +416,10 @@ def _apply_field_task_filters(rows: list[dict], *, assignee_lookup: dict[str, st
     if fid:
         out = [t for t in out if str(t.get("job_id") or "").strip() == fid]
     try:
-        from app.auth import current_role
+        from app.auth import current_role, effective_role
     except ImportError:
-        from auth import current_role  # type: ignore
-    if str(current_role() or "").strip().lower() == "employee":
+        from auth import current_role, effective_role  # type: ignore
+    if str(effective_role() or "").strip().lower() == "employee":
         out = [t for t in out if _task_matches_field_assignee(t, assignee_lookup)]
     return out
 

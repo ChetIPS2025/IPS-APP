@@ -9,7 +9,7 @@ from typing import Any
 import streamlit as st
 
 try:
-    from app.auth import current_profile, current_role
+    from app.auth import current_profile, current_role, effective_role
     from app.pages._core._crud import apply_persist_feedback, is_demo_id
     from app.pages._core._data import load_tasks, task_assignee_options
     from app.services.management_reminders_service import (
@@ -21,7 +21,7 @@ try:
     )
     from app.utils.formatting import fmt_date
 except ImportError:
-    from auth import current_profile, current_role  # type: ignore
+    from auth import current_profile, current_role, effective_role  # type: ignore
     from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
     from pages._core._data import load_tasks, task_assignee_options  # type: ignore
     from services.management_reminders_service import (  # type: ignore
@@ -47,7 +47,7 @@ def _default_assignee(profile: dict[str, Any], options: list[str]) -> str:
 def render_dashboard_management_reminders_section(*, limit: int = 8) -> None:
     """Shared office to-dos: managers see all open items; others see assigned work."""
     profile = current_profile() or {}
-    role = current_role()
+    role = effective_role()
     reminders = filter_dashboard_reminders(
         load_tasks(),
         profile=profile,

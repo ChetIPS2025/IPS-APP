@@ -15,10 +15,10 @@ except ImportError:
 
 def can_admin_mutate() -> bool:
     try:
-        from app.auth import current_role
+        from app.auth import current_role, effective_role
     except ImportError:
-        from auth import current_role  # type: ignore
-    return str(current_role() or "").strip().lower() in {"admin", "manager", "supervisor"}
+        from auth import current_role, effective_role  # type: ignore
+    return str(effective_role() or "").strip().lower() in {"admin", "manager", "supervisor"}
 
 
 def _confirm_key(prefix: str) -> str:

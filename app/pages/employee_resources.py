@@ -8,7 +8,7 @@ from typing import Any
 import streamlit as st
 
 try:
-    from app.auth import current_role
+    from app.auth import current_role, effective_role
     from app.pages._core._access import begin_module
     from app.services.employee_resources_service import (
         RESOURCE_TYPES,
@@ -24,7 +24,7 @@ try:
     from app.utils.formatting import fmt_date
     from app.utils.permissions import normalize_role
 except ImportError:
-    from auth import current_role  # type: ignore
+    from auth import current_role, effective_role  # type: ignore
     from pages._core._access import begin_module  # type: ignore
     from services.employee_resources_service import (  # type: ignore
         RESOURCE_TYPES,
@@ -189,7 +189,7 @@ def render() -> None:
     )
     st.markdown('<h2 class="ips-ep-page-title">Employee Resources</h2>', unsafe_allow_html=True)
 
-    role = current_role()
+    role = effective_role()
     rows, _used_demo = list_employee_resources(role=role)
     for row in rows:
         _render_resource_card(row)

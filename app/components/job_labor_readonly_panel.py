@@ -12,7 +12,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 try:
-    from app.auth import current_profile, current_role
+    from app.auth import current_profile, current_role, effective_role
     from app.components.status import status_pill_html
     from app.services.job_labor_summary_service import get_job_labor_summary
     from app.services.job_weekly_timesheets import monday_of_week, week_bounds
@@ -32,7 +32,7 @@ try:
     from app.utils.formatting import fmt_currency, fmt_date, fmt_hours
     from app.utils.permissions import can_submit_timekeeping
 except ImportError:
-    from auth import current_profile, current_role  # type: ignore
+    from auth import current_profile, current_role, effective_role  # type: ignore
     from components.status import status_pill_html  # type: ignore
     from services.job_labor_summary_service import get_job_labor_summary  # type: ignore
     from services.job_weekly_timesheets import monday_of_week, week_bounds  # type: ignore
@@ -84,7 +84,7 @@ def _init_week_state(key_prefix: str) -> date:
 
 
 def _can_edit_time_in_timekeeping() -> bool:
-    role = current_role()
+    role = effective_role()
     return can_submit_timekeeping(role) or str(role or "").strip().lower() == "admin"
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from auth import current_profile, current_role
+from auth import current_profile, current_role, effective_role
 
 try:
     from app.components.headers import render_page_brand_header
@@ -35,7 +35,7 @@ except ImportError:
 
 
 def _admin_read() -> bool:
-    return current_role() in {"admin", "manager"}
+    return effective_role() in {"admin", "manager"}
 
 
 def render() -> None:
@@ -61,7 +61,7 @@ def render() -> None:
     prof = current_profile() or {}
     uid = str(prof.get("id") or "").strip() or None
     uname = str(prof.get("full_name") or prof.get("email") or "").strip()
-    role = str(current_role() or "").strip().lower()
+    role = str(effective_role() or "").strip().lower()
 
     jobs = sort_jobs_by_number_then_name(
         list(fetch_jobs_with_order_fallback(limit=3000, use_admin=admin) or [])
@@ -102,7 +102,7 @@ def render() -> None:
             from app.utils.permissions import can_submit_timekeeping
         except ImportError:
             from utils.permissions import can_submit_timekeeping  # type: ignore
-        if not can_submit_timekeeping(current_role()):
+        if not can_submit_timekeeping(effective_role()):
             st.info(
                 "Crew time is entered by your supervisor in **Timekeeping**. "
                 "Use the **Time** tab to view your hours."
@@ -119,7 +119,7 @@ def render() -> None:
         return
 
     if tab == "Time":
-        if not role_can_access_page(current_role(), "timekeeping"):
+        if not role_can_access_page(effective_role(), "timekeeping"):
             st.info("Timekeeping is not available for your role.")
             return
         try:
@@ -130,7 +130,7 @@ def render() -> None:
         return
 
     if tab == "Tasks":
-        if not role_can_access_page(current_role(), "tasks"):
+        if not role_can_access_page(effective_role(), "tasks"):
             st.info("Tasks are not available for your role.")
             return
         try:

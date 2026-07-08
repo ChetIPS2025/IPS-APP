@@ -10,7 +10,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-from auth import current_profile, current_role
+from auth import current_profile, current_role, effective_role
 try:
     from app.ui.page_shell import render_page_header
 except ImportError:
@@ -58,7 +58,7 @@ _PHOTO_EXT = re.compile(r"\.(jpe?g|png|gif|webp)$", re.IGNORECASE)
 
 
 def _admin_read() -> bool:
-    return current_role() in {"admin", "pm"}
+    return effective_role() in {"admin", "pm"}
 
 
 def _safe_filename(name: str) -> str:
@@ -553,7 +553,7 @@ def render_daily_reports_for_job(
                         except Exception as exc:
                             st.error(str(exc))
                 with b2:
-                    if current_role() in {"admin", "manager"} and str(existing.get("status") or "") == "Submitted":
+                    if effective_role() in {"admin", "manager"} and str(existing.get("status") or "") == "Submitted":
                         if st.button("Mark reviewed", use_container_width=True, key=f"sdr_review_{jid}"):
                             try:
                                 prof = current_profile() or {}

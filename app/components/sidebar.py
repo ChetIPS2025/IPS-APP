@@ -8,7 +8,7 @@ from pathlib import Path
 import streamlit as st
 
 try:
-    from app.auth import current_profile, current_role, sign_out
+    from app.auth import current_profile, current_role, effective_role, sign_out
     from app.components.sidebar_nav_icons import nav_icon_for_slug
     from app.components.sidebar_shell import (
         apply_pending_sidebar_collapse,
@@ -28,7 +28,7 @@ try:
         role_can_access_page,
     )
 except ImportError:
-    from auth import current_profile, current_role, sign_out  # type: ignore
+    from auth import current_profile, current_role, effective_role, sign_out  # type: ignore
     from components.sidebar_nav_icons import nav_icon_for_slug  # type: ignore
     from components.sidebar_shell import (  # type: ignore
         apply_pending_sidebar_collapse,
@@ -148,7 +148,7 @@ def _render_collapse_toggle(*, collapsed: bool) -> None:
 
 def render_sidebar(active_slug: str) -> None:
     apply_pending_sidebar_collapse()
-    role = normalize_role(current_role())
+    role = normalize_role(effective_role())
     field_mode = bool(st.session_state.get("ips_field_mode"))
     is_employee_nav = role == "employee"
     if is_employee_nav:
@@ -226,7 +226,7 @@ def render_sidebar(active_slug: str) -> None:
 
         if not is_employee_nav:
             st.markdown('<p class="sidebar-section-title sidebar-footer-label section-header">View mode</p>', unsafe_allow_html=True)
-        if not is_employee_nav:
+        if not is_employee_nav and not is_view_as_active():
             fm = st.toggle(
                 "Field Supervisor Mode",
                 value=field_mode,
@@ -239,6 +239,13 @@ def render_sidebar(active_slug: str) -> None:
                     set_nav_slug("field_dashboard")
                 request_sidebar_collapse_after_nav()
                 st.rerun()
+
+        try:
+            from app.utils.view_as import is_real_admin, is_view_as_active, render_view_as_selector
+        except ImportError:
+            from utils.view_as import is_real_admin, is_view_as_active, render_view_as_selector  # type: ignore
+        if is_real_admin():
+            render_view_as_selector()
 
         prof = current_profile()
         name = html.escape(str(prof.get("full_name") or prof.get("email") or "User"))

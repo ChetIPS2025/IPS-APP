@@ -597,6 +597,11 @@ def sign_out() -> None:
         from db import clear_streamlit_db_read_cache  # type: ignore
 
     clear_streamlit_db_read_cache()
+    try:
+        from app.utils.view_as import clear_view_as
+    except ImportError:
+        from utils.view_as import clear_view_as  # type: ignore
+    clear_view_as()
 
 
 def current_profile() -> dict:
@@ -627,6 +632,15 @@ def current_role() -> str:
 def get_current_user_role() -> str:
     """Helper requested by spec."""
     return current_role()
+
+
+def effective_role() -> str:
+    """UI/navigation role (admin View As preview overrides visibility only)."""
+    try:
+        from app.utils.view_as import ui_role
+    except ImportError:
+        from utils.view_as import ui_role  # type: ignore
+    return ui_role()
 
 
 def must_reset_password() -> bool:

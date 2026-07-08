@@ -7,14 +7,14 @@ import html
 import streamlit as st
 
 try:
-    from app.auth import current_profile, current_role
+    from app.auth import current_profile, current_role, effective_role
     from app.pages._core._access import begin_module
     from app.pages._core._data import get_employee
     from app.services.certification_helpers import resolve_logged_in_employee_id
     from app.styles import inject_employee_portal_css, inject_global_css
     from app.utils.formatting import fmt_date
 except ImportError:
-    from auth import current_profile, current_role  # type: ignore
+    from auth import current_profile, current_role, effective_role  # type: ignore
     from pages._core._access import begin_module  # type: ignore
     from pages._core._data import get_employee  # type: ignore
     from services.certification_helpers import resolve_logged_in_employee_id  # type: ignore
@@ -41,7 +41,7 @@ def render() -> None:
     email = html.escape(str((emp or profile).get("email") or "—"))
     phone = html.escape(str((emp or profile).get("phone") or "—"))
     department = html.escape(str((emp or profile).get("department") or "—"))
-    role = html.escape(str(current_role() or "Employee").replace("_", " ").title())
+    role = html.escape(str(effective_role() or "Employee").replace("_", " ").title())
     hire = ""
     if emp and emp.get("hire_date"):
         hire = fmt_date(str(emp.get("hire_date") or "")[:10])

@@ -2374,10 +2374,10 @@ def _render_job_equipment_tab(job: dict) -> None:
 
 def _field_admin_read() -> bool:
     try:
-        from auth import current_role
+        from auth import current_role, effective_role
     except ImportError:
-        from app.auth import current_role  # type: ignore
-    return current_role() in {"admin", "manager"}
+        from app.auth import current_role, effective_role  # type: ignore
+    return effective_role() in {"admin", "manager"}
 
 
 def _render_field_job_detail_tabs(job: dict) -> None:

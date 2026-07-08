@@ -261,7 +261,7 @@ def _current_employee_id() -> str:
 
 
 def _can_manage_certifications() -> bool:
-    return can_manage_employee_certifications(_current_role())
+    return can_manage_employee_certifications(_effective_role())
 
 
 def _current_user_id() -> str | None:
@@ -269,17 +269,17 @@ def _current_user_id() -> str | None:
     return uid or None
 
 
-def _current_role() -> str:
+def _effective_role() -> str:
     try:
-        from app.auth import current_role
+        from app.auth import current_role, effective_role
     except ImportError:
-        from auth import current_role  # type: ignore
-    return current_role()
+        from auth import current_role, effective_role  # type: ignore
+    return effective_role()
 
 
 def _can_view_cert_attachment(cert: dict) -> bool:
     return can_view_certification_attachment(
-        _current_role(),
+        _effective_role(),
         cert,
         current_employee_id=_current_employee_id(),
     )
@@ -983,7 +983,7 @@ def render() -> None:
             for c in scope_certs
             if certification_visible_to_user(
                 c,
-                role=_current_role(),
+                role=_effective_role(),
                 viewer_employee_id=viewer_eid,
             )
         ]

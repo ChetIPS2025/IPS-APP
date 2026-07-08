@@ -7,7 +7,7 @@ import logging
 import streamlit as st
 
 try:
-    from app.auth import current_role
+    from app.auth import current_role, effective_role
     from app.pages import (
         admin,
         assets,
@@ -45,7 +45,7 @@ try:
     from app.utils.constants import SESSION_NAV_KEY
     from app.utils.permissions import role_can_access_page
 except ImportError:
-    from auth import current_role  # type: ignore
+    from auth import current_role, effective_role  # type: ignore
     from pages import (  # type: ignore
         admin,
         assets,
@@ -125,7 +125,7 @@ def ensure_nav_defaults() -> None:
     except ImportError:
         from utils.permissions import role_default_nav_slug  # type: ignore
     default = role_default_nav_slug(
-        current_role(),
+        effective_role(),
         field_mode=bool(st.session_state.get("ips_field_mode")),
     )
     st.session_state.setdefault(SESSION_NAV_KEY, default)
@@ -143,7 +143,7 @@ def render_module(slug: str | None = None) -> None:
         from navigation import normalize_nav_slug  # type: ignore
 
     active = normalize_nav_slug(slug or nav_slug() or "dashboard")
-    role = current_role()
+    role = effective_role()
     if not role_can_access_page(role, active):
         try:
             from app.navigation import default_nav_slug, set_nav_slug
@@ -176,6 +176,11 @@ def render_module(slug: str | None = None) -> None:
                 from components.headers import render_main_brand_bar  # type: ignore
             if active not in {"employees", "users"}:
                 render_main_brand_bar()
+            try:
+                from app.utils.view_as import render_view_as_banner
+            except ImportError:
+                from utils.view_as import render_view_as_banner  # type: ignore
+            render_view_as_banner()
             with perf_span(f"module.render:{active}"):
                 fn()  # type: ignore[operator]
         except Exception as exc:

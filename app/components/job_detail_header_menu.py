@@ -45,7 +45,11 @@ def _normalize_status(job: dict[str, Any]) -> str:
 
 
 def _is_job_admin() -> bool:
-    return str(current_role() or "").strip().lower() == "admin"
+    try:
+        from app.auth import effective_role
+    except ImportError:
+        from auth import effective_role  # type: ignore
+    return str(effective_role() or "").strip().lower() == "admin"
 
 
 def _close_menu(job_key: str) -> None:

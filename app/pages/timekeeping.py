@@ -517,12 +517,12 @@ def _render_horizontal_week_grid(
 def _filter_summaries_for_current_user(summaries: list[dict]) -> list[dict]:
     """Supervisors see all crew; employees see only their own timecard."""
     try:
-        from app.auth import current_profile, current_role
+        from app.auth import current_profile, current_role, effective_role
         from app.utils.permissions import can_submit_timekeeping
     except ImportError:
-        from auth import current_profile, current_role  # type: ignore
+        from auth import current_profile, current_role, effective_role  # type: ignore
         from utils.permissions import can_submit_timekeeping  # type: ignore
-    if can_submit_timekeeping(current_role()):
+    if can_submit_timekeeping(effective_role()):
         return summaries
 
     prof = current_profile() or {}
@@ -575,12 +575,12 @@ def _day_is_editable(status: str) -> bool:
 
 def _can_admin_edit_approved_timekeeping() -> bool:
     try:
-        from app.auth import current_role
+        from app.auth import current_role, effective_role
         from app.utils.permissions import can_admin_edit_approved_timekeeping
     except ImportError:
-        from auth import current_role  # type: ignore
+        from auth import current_role, effective_role  # type: ignore
         from utils.permissions import can_admin_edit_approved_timekeeping  # type: ignore
-    return can_admin_edit_approved_timekeeping(current_role())
+    return can_admin_edit_approved_timekeeping(effective_role())
 
 
 def _day_hours_editable(day_status: str, week_status: str) -> bool:
@@ -703,22 +703,22 @@ def _current_user_name() -> str:
 
 def _can_approve_timekeeping() -> bool:
     try:
-        from app.auth import current_role
+        from app.auth import current_role, effective_role
         from app.utils.permissions import can_approve_timekeeping
     except ImportError:
-        from auth import current_role  # type: ignore
+        from auth import current_role, effective_role  # type: ignore
         from utils.permissions import can_approve_timekeeping  # type: ignore
-    return can_approve_timekeeping(current_role())
+    return can_approve_timekeeping(effective_role())
 
 
 def _can_submit_timekeeping() -> bool:
     try:
-        from app.auth import current_role
+        from app.auth import current_role, effective_role
         from app.utils.permissions import can_submit_timekeeping
     except ImportError:
-        from auth import current_role  # type: ignore
+        from auth import current_role, effective_role  # type: ignore
         from utils.permissions import can_submit_timekeeping  # type: ignore
-    return can_submit_timekeeping(current_role())
+    return can_submit_timekeeping(effective_role())
 
 
 def _handle_day_submit_for_date(emp: dict, week_start_d: date, work_date: str) -> bool:
@@ -3549,9 +3549,9 @@ def render() -> None:
             from db import fetch_jobs_with_order_fallback  # type: ignore
             from services.job_service import sort_jobs_by_number_then_name  # type: ignore
         try:
-            from app.auth import current_role as _tk_role
+            from app.auth import current_role, effective_role as _tk_role
         except ImportError:
-            from auth import current_role as _tk_role  # type: ignore
+            from auth import current_role, effective_role as _tk_role  # type: ignore
         if _tk_role() in {"admin", "manager", "supervisor", "project manager", "pm"}:
             jobs = sort_jobs_by_number_then_name(
                 list(fetch_jobs_with_order_fallback(limit=3000, use_admin=True) or [])
@@ -3611,12 +3611,12 @@ def render() -> None:
         _show_timecard_detail_modal()
 
     try:
-        from app.auth import current_role
+        from app.auth import current_role, effective_role
         from app.utils.permissions import role_can_access_page
     except ImportError:
-        from auth import current_role  # type: ignore
+        from auth import current_role, effective_role  # type: ignore
         from utils.permissions import role_can_access_page  # type: ignore
-    if role_can_access_page(current_role(), "jobs"):
+    if role_can_access_page(effective_role(), "jobs"):
         st.divider()
         st.markdown("**Weekly customer timesheets**")
         st.caption("Generate and send weekly timesheets from the job's **Weekly Timesheets** tab in Job Detail.")

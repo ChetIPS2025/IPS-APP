@@ -381,6 +381,12 @@ def main() -> None:
         show_page_error(exc, context=f"module:{slug}")
 
     try:
+        from app.utils.view_as import render_view_as_mobile_bottom_nav
+    except ImportError:
+        from utils.view_as import render_view_as_mobile_bottom_nav  # type: ignore
+    render_view_as_mobile_bottom_nav(slug)
+
+    try:
         from app.components.sidebar_shell import inject_desktop_nav_rail_markup
     except ImportError:
         from components.sidebar_shell import inject_desktop_nav_rail_markup  # type: ignore

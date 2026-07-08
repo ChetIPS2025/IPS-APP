@@ -7,7 +7,7 @@ import html
 import streamlit as st
 
 try:
-    from app.auth import current_role
+    from app.auth import current_role, effective_role
     from app.components.action_styles import success_solid_button
     from app.components.clickable_table import render_clickable_table
     from app.components.headers import render_page_brand_header
@@ -47,7 +47,7 @@ try:
     from app.utils.permissions import can_view_hr_documents, normalize_role
     from app.pages._core._session import select_key
 except ImportError:
-    from auth import current_role  # type: ignore
+    from auth import current_role, effective_role  # type: ignore
     from components.action_styles import success_solid_button  # type: ignore
     from components.clickable_table import render_clickable_table  # type: ignore
     from components.headers import render_page_brand_header  # type: ignore
@@ -252,7 +252,7 @@ def _show_doc_detail_modal() -> None:
     if not doc:
         render_missing_record(_clear_doc_modal, close_key="doc_modal_missing_close")
         return
-    role_norm = normalize_role(current_role())
+    role_norm = normalize_role(effective_role())
     hr_ok = can_view_hr_documents(role_norm)
     employee_id = str(st.session_state.get(ACTIVE_EMPLOYEE_KEY) or "")
     render_doc_detail_dialog(doc, hr_ok=hr_ok, employee_id=employee_id)
@@ -274,7 +274,7 @@ def render() -> None:
         from pages._core._access import begin_module  # type: ignore
     if not begin_module("employee_documents"):
         return
-    role_norm = normalize_role(current_role())
+    role_norm = normalize_role(effective_role())
     hr_ok = can_view_hr_documents(role_norm)
     employees = load_employees()
     emp_opts = {str(e.get("name") or ""): str(e.get("id") or "") for e in employees}

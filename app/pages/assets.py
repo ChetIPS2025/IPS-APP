@@ -1647,10 +1647,10 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
 
 def _render_asset_documents_tab(asset: dict) -> None:
     try:
-        from app.auth import current_role, is_authenticated
+        from app.auth import current_role, effective_role, is_authenticated
     except ImportError:
-        from auth import current_role, is_authenticated  # type: ignore
-    include_restricted = is_authenticated() and str(current_role() or "").lower() in {
+        from auth import current_role, effective_role, is_authenticated  # type: ignore
+    include_restricted = is_authenticated() and str(effective_role() or "").lower() in {
         "admin",
         "supervisor",
         "manager",

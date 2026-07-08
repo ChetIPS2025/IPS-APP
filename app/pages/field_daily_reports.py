@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from auth import current_profile, current_role
+from auth import current_profile, current_role, effective_role
 
 try:
     from app.components.headers import render_page_brand_header
@@ -33,7 +33,7 @@ except ImportError:
 
 
 def _admin_read() -> bool:
-    return current_role() in {"admin", "manager"}
+    return effective_role() in {"admin", "manager"}
 
 
 def render() -> None:

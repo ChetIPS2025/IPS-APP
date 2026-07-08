@@ -9,7 +9,7 @@ from typing import Any
 import streamlit as st
 
 try:
-    from app.auth import current_role
+    from app.auth import current_role, effective_role
     from app.components.action_styles import danger_solid_button, success_solid_button
     from app.components.modal_delete import can_admin_mutate
     from app.pages._core._crud import is_demo_id
@@ -21,7 +21,7 @@ try:
     )
     from app.services.repository import clear_data_cache_for_table
 except ImportError:
-    from auth import current_role  # type: ignore
+    from auth import current_role, effective_role  # type: ignore
     from components.action_styles import danger_solid_button, success_solid_button  # type: ignore
     from components.modal_delete import can_admin_mutate  # type: ignore
     from pages._core._crud import is_demo_id  # type: ignore
@@ -39,7 +39,7 @@ def _confirm_state_key(estimate_id: str, action: str) -> str:
 
 
 def _can_show_approve(est: dict) -> bool:
-    if not can_approve_estimates(current_role()):
+    if not can_approve_estimates(effective_role()):
         return False
     eid = str(est.get("id") or "").strip()
     if not eid or is_demo_id(eid):
@@ -98,7 +98,7 @@ def render_estimate_action_buttons(
     show_approve = _can_show_approve(est)
 
     if not show_approve and not can_delete:
-        if not can_approve_estimates(current_role()) and not can_delete:
+        if not can_approve_estimates(effective_role()) and not can_delete:
             st.caption("You do not have permission to change this estimate.")
         return
 

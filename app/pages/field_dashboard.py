@@ -6,7 +6,7 @@ from datetime import date
 
 import streamlit as st
 
-from auth import current_profile, current_role
+from auth import current_profile, current_role, effective_role
 
 try:
     from app.components.cards import render_kpi_card
@@ -31,7 +31,7 @@ except ImportError:
 
 
 def _admin_read() -> bool:
-    return current_role() in {"admin", "manager"}
+    return effective_role() in {"admin", "manager"}
 
 
 def render() -> None:
@@ -48,7 +48,7 @@ def render() -> None:
         unsafe_allow_html=True,
     )
 
-    role = current_role()
+    role = effective_role()
     if role == "viewer":
         st.warning("View-only access.")
         return

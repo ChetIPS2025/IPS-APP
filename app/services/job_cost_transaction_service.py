@@ -878,10 +878,10 @@ def _estimated_cost(job: dict[str, Any], estimate: dict[str, Any] | None = None)
 def can_manage_manual_cost_adjustments() -> bool:
     """Only admin users may add/edit/delete manual cost adjustments."""
     try:
-        from app.auth import current_role
+        from app.auth import effective_role
     except ImportError:
-        from auth import current_role  # type: ignore
-    return str(current_role() or "").strip().lower() == "admin"
+        from auth import effective_role  # type: ignore
+    return str(effective_role() or "").strip().lower() == "admin"
 
 
 def _asset_rental_category(asset: dict[str, Any] | None) -> str:
