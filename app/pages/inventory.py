@@ -11,6 +11,7 @@ try:
     from app.components.inventory_actions import render_inventory_action_buttons
     from app.components.inventory_list_table import (
         INVENTORY_TABLE_LAST_ACTION_KEY,
+        apply_inventory_table_bridge_action,
         build_inventory_html_table,
         inventory_category,
         inventory_description,
@@ -110,6 +111,7 @@ except ImportError:
     from components.inventory_actions import render_inventory_action_buttons  # type: ignore
     from components.inventory_list_table import (  # type: ignore
         INVENTORY_TABLE_LAST_ACTION_KEY,
+        apply_inventory_table_bridge_action,
         build_inventory_html_table,
         inventory_category,
         inventory_description,
@@ -400,15 +402,6 @@ def _render_custom_inventory_table(
             st.markdown('<div class="ips-field-row-expand">', unsafe_allow_html=True)
             _render_inventory_expand_panel(expanded_item)
             st.markdown("</div>", unsafe_allow_html=True)
-
-        render_inventory_table_bridge(
-            items_by_id,
-            component_key="ips_inventory_list_bridge",
-            hook_key="ipsInvList::action",
-            open_item_fn=_open_inventory_table_item,
-            on_expand_fn=_on_inventory_table_expand if field_mode else None,
-            field_mode=field_mode,
-        )
 
     return all_item_ids
 
@@ -1093,6 +1086,29 @@ def render() -> None:
 
         build_modal_cache(filtered, cache_key=_CACHE_KEY)
         _render_custom_inventory_table(page_rows, filter_options=filter_options)
+
+        page_items_by_id = {
+            str(i.get("id") or "").strip(): i
+            for i in page_rows
+            if str(i.get("id") or "").strip()
+        }
+        field_mode = is_field_context()
+        st.markdown(
+            '<span class="ips-inventory-table-link-bridge-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        table_action = render_inventory_table_bridge(
+            component_key="ips_inventory_list_bridge",
+            hook_key="ipsInvList::action",
+            field_mode=field_mode,
+        )
+        apply_inventory_table_bridge_action(
+            table_action,
+            page_items_by_id,
+            open_item_fn=_open_inventory_table_item,
+            on_expand_fn=_on_inventory_table_expand if field_mode else None,
+        )
+
         render_table_pagination_footer(len(filtered), _TABLE_KEY)
 
     with tab_qr_history:
@@ -1105,5 +1121,5 @@ def render() -> None:
             empty_message="No QR scans recorded yet. Scans appear when materials or tools are used via QR.",
         )
 
-    if st.session_state.get(SHOW_INVENTORY_MODAL_KEY):
+    if st.session_state.get(SHOW_INVENTORY_MODAL_KEY) or str(st.session_state.get(_MODAL_KEY) or "").strip():
         show_modal_if_pending(_MODAL_KEY, _show_inventory_detail_modal)

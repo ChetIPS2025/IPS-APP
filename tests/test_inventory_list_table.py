@@ -86,3 +86,12 @@ def test_handle_inventory_table_action_opens_item():
     )
 
     assert opened == [("inv-1", {"id": "inv-1", "description": "Widget"})]
+
+    handle_inventory_table_action(
+        "open:inv-1",
+        {"inv-1": {"id": "inv-1", "description": "Widget"}},
+        last_action_key="inventory_test_last_action",
+        open_item_fn=lambda item_id, item: opened.append((item_id, item)),
+    )
+
+    assert opened == [("inv-1", {"id": "inv-1", "description": "Widget"})]

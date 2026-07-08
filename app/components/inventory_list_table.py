@@ -298,7 +298,7 @@ def handle_inventory_table_action(
     val = str(raw or "").strip()
     if not val:
         return
-    if val == str(st.session_state.get(last_action_key) or "") and not val.startswith("open:"):
+    if val == str(st.session_state.get(last_action_key) or ""):
         return
     st.session_state[last_action_key] = val
 
@@ -317,30 +317,21 @@ def handle_inventory_table_action(
     if not item:
         return
     open_item_fn(item_id, item)
-    st.rerun()
 
 
 def render_inventory_table_bridge(
-    items_by_id: dict[str, dict[str, Any]],
     *,
     component_key: str = "ips_inventory_list_bridge",
     hook_key: str = "ipsInvList::action",
-    last_action_key: str = INVENTORY_TABLE_LAST_ACTION_KEY,
-    open_item_fn: Callable[[str, dict[str, Any]], None],
-    on_expand_fn: Callable[[str, dict[str, Any]], None] | None = None,
     field_mode: bool = False,
-) -> None:
+) -> str | None:
     try:
         from app.ui.clean_table import _components_html
     except ImportError:
         from ui.clean_table import _components_html  # type: ignore
 
     field_mode_js = "true" if field_mode else "false"
-    st.markdown(
-        '<span class="ips-inventory-table-link-bridge-marker" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
-    picked = _components_html(
+    return _components_html(
         f"""
 <script>
 (function () {{
@@ -458,12 +449,53 @@ def render_inventory_table_bridge(
         component_key=component_key,
         height=0,
     )
-    action = str(picked or "").strip()
-    if action:
-        handle_inventory_table_action(
-            action,
-            items_by_id,
-            last_action_key=last_action_key,
-            open_item_fn=open_item_fn,
-            on_expand_fn=on_expand_fn,
-        )
+
+
+def apply_inventory_table_bridge_action(
+    action: str | None,
+    items_by_id: dict[str, dict[str, Any]],
+    *,
+    last_action_key: str = INVENTORY_TABLE_LAST_ACTION_KEY,
+    open_item_fn: Callable[[str, dict[str, Any]], None],
+    on_expand_fn: Callable[[str, dict[str, Any]], None] | None = None,
+) -> bool:
+    """Apply a bridge action at page level. Returns True when an open action was handled."""
+    raw = str(action or "").strip()
+    if not raw:
+        return False
+    handle_inventory_table_action(
+        raw,
+        items_by_id,
+        last_action_key=last_action_key,
+        open_item_fn=open_item_fn,
+        on_expand_fn=on_expand_fn,
+    )
+    return raw.startswith("open:")
+
+
+def render_inventory_table_bridge_legacy(
+    items_by_id: dict[str, dict[str, Any]],
+    *,
+    component_key: str = "ips_inventory_list_bridge",
+    hook_key: str = "ipsInvList::action",
+    last_action_key: str = INVENTORY_TABLE_LAST_ACTION_KEY,
+    open_item_fn: Callable[[str, dict[str, Any]], None],
+    on_expand_fn: Callable[[str, dict[str, Any]], None] | None = None,
+    field_mode: bool = False,
+) -> None:
+    st.markdown(
+        '<span class="ips-inventory-table-link-bridge-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    picked = render_inventory_table_bridge(
+        component_key=component_key,
+        hook_key=hook_key,
+        field_mode=field_mode,
+    )
+    apply_inventory_table_bridge_action(
+        picked,
+        items_by_id,
+        last_action_key=last_action_key,
+        open_item_fn=open_item_fn,
+        on_expand_fn=on_expand_fn,
+    )
