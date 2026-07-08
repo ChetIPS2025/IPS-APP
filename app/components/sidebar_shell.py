@@ -18,6 +18,7 @@ IPS_SIDEBAR_COLLAPSED_SESSION_KEY = "ips_sidebar_collapsed"
 IPS_SIDEBAR_COLLAPSE_AFTER_NAV_KEY = "ips_sidebar_collapse_after_nav"
 IPS_SIDEBAR_COLLAPSED_STORAGE_KEY = "ips_sidebar_collapsed"
 IPS_SIDEBAR_COLLAPSED_HYDRATED_KEY = "_ips_sidebar_collapsed_hydrated"
+IPS_DESKTOP_NAV_RAIL_LAST_KEY = "_ips_desktop_nav_rail_last"
 IPS_SIDEBAR_DESKTOP_MIN_PX = 900
 IPS_SIDEBAR_EXPANDED_WIDTH_PX = 232
 IPS_SIDEBAR_COLLAPSED_WIDTH_PX = 48
@@ -315,6 +316,9 @@ def _desktop_nav_rail_css() -> str:
   min-height: {nav_h}px !important;
   margin: 0 4px !important;
   padding: 0 10px !important;
+  border: none !important;
+  background: transparent !important;
+  cursor: pointer !important;
   border-radius: 10px !important;
   color: #0f172a !important;
   text-decoration: none !important;
@@ -323,6 +327,8 @@ def _desktop_nav_rail_css() -> str:
   line-height: 1.2 !important;
   box-sizing: border-box !important;
   overflow: hidden !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
 }}
 .ips-desktop-nav-rail:not(:hover) .ips-desktop-nav-rail__link {{
   justify-content: center !important;
@@ -393,13 +399,14 @@ def _desktop_nav_rail_html(rows: list[dict[str, str]], active_slug: str) -> str:
         if slug == "employee_qr_scan" and active_slug in {"inventory", "assets"}:
             is_active = True
         active_cls = " is-active" if is_active else ""
-        href = html.escape(f"?ips_nav={slug}", quote=True)
+        slug_attr = html.escape(slug, quote=True)
         item_bits.append(
-            f'<a class="ips-desktop-nav-rail__link{active_cls}" href="{href}" '
+            f'<button type="button" class="ips-desktop-nav-rail__link{active_cls}" '
+            f'data-ips-nav-slug="{slug_attr}" '
             f'title="{label}" aria-label="{label}">'
             f'<span class="ips-desktop-nav-rail__icon" aria-hidden="true">{icon}</span>'
             f'<span class="ips-desktop-nav-rail__label">{label}</span>'
-            f"</a>"
+            f"</button>"
         )
     items_html = "\n".join(item_bits)
     return f"""
@@ -409,13 +416,108 @@ def _desktop_nav_rail_html(rows: list[dict[str, str]], active_slug: str) -> str:
     {items_html}
   </div>
   <div class="ips-desktop-nav-rail__footer">
-    <a class="ips-desktop-nav-rail__link ips-desktop-nav-rail__link--logout" href="?ips_logout=1" title="Log out" aria-label="Log out">
+    <button type="button" class="ips-desktop-nav-rail__link ips-desktop-nav-rail__link--logout" data-ips-nav-slug="logout" title="Log out" aria-label="Log out">
       <span class="ips-desktop-nav-rail__icon" aria-hidden="true">⎋</span>
       <span class="ips-desktop-nav-rail__label">Log out</span>
-    </a>
+    </button>
   </div>
 </nav>
 """
+
+
+def handle_desktop_nav_rail_pick(raw: str) -> None:
+    """Navigate in-app from the fixed desktop rail (no browser link / new window)."""
+    slug = str(raw or "").strip()
+    if not slug:
+        return
+    if slug == str(st.session_state.get(IPS_DESKTOP_NAV_RAIL_LAST_KEY) or ""):
+        return
+    st.session_state[IPS_DESKTOP_NAV_RAIL_LAST_KEY] = slug
+
+    if slug == "logout":
+        try:
+            from app.auth import sign_out
+        except ImportError:
+            from auth import sign_out  # type: ignore
+        sign_out()
+        st.rerun()
+        return
+
+    try:
+        from app.navigation import set_nav_slug
+    except ImportError:
+        from navigation import set_nav_slug  # type: ignore
+    set_nav_slug(slug)
+    request_sidebar_collapse_after_nav()
+    st.rerun()
+
+
+def render_desktop_nav_rail_bridge(*, component_key: str = "ips_desktop_nav_rail_bridge") -> None:
+    """Wire desktop rail buttons to Streamlit session navigation."""
+    try:
+        from app.ui.clean_table import _components_html
+    except ImportError:
+        from ui.clean_table import _components_html  # type: ignore
+
+    picked = _components_html(
+        """
+<script>
+(function () {
+  const w = window.parent || window;
+  const doc = w.document;
+  const sel = ".ips-desktop-nav-rail__link[data-ips-nav-slug]";
+
+  function sendValue(slug) {
+    const payload = { type: "streamlit:setComponentValue", value: slug };
+    const frames = [window, window.parent, w].filter(function (f, i, arr) {
+      return f && arr.indexOf(f) === i;
+    });
+    for (var i = 0; i < frames.length; i++) {
+      try {
+        if (frames[i].Streamlit && typeof frames[i].Streamlit.setComponentValue === "function") {
+          frames[i].Streamlit.setComponentValue(slug);
+          return;
+        }
+      } catch (err) {}
+    }
+    for (var j = 0; j < frames.length; j++) {
+      try { frames[j].postMessage(payload, "*"); } catch (err) {}
+    }
+  }
+
+  function bindTargets() {
+    doc.querySelectorAll(sel).forEach(function (el) {
+      if (el.dataset.ipsNavRailBound === "1") return;
+      el.dataset.ipsNavRailBound = "1";
+      el.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const slug = el.getAttribute("data-ips-nav-slug");
+        if (!slug) return;
+        sendValue(slug);
+      });
+    });
+  }
+
+  if (!doc.ipsDesktopNavRailRegistry) doc.ipsDesktopNavRailRegistry = {};
+  doc.ipsDesktopNavRailRegistry.bind = bindTargets;
+  bindTargets();
+  if (!doc.ipsDesktopNavRailObserver) {
+    doc.ipsDesktopNavRailObserver = new MutationObserver(function () {
+      if (doc.ipsDesktopNavRailRegistry && typeof doc.ipsDesktopNavRailRegistry.bind === "function") {
+        doc.ipsDesktopNavRailRegistry.bind();
+      }
+    });
+    doc.ipsDesktopNavRailObserver.observe(doc.body, { childList: true, subtree: true });
+  }
+})();
+</script>
+        """,
+        component_key=component_key,
+        height=0,
+    )
+    if picked:
+        handle_desktop_nav_rail_pick(str(picked))
 
 
 def inject_desktop_nav_rail_css() -> None:
@@ -442,6 +544,7 @@ def inject_desktop_nav_rail(*, active_slug: str | None = None) -> None:
     """Fixed desktop icon rail in the main document (Streamlit sidebar is unreliable on Cloud)."""
     inject_desktop_nav_rail_css()
     inject_desktop_nav_rail_markup(active_slug=active_slug)
+    render_desktop_nav_rail_bridge()
 
 
 def inject_sidebar_shell() -> None:
@@ -449,6 +552,7 @@ def inject_sidebar_shell() -> None:
     collapsed = True
     inject_sidebar_nav_override_css()
     inject_desktop_nav_rail_markup()
+    render_desktop_nav_rail_bridge()
     st.markdown(_shell_css(), unsafe_allow_html=True)
 
     nav_json = _fallback_nav_json()
@@ -1746,10 +1850,19 @@ def _shell_script(nav_json: str) -> str:
     el.id = 'ips-nav-fallback';
     el.innerHTML = '<p class="ips-nav-fallback-title">Navigation</p>';
     NAV.forEach(function (item) {{
-      var a = d.createElement('a');
-      a.href = '?ips_nav=' + encodeURIComponent(item.slug);
-      a.textContent = item.label;
-      el.appendChild(a);
+      var btn = d.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ips-nav-fallback-link';
+      btn.setAttribute('data-ips-nav-slug', item.slug);
+      btn.textContent = item.label;
+      btn.addEventListener('click', function (ev) {{
+        ev.preventDefault();
+        var top = window.top || window.parent || window;
+        var url = new URL(top.location.href);
+        url.searchParams.set('ips_nav', item.slug);
+        top.location.assign(url.toString());
+      }});
+      el.appendChild(btn);
     }});
     d.body.appendChild(el);
     return el;
