@@ -184,7 +184,10 @@ def render_sidebar(active_slug: str) -> None:
         _render_sidebar_header()
 
         nav_scroll_cls = "ips-sidebar-nav-scroll sidebar-nav-scroll ips-sidebar-nav-expanded"
-        st.markdown(f'<{_OT} class="{nav_scroll_cls}">', unsafe_allow_html=True)
+        st.markdown(
+            f'<span class="{nav_scroll_cls} sidebar-nav-scroll-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
         for item in nav_items:
             if len(item) == 3:
                 slug, label, _icon = item
@@ -218,7 +221,6 @@ def render_sidebar(active_slug: str) -> None:
                     set_nav_slug(slug)
                     request_sidebar_collapse_after_nav()
                     st.rerun()
-        st.markdown(f"<{_CT}>", unsafe_allow_html=True)
 
         st.markdown(f'<{_OT} class="ips-sidebar-footer sidebar-footer">', unsafe_allow_html=True)
 

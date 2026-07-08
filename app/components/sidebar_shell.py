@@ -187,7 +187,7 @@ def inject_sidebar_nav_override_css() -> None:
 def _sidebar_nav_override_css() -> str:
     """Final cascade override for sidebar navigation rows (not button chrome)."""
     return """
-<style id="ips-sidebar-nav-override-v5">
+<style id="ips-sidebar-nav-override-v6">
 section[data-testid="stSidebar"] > div,
 section[data-testid="stSidebar"] [data-testid="stSidebarContent"],
 section[data-testid="stSidebar"] .block-container {
@@ -472,9 +472,25 @@ section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):n
   padding: 0 !important;
 }
 body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) .st-key-sidebar_expanded_header_wrap,
-body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stVerticalBlockBorderWrapper"]:has(.sidebar-header-expanded-rail-marker),
+body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stVerticalBlock"].st-key-sidebar_expanded_header_wrap,
+body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stVerticalBlockBorderWrapper"].st-key-sidebar_expanded_header_wrap,
+body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stVerticalBlock"]:has(.sidebar-header-expanded-rail-marker),
+body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stHorizontalBlock"]:has(.sidebar-header-brand-marker),
+body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stElementContainer"]:has(.sidebar-header-expanded-rail-marker),
+body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stElementContainer"]:has(.sidebar-header-brand-marker),
+body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stElementContainer"]:has(.sidebar-logo-wrap--expanded),
+body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stElementContainer"]:has(.sidebar-divider--expanded-rail),
+body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [class*="st-key-ips_sidebar_collapse_toggle"],
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) .st-key-sidebar_expanded_header_wrap,
-section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stVerticalBlockBorderWrapper"]:has(.sidebar-header-expanded-rail-marker) {
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stVerticalBlock"].st-key-sidebar_expanded_header_wrap,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stVerticalBlockBorderWrapper"].st-key-sidebar_expanded_header_wrap,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stVerticalBlock"]:has(.sidebar-header-expanded-rail-marker),
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stHorizontalBlock"]:has(.sidebar-header-brand-marker),
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stElementContainer"]:has(.sidebar-header-expanded-rail-marker),
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stElementContainer"]:has(.sidebar-header-brand-marker),
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stElementContainer"]:has(.sidebar-logo-wrap--expanded),
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stElementContainer"]:has(.sidebar-divider--expanded-rail),
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [class*="st-key-ips_sidebar_collapse_toggle"] {
   display: none !important;
   height: 0 !important;
   min-height: 0 !important;
@@ -482,7 +498,47 @@ section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):n
   margin: 0 !important;
   padding: 0 !important;
   overflow: hidden !important;
+  visibility: hidden !important;
   border: none !important;
+}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [class*="st-key-nav_"] .stButton > button,
+body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [class*="st-key-nav_"] [data-testid="stButton"] > button,
+body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"],
+body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"],
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [class*="st-key-nav_"] .stButton > button,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [class*="st-key-nav_"] [data-testid="stButton"] > button,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"],
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"] {
+  width: 48px !important;
+  min-width: 48px !important;
+  max-width: 48px !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  padding: 0 !important;
+  margin: 4px auto !important;
+  border-radius: 10px !important;
+  justify-content: center !important;
+  overflow: visible !important;
+}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [class*="st-key-nav_"] .sidebar-nav-icon,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [class*="st-key-nav_"] .sidebar-nav-icon {
+  display: inline-flex !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  width: 18px !important;
+  min-width: 18px !important;
+  max-width: 18px !important;
+  flex: 0 0 18px !important;
+  font-size: 18px !important;
+}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) .sidebar-section-title,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) .sidebar-section-title {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
 }
 .sidebar-header--collapsed-rail {
   display: flex !important;
@@ -584,7 +640,7 @@ def inject_sidebar_nav_align() -> None:
   }
   function align(d) {
     if (!d || !d.body) return;
-    if (!d.querySelector('.ips-sidebar-nav-expanded')) return;
+    if (!d.querySelector('section[data-testid="stSidebar"] [class*="st-key-nav_"] button')) return;
     d.querySelectorAll('section[data-testid="stSidebar"] [class*="st-key-nav_"] button').forEach(function (btn) {
       var p = btn.querySelector('p');
       if (!p) return;
@@ -668,7 +724,7 @@ def _shell_css() -> str:
     mobile_max = IPS_SIDEBAR_DESKTOP_MIN_PX - 1
     collapsed_sel = _collapsed_sidebar_selectors()
     return f"""
-<style id="ips-sidebar-shell-v11">
+<style id="ips-sidebar-shell-v12">
 section[data-testid="stSidebar"].app-sidebar,
 [data-testid="stSidebar"].app-sidebar {{
   transition: width 0.2s ease, min-width 0.2s ease, max-width 0.2s ease, flex-basis 0.2s ease !important;
@@ -942,7 +998,15 @@ button.ips-header-menu-btn {{
     overflow: hidden !important;
   }}
   {collapsed_sel}:not(:hover) .st-key-sidebar_expanded_header_wrap,
-  {collapsed_sel}:not(:hover) [data-testid="stVerticalBlockBorderWrapper"]:has(.sidebar-header-expanded-rail-marker) {{
+  {collapsed_sel}:not(:hover) [data-testid="stVerticalBlock"].st-key-sidebar_expanded_header_wrap,
+  {collapsed_sel}:not(:hover) [data-testid="stVerticalBlockBorderWrapper"].st-key-sidebar_expanded_header_wrap,
+  {collapsed_sel}:not(:hover) [data-testid="stVerticalBlock"]:has(.sidebar-header-expanded-rail-marker),
+  {collapsed_sel}:not(:hover) [data-testid="stHorizontalBlock"]:has(.sidebar-header-brand-marker),
+  {collapsed_sel}:not(:hover) [data-testid="stElementContainer"]:has(.sidebar-header-expanded-rail-marker),
+  {collapsed_sel}:not(:hover) [data-testid="stElementContainer"]:has(.sidebar-header-brand-marker),
+  {collapsed_sel}:not(:hover) [data-testid="stElementContainer"]:has(.sidebar-logo-wrap--expanded),
+  {collapsed_sel}:not(:hover) [data-testid="stElementContainer"]:has(.sidebar-divider--expanded-rail),
+  {collapsed_sel}:not(:hover) [class*="st-key-ips_sidebar_collapse_toggle"] {{
     display: none !important;
     height: 0 !important;
     min-height: 0 !important;
@@ -950,7 +1014,27 @@ button.ips-header-menu-btn {{
     margin: 0 !important;
     padding: 0 !important;
     overflow: hidden !important;
+    visibility: hidden !important;
     border: none !important;
+  }}
+  {collapsed_sel}:not(:hover) .sidebar-section-title {{
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }}
+  {collapsed_sel}:not(:hover) [class*="st-key-nav_"] .stButton > button,
+  {collapsed_sel}:not(:hover) [class*="st-key-nav_"] [data-testid="stButton"] > button,
+  {collapsed_sel}:not(:hover) [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"],
+  {collapsed_sel}:not(:hover) [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"] {{
+    overflow: visible !important;
+  }}
+  {collapsed_sel}:not(:hover) [class*="st-key-nav_"] .sidebar-nav-icon {{
+    display: inline-flex !important;
+    opacity: 1 !important;
+    visibility: visible !important;
   }}
   {collapsed_sel}:hover .sidebar-header--collapsed-rail {{
     display: none !important;
