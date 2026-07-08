@@ -457,7 +457,7 @@ def _fetch_by_match_query(
 
 if _st_for_cache is not None:
 
-    @_st_for_cache.cache_data(ttl=30)
+    @_st_for_cache.cache_data(ttl=30, show_spinner=False)
     def _fetch_table_cached(
         table_name: str,
         columns: str,
@@ -467,7 +467,7 @@ if _st_for_cache is not None:
     ) -> list[dict[str, Any]]:
         return _fetch_table_query(table_name, columns, limit, order_by, use_admin=False)
 
-    @_st_for_cache.cache_data(ttl=30)
+    @_st_for_cache.cache_data(ttl=30, show_spinner=False)
     def _fetch_table_admin_cached(
         table_name: str,
         columns: str,
@@ -478,7 +478,7 @@ if _st_for_cache is not None:
         _ = _admin_partition
         return _fetch_table_query(table_name, columns, limit, order_by, use_admin=True)
 
-    @_st_for_cache.cache_data(ttl=30)
+    @_st_for_cache.cache_data(ttl=30, show_spinner=False)
     def _fetch_by_match_cached(
         table_name: str,
         match_json: str,
@@ -490,7 +490,7 @@ if _st_for_cache is not None:
             table_name, json.loads(match_json), columns, limit, use_admin=False
         )
 
-    @_st_for_cache.cache_data(ttl=30)
+    @_st_for_cache.cache_data(ttl=30, show_spinner=False)
     def _fetch_by_match_admin_cached(
         table_name: str,
         match_json: str,

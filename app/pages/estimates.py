@@ -436,12 +436,11 @@ def _estimate_customer_price_from_builder(row: dict, *, field: str = "customer_p
 
 
 def _estimate_customer_price(row: dict) -> str:
+    """List view: prefer persisted rollups; only hit Cost Builder when stored total is zero."""
     stored = _estimate_stored_customer_price(row)
-    live = _estimate_live_customer_price_amount(row)
-    if live > 0 and (stored <= 0 or abs(stored - live) > 0.01):
-        return fmt_currency(live)
     if stored > 0:
         return fmt_currency(stored)
+    live = _estimate_live_customer_price_amount(row)
     return fmt_currency(live) if live > 0 else fmt_currency(0)
 
 
@@ -2083,8 +2082,6 @@ def render() -> None:
         )
 
     build_modal_cache(filtered, cache_key=_ESTIMATES_CACHE_KEY)
-    refreshed = _sync_stale_estimate_rollups(filtered, max_sync=5)
-    filtered = _apply_estimate_row_refreshes(filtered, refreshed)
     render_estimates_table_pagination_header(len(filtered), _TABLE_KEY)
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
     _render_custom_estimates_table(page_rows)
