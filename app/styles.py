@@ -13795,9 +13795,84 @@ section[data-testid="stSidebar"] > div {{
   padding: 0.35rem 0.45rem 0.25rem;
   min-height: 150px;
 }}
+.sidebar-header--collapsed-rail {{
+  min-height: 56px;
+  height: 56px;
+  max-height: 56px;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}}
+.sidebar-header--collapsed-rail .sidebar-logo-wrap--collapsed {{
+  width: 100%;
+  height: 56px;
+  min-height: 56px;
+  max-height: 56px;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}}
+.sidebar-logo-icon {{
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  max-width: 28px;
+  max-height: 28px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+  padding: 0;
+}}
+.sidebar-logo-icon-fallback {{
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #2563eb;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) .st-key-sidebar_expanded_header_wrap,
+body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stVerticalBlockBorderWrapper"]:has(.sidebar-header-expanded-rail-marker),
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) .st-key-sidebar_expanded_header_wrap,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stVerticalBlockBorderWrapper"]:has(.sidebar-header-expanded-rail-marker) {{
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: none !important;
+}}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stElementContainer"]:has(.sidebar-header--collapsed-rail),
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stElementContainer"]:has(.sidebar-header--collapsed-rail) {{
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+  height: 56px !important;
+  max-height: 56px !important;
+  overflow: hidden !important;
+}}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"]:hover .sidebar-header--collapsed-rail,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):hover .sidebar-header--collapsed-rail,
+body.ips-sidebar-collapsed section[data-testid="stSidebar"]:hover [data-testid="stElementContainer"]:has(.sidebar-header--collapsed-rail),
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):hover [data-testid="stElementContainer"]:has(.sidebar-header--collapsed-rail) {{
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}}
 .sidebar-header--collapsed {{
   min-height: 0;
-  padding: 0.06rem 0 0.08rem;
+  padding: 0;
 }}
 .sidebar-header-brand {{
   display: flex;
@@ -13855,20 +13930,17 @@ section[data-testid="stSidebar"] > div {{
 .sidebar-header--collapsed .sidebar-logo-wrap [data-testid="stImage"] img,
 .sidebar-header--collapsed .sidebar-logo-wrap--collapsed img,
 .sidebar-header--collapsed .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {{
-  max-width: 32px;
-  max-height: 32px;
+  max-width: 28px;
+  max-height: 28px;
 }}
-section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed) {{
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--expanded),
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stElementContainer"]:has(.sidebar-logo-wrap--expanded) {{
+  display: none !important;
+  height: 0 !important;
   min-height: 0 !important;
-  height: auto !important;
-  align-items: center !important;
-  margin: 0 !important;
-  padding: 0.06rem 0 0.08rem !important;
-}}
-section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stElementContainer"]:has(.sidebar-logo-wrap--collapsed) {{
   margin: 0 !important;
   padding: 0 !important;
-  min-height: 0 !important;
+  overflow: hidden !important;
 }}
 section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"],
 section[data-testid="stSidebar"] .ips-sidebar-logo-wrap [data-testid="stImage"],

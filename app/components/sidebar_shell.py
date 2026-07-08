@@ -21,6 +21,8 @@ IPS_SIDEBAR_EXPANDED_WIDTH_PX = 232
 IPS_SIDEBAR_COLLAPSED_WIDTH_PX = 48
 IPS_SIDEBAR_COLLAPSED_NAV_HEIGHT_PX = 44
 IPS_SIDEBAR_COLLAPSED_ICON_PX = 18
+IPS_SIDEBAR_COLLAPSED_HEADER_HEIGHT_PX = 56
+IPS_SIDEBAR_COLLAPSED_LOGO_PX = 28
 
 
 def _collapsed_sidebar_selectors() -> str:
@@ -185,7 +187,7 @@ def inject_sidebar_nav_override_css() -> None:
 def _sidebar_nav_override_css() -> str:
     """Final cascade override for sidebar navigation rows (not button chrome)."""
     return """
-<style id="ips-sidebar-nav-override-v4">
+<style id="ips-sidebar-nav-override-v5">
 section[data-testid="stSidebar"] > div,
 section[data-testid="stSidebar"] [data-testid="stSidebarContent"],
 section[data-testid="stSidebar"] .block-container {
@@ -333,8 +335,8 @@ body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap i
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"] img,
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed img,
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {
-  max-width: 32px !important;
-  max-height: 32px !important;
+  max-width: 28px !important;
+  max-height: 28px !important;
 }
 section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"],
 section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] {
@@ -366,47 +368,14 @@ body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap--
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) .sidebar-logo-wrap--collapsed {
   align-items: center !important;
 }
-body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-header-anchor--collapsed),
-section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stElementContainer"]:has(.sidebar-header-anchor--collapsed) {
-  display: none !important;
-  height: 0 !important;
-  min-height: 0 !important;
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-header--collapsed-rail),
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stElementContainer"]:has(.sidebar-header--collapsed-rail) {
   margin: 0 !important;
   padding: 0 !important;
+  min-height: 0 !important;
+  height: 56px !important;
+  max-height: 56px !important;
   overflow: hidden !important;
-}
-body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed),
-section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed) {
-  min-height: 0 !important;
-  height: auto !important;
-  align-items: center !important;
-  margin: 0 !important;
-  padding: 0.08rem 0 0.1rem !important;
-  gap: 0 !important;
-}
-body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed) [data-testid="column"],
-section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed) [data-testid="column"] {
-  min-height: 0 !important;
-  padding: 0 !important;
-  align-self: center !important;
-}
-body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed) [data-testid="column"]:first-child,
-section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed) [data-testid="column"]:first-child {
-  display: flex !important;
-  justify-content: center !important;
-  align-items: center !important;
-}
-body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-logo-wrap--collapsed),
-section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stElementContainer"]:has(.sidebar-logo-wrap--collapsed) {
-  margin: 0 !important;
-  padding: 0 !important;
-  min-height: 0 !important;
-}
-body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-logo-wrap--collapsed) [data-testid="stImage"],
-section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [data-testid="stElementContainer"]:has(.sidebar-logo-wrap--collapsed) [data-testid="stImage"] {
-  margin: 0 auto !important;
-  padding: 0 !important;
-  min-height: 0 !important;
 }
 section[data-testid="stSidebar"] .sidebar-logo-tagline {
   font-size: 0.875rem !important;
@@ -501,6 +470,56 @@ body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [class*=
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [class*="st-key-nav_"] [data-testid="stElementContainer"] {
   margin: 0 !important;
   padding: 0 !important;
+}
+body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) .st-key-sidebar_expanded_header_wrap,
+body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stVerticalBlockBorderWrapper"]:has(.sidebar-header-expanded-rail-marker),
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) .st-key-sidebar_expanded_header_wrap,
+section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stVerticalBlockBorderWrapper"]:has(.sidebar-header-expanded-rail-marker) {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: none !important;
+}
+.sidebar-header--collapsed-rail {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.sidebar-header--collapsed-rail .sidebar-logo-wrap--collapsed {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+.sidebar-logo-icon {
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  min-height: 28px !important;
+  max-width: 28px !important;
+  max-height: 28px !important;
+  object-fit: contain !important;
+  display: block !important;
+  margin: 0 auto !important;
 }
 </style>
 """
@@ -644,10 +663,12 @@ def _shell_css() -> str:
     col = IPS_SIDEBAR_COLLAPSED_WIDTH_PX
     nav_h = IPS_SIDEBAR_COLLAPSED_NAV_HEIGHT_PX
     icon = IPS_SIDEBAR_COLLAPSED_ICON_PX
+    header_h = IPS_SIDEBAR_COLLAPSED_HEADER_HEIGHT_PX
+    logo_px = IPS_SIDEBAR_COLLAPSED_LOGO_PX
     mobile_max = IPS_SIDEBAR_DESKTOP_MIN_PX - 1
     collapsed_sel = _collapsed_sidebar_selectors()
     return f"""
-<style id="ips-sidebar-shell-v10">
+<style id="ips-sidebar-shell-v11">
 section[data-testid="stSidebar"].app-sidebar,
 [data-testid="stSidebar"].app-sidebar {{
   transition: width 0.2s ease, min-width 0.2s ease, max-width 0.2s ease, flex-basis 0.2s ease !important;
@@ -743,6 +764,7 @@ button.ips-header-menu-btn {{
     width: {col}px !important;
     min-width: {col}px !important;
     max-width: {col}px !important;
+    padding: 0 !important;
   }}
   {collapsed_sel}:hover {{
     flex-basis: {exp}px !important;
@@ -857,14 +879,96 @@ button.ips-header-menu-btn {{
     padding-bottom: 0.5rem !important;
   }}
   {collapsed_sel} > div {{
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-    padding-top: 0.2rem !important;
-    padding-bottom: 0.25rem !important;
+    padding: 0 !important;
   }}
   {collapsed_sel} [data-testid="stSidebarContent"] {{
     padding-left: 0 !important;
     padding-right: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }}
+  .sidebar-header--collapsed-rail {{
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    height: {header_h}px !important;
+    min-height: {header_h}px !important;
+    max-height: {header_h}px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    flex-shrink: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }}
+  .sidebar-header--collapsed-rail .sidebar-logo-wrap--collapsed {{
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    height: {header_h}px !important;
+    min-height: {header_h}px !important;
+    max-height: {header_h}px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }}
+  .sidebar-logo-icon {{
+    width: {logo_px}px !important;
+    height: {logo_px}px !important;
+    min-width: {logo_px}px !important;
+    min-height: {logo_px}px !important;
+    max-width: {logo_px}px !important;
+    max-height: {logo_px}px !important;
+    object-fit: contain !important;
+    display: block !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+  }}
+  .sidebar-logo-icon-fallback {{
+    font-size: 0.62rem !important;
+    font-weight: 800 !important;
+    color: #2563eb !important;
+    letter-spacing: 0.04em !important;
+    line-height: 1 !important;
+  }}
+  {collapsed_sel}:not(:hover) [data-testid="stElementContainer"]:has(.sidebar-header--collapsed-rail) {{
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+    height: {header_h}px !important;
+    max-height: {header_h}px !important;
+    overflow: hidden !important;
+  }}
+  {collapsed_sel}:not(:hover) .st-key-sidebar_expanded_header_wrap,
+  {collapsed_sel}:not(:hover) [data-testid="stVerticalBlockBorderWrapper"]:has(.sidebar-header-expanded-rail-marker) {{
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border: none !important;
+  }}
+  {collapsed_sel}:hover .sidebar-header--collapsed-rail {{
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }}
+  {collapsed_sel}:hover [data-testid="stElementContainer"]:has(.sidebar-header--collapsed-rail) {{
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
   }}
   section[data-testid="stMain"] {{
     flex: 1 1 auto !important;
@@ -894,30 +998,15 @@ button.ips-header-menu-btn {{
     padding: 0.35rem 0.45rem 0.25rem !important;
     min-height: 150px !important;
   }}
-  .sidebar-header--collapsed {{
-    min-height: 0 !important;
-    padding: 0.06rem 0 0.08rem !important;
-  }}
-  {collapsed_sel} [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed) {{
-    min-height: 0 !important;
-    height: auto !important;
-    align-items: center !important;
-    margin: 0 !important;
-    padding: 0.06rem 0 0.08rem !important;
-    gap: 0 !important;
-  }}
-  {collapsed_sel} [data-testid="stHorizontalBlock"]:has(.sidebar-logo-wrap--collapsed) [data-testid="column"] {{
-    min-height: 0 !important;
+  .sidebar-header--collapsed-rail {{
+    min-height: {header_h}px !important;
     padding: 0 !important;
-    align-self: center !important;
   }}
-  {collapsed_sel} [data-testid="stElementContainer"]:has(.sidebar-logo-wrap--collapsed) {{
-    margin: 0 !important;
-    padding: 0 !important;
+  .sidebar-header--expanded-rail {{
     min-height: 0 !important;
   }}
   {collapsed_sel} [data-testid="stSidebarContent"] > [data-testid="stVerticalBlock"] {{
-    gap: 0.2rem !important;
+    gap: 0 !important;
   }}
   .sidebar-header-brand {{
     display: flex !important;
@@ -987,12 +1076,12 @@ button.ips-header-menu-btn {{
     margin: 0 auto !important;
     object-fit: contain !important;
   }}
-  .sidebar-header--collapsed .sidebar-logo-wrap img,
-  .sidebar-header--collapsed .sidebar-logo-wrap [data-testid="stImage"] img,
-  .sidebar-header--collapsed .sidebar-logo-wrap--collapsed img,
-  .sidebar-header--collapsed .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {{
-    max-width: 32px !important;
-    max-height: 32px !important;
+  .sidebar-header--collapsed-rail .sidebar-logo-wrap img,
+  .sidebar-header--collapsed-rail .sidebar-logo-wrap [data-testid="stImage"] img,
+  .sidebar-header--collapsed-rail .sidebar-logo-wrap--collapsed img,
+  .sidebar-header--collapsed-rail .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {{
+    max-width: {logo_px}px !important;
+    max-height: {logo_px}px !important;
   }}
   section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"],
   section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] {{
@@ -1125,6 +1214,24 @@ button.ips-header-menu-btn {{
   }}
 }}
 @media (max-width: {mobile_max}px) {{
+  .sidebar-header--collapsed-rail,
+  section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-header--collapsed-rail) {{
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }}
+  .st-key-sidebar_expanded_header_wrap,
+  [data-testid="stVerticalBlockBorderWrapper"]:has(.sidebar-header-expanded-rail-marker) {{
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }}
   section[data-testid="stSidebar"],
   [data-testid="stSidebar"] {{
     position: fixed !important;

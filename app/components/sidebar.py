@@ -76,21 +76,56 @@ def _section_for_slug(slug: str, sections: list[tuple[frozenset[str], str]]) -> 
     return None
 
 
+def _sidebar_rail_icon_html(*, size: int = 28) -> str:
+    """Inline IPS icon for the collapsed sidebar rail header."""
+    try:
+        from app.branding import _logo_data_uri
+    except ImportError:
+        from branding import _logo_data_uri  # type: ignore
+    logo = _logo_path(compact=True)
+    if not logo:
+        return '<span class="sidebar-logo-icon sidebar-logo-icon-fallback">IPS</span>'
+    src = _logo_data_uri(str(logo))
+    return (
+        f'<img class="sidebar-logo-icon" src="{src}" alt="IPS" '
+        f'width="{size}" height="{size}" style="width:{size}px;height:{size}px;" />'
+    )
+
+
 def _render_sidebar_header() -> None:
-    st.markdown('<span class="sidebar-header-anchor" aria-hidden="true"></span>', unsafe_allow_html=True)
-    brand_col, toggle_col = st.columns([8, 1], gap="small", vertical_alignment="center")
-    with brand_col:
-        st.markdown('<span class="sidebar-header-brand-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
-        logo = _logo_path(compact=False)
-        st.markdown('<span class="sidebar-logo-wrap" aria-hidden="true"></span>', unsafe_allow_html=True)
-        if logo:
-            st.image(str(logo), width=100)
-        else:
-            st.markdown('<p class="ips-sidebar-brand">IPS Operations</p>', unsafe_allow_html=True)
-        st.markdown('<p class="sidebar-logo-tagline sidebar-brand-text">Industrial Plant Solutions</p>', unsafe_allow_html=True)
-    with toggle_col:
-        _render_collapse_toggle(collapsed=True)
-    st.markdown('<hr class="sidebar-divider" />', unsafe_allow_html=True)
+    st.markdown(
+        f"""
+<div class="sidebar-header sidebar-header--collapsed-rail">
+  <span class="sidebar-header-anchor sidebar-header-anchor--collapsed" aria-hidden="true"></span>
+  <div class="sidebar-logo-wrap sidebar-logo-wrap--collapsed">
+    {_sidebar_rail_icon_html(size=28)}
+  </div>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    with st.container(key="sidebar_expanded_header_wrap"):
+        st.markdown(
+            '<span class="sidebar-header-expanded-rail-marker sidebar-header-anchor--expanded" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        brand_col, toggle_col = st.columns([8, 1], gap="small", vertical_alignment="center")
+        with brand_col:
+            st.markdown('<span class="sidebar-header-brand-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
+            logo = _logo_path(compact=False)
+            st.markdown('<span class="sidebar-logo-wrap sidebar-logo-wrap--expanded" aria-hidden="true"></span>', unsafe_allow_html=True)
+            if logo:
+                st.image(str(logo), width=100)
+            else:
+                st.markdown('<p class="ips-sidebar-brand">IPS Operations</p>', unsafe_allow_html=True)
+            st.markdown(
+                '<p class="sidebar-logo-tagline sidebar-brand-text">Industrial Plant Solutions</p>',
+                unsafe_allow_html=True,
+            )
+        with toggle_col:
+            _render_collapse_toggle(collapsed=True)
+        st.markdown('<hr class="sidebar-divider sidebar-divider--expanded-rail" />', unsafe_allow_html=True)
 
 
 def _render_collapse_toggle(*, collapsed: bool) -> None:

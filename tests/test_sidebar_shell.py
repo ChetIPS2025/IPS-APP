@@ -70,8 +70,15 @@ def test_nav_button_label_includes_icon_and_text():
 
 
 def test_sidebar_width_tokens_match_design_spec():
+    from app.components.sidebar_shell import (
+        IPS_SIDEBAR_COLLAPSED_HEADER_HEIGHT_PX,
+        IPS_SIDEBAR_COLLAPSED_LOGO_PX,
+    )
+
     assert IPS_SIDEBAR_EXPANDED_WIDTH_PX == 232
     assert IPS_SIDEBAR_COLLAPSED_WIDTH_PX == 48
+    assert IPS_SIDEBAR_COLLAPSED_HEADER_HEIGHT_PX == 56
+    assert IPS_SIDEBAR_COLLAPSED_LOGO_PX == 28
 
 
 def test_employee_nav_is_simplified_portal_menu():
