@@ -243,6 +243,30 @@ def _auth_user_id_str() -> str | None:
     return s or None
 
 
+_QR_SCAN_ACTOR_SESSION_KEY = "ips_qr_scan_actor_session"
+
+
+def _pin_qr_scan_actor_session() -> dict[str, Any]:
+    """Capture scanner identity once per scan workflow (field phone or office scan page)."""
+    existing = st.session_state.get(_QR_SCAN_ACTOR_SESSION_KEY)
+    if isinstance(existing, dict) and str(existing.get("scanned_by_name") or "").strip():
+        return existing
+    ua = request_user_agent()
+    suf = str(st.session_state.get("ips_inv_device_suffix") or "")
+    device = str(st.session_state.get("inv_scan_device_display") or "").strip()
+    if not device:
+        device = format_device_label(device_family_from_user_agent(ua), suf)
+    name = _scan_profile_name() or str(st.session_state.get("inv_scan_manual_actor") or "").strip()
+    actor = {
+        "scanned_by_user_id": _scan_profile_user_id() or _auth_user_id_str(),
+        "scanned_by_name": name or "Field scanner",
+        "employee_id": _profile_employee_id(),
+        "device_label": device,
+    }
+    st.session_state[_QR_SCAN_ACTOR_SESSION_KEY] = actor
+    return actor
+
+
 def _scan_audit_fields(*, device_label: str, manual_actor: str) -> dict[str, Any]:
     """
     Payload keys for sql/030 scan audit columns. Omitted keys are not sent.
@@ -271,6 +295,14 @@ def _scan_audit_fields(*, device_label: str, manual_actor: str) -> dict[str, Any
 
 
 def _qr_scan_logging_context() -> dict[str, Any]:
+    pinned = st.session_state.get(_QR_SCAN_ACTOR_SESSION_KEY)
+    if isinstance(pinned, dict):
+        return {
+            "scanned_by_user_id": pinned.get("scanned_by_user_id"),
+            "scanned_by_name": pinned.get("scanned_by_name"),
+            "employee_id": pinned.get("employee_id"),
+            "device_label": pinned.get("device_label"),
+        }
     ua = request_user_agent()
     suf = str(st.session_state.get("ips_inv_device_suffix") or "")
     device = str(st.session_state.get("inv_scan_device_display") or "").strip()
@@ -302,7 +334,11 @@ def _log_qr_scan_event(**kwargs: Any) -> None:
     except ImportError:
         from services.qr_scan_event_service import record_qr_scan_event  # type: ignore
     ctx = _qr_scan_logging_context()
-    record_qr_scan_event(**{**ctx, **kwargs})
+    merged = {**ctx, **kwargs}
+    for key in ("scanned_by_user_id", "scanned_by_name", "scanned_by_phone", "employee_id", "device_label"):
+        if kwargs.get(key):
+            merged[key] = kwargs[key]
+    record_qr_scan_event(**merged)
 
 
 def _log_qr_scan_opened_once(
@@ -314,19 +350,9 @@ def _log_qr_scan_opened_once(
     asset_id: str | None = None,
     source: str = "qr_scan",
 ) -> None:
+    """Dedupe page-view opens locally; do not write browse events to scan history."""
     dedupe = f"_ips_qr_evt_open_{item_type}_{inventory_item_id or asset_id or qr_value}"
-    if st.session_state.get(dedupe):
-        return
     st.session_state[dedupe] = True
-    _log_qr_scan_event(
-        qr_value=qr_value,
-        result="opened",
-        item_type=item_type,
-        item_name=item_name,
-        inventory_item_id=inventory_item_id,
-        asset_id=asset_id,
-        source=source,
-    )
 
 
 def _inv_item_thumb_display(item: dict) -> None:
@@ -894,6 +920,7 @@ def render() -> None:
 def _render_inventory_scan_inner() -> None:
     """Full Scan Inventory workflow — action types, notes, device, admin overrides (office)."""
     ensure_narrow_viewport_detected()
+    _pin_qr_scan_actor_session()
     render_page_header("Scan Inventory", "Consume materials or check out serialized tools via QR scan.")
     _inject_inv_scan_mobile_css()
     st.markdown('<span class="ips-inv-scan-scope" aria-hidden="true"></span>', unsafe_allow_html=True)
@@ -1282,8 +1309,10 @@ def _render_inventory_scan_inner() -> None:
     note_s = str(notes or "").strip()
     emp_id = _profile_employee_id()
     prof_id = _profile_uuid()
-    cb = _created_by_label()
-    ts = datetime.now(timezone.utc).isoformat()
+    actor = _pin_qr_scan_actor_session()
+    cb = str(actor.get("scanned_by_name") or _scan_profile_name() or "").strip()
+    scan_user_id = str(actor.get("scanned_by_user_id") or prof_id or "").strip() or None
+    scan_device = str(actor.get("device_label") or "").strip()
 
     if itype == INVENTORY_USE_ON_JOB_LABEL and jid:
         try:
@@ -1305,7 +1334,7 @@ def _render_inventory_scan_inner() -> None:
             employee_id=emp_id,
             usage_source="qr_scan",
             allow_overdraw=allow_neg,
-            scanned_by_user_id=prof_id,
+            scanned_by_user_id=scan_user_id,
             scanned_by_name=cb or str(manual_actor or "").strip() or None,
             scanned_by_employee_id=emp_id,
             source="inventory_scan_desktop",
@@ -1327,6 +1356,10 @@ def _render_inventory_scan_inner() -> None:
             quantity=qv,
             unit=str(item.get("unit") or "EA"),
             inventory_transaction_id=txn_id,
+            scanned_by_user_id=scan_user_id,
+            scanned_by_name=cb or str(manual_actor or "").strip() or None,
+            employee_id=emp_id,
+            device_label=scan_device or final_device,
             source="inventory_scan_desktop",
         )
         st.session_state.pop("inv_scan_loaded", None)
@@ -1372,6 +1405,10 @@ def _render_inventory_scan_inner() -> None:
         destination_type="shop",
         quantity=qv,
         unit=str(item.get("unit") or "EA"),
+        scanned_by_user_id=scan_user_id,
+        scanned_by_name=cb or str(manual_actor or "").strip() or scan_extra.get("scanned_by_name"),
+        employee_id=emp_id,
+        device_label=scan_device or final_device,
         source="inventory_scan_desktop",
     )
     st.session_state.pop("inv_scan_loaded", None)
@@ -1637,18 +1674,20 @@ def _record_mobile_shop_use(
         return False, "Quantity exceeds quantity on hand."
 
     actor_name, phone_norm, _, phone_verified = _mobile_scan_actor_defaults()
+    actor = _pin_qr_scan_actor_session()
     result = record_shop_inventory_consumption(
         {
             "inventory_item_id": iid,
             "quantity": qv,
             "allow_overdraw": allow_over,
             "notes": f"{INVENTORY_USE_IN_SHOP_LABEL} (mobile QR scan)",
-            "scanned_by_user_id": _scan_profile_user_id() if is_authenticated() else None,
+            "scanned_by_user_id": actor.get("scanned_by_user_id"),
             "scanned_by_name": actor_name[:500],
             "scanned_by_phone": phone_norm or None,
-            "scanned_by_employee_id": _profile_employee_id(),
+            "scanned_by_employee_id": actor.get("employee_id") or _profile_employee_id(),
             "phone_verified": phone_verified,
             "source": "qr_scan",
+            "device_label": actor.get("device_label"),
             "unit": str(item.get("unit") or "EA"),
         }
     )
@@ -1669,13 +1708,14 @@ def _mobile_scan_qty_step(delta: int) -> None:
 
 
 def _mobile_scan_actor_defaults() -> tuple[str, str, str, bool]:
-    """Name, normalized phone, display phone, and phone_verified from profile/device."""
+    """Name, normalized phone, display phone, and phone_verified from pinned scan session."""
     try:
         from app.utils.phone_helpers import format_phone_display, is_valid_phone, normalize_phone
     except ImportError:
         from utils.phone_helpers import format_phone_display, is_valid_phone, normalize_phone  # type: ignore
 
-    prof_name = _scan_profile_name()
+    actor = _pin_qr_scan_actor_session()
+    prof_name = str(actor.get("scanned_by_name") or "").strip() or _scan_profile_name()
     prof_phone = _scan_profile_phone()
     default_phone = _scan_default_phone()
     actor_name = prof_name or ("Mobile scanner" if not is_authenticated() else "Scanner")
@@ -1718,6 +1758,10 @@ def _submit_mobile_inventory_scan(
         st.stop()
 
     actor_name, phone_norm, phone_display, phone_verified = _mobile_scan_actor_defaults()
+    actor = _pin_qr_scan_actor_session()
+    device_label = str(actor.get("device_label") or "").strip()
+    scan_user_id = str(actor.get("scanned_by_user_id") or "").strip() or None
+    employee_id = str(actor.get("employee_id") or "").strip() or _profile_employee_id()
     allow_over = str(current_role() or "").lower() == "admin"
 
     if destination_type == "shop":
@@ -1735,8 +1779,11 @@ def _submit_mobile_inventory_scan(
             destination_type="shop",
             quantity=qv,
             unit=unit,
+            scanned_by_user_id=scan_user_id,
             scanned_by_name=actor_name,
             scanned_by_phone=phone_norm or None,
+            employee_id=employee_id,
+            device_label=device_label or None,
             source="mobile_qr_scan",
         )
         st.session_state["inv_scan_success_payload"] = {
@@ -1767,13 +1814,13 @@ def _submit_mobile_inventory_scan(
         quantity=qv,
         transaction_type=action,
         notes="",
-        employee_id=_profile_employee_id(),
+        employee_id=employee_id,
         usage_source="qr_scan",
         allow_overdraw=allow_over,
-        scanned_by_user_id=_scan_profile_user_id() if is_authenticated() else None,
+        scanned_by_user_id=scan_user_id,
         scanned_by_name=actor_name,
         scanned_by_phone=phone_norm or None,
-        scanned_by_employee_id=_profile_employee_id(),
+        scanned_by_employee_id=employee_id,
         phone_verified=phone_verified,
         source="qr_scan",
         unit=unit,
@@ -1795,8 +1842,11 @@ def _submit_mobile_inventory_scan(
         destination_type="job",
         quantity=qv,
         unit=unit,
+        scanned_by_user_id=scan_user_id,
         scanned_by_name=actor_name,
         scanned_by_phone=phone_norm or None,
+        employee_id=employee_id,
+        device_label=device_label or None,
         inventory_transaction_id=txn_id,
         source="mobile_qr_scan",
     )
@@ -1913,6 +1963,7 @@ def _render_inventory_scan_entry_fragment(
 def render_inventory_scan_page() -> None:
     """Mobile QR scan workflow — Qty + Job + Enter only (field speed). No sidebar."""
     ensure_narrow_viewport_detected()
+    _pin_qr_scan_actor_session()
     try:
         from app.styles import inject_inventory_qr_scan_css
     except ImportError:
@@ -1937,12 +1988,17 @@ def render_inventory_scan_page() -> None:
             or str(st.session_state.get("_ips_scan_legacy_code") or "")
         )
         if qr_attempt and err:
+            actor = _pin_qr_scan_actor_session()
             _log_qr_scan_event(
                 qr_value=qr_attempt,
                 result="failed" if "missing" in err.casefold() else "unknown_item",
                 item_type="unknown",
                 item_name="Unknown item",
                 error_message=err,
+                scanned_by_user_id=actor.get("scanned_by_user_id"),
+                scanned_by_name=actor.get("scanned_by_name"),
+                employee_id=actor.get("employee_id"),
+                device_label=actor.get("device_label"),
                 source="mobile_qr_scan",
             )
         _render_scan_manual_lookup(err=err or "Invalid inventory QR code.")

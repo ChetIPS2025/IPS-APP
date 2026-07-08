@@ -18,27 +18,27 @@ except ImportError:
     from utils.formatting import fmt_datetime  # type: ignore
 
 _FULL_COLS = (
+    ("summary", "Scan"),
     ("scanned_at", "Scanned At"),
+    ("scanned_by", "Scanned By"),
+    ("device_label", "Device"),
     ("qr_value", "QR Code / Value"),
     ("item_name", "Item"),
     ("item_type", "Type"),
     ("result", "Result"),
     ("job_shop", "Job / Shop"),
-    ("scanned_by", "Scanned By"),
-    ("device_source", "Device / Source"),
+    ("device_source", "Source"),
     ("action_taken", "Action Taken"),
 )
 
 _COMPACT_COLS = (
-    ("scanned_at", "Scanned At"),
-    ("item_name", "Item"),
-    ("item_type", "Type"),
+    ("summary", "Recent Scan"),
     ("result", "Result"),
-    ("action_taken", "Action Taken"),
+    ("action_taken", "Action"),
 )
 
-_FULL_COL_FR = ["1.05fr", "1.15fr", "1.2fr", "0.75fr", "0.7fr", "1fr", "0.95fr", "1fr", "1fr"]
-_COMPACT_COL_FR = ["1.05fr", "1.4fr", "0.8fr", "0.75fr", "1.1fr"]
+_FULL_COL_FR = ["2.2fr", "1fr", "0.95fr", "0.85fr", "1fr", "1.1fr", "0.7fr", "0.7fr", "1fr", "0.9fr", "0.95fr"]
+_COMPACT_COL_FR = ["2.4fr", "0.75fr", "0.95fr"]
 
 
 def _result_badge(result: str) -> str:
@@ -60,6 +60,14 @@ def _qr_cell_renderer(field: str, row: dict[str, Any]) -> str:
         return _result_badge(str(row.get("result") or "—"))
     if field == "scanned_at":
         return html.escape(fmt_datetime(row.get("scanned_at"), compact=True))
+    if field == "summary":
+        summary = str(row.get("summary") or "").strip()
+        if summary:
+            return f'<span class="ips-qr-scan-summary">{html.escape(summary)}</span>'
+    if field == "device_label":
+        device = str(row.get("device_label") or "").strip()
+        if device:
+            return html.escape(device)
     return html.escape(str(row.get(field) or "—"))
 
 
@@ -135,6 +143,11 @@ def inject_qr_scan_history_css() -> None:
             cursor: default;
         }
         .ips-qr-scan-full-table .ips-data-row:hover { background: transparent; }
+        .ips-qr-scan-summary {
+            font-weight: 700;
+            color: #0f172a;
+            line-height: 1.35;
+        }
         </style>
         """,
         unsafe_allow_html=True,

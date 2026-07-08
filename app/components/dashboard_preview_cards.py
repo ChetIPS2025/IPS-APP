@@ -263,18 +263,11 @@ def _qr_preview_html(rows: list[dict[str, Any]]) -> str:
         return '<p class="ips-dash-preview-empty">No QR scans recorded yet.</p>'
     items: list[str] = []
     for row in rows[:5]:
-        item = html.escape(str(row.get("item_name") or "—"))
-        scanned_by = html.escape(str(row.get("scanned_by") or "—"))
-        when = html.escape(fmt_datetime(row.get("scanned_at"), compact=True))
-        job = str(row.get("job_shop") or "—").strip()
-        job_html = ""
-        if job and job not in {"—", "-"}:
-            job_html = f' · {html.escape(job)}'
+        summary = html.escape(str(row.get("summary") or row.get("item_name") or "—"))
         items.append(
             '<li class="ips-dash-preview-row">'
             f'<div class="ips-dash-preview-row-main">'
-            f'<p class="ips-dash-preview-row-title">{item}</p>'
-            f'<p class="ips-dash-preview-row-sub">{scanned_by} · {when}{job_html}</p>'
+            f'<p class="ips-dash-preview-row-title ips-qr-scan-summary">{summary}</p>'
             f"</div>"
             "</li>"
         )

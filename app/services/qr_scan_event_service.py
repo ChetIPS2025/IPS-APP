@@ -25,6 +25,27 @@ def qr_scan_result_label(result: str) -> str:
     return _RESULT_LABELS.get(key, key.replace("_", " ").title() or "—")
 
 
+def qr_scan_summary_line(
+    *,
+    scanned_by_name: object,
+    scanned_at: object,
+    job_shop: object,
+    item_name: object,
+) -> str:
+    """Display: ``Amanda • 2026-07-08 17:05 • J26101 — I/E Labor``."""
+    try:
+        from app.utils.formatting import fmt_datetime
+    except ImportError:
+        from utils.formatting import fmt_datetime  # type: ignore
+
+    who = _clean(scanned_by_name) or "—"
+    when = fmt_datetime(scanned_at, compact=True)
+    job = _clean(job_shop)
+    item = _clean(item_name) or "—"
+    tail = f"{job} — {item}" if job and job != "—" else item
+    return f"{who} • {when} • {tail}"
+
+
 def _clean(raw: object) -> str:
     return str(raw or "").strip()
 
@@ -139,6 +160,9 @@ def list_qr_scan_events(
     for row in sorted(rows, key=lambda r: _clean(r.get("created_at")), reverse=True):
         if item_filter and _clean(row.get("inventory_item_id")) != item_filter:
             continue
+        result_key = _clean(row.get("result")).lower() or "opened"
+        if result_key == "opened":
+            continue
         jid = _clean(row.get("job_id"))
         dest = _clean(row.get("destination_type")).casefold()
         if dest == "shop":
@@ -154,20 +178,30 @@ def list_qr_scan_events(
         source = _clean(row.get("source"))
         device_source = " · ".join(p for p in (device, source or "QR scan") if p) or "QR scan"
 
-        result_key = _clean(row.get("result")).lower() or "opened"
+        scanned_by = _clean(row.get("scanned_by_name")) or "—"
+        scanned_at = row.get("created_at")
+        item_name = _clean(row.get("item_name")) or "—"
         out.append({
-            "scanned_at": row.get("created_at"),
+            "scanned_at": scanned_at,
             "qr_value": _clean(row.get("qr_value")) or "—",
-            "item_name": _clean(row.get("item_name")) or "—",
+            "item_name": item_name,
             "item_type": {
                 "inventory": "Inventory",
                 "asset": "Asset / Tool",
             }.get(_clean(row.get("item_type")).lower(), _clean(row.get("item_type")) or "Unknown"),
             "result": qr_scan_result_label(result_key),
             "job_shop": job_shop,
-            "scanned_by": _clean(row.get("scanned_by_name")) or "—",
+            "scanned_by": scanned_by,
+            "scanned_by_user_id": _clean(row.get("scanned_by_user_id")) or "",
             "device_source": device_source,
-            "action_taken": _clean(row.get("action_taken")) or ("—" if result_key == "opened" else "—"),
+            "device_label": device,
+            "action_taken": _clean(row.get("action_taken")) or "—",
+            "summary": qr_scan_summary_line(
+                scanned_by_name=scanned_by,
+                scanned_at=scanned_at,
+                job_shop=job_shop,
+                item_name=item_name,
+            ),
             "_sort_ts": _clean(row.get("created_at")),
         })
         if len(out) >= limit:
@@ -180,5 +214,6 @@ def list_qr_scan_events(
 __all__ = [
     "list_qr_scan_events",
     "qr_scan_result_label",
+    "qr_scan_summary_line",
     "record_qr_scan_event",
 ]

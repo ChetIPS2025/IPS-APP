@@ -8,6 +8,7 @@ try:
     from app.services.inventory_display_helpers import resolve_inventory_qr_value
     from app.services.inventory_service import normalize_inventory
     from app.services.job_service import job_row_select_label
+    from app.services.qr_scan_event_service import qr_scan_summary_line
     from app.services.repository import fetch_rows
     from app.services.tracking_terminology import (
         inventory_action_label,
@@ -17,6 +18,7 @@ except ImportError:
     from services.inventory_display_helpers import resolve_inventory_qr_value  # type: ignore
     from services.inventory_service import normalize_inventory  # type: ignore
     from services.job_service import job_row_select_label  # type: ignore
+    from services.qr_scan_event_service import qr_scan_summary_line  # type: ignore
     from services.repository import fetch_rows  # type: ignore
     from services.tracking_terminology import (  # type: ignore
         inventory_action_label,
@@ -97,17 +99,27 @@ def _inventory_scan_record(
     action = inventory_action_label(txn_type)
     jid = _clean(row.get("job_id"))
     dest = _clean(row.get("destination_type"))
-    who = _clean(row.get("scanned_by_name") or row.get("created_by")) or "—"
+    who = _clean(row.get("scanned_by_name")) or "—"
+    scanned_at = row.get("created_at")
+    job_shop = _job_shop_label(job_id=jid, destination_type=dest, jobs_by_id=jobs_by_id)
     return {
-        "scanned_at": row.get("created_at"),
+        "scanned_at": scanned_at,
         "qr_value": qr_value or "—",
         "item_name": name,
         "item_type": "Inventory",
         "result": "Success",
-        "job_shop": _job_shop_label(job_id=jid, destination_type=dest, jobs_by_id=jobs_by_id),
+        "job_shop": job_shop,
         "scanned_by": who,
+        "scanned_by_user_id": _clean(row.get("scanned_by_user_id")) or "",
         "device_source": _device_source(row),
+        "device_label": _clean(row.get("device_label") or row.get("device_info")),
         "action_taken": action,
+        "summary": qr_scan_summary_line(
+            scanned_by_name=who,
+            scanned_at=scanned_at,
+            job_shop=job_shop,
+            item_name=name,
+        ),
         "_sort_ts": _clean(row.get("created_at")),
     }
 
@@ -128,19 +140,29 @@ def _tool_scan_record(
     jid = _clean(row.get("job_id"))
     eid = _clean(row.get("employee_id"))
     emp = employees_by_id.get(eid, {})
-    who = _clean(emp.get("name") or emp.get("full_name")) or "—"
+    who = _clean(row.get("scanned_by_name") or emp.get("name") or emp.get("full_name")) or "—"
     notes = _clean(row.get("notes"))
     device = notes if notes.lower().startswith("device") else "QR scan"
+    scanned_at = row.get("created_at")
+    job_shop = _job_shop_label(job_id=jid, destination_type="job" if jid else "", jobs_by_id=jobs_by_id)
     return {
-        "scanned_at": row.get("created_at"),
+        "scanned_at": scanned_at,
         "qr_value": qr_value,
         "item_name": name,
         "item_type": "Asset / Tool",
         "result": "Success",
-        "job_shop": _job_shop_label(job_id=jid, destination_type="job" if jid else "", jobs_by_id=jobs_by_id),
+        "job_shop": job_shop,
         "scanned_by": who,
+        "scanned_by_user_id": _clean(row.get("scanned_by_user_id") or row.get("profile_id")) or "",
         "device_source": device,
+        "device_label": device if device != "QR scan" else "",
         "action_taken": action,
+        "summary": qr_scan_summary_line(
+            scanned_by_name=who,
+            scanned_at=scanned_at,
+            job_shop=job_shop,
+            item_name=name,
+        ),
         "_sort_ts": _clean(row.get("created_at")),
     }
 
