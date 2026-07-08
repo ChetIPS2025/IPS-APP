@@ -10209,7 +10209,7 @@ def inject_ips_dialog_styles() -> None:
     """Reusable IPS SaaS dialog / ``st.dialog`` styling (Jobs detail and future modals)."""
     st.markdown(
         f"""
-<style id="ips-dialog-styles-v4">
+<style id="ips-dialog-styles-v5">
 div[data-testid="stBackdrop"] {{
   background: rgba(15, 23, 42, 0.42) !important;
   backdrop-filter: blur(3px) !important;
@@ -10299,10 +10299,31 @@ div[data-testid="stDialog"] [data-testid="stButton"] > button p {{
   white-space: nowrap !important;
   margin: 0 !important;
 }}
+<div[data-testid="stDialog"] [data-testid="stElementContainer"]:not([class*="st-key-ips_dng_o_"]):not([class*="st-key-ips_dng_s_"]):not([class*="st-key-ips_succ_s_"]):not([class*="st-key-ips_warn_s_"]) [data-testid="stButton"] > button[kind="primary"],
+div[data-testid="stDialog"] [data-testid="stElementContainer"]:not([class*="st-key-ips_dng_o_"]):not([class*="st-key-ips_dng_s_"]):not([class*="st-key-ips_succ_s_"]):not([class*="st-key-ips_warn_s_"]) .stButton > button[kind="primary"],
+div[data-testid="stDialog"] [data-testid="stElementContainer"]:not([class*="st-key-ips_dng_o_"]):not([class*="st-key-ips_dng_s_"]):not([class*="st-key-ips_succ_s_"]):not([class*="st-key-ips_warn_s_"]) [data-testid="stButton"] > button[data-testid="baseButton-primary"],
+div[data-testid="stDialog"] [data-testid="stElementContainer"]:not([class*="st-key-ips_dng_o_"]):not([class*="st-key-ips_dng_s_"]):not([class*="st-key-ips_succ_s_"]):not([class*="st-key-ips_warn_s_"]) .stButton > button[data-testid="baseButton-primary"],
+div[data-testid="stDialog"] .ips-dialog-actions + div .stButton > button[kind="primary"],
+div[data-testid="stDialog"] .ips-dialog-actions + div [data-testid="stButton"] > button[kind="primary"],
+div[data-testid="stDialog"] .ips-dialog-actions + div .stButton > button[data-testid="baseButton-primary"],
+div[data-testid="stDialog"] .ips-dialog-actions + div [data-testid="stButton"] > button[data-testid="baseButton-primary"],
+div[data-testid="stDialog"] [data-testid="stVerticalBlock"]:has(.ips-dialog-actions) .stButton > button[kind="primary"],
+div[data-testid="stDialog"] [data-testid="stVerticalBlock"]:has(.ips-dialog-actions) [data-testid="stButton"] > button[kind="primary"],
+div[data-testid="stDialog"] [data-testid="stVerticalBlock"]:has(.ips-dialog-actions) .stButton > button[data-testid="baseButton-primary"],
+div[data-testid="stDialog"] [data-testid="stVerticalBlock"]:has(.ips-dialog-actions) [data-testid="stButton"] > button[data-testid="baseButton-primary"],
 div[data-testid="stDialog"] .stButton > button[kind="primary"],
 div[data-testid="stDialog"] [data-testid="stButton"] > button[data-testid="baseButton-primary"] {{
   background: {PRIMARY} !important;
   border-color: {PRIMARY} !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}}
+div[data-testid="stDialog"] [data-testid="stElementContainer"]:not([class*="st-key-ips_dng_o_"]):not([class*="st-key-ips_dng_s_"]):not([class*="st-key-ips_succ_s_"]):not([class*="st-key-ips_warn_s_"]) [data-testid="stButton"] > button[kind="primary"]:hover,
+div[data-testid="stDialog"] [data-testid="stElementContainer"]:not([class*="st-key-ips_dng_o_"]):not([class*="st-key-ips_dng_s_"]):not([class*="st-key-ips_succ_s_"]):not([class*="st-key-ips_warn_s_"]) .stButton > button[kind="primary"]:hover,
+div[data-testid="stDialog"] .ips-dialog-actions + div .stButton > button[kind="primary"]:hover,
+div[data-testid="stDialog"] [data-testid="stVerticalBlock"]:has(.ips-dialog-actions) .stButton > button[kind="primary"]:hover {{
+  background: #1d4ed8 !important;
+  border-color: #1d4ed8 !important;
   color: #ffffff !important;
 }}
 div[data-testid="stDialog"] .ips-dialog-actions + div [data-testid="stHorizontalBlock"],
