@@ -380,6 +380,12 @@ def main() -> None:
     except Exception as exc:
         show_page_error(exc, context=f"module:{slug}")
 
+    try:
+        from app.components.sidebar_shell import inject_desktop_nav_rail_markup
+    except ImportError:
+        from components.sidebar_shell import inject_desktop_nav_rail_markup  # type: ignore
+    inject_desktop_nav_rail_markup(active_slug=slug)
+
 
 if __name__ == "__main__":
     main()

@@ -14,7 +14,6 @@ from app.components.sidebar_shell import (
     IPS_SIDEBAR_NAV_FALLBACK_KEY,
     _desktop_nav_rail_item_is_active,
     _fallback_nav_json,
-    _rail_nav_button_label,
     apply_pending_sidebar_collapse,
     capture_sidebar_collapsed_from_query,
     ensure_sidebar_collapsed_hydrated,
@@ -116,8 +115,15 @@ def test_inject_sidebar_shell_injects_layout_on_every_render():
     assert "if st.session_state.get(IPS_SIDEBAR_SHELL_KEY)" not in source
 
 
-def test_rail_nav_button_label_matches_sidebar_pattern():
-    assert _rail_nav_button_label("jobs", "Jobs") == "💼\u2002Jobs"
+def test_desktop_nav_rail_renders_fixed_anchor_links():
+    from app.components.sidebar_shell import _desktop_nav_rail_html
+
+    rows = [{"slug": "jobs", "label": "Jobs", "icon": "💼"}]
+    markup = _desktop_nav_rail_html(rows, "dashboard")
+    assert "ips-desktop-nav-rail" in markup
+    assert '?ips_nav=jobs' in markup
+    assert 'target="_top"' in markup
+    assert "?ips_logout=1" in markup
 
 
 def test_desktop_nav_rail_item_active_for_scan_aliases():
@@ -126,12 +132,12 @@ def test_desktop_nav_rail_item_active_for_scan_aliases():
     assert _desktop_nav_rail_item_is_active("jobs", "dashboard") is False
 
 
-def test_desktop_nav_rail_css_targets_streamlit_wrap():
+def test_desktop_nav_rail_css_hides_legacy_streamlit_wrap():
     from app.components.sidebar_shell import _desktop_nav_rail_css
 
     css = _desktop_nav_rail_css()
     assert "st-key-ips_desktop_nav_rail_wrap" in css
-    assert "ips-rail-nav-label" in css
+    assert "ips-desktop-nav-rail" in css
 
 
 def test_employee_field_nav_is_restricted_without_legacy_access():

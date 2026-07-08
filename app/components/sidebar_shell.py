@@ -382,138 +382,45 @@ def _desktop_nav_rail_css() -> str:
 .st-key-ips_desktop_nav_rail_wrap {{
   display: none !important;
 }}
-@media (min-width: {IPS_SIDEBAR_DESKTOP_MIN_PX}px) {{
-  .st-key-ips_desktop_nav_rail_wrap {{
-    display: flex !important;
-    position: fixed !important;
-    left: 0 !important;
-    top: 0 !important;
-    bottom: 0 !important;
-    width: {col}px !important;
-    z-index: 999999 !important;
-    flex-direction: column !important;
-    background: #ffffff !important;
-    border-right: 1px solid #e5eaf2 !important;
-    overflow-x: hidden !important;
-    overflow-y: auto !important;
-    transition: width 0.2s ease, box-shadow 0.2s ease !important;
-    box-sizing: border-box !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    gap: 0 !important;
-    pointer-events: auto !important;
-  }}
-  .st-key-ips_desktop_nav_rail_wrap:hover {{
-    width: {exp}px !important;
-    box-shadow: 4px 0 18px rgba(15, 23, 42, 0.12) !important;
-  }}
-  .st-key-ips_desktop_nav_rail_wrap .ips-desktop-nav-rail--streamlit {{
-    display: flex !important;
-    flex-direction: column !important;
-    flex: 1 1 auto !important;
-    position: static !important;
-    width: 100% !important;
-    min-height: 0 !important;
-    border: none !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    z-index: auto !important;
-    overflow: visible !important;
-  }}
-  .st-key-ips_desktop_nav_rail_wrap [data-testid="stVerticalBlock"] {{
-    gap: 2px !important;
-    width: 100% !important;
-    padding: 0 !important;
-    margin: 0 !important;
-  }}
-  .st-key-ips_desktop_nav_rail_wrap [class*="st-key-ips_rail_nav_"],
-  .st-key-ips_desktop_nav_rail_wrap [class*="st-key-ips_rail_nav_"] [data-testid="stElementContainer"],
-  .st-key-ips_desktop_nav_rail_wrap .st-key-ips_rail_logout,
-  .st-key-ips_desktop_nav_rail_wrap .st-key-ips_rail_logout [data-testid="stElementContainer"] {{
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }}
-  .st-key-ips_desktop_nav_rail_wrap [class*="st-key-ips_rail_nav_"] .stButton,
-  .st-key-ips_desktop_nav_rail_wrap .st-key-ips_rail_logout .stButton {{
-    width: 100% !important;
-    margin: 0 !important;
-  }}
-  .st-key-ips_desktop_nav_rail_wrap [class*="st-key-ips_rail_nav_"] .stButton > button,
-  .st-key-ips_desktop_nav_rail_wrap .st-key-ips_rail_logout .stButton > button {{
-    width: 100% !important;
-    min-height: {nav_h}px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: flex-start !important;
-    gap: 10px !important;
-    margin: 0 4px !important;
-    padding: 0 10px !important;
-    border: none !important;
-    border-radius: 10px !important;
-    background: transparent !important;
-    color: #0f172a !important;
-    font-size: 0.875rem !important;
-    font-weight: 500 !important;
-    box-shadow: none !important;
-  }}
-  .st-key-ips_desktop_nav_rail_wrap:not(:hover) [class*="st-key-ips_rail_nav_"] .stButton > button,
-  .st-key-ips_desktop_nav_rail_wrap:not(:hover) .st-key-ips_rail_logout .stButton > button {{
-    justify-content: center !important;
-    padding: 0 !important;
-    width: {col}px !important;
-    margin: 0 !important;
-  }}
-  .st-key-ips_desktop_nav_rail_wrap:not(:hover) .ips-rail-nav-label {{
-    display: none !important;
-  }}
-  .st-key-ips_desktop_nav_rail_wrap [class*="st-key-ips_rail_nav_"] .stButton > button:hover,
-  .st-key-ips_desktop_nav_rail_wrap .st-key-ips_rail_logout .stButton > button:hover {{
-    background: #f1f5f9 !important;
-    color: #0f172a !important;
-  }}
-  .st-key-ips_desktop_nav_rail_wrap [class*="st-key-ips_rail_nav_"] button[data-testid="stBaseButton-primary"],
-  .st-key-ips_desktop_nav_rail_wrap [class*="st-key-ips_rail_nav_"] button[data-testid="baseButton-primary"] {{
-    background: #eff6ff !important;
-    color: #2563eb !important;
-    font-weight: 600 !important;
-  }}
-  .st-key-ips_desktop_nav_rail_wrap .ips-rail-nav-icon {{
-    flex: 0 0 {IPS_SIDEBAR_COLLAPSED_ICON_PX}px !important;
-    width: {IPS_SIDEBAR_COLLAPSED_ICON_PX}px !important;
-    min-width: {IPS_SIDEBAR_COLLAPSED_ICON_PX}px !important;
-    text-align: center !important;
-    font-size: {IPS_SIDEBAR_COLLAPSED_ICON_PX}px !important;
-    line-height: 1 !important;
-    font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif !important;
-  }}
-  .st-key-ips_desktop_nav_rail_wrap .ips-rail-nav-label {{
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-  }}
-  .st-key-ips_desktop_nav_rail_wrap .st-key-ips_rail_logout {{
-    margin-top: auto !important;
-    padding-top: 8px !important;
-    border-top: 1px solid #eef2f7 !important;
-  }}
-}}
-@media (max-width: {mobile_max}px) {{
-  .st-key-ips_desktop_nav_rail_wrap {{
-    display: none !important;
-  }}
-}}
 </style>
 """
 
 
-def _rail_nav_button_label(slug: str, label: str) -> str:
+def _desktop_nav_rail_html(rows: list[dict[str, str]], active_slug: str) -> str:
     try:
         from app.components.sidebar_nav_icons import nav_icon_for_slug
     except ImportError:
         from components.sidebar_nav_icons import nav_icon_for_slug  # type: ignore
-    return f"{nav_icon_for_slug(slug)}\u2002{label}"
+    item_bits: list[str] = []
+    for row in rows:
+        slug = row["slug"]
+        label = html.escape(row["label"])
+        icon = html.escape(nav_icon_for_slug(slug))
+        is_active = _desktop_nav_rail_item_is_active(slug, active_slug)
+        active_cls = " is-active" if is_active else ""
+        href = html.escape(f"?ips_nav={slug}", quote=True)
+        item_bits.append(
+            f'<a class="ips-desktop-nav-rail__link{active_cls}" href="{href}" '
+            f'target="_top" rel="noopener noreferrer" title="{label}" aria-label="{label}">'
+            f'<span class="ips-desktop-nav-rail__icon" aria-hidden="true">{icon}</span>'
+            f'<span class="ips-desktop-nav-rail__label">{label}</span>'
+            f"</a>"
+        )
+    items_html = "\n".join(item_bits)
+    return f"""
+<nav class="ips-desktop-nav-rail" aria-label="Main navigation">
+  <div class="ips-desktop-nav-rail__header">{_desktop_rail_logo_html()}</div>
+  <div class="ips-desktop-nav-rail__items">
+    {items_html}
+  </div>
+  <div class="ips-desktop-nav-rail__footer">
+    <a class="ips-desktop-nav-rail__link ips-desktop-nav-rail__link--logout" href="?ips_logout=1" target="_top" rel="noopener noreferrer" title="Log out" aria-label="Log out">
+      <span class="ips-desktop-nav-rail__icon" aria-hidden="true">⎋</span>
+      <span class="ips-desktop-nav-rail__label">Log out</span>
+    </a>
+  </div>
+</nav>
+"""
 
 
 def _desktop_nav_rail_item_is_active(slug: str, active_slug: str) -> bool:
@@ -533,7 +440,7 @@ def inject_desktop_nav_rail_css() -> None:
 
 
 def inject_desktop_nav_rail_markup(*, active_slug: str | None = None) -> None:
-    """Inject desktop nav rail using Streamlit buttons (reliable on Cloud; no JS bridge)."""
+    """Inject fixed HTML nav rail (anchors use query params; no layout-breaking widgets)."""
     rows = _nav_fallback_rows()
     if not rows:
         return
@@ -543,54 +450,7 @@ def inject_desktop_nav_rail_markup(*, active_slug: str | None = None) -> None:
         except ImportError:
             from navigation import current_nav_slug  # type: ignore
         active_slug = current_nav_slug()
-
-    try:
-        from app.auth import sign_out
-    except ImportError:
-        from auth import sign_out  # type: ignore
-    try:
-        from app.navigation import set_nav_slug
-    except ImportError:
-        from navigation import set_nav_slug  # type: ignore
-
-    scan_slugs = frozenset({"scan_inventory", "scan_asset"})
-
-    with st.container(key="ips_desktop_nav_rail_wrap"):
-        st.markdown(
-            (
-                '<nav class="ips-desktop-nav-rail ips-desktop-nav-rail--streamlit" '
-                'aria-label="Main navigation">'
-                f'<div class="ips-desktop-nav-rail__header">{_desktop_rail_logo_html()}</div>'
-                '<span class="ips-desktop-nav-rail__items-marker" aria-hidden="true"></span>'
-                "</nav>"
-            ),
-            unsafe_allow_html=True,
-        )
-        for row in rows:
-            slug = row["slug"]
-            label = row["label"]
-            is_active = _desktop_nav_rail_item_is_active(slug, active_slug)
-            if st.button(
-                _rail_nav_button_label(slug, label),
-                key=f"ips_rail_nav_{slug}",
-                use_container_width=True,
-                type="primary" if is_active else "secondary",
-                help=label,
-            ):
-                if not is_active or slug in scan_slugs:
-                    set_nav_slug(slug)
-                    request_sidebar_collapse_after_nav()
-                    st.rerun()
-
-        if st.button(
-            "⎋\u2002Log out",
-            key="ips_rail_logout",
-            use_container_width=True,
-            type="secondary",
-            help="Log out",
-        ):
-            sign_out()
-            st.rerun()
+    st.markdown(_desktop_nav_rail_html(rows, active_slug), unsafe_allow_html=True)
 
 
 def inject_desktop_nav_rail(*, active_slug: str | None = None) -> None:
@@ -603,7 +463,6 @@ def inject_sidebar_shell() -> None:
     """Inject sidebar layout CSS/JS on every authenticated render."""
     collapsed = True
     inject_sidebar_nav_override_css()
-    inject_desktop_nav_rail_markup()
     st.markdown(_shell_css(), unsafe_allow_html=True)
 
     nav_json = _fallback_nav_json()
@@ -611,7 +470,6 @@ def inject_sidebar_shell() -> None:
 
     inject_sidebar_menu_wire()
     inject_sidebar_nav_align()
-    inject_desktop_nav_rail_align()
     inject_sidebar_layout_state(collapsed)
 
     if st.session_state.pop(IPS_SIDEBAR_TOGGLE_REQUEST_KEY, False):
@@ -1115,53 +973,6 @@ def inject_sidebar_nav_align() -> None:
 </script>
         """,
         height=0,
-    )
-
-
-def inject_desktop_nav_rail_align() -> None:
-    """Split desktop rail button labels into icon + text (main document script)."""
-    st.markdown(
-        """
-<script>
-(function () {
-  function esc(s) {
-    return String(s || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
-  function splitNavLabel(text) {
-    var raw = String(text || '').trim();
-    if (!raw) return null;
-    var sep = raw.indexOf('\u2002');
-    if (sep < 0) sep = raw.indexOf('  ');
-    if (sep >= 0) {
-      return { icon: raw.slice(0, sep).trim(), label: raw.slice(sep + 1).trim() };
-    }
-    var m = raw.match(/^(\\S+)\\s+(.+)$/);
-    if (m) return { icon: m[1], label: m[2] };
-    return null;
-  }
-  function align() {
-    document.querySelectorAll('.st-key-ips_desktop_nav_rail_wrap [class*="st-key-ips_rail_nav_"] button, .st-key-ips_desktop_nav_rail_wrap .st-key-ips_rail_logout button').forEach(function (btn) {
-      var p = btn.querySelector('p');
-      if (!p) return;
-      if (p.querySelector('.ips-rail-nav-icon') && p.querySelector('.ips-rail-nav-label')) return;
-      var parts = splitNavLabel(p.textContent || '');
-      if (!parts || !parts.label) return;
-      p.innerHTML =
-        '<span class="ips-rail-nav-icon">' + esc(parts.icon) + '</span>' +
-        '<span class="ips-rail-nav-label">' + esc(parts.label) + '</span>';
-    });
-  }
-  align();
-  setTimeout(align, 40);
-  setTimeout(align, 180);
-})();
-</script>
-        """,
-        unsafe_allow_html=True,
     )
 
 
