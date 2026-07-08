@@ -242,7 +242,7 @@ def render_sidebar(active_slug: str) -> None:
                 request_sidebar_collapse_after_nav()
                 st.rerun()
 
-        if is_real_admin():
+        if is_real_admin() and not is_view_as_active():
             render_view_as_selector()
 
         prof = current_profile()

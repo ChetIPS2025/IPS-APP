@@ -29,6 +29,8 @@ VIEW_AS_OPTIONS: tuple[tuple[str, str], ...] = (
     ("field_mobile", "Field Mode (Mobile Preview)"),
 )
 
+VIEW_AS_PICKER_SUFFIXES: tuple[str, ...] = ("admin_page", "header_bar", "sidebar", "active_toolbar")
+
 _VIEW_AS_LABELS = {
     "supervisor": "Supervisor",
     "employee": "Employee",
@@ -76,6 +78,43 @@ def _landing_slug_for_mode(mode: str) -> str:
     return role_default_nav_slug("admin", field_mode=False)
 
 
+def _picker_label_for_mode(mode: str) -> str:
+    picked = str(mode or "admin").strip().lower()
+    for value, label in VIEW_AS_OPTIONS:
+        if value == picked:
+            return label
+    return VIEW_AS_OPTIONS[0][1]
+
+
+def _active_picker_mode() -> str:
+    return view_as_mode() if is_view_as_active() else "admin"
+
+
+def _clear_view_as_picker_widgets() -> None:
+    for suffix in VIEW_AS_PICKER_SUFFIXES:
+        st.session_state.pop(f"ips_view_as_select_{suffix}", None)
+
+
+def ensure_view_as_navigation() -> None:
+    """Keep admins on pages allowed by the active preview role."""
+    if not is_view_as_active():
+        return
+    try:
+        from app.navigation import current_nav_slug, default_nav_slug, set_nav_slug
+        from app.utils.permissions import role_can_access_page
+    except ImportError:
+        from navigation import current_nav_slug, default_nav_slug, set_nav_slug  # type: ignore
+        from utils.permissions import role_can_access_page  # type: ignore
+    slug = current_nav_slug()
+    role = ui_role()
+    if role_can_access_page(role, slug):
+        return
+    target = default_nav_slug()
+    if slug != target and role_can_access_page(role, target):
+        set_nav_slug(target)
+        st.rerun()
+
+
 def set_view_as(mode: str) -> None:
     """Activate or clear admin preview mode (session only)."""
     if not is_real_admin():
@@ -88,6 +127,7 @@ def set_view_as(mode: str) -> None:
         except ImportError:
             from navigation import set_nav_slug  # type: ignore
         set_nav_slug("dashboard")
+        _clear_view_as_picker_widgets()
         return
 
     st.session_state[IPS_VIEW_AS_ACTIVE_KEY] = True
@@ -113,6 +153,7 @@ def set_view_as(mode: str) -> None:
     except ImportError:
         from navigation import set_nav_slug  # type: ignore
     set_nav_slug(_landing_slug_for_mode(picked))
+    _clear_view_as_picker_widgets()
 
 
 def clear_view_as() -> None:
@@ -120,6 +161,7 @@ def clear_view_as() -> None:
         st.session_state.pop(key, None)
     if st.session_state.pop(IPS_VIEW_AS_FORCED_NARROW_KEY, None):
         st.session_state.pop(IPS_VIEWPORT_NARROW_KEY, None)
+    _clear_view_as_picker_widgets()
 
 
 def inject_view_as_styles() -> None:
@@ -151,6 +193,12 @@ def inject_view_as_styles() -> None:
 }
 .ips-view-as-banner-text strong {
   color: #1d4ed8;
+}
+.ips-view-as-banner-sub {
+  margin: 0.1rem 0 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #475569;
 }
 .ips-view-as-admin-panel {
   background: #f8fafc;
@@ -231,11 +279,9 @@ def inject_view_as_styles() -> None:
         )
 
     marker_classes = "ips-view-as-marker"
-    mobile_css = ""
-    if is_view_as_mobile_preview():
-        marker_classes += " ips-view-as-mobile-active"
-        mobile_css = """
+    mobile_css = """
 <style id="ips-view-as-mobile-v2">
+html.ips-view-as-mobile-active section[data-testid="stMain"],
 section[data-testid="stMain"]:has(.ips-view-as-mobile-active) {
   max-width: 430px !important;
   margin: 0 auto !important;
@@ -244,18 +290,44 @@ section[data-testid="stMain"]:has(.ips-view-as-mobile-active) {
   overflow: hidden !important;
   padding-bottom: 4.25rem !important;
 }
+html.ips-view-as-mobile-active section[data-testid="stMain"] .ips-jobs-summary-cards,
 section[data-testid="stMain"]:has(.ips-view-as-mobile-active) .ips-jobs-summary-cards {
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
 }
+html.ips-view-as-mobile-active .ips-desktop-nav-rail {
+  display: none !important;
+}
 </style>
 """
+    mobile_on = "true" if is_view_as_mobile_preview() else "false"
+    if is_view_as_mobile_preview():
+        marker_classes += " ips-view-as-mobile-active"
     st.markdown(
-        f'{mobile_css}<span class="{marker_classes}" aria-hidden="true"></span>',
+        f"""
+{mobile_css}
+<script>
+(function () {{
+  try {{
+    var root = document.documentElement;
+    if (!root) return;
+    root.classList.toggle("ips-view-as-mobile-active", {mobile_on});
+  }} catch (e) {{}}
+}})();
+</script>
+<span class="{marker_classes}" aria-hidden="true"></span>
+        """,
         unsafe_allow_html=True,
     )
 
 
 def render_view_as_banner() -> None:
+    if not is_view_as_active():
+        return
+    render_view_as_active_toolbar()
+
+
+def render_view_as_active_toolbar() -> None:
+    """Prominent preview status bar with role picker and Return to Admin."""
     if not is_view_as_active():
         return
     inject_view_as_styles()
@@ -273,9 +345,11 @@ def render_view_as_banner() -> None:
         """,
         unsafe_allow_html=True,
     )
-    btn_left, btn_right = st.columns([4, 1], gap="small")
-    with btn_right:
-        if st.button("Return to Admin", key="ips_view_as_return_admin", type="primary"):
+    picker_col, return_col = st.columns([5, 1], gap="small")
+    with picker_col:
+        _render_view_as_picker(key_suffix="active_toolbar", show_help=True)
+    with return_col:
+        if st.button("Return to Admin", key="ips_view_as_return_admin", type="primary", use_container_width=True):
             clear_view_as()
             try:
                 from app.navigation import set_nav_slug
@@ -288,15 +362,16 @@ def render_view_as_banner() -> None:
 def _render_view_as_picker(*, key_suffix: str, show_help: bool = False) -> None:
     labels = [label for _, label in VIEW_AS_OPTIONS]
     values = [value for value, _ in VIEW_AS_OPTIONS]
-    if is_view_as_active():
-        current_ix = values.index(view_as_mode()) if view_as_mode() in values else 0
-    else:
-        current_ix = 0
+    active_mode = _active_picker_mode()
+    widget_key = f"ips_view_as_select_{key_suffix}"
+    expected_label = _picker_label_for_mode(active_mode)
+    if st.session_state.get(widget_key) not in labels:
+        st.session_state[widget_key] = expected_label
     picked_label = st.selectbox(
         "View As",
         labels,
-        index=current_ix,
-        key=f"ips_view_as_select_{key_suffix}",
+        value=st.session_state.get(widget_key, expected_label),
+        key=widget_key,
         help=(
             "Preview the app as another role without changing your signed-in account."
             if show_help
@@ -305,7 +380,6 @@ def _render_view_as_picker(*, key_suffix: str, show_help: bool = False) -> None:
         label_visibility="collapsed",
     )
     picked_mode = values[labels.index(picked_label)]
-    active_mode = view_as_mode() if is_view_as_active() else "admin"
     if picked_mode != active_mode:
         set_view_as(picked_mode)
         st.rerun()
@@ -332,8 +406,8 @@ def render_view_as_admin_panel() -> None:
 
 
 def render_view_as_header_bar() -> None:
-    """Compact View As picker below the main brand bar (admin only)."""
-    if not is_real_admin():
+    """Compact View As picker below the main brand bar (admin only, preview off)."""
+    if not is_real_admin() or is_view_as_active():
         return
     inject_view_as_styles()
     with st.container(key="ips_view_as_header_bar"):

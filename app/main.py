@@ -372,6 +372,14 @@ def main() -> None:
     slug = current_nav_slug()
     st.session_state[SESSION_NAV_KEY] = slug
 
+    try:
+        from app.utils.view_as import ensure_view_as_navigation, is_view_as_mobile_preview
+    except ImportError:
+        from utils.view_as import ensure_view_as_navigation, is_view_as_mobile_preview  # type: ignore
+    ensure_view_as_navigation()
+    slug = current_nav_slug()
+    st.session_state[SESSION_NAV_KEY] = slug
+
     render_sidebar(slug)
     inject_sidebar_shell()
 
@@ -390,7 +398,8 @@ def main() -> None:
         from app.components.sidebar_shell import inject_desktop_nav_rail_markup
     except ImportError:
         from components.sidebar_shell import inject_desktop_nav_rail_markup  # type: ignore
-    inject_desktop_nav_rail_markup(active_slug=slug)
+    if not is_view_as_mobile_preview():
+        inject_desktop_nav_rail_markup(active_slug=slug)
 
 
 if __name__ == "__main__":
