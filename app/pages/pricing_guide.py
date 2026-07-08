@@ -491,18 +491,23 @@ def _render_pg_thumbnail(row: dict[str, Any]) -> None:
     image_url = get_pricing_guide_image_url(row)
     if image_url:
         inner = (
-            f'<img class="ips-pg-thumb-img" src="{html.escape(image_url, quote=True)}" '
-            f'alt="" aria-hidden="true" />'
+            f'<img class="pricing-thumb table-image-preview ips-pg-thumb-img" '
+            f'src="{html.escape(image_url, quote=True)}" alt="" aria-hidden="true" />'
         )
     else:
-        inner = '<span class="ips-pg-thumb-placeholder" aria-hidden="true">—</span>'
+        inner = (
+            '<span class="pricing-thumb table-image-preview ips-pg-thumb-placeholder" '
+            'aria-hidden="true">—</span>'
+        )
     st.markdown(
         (
-            f'<button type="button" class="ips-pg-thumb-cell ips-pg-thumb-cell-link" '
+            f'<div class="image-cell ips-pg-image-cell">'
+            f'<button type="button" class="ips-pg-thumb-cell-link" '
             f'data-row-id="{html.escape(rid, quote=True)}" '
             f'aria-label="{aria}" tabindex="0">'
             f"{inner}"
             f"</button>"
+            f"</div>"
         ),
         unsafe_allow_html=True,
     )

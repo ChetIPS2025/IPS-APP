@@ -146,38 +146,43 @@ def inventory_image_placeholder_html(*, category: str = "") -> str:
 def inventory_thumbnail_html(
     item: dict[str, Any],
     *,
-    css_class: str = "ips-inventory-thumb-img",
+    css_class: str = "ips-inventory-thumb-img inventory-thumb table-image-preview",
     cell_class: str = "ips-inventory-thumb-cell",
 ) -> str:
     image_url = get_inventory_image_url(item)
     if image_url:
-        return (
-            f'<span class="{html.escape(cell_class)}">'
+        inner = (
             f'<img class="{html.escape(css_class)}" '
             f'src="{html.escape(image_url, quote=True)}" alt="Inventory item image" />'
-            f"</span>"
         )
-    return f'<span class="{html.escape(cell_class)}">{inventory_image_placeholder_html()}</span>'
+    else:
+        inner = (
+            '<span class="ips-inventory-thumb-placeholder inventory-thumb table-image-preview" '
+            'aria-hidden="true">📦</span>'
+        )
+    return (
+        f'<span class="image-cell ips-inventory-image-cell">'
+        f'<span class="{html.escape(cell_class)}">{inner}</span>'
+        f"</span>"
+    )
 
 
 def render_inventory_item_thumbnail(
     item: dict[str, Any],
     *,
-    width: int = 80,
+    width: int = 52,
     use_markdown_cell: bool = True,
 ) -> None:
     """Streamlit thumbnail — product image or category placeholder."""
+    _ = use_markdown_cell
+    if width <= 56:
+        st.markdown(inventory_thumbnail_html(item), unsafe_allow_html=True)
+        return
     image_url = get_inventory_image_url(item)
     if image_url:
         st.image(image_url, width=width)
         return
-    if use_markdown_cell:
-        st.markdown(inventory_thumbnail_html(item), unsafe_allow_html=True)
-    else:
-        st.markdown(
-            f'<p style="font-size:2.5rem;margin:0;line-height:1;">📦</p>',
-            unsafe_allow_html=True,
-        )
+    st.markdown(inventory_thumbnail_html(item), unsafe_allow_html=True)
 
 
 def get_inventory_stored_image_url(item: dict[str, Any], *, expires_in: int = 3600) -> str | None:

@@ -314,7 +314,7 @@ def _render_inventory_thumbnail(item: dict) -> None:
         from app.services.inventory_images import render_inventory_item_thumbnail
     except ImportError:
         from services.inventory_images import render_inventory_item_thumbnail  # type: ignore
-    render_inventory_item_thumbnail(item, width=42)
+    render_inventory_item_thumbnail(item, width=52)
 
 
 def _render_inventory_photo_manager(item: dict) -> None:

@@ -2881,7 +2881,7 @@ def inject_inventory_module_css() -> None:
     checkbox_css = _list_table_checkbox_column_css("inventory_table_wrap")
     st.markdown(
         f"""
-<style id="ips-inventory-module-v6">
+<style id="ips-inventory-module-v7">
 .ips-inventory-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -3000,8 +3000,18 @@ def inject_inventory_module_css() -> None:
   margin: 0 !important;
   padding: 0 !important;
 }}
+.st-key-inventory_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) {{
+  flex: 0 0 80px !important;
+  min-width: 80px !important;
+  max-width: 80px !important;
+  width: 80px !important;
+}}
+.st-key-inventory_table_wrap .stMarkdown p:has(.ips-inventory-image-cell),
 .st-key-inventory_table_wrap .stMarkdown p:has(.ips-inventory-thumb-cell) {{
-  line-height: 0 !important;
+  line-height: normal !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }}
 .st-key-inventory_table_wrap [data-testid="stHorizontalBlock"] {{
   gap: 0.35rem !important;
@@ -3010,10 +3020,12 @@ def inject_inventory_module_css() -> None:
   padding: 6px 10px !important;
   margin: 0 !important;
   min-height: 56px;
+  max-height: 64px;
 }}
 .st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
   background: #f8fafc;
   min-height: 36px;
+  max-height: none;
   padding: 5px 10px !important;
 }}
 .st-key-inventory_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
@@ -3032,57 +3044,61 @@ def inject_inventory_module_css() -> None:
   margin: 0 !important;
 }}
 {checkbox_css}
-.st-key-inventory_table_wrap [data-testid="stImage"] {{
-  margin: 0 !important;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.image-cell,
+.ips-inventory-image-cell {{
+  width: 80px !important;
+  min-width: 80px !important;
+  max-width: 80px !important;
+  text-align: center !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  vertical-align: middle !important;
+  flex-shrink: 0 !important;
+  height: auto !important;
 }}
-.st-key-inventory_table_wrap [data-testid="stImage"] img {{
-  width: 40px !important;
-  height: 40px !important;
-  max-width: 40px !important;
-  max-height: 40px !important;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  background: #ffffff;
-  object-fit: contain;
-}}
-.ips-inventory-qr-cell {{
-  width: 40px;
-  height: 40px;
+.inventory-thumb,
+.pricing-thumb,
+.table-image-preview,
+.ips-inventory-thumb-img,
+.ips-inventory-thumb-placeholder {{
+  width: 52px !important;
+  height: 52px !important;
+  min-width: 52px !important;
+  max-width: 52px !important;
+  min-height: 52px !important;
+  max-height: 52px !important;
+  object-fit: cover !important;
+  border-radius: 8px !important;
+  border: 1px solid #e2e8f0 !important;
+  background: #f8fafc !important;
+  display: block !important;
+  margin: 0 auto !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
 }}
 .ips-inventory-thumb-cell {{
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 42px;
-  height: 42px;
-  vertical-align: middle;
-  flex-shrink: 0;
-}}
-.ips-inventory-thumb-img {{
-  display: block;
-  width: 42px !important;
-  height: 42px !important;
-  object-fit: cover;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #ffffff;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 52px !important;
+  height: 52px !important;
+  min-width: 52px !important;
+  max-width: 52px !important;
+  min-height: 52px !important;
+  max-height: 52px !important;
+  vertical-align: middle !important;
+  flex-shrink: 0 !important;
+  line-height: 0 !important;
 }}
 .ips-inventory-thumb-placeholder {{
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 42px;
-  height: 42px;
-  border: 1px dashed #cbd5e1;
-  border-radius: 8px;
-  background: #f8fafc;
-  color: #94a3b8;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  object-fit: none !important;
+  color: #94a3b8 !important;
+  font-size: 1.1rem !important;
+  line-height: 1 !important;
 }}
 .ips-inventory-detail-image {{
   max-width: 260px;
@@ -3217,7 +3233,7 @@ def inject_pricing_guide_module_css() -> None:
     """Pricing Guide list custom table styling (matches Inventory table)."""
     st.markdown(
         f"""
-<style id="ips-pricing-guide-module-v4">
+<style id="ips-pricing-guide-module-v5">
 .ips-pg-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -3260,31 +3276,93 @@ def inject_pricing_guide_module_css() -> None:
   text-align: right;
   white-space: nowrap;
 }}
-.st-key-pricing_guide_table_wrap .stMarkdown p:has(.ips-pg-thumb-cell) {{
-  margin: 0 !important;
-  line-height: 0 !important;
+.st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(1) {{
+  flex: 0 0 80px !important;
+  min-width: 80px !important;
+  max-width: 80px !important;
+  width: 80px !important;
 }}
-.ips-pg-thumb-cell {{
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  padding: 0;
+.st-key-pricing_guide_table_wrap .stMarkdown p:has(.ips-pg-image-cell),
+.st-key-pricing_guide_table_wrap .stMarkdown p:has(.ips-pg-thumb-cell-link) {{
+  margin: 0 !important;
+  line-height: normal !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}}
+.image-cell,
+.ips-pg-image-cell {{
+  width: 80px !important;
+  min-width: 80px !important;
+  max-width: 80px !important;
+  text-align: center !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  vertical-align: middle !important;
+  flex-shrink: 0 !important;
+  height: auto !important;
 }}
 .ips-pg-thumb-cell-link {{
-  cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  margin: 0 auto !important;
+  border: none !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  border-radius: 8px !important;
+  line-height: 0 !important;
+  flex-shrink: 0 !important;
+  width: 52px !important;
+  height: 52px !important;
+  min-width: 52px !important;
+  max-width: 52px !important;
+  min-height: 52px !important;
+  max-height: 52px !important;
+  transition: box-shadow 0.15s ease;
 }}
 .ips-pg-thumb-cell-link:hover,
 .ips-pg-thumb-cell-link:focus-visible {{
-  border-color: #93c5fd;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
-  outline: none;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15) !important;
+}}
+.ips-pg-thumb-cell-link:hover .ips-pg-thumb-img,
+.ips-pg-thumb-cell-link:focus-visible .ips-pg-thumb-img,
+.ips-pg-thumb-cell-link:hover .ips-pg-thumb-placeholder,
+.ips-pg-thumb-cell-link:focus-visible .ips-pg-thumb-placeholder {{
+  border-color: #93c5fd !important;
+}}
+.inventory-thumb,
+.pricing-thumb,
+.table-image-preview,
+.ips-pg-thumb-img,
+.ips-pg-thumb-placeholder {{
+  width: 52px !important;
+  height: 52px !important;
+  min-width: 52px !important;
+  max-width: 52px !important;
+  min-height: 52px !important;
+  max-height: 52px !important;
+  object-fit: cover !important;
+  border-radius: 8px !important;
+  border: 1px solid #e2e8f0 !important;
+  background: #f8fafc !important;
+  display: block !important;
+  margin: 0 auto !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
+}}
+.ips-pg-thumb-placeholder {{
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  object-fit: none !important;
+  color: #94a3b8 !important;
+  font-size: 0.8125rem !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
 }}
 .ips-pg-table-row {{
   display: none !important;
@@ -3351,16 +3429,6 @@ def inject_pricing_guide_module_css() -> None:
   text-align: left !important;
   white-space: normal !important;
   word-break: break-word !important;
-}}
-.ips-pg-thumb-img {{
-  width: 36px;
-  height: 36px;
-  object-fit: cover;
-  display: block;
-}}
-.ips-pg-thumb-placeholder {{
-  color: #94a3b8;
-  font-size: 12px;
 }}
 .ips-pg-detail-image {{
   width: 100%;
@@ -3458,10 +3526,12 @@ def inject_pricing_guide_module_css() -> None:
   padding: 6px 10px !important;
   margin: 0 !important;
   min-height: 56px;
+  max-height: 64px;
 }}
 .st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"]:first-of-type {{
   background: #f8fafc;
   min-height: 36px;
+  max-height: none;
   padding: 5px 10px !important;
 }}
 .st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
