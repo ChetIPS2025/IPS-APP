@@ -19,9 +19,7 @@ try:
         render_job_detail_activity_timeline,
         render_job_detail_financial_section,
         render_job_detail_header,
-        render_job_detail_header_menu_slot,
         render_job_detail_overview_section,
-        close_job_detail_header_menu_slot,
     )
     from app.components.job_status_ui import (
         job_status_pill_html,
@@ -133,9 +131,7 @@ except ImportError:
         render_job_detail_activity_timeline,
         render_job_detail_financial_section,
         render_job_detail_header,
-        render_job_detail_header_menu_slot,
         render_job_detail_overview_section,
-        close_job_detail_header_menu_slot,
     )
     from components.job_ips_forms import render_job_ips_forms_tab  # type: ignore
     from components.job_materials_ui import render_job_materials_tab  # type: ignore
@@ -2900,27 +2896,28 @@ def render_job_detail_dialog(job: dict) -> None:
             customer=customer,
         )
     with header_actions:
-        render_job_detail_header_menu_slot()
-        if not edit_mode:
-            render_job_status_badge_editor(
-                job,
-                key_prefix="jobs_modal",
-                on_updated=_on_job_status_updated,
-            )
-        else:
-            st.markdown(
-                f'<div class="ips-job-detail-header-actions">{job_status_pill_html(status)}</div>',
-                unsafe_allow_html=True,
-            )
-        if not edit_mode:
-            render_job_detail_header_menu(
-                job,
-                on_edit=_set_job_edit_mode,
-                on_add_task=_open_job_detail_task_form,
-                on_assign_crew=_assign_employees_for_job,
-                on_print_packet=_open_job_detail_print_packet,
-            )
-        close_job_detail_header_menu_slot()
+        status_col, menu_col = st.columns([1.15, 0.55], gap="small")
+        with status_col:
+            if not edit_mode:
+                render_job_status_badge_editor(
+                    job,
+                    key_prefix="jobs_modal",
+                    on_updated=_on_job_status_updated,
+                )
+            else:
+                st.markdown(
+                    f'<div class="ips-job-detail-header-actions">{job_status_pill_html(status)}</div>',
+                    unsafe_allow_html=True,
+                )
+        with menu_col:
+            if not edit_mode:
+                render_job_detail_header_menu(
+                    job,
+                    on_edit=_set_job_edit_mode,
+                    on_add_task=_open_job_detail_task_form,
+                    on_assign_crew=_assign_employees_for_job,
+                    on_print_packet=_open_job_detail_print_packet,
+                )
     st.markdown("</div>", unsafe_allow_html=True)
 
     if not edit_mode:

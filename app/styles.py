@@ -10243,7 +10243,9 @@ div[data-testid="stDialog"] [data-testid="column"]:has([data-testid="stDateInput
 }}
 body:has(div[data-testid="stDialog"]) div[data-baseweb="popover"]:has([data-baseweb="calendar"]),
 body:has(div[data-testid="stDialog"]) .ips-dialog-date-popper,
-body:has(div[data-testid="stDialog"]) .hire-date-popper {{
+body:has(div[data-testid="stDialog"]) .hire-date-popper,
+body:has(div[data-testid="stDialog"]) .ips-dialog-action-popper,
+body:has(div[data-testid="stDialog"]) div[data-baseweb="popover"]:has([data-testid="stPopoverBody"]) {{
   z-index: 100000 !important;
   position: fixed !important;
   overflow: visible !important;
@@ -10841,7 +10843,11 @@ div[data-testid="stDialog"] [class*="st-key-job_subjob_doc_"][class*="cancel_del
 
   var DIALOG_SEL = 'div[data-testid="stDialog"]';
   var DATE_INPUT_SEL = '[data-testid="stDateInput"]';
-  var POPPER_SEL = 'div[data-baseweb="popover"]:has([data-baseweb="calendar"])';
+  var POPPER_SEL = 'div[data-baseweb="popover"]';
+
+  function dialogIsOpen() {
+    return !!doc.querySelector(DIALOG_SEL);
+  }
 
   function dialogHasDateInput() {
     var dialog = doc.querySelector(DIALOG_SEL);
@@ -10849,18 +10855,23 @@ div[data-testid="stDialog"] [class*="st-key-job_subjob_doc_"][class*="cancel_del
   }
 
   function elevatePopper(pop) {
-    if (!pop || !dialogHasDateInput()) return;
-    pop.classList.add('ips-dialog-date-popper', 'hire-date-popper');
-    pop.style.zIndex = '100000';
+    if (!dialogIsOpen()) return;
+    if (pop.querySelector('[data-baseweb="calendar"]')) {
+      pop.classList.add('ips-dialog-date-popper', 'hire-date-popper');
+    } else {
+      pop.classList.add('ips-dialog-action-popper');
+    }
+    pop.style.zIndex = '100001';
     pop.style.position = 'fixed';
     pop.style.overflow = 'visible';
+    pop.style.pointerEvents = 'auto';
     if (pop.parentElement && pop.parentElement !== doc.body) {
       doc.body.appendChild(pop);
     }
   }
 
   function scan() {
-    if (!dialogHasDateInput()) return;
+    if (!dialogIsOpen()) return;
     doc.querySelectorAll(POPPER_SEL).forEach(elevatePopper);
   }
 

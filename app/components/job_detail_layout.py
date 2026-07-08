@@ -311,6 +311,31 @@ div[data-testid="stDialog"]:has(.ips-job-status-badge-editor-marker.ips-job-stat
 div[data-testid="stDialog"]:has(.ips-job-status-badge-editor-marker) [data-testid="stPopover"] > button:hover {
   filter: brightness(0.96) !important;
 }
+div[data-testid="stDialog"]:has(.ips-job-detail-control-page) > div,
+div[data-testid="stDialog"]:has(.ips-job-detail-control-page) div[role="dialog"] {
+  overflow: visible !important;
+}
+div[data-testid="stDialog"]:has(.ips-job-detail-control-page) [data-testid="column"]:has(.ips-job-status-badge-editor-marker),
+div[data-testid="stDialog"]:has(.ips-job-detail-control-page) [data-testid="column"]:has(.job-detail-header-menu-marker),
+div[data-testid="stDialog"]:has(.ips-job-detail-control-page) [data-testid="column"]:has(.ips-job-detail-header-actions-marker) {
+  overflow: visible !important;
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 4 !important;
+}
+div[data-testid="stDialog"]:has(.ips-job-detail-control-page) [data-testid="stPopover"],
+div[data-testid="stDialog"]:has(.ips-job-detail-control-page) [data-testid="stPopover"] > button,
+div[data-testid="stDialog"]:has(.ips-job-detail-control-page) button[data-testid="stBaseButton-popover"] {
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 5 !important;
+  min-width: 0 !important;
+}
+body:has(div[data-testid="stDialog"]:has(.ips-job-detail-control-page)) div[data-baseweb="popover"],
+body:has(div[data-testid="stDialog"]:has(.ips-job-detail-control-page)) [data-testid="stPopoverBody"] {
+  z-index: 100001 !important;
+  pointer-events: auto !important;
+}
 </style>
         """,
         unsafe_allow_html=True,
