@@ -148,6 +148,38 @@ section[data-testid="stMain"]:has(.ips-inventory-page) .ips-inventory-filter-bar
   text-decoration: underline !important;
   outline: none !important;
 }
+.st-key-inventory_open_button_harness,
+.st-key-inventory_open_button_harness [data-testid="stVerticalBlock"],
+.st-key-inventory_open_button_harness [data-testid="stElementContainer"] {
+  display: block !important;
+  width: 0 !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+.st-key-inventory_open_button_harness [class*="st-key-inv_bridge_open_"] {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  pointer-events: auto !important;
+}
+.st-key-inventory_open_button_harness [class*="st-key-inv_bridge_open_"] button {
+  width: 1px !important;
+  height: 1px !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  opacity: 0 !important;
+  pointer-events: auto !important;
+}
 .st-key-inventory_table_wrap .ips-dash-est-link,
 .st-key-inventory_table_wrap .ips-inventory-desc-link {
   color: #2563eb !important;

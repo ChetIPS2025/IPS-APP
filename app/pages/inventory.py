@@ -11,14 +11,14 @@ try:
     from app.components.inventory_actions import render_inventory_action_buttons
     from app.components.inventory_list_table import (
         INVENTORY_TABLE_LAST_ACTION_KEY,
-        apply_inventory_table_bridge_action,
         build_inventory_html_table,
         inventory_category,
         inventory_description,
         inventory_location,
         inventory_vendor,
         normalize_inventory_status,
-        render_inventory_table_bridge,
+        render_inventory_table_bridge_legacy,
+        render_inventory_table_open_buttons,
     )
     from app.components.inventory_page_layout import (
         close_inventory_filter_bar_shell,
@@ -111,14 +111,14 @@ except ImportError:
     from components.inventory_actions import render_inventory_action_buttons  # type: ignore
     from components.inventory_list_table import (  # type: ignore
         INVENTORY_TABLE_LAST_ACTION_KEY,
-        apply_inventory_table_bridge_action,
         build_inventory_html_table,
         inventory_category,
         inventory_description,
         inventory_location,
         inventory_vendor,
         normalize_inventory_status,
-        render_inventory_table_bridge,
+        render_inventory_table_bridge_legacy,
+        render_inventory_table_open_buttons,
     )
     from components.inventory_page_layout import (  # type: ignore
         close_inventory_filter_bar_shell,
@@ -395,6 +395,18 @@ def _render_custom_inventory_table(
                 expanded_item_id=expanded_item_id,
             ),
             unsafe_allow_html=True,
+        )
+        render_inventory_table_open_buttons(
+            filtered,
+            open_item_fn=_open_inventory_table_item,
+        )
+        render_inventory_table_bridge_legacy(
+            items_by_id,
+            component_key="ips_inventory_list_bridge",
+            hook_key="ipsInvList::action",
+            open_item_fn=_open_inventory_table_item,
+            on_expand_fn=_on_inventory_table_expand if field_mode else None,
+            field_mode=field_mode,
         )
 
         if field_mode and expanded_item_id and expanded_item_id in items_by_id:
@@ -1086,28 +1098,6 @@ def render() -> None:
 
         build_modal_cache(filtered, cache_key=_CACHE_KEY)
         _render_custom_inventory_table(page_rows, filter_options=filter_options)
-
-        page_items_by_id = {
-            str(i.get("id") or "").strip(): i
-            for i in page_rows
-            if str(i.get("id") or "").strip()
-        }
-        field_mode = is_field_context()
-        st.markdown(
-            '<span class="ips-inventory-table-link-bridge-marker" aria-hidden="true"></span>',
-            unsafe_allow_html=True,
-        )
-        table_action = render_inventory_table_bridge(
-            component_key="ips_inventory_list_bridge",
-            hook_key="ipsInvList::action",
-            field_mode=field_mode,
-        )
-        apply_inventory_table_bridge_action(
-            table_action,
-            page_items_by_id,
-            open_item_fn=_open_inventory_table_item,
-            on_expand_fn=_on_inventory_table_expand if field_mode else None,
-        )
 
         render_table_pagination_footer(len(filtered), _TABLE_KEY)
 

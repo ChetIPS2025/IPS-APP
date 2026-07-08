@@ -19,6 +19,12 @@ except ImportError:
 
 INVENTORY_TABLE_LAST_ACTION_KEY = "inventory_list_last_action"
 
+
+def inventory_bridge_button_key(item: dict[str, Any]) -> str:
+    raw = str(item.get("id") or item.get("sku") or "item").strip()
+    safe = "".join(ch if ch.isalnum() else "_" for ch in raw) or "item"
+    return f"inv_bridge_open_{safe}"
+
 INVENTORY_TABLE_HEADERS: tuple[tuple[str, str], ...] = (
     ("image", "IMAGE"),
     ("desc", "DESCRIPTION"),
@@ -116,23 +122,41 @@ def inventory_qty_display(item: dict[str, Any]) -> str:
     return format_inventory_quantity(qty)
 
 
-def _inventory_link_html(iid: str, label: str, *, extra_class: str = "") -> str:
+def _inventory_link_html(
+    iid: str,
+    label: str,
+    *,
+    extra_class: str = "",
+    bridge_key: str = "",
+) -> str:
     item_id = html.escape(str(iid or "").strip(), quote=True)
     text = html.escape(label)
     title = html.escape(label, quote=True)
     cls = f"ips-row-open-link ips-dash-est-link ips-inventory-desc-link ips-inventory-open-link {extra_class}".strip()
+    bridge_attr = ""
+    if bridge_key:
+        bridge_attr = f' data-bridge-key="{html.escape(bridge_key, quote=True)}"'
     return (
         f'<button type="button" class="{html.escape(cls)}" data-inv-action="open" '
-        f'data-inventory-id="{item_id}" data-row-id="{item_id}" title="{title}">{text}</button>'
+        f'data-inventory-id="{item_id}" data-row-id="{item_id}"{bridge_attr} '
+        f'title="{title}">{text}</button>'
     )
 
 
-def _inventory_thumb_link_html(iid: str, item: dict[str, Any]) -> str:
+def _inventory_thumb_link_html(
+    iid: str,
+    item: dict[str, Any],
+    *,
+    bridge_key: str = "",
+) -> str:
     item_id = html.escape(str(iid or "").strip(), quote=True)
     thumb = inventory_thumbnail_html(item)
+    bridge_attr = ""
+    if bridge_key:
+        bridge_attr = f' data-bridge-key="{html.escape(bridge_key, quote=True)}"'
     return (
         f'<button type="button" class="ips-inventory-thumb-cell-link ips-inventory-open-link" '
-        f'data-inv-action="open" data-inventory-id="{item_id}" data-row-id="{item_id}" '
+        f'data-inv-action="open" data-inventory-id="{item_id}" data-row-id="{item_id}"{bridge_attr} '
         f'title="View item" aria-label="View item">{thumb}</button>'
     )
 
@@ -167,6 +191,7 @@ def build_inventory_html_table(
         if not iid:
             continue
 
+        bridge_key = inventory_bridge_button_key(item)
         description = inventory_description(item)
         desc_label = description if description and description != "—" else "View item"
         category = inventory_category(item)
@@ -184,7 +209,7 @@ def build_inventory_html_table(
                 "image",
                 "center",
                 _cell_wrapper(
-                    _inventory_thumb_link_html(iid, item),
+                    _inventory_thumb_link_html(iid, item, bridge_key=bridge_key),
                     extra_class="ips-inventory-image-td",
                     align="center",
                 ),
@@ -193,7 +218,12 @@ def build_inventory_html_table(
                 "desc",
                 "left",
                 _cell_wrapper(
-                    _inventory_link_html(iid, desc_label, extra_class="ips-dash-est-desc-link"),
+                    _inventory_link_html(
+                        iid,
+                        desc_label,
+                        extra_class="ips-dash-est-desc-link",
+                        bridge_key=bridge_key,
+                    ),
                     extra_class="ips-dash-est-desc-cell",
                 ),
             ),
@@ -270,7 +300,8 @@ def build_inventory_html_table(
         expanded_cls = " ips-inventory-row-expanded" if expanded else ""
         body_rows.append(
             f'<tr class="ips-dash-est-tr ips-dash-est-row-{row_parity}{expanded_cls}" '
-            f'data-inventory-id="{html.escape(iid, quote=True)}" data-row-id="{html.escape(iid, quote=True)}"{expand_attr}>'
+            f'data-inventory-id="{html.escape(iid, quote=True)}" data-row-id="{html.escape(iid, quote=True)}" '
+            f'data-bridge-key="{html.escape(bridge_key, quote=True)}"{expand_attr}>'
             f"{tds}"
             f"</tr>"
         )
@@ -317,6 +348,32 @@ def handle_inventory_table_action(
     if not item:
         return
     open_item_fn(item_id, item)
+    st.rerun()
+
+
+def render_inventory_table_open_buttons(
+    items: list[dict[str, Any]],
+    *,
+    open_item_fn: Callable[[str, dict[str, Any]], None],
+) -> None:
+    """Hidden Streamlit buttons — HTML link clicks trigger these via the bridge script."""
+    with st.container(key="inventory_open_button_harness"):
+        for item in items:
+            iid = str(item.get("id") or "").strip()
+            if not iid:
+                continue
+            bridge_key = inventory_bridge_button_key(item)
+
+            def _open(_iid: str = iid, _item: dict = item) -> None:
+                open_item_fn(_iid, _item)
+
+            st.button(
+                "Open item",
+                key=bridge_key,
+                type="tertiary",
+                on_click=_open,
+                label_visibility="collapsed",
+            )
 
 
 def render_inventory_table_bridge(
@@ -361,9 +418,20 @@ def render_inventory_table_bridge(
     }}
   }}
 
-  function openItem(id, action) {{
+  function clickBridgeButton(bridgeKey) {{
+    if (!bridgeKey) return false;
+    const host = doc.querySelector(".st-key-" + bridgeKey);
+    const btn = host && host.querySelector('[data-testid="stButton"] > button');
+    if (!btn) return false;
+    btn.click();
+    return true;
+  }}
+
+  function openItem(id, action, bridgeKey) {{
     if (!id) return;
-    sendValue((action || "open") + ":" + id);
+    const act = action || "open";
+    if (act === "open" && bridgeKey && clickBridgeButton(bridgeKey)) return;
+    sendValue(act + ":" + id);
   }}
 
   function isInteractive(target) {{
@@ -382,7 +450,7 @@ def render_inventory_table_bridge(
         e.preventDefault();
         e.stopPropagation();
         const id = el.getAttribute("data-inventory-id") || el.getAttribute("data-row-id");
-        openItem(id, "open");
+        openItem(id, "open", el.getAttribute("data-bridge-key") || "");
       }}
       el.addEventListener("click", onActivate, true);
       el.addEventListener("keydown", function (e) {{
@@ -398,7 +466,11 @@ def render_inventory_table_bridge(
         if (!id) return;
         e.preventDefault();
         e.stopPropagation();
-        openItem(id, fieldMode ? "expand" : "open");
+        openItem(
+          id,
+          fieldMode ? "expand" : "open",
+          row.getAttribute("data-bridge-key") || ""
+        );
       }}, true);
     }});
   }}
@@ -415,7 +487,7 @@ def render_inventory_table_bridge(
         e.preventDefault();
         e.stopPropagation();
         const id = link.getAttribute("data-inventory-id") || link.getAttribute("data-row-id");
-        openItem(id, "open");
+        openItem(id, "open", link.getAttribute("data-bridge-key") || "");
         return;
       }}
       if (isInteractive(t)) return;
@@ -425,7 +497,11 @@ def render_inventory_table_bridge(
       if (!id) return;
       e.preventDefault();
       e.stopPropagation();
-      openItem(id, fieldMode ? "expand" : "open");
+      openItem(
+        id,
+        fieldMode ? "expand" : "open",
+        row.getAttribute("data-bridge-key") || ""
+      );
     }}, true);
   }}
 
