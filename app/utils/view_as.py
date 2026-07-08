@@ -123,17 +123,15 @@ def clear_view_as() -> None:
 
 
 def inject_view_as_styles() -> None:
-    if st.session_state.get("_ips_view_as_css"):
-        return
-    st.session_state["_ips_view_as_css"] = True
-    mobile_cls = " ips-view-as-mobile-preview" if is_view_as_mobile_preview() else ""
-    st.markdown(
-        f"""
-<style id="ips-view-as-v1">
-.ips-view-as-banner-wrap {{
+    if not st.session_state.get("_ips_view_as_base_css"):
+        st.session_state["_ips_view_as_base_css"] = True
+        st.markdown(
+            """
+<style id="ips-view-as-base-v2">
+.ips-view-as-banner-wrap {
   margin: 0 0 0.5rem 0;
-}}
-.ips-view-as-banner {{
+}
+.ips-view-as-banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -144,33 +142,23 @@ def inject_view_as_styles() -> None:
   border-left: 4px solid #2563eb;
   border-radius: 10px;
   padding: 0.55rem 0.85rem;
-}}
-.ips-view-as-banner-text {{
+}
+.ips-view-as-banner-text {
   margin: 0;
   font-size: 0.84rem;
   font-weight: 700;
   color: #1e3a8a;
-}}
-.ips-view-as-banner-text strong {{
+}
+.ips-view-as-banner-text strong {
   color: #1d4ed8;
-}}
-.ips-view-as-banner-sub {{
+}
+.ips-view-as-banner-sub {
   margin: 0.1rem 0 0;
   font-size: 0.72rem;
   font-weight: 600;
   color: #475569;
-}}
-body{mobile_cls} section[data-testid="stMain"] {{
-  max-width: 430px !important;
-  margin: 0 auto !important;
-  box-shadow: 0 0 0 1px #dbeafe, 0 12px 40px rgba(37, 99, 235, 0.12) !important;
-  border-radius: 16px !important;
-  overflow: hidden !important;
-}}
-body.ips-view-as-mobile-preview section[data-testid="stMain"] {{
-  padding-bottom: 4.25rem !important;
-}}
-.ips-view-as-mobile-nav {{
+}
+.ips-view-as-mobile-nav {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
@@ -182,8 +170,8 @@ body.ips-view-as-mobile-preview section[data-testid="stMain"] {{
   border-top: 1px solid #dbeafe;
   box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.08);
   padding: 0.2rem 0.15rem calc(0.2rem + env(safe-area-inset-bottom));
-}}
-.ips-view-as-mobile-nav-btn {{
+}
+.ips-view-as-mobile-nav-btn {
   flex: 1 1 0;
   display: flex;
   flex-direction: column;
@@ -200,17 +188,40 @@ body.ips-view-as-mobile-preview section[data-testid="stMain"] {{
   letter-spacing: 0.02em;
   cursor: pointer;
   padding: 0.2rem 0.1rem;
-}}
-.ips-view-as-mobile-nav-btn .ips-view-as-mobile-nav-icon {{
+}
+.ips-view-as-mobile-nav-btn .ips-view-as-mobile-nav-icon {
   font-size: 1rem;
   line-height: 1;
-}}
-.ips-view-as-mobile-nav-btn.is-active {{
+}
+.ips-view-as-mobile-nav-btn.is-active {
   color: #2563eb;
-}}
+}
 </style>
-<span class="ips-view-as-marker{mobile_cls}" aria-hidden="true"></span>
-        """,
+            """,
+            unsafe_allow_html=True,
+        )
+
+    marker_classes = "ips-view-as-marker"
+    mobile_css = ""
+    if is_view_as_mobile_preview():
+        marker_classes += " ips-view-as-mobile-active"
+        mobile_css = """
+<style id="ips-view-as-mobile-v2">
+section[data-testid="stMain"]:has(.ips-view-as-mobile-active) {
+  max-width: 430px !important;
+  margin: 0 auto !important;
+  box-shadow: 0 0 0 1px #dbeafe, 0 12px 40px rgba(37, 99, 235, 0.12) !important;
+  border-radius: 16px !important;
+  overflow: hidden !important;
+  padding-bottom: 4.25rem !important;
+}
+section[data-testid="stMain"]:has(.ips-view-as-mobile-active) .ips-jobs-summary-cards {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+</style>
+"""
+    st.markdown(
+        f'{mobile_css}<span class="{marker_classes}" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
 

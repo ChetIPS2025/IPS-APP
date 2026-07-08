@@ -80,7 +80,7 @@ def _profit_pct_summary_class(value: float) -> str:
 def inject_jobs_page_layout_css() -> None:
     st.markdown(
         """
-<style id="ips-jobs-page-layout-v22">
+<style id="ips-jobs-page-layout-v23">
 section[data-testid="stMain"]:has(.ips-jobs-page) {
   background: #ffffff !important;
 }
@@ -709,13 +709,19 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap .stB
 }
 .ips-jobs-summary-cards {
   display: grid;
-  grid-template-columns: repeat(9, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: 0.4rem;
   margin: 0 0 0.35rem 0;
 }
+.ips-jobs-stat-label,
+.ips-jobs-stat-value {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 @media (max-width: 1500px) {
   .ips-jobs-summary-cards {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
   }
 }
 @media (max-width: 900px) {
@@ -724,6 +730,7 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap .stB
   }
 }
 .ips-jobs-stat-card {
+  min-width: 0;
   background: #ffffff;
   border: 1px solid #dbe3ef;
   border-radius: 10px;
