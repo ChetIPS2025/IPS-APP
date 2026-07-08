@@ -120,10 +120,20 @@ def _inventory_link_html(iid: str, label: str, *, extra_class: str = "") -> str:
     item_id = html.escape(str(iid or "").strip(), quote=True)
     text = html.escape(label)
     title = html.escape(label, quote=True)
-    cls = f"ips-row-open-link ips-dash-est-link ips-inventory-desc-link {extra_class}".strip()
+    cls = f"ips-row-open-link ips-dash-est-link ips-inventory-desc-link ips-inventory-open-link {extra_class}".strip()
     return (
-        f'<a href="#" class="{html.escape(cls)}" data-inv-action="open" data-inventory-id="{item_id}" '
-        f'data-row-id="{item_id}" title="{title}">{text}</a>'
+        f'<button type="button" class="{html.escape(cls)}" data-inv-action="open" '
+        f'data-inventory-id="{item_id}" data-row-id="{item_id}" title="{title}">{text}</button>'
+    )
+
+
+def _inventory_thumb_link_html(iid: str, item: dict[str, Any]) -> str:
+    item_id = html.escape(str(iid or "").strip(), quote=True)
+    thumb = inventory_thumbnail_html(item)
+    return (
+        f'<button type="button" class="ips-inventory-thumb-cell-link ips-inventory-open-link" '
+        f'data-inv-action="open" data-inventory-id="{item_id}" data-row-id="{item_id}" '
+        f'title="View item" aria-label="View item">{thumb}</button>'
     )
 
 
@@ -174,7 +184,7 @@ def build_inventory_html_table(
                 "image",
                 "center",
                 _cell_wrapper(
-                    inventory_thumbnail_html(item),
+                    _inventory_thumb_link_html(iid, item),
                     extra_class="ips-inventory-image-td",
                     align="center",
                 ),
@@ -288,7 +298,7 @@ def handle_inventory_table_action(
     val = str(raw or "").strip()
     if not val:
         return
-    if val == str(st.session_state.get(last_action_key) or ""):
+    if val == str(st.session_state.get(last_action_key) or "") and not val.startswith("open:"):
         return
     st.session_state[last_action_key] = val
 
@@ -367,12 +377,14 @@ def render_inventory_table_bridge(
 
   function isInteractive(target) {{
     return !!(target && target.closest && target.closest(
-      "button, input, select, textarea, label, [data-inv-action='open']"
+      "button:not(.ips-inventory-open-link), input, select, textarea, label, [data-inv-action]:not([data-inv-action='open'])"
     ));
   }}
 
   function bindTargets() {{
-    doc.querySelectorAll(openSel).forEach(function (el) {{
+    const wrap = doc.querySelector(wrapSel);
+    if (!wrap) return;
+    wrap.querySelectorAll(openSel).forEach(function (el) {{
       if (el.dataset.ipsInvOpenBound === "1") return;
       el.dataset.ipsInvOpenBound = "1";
       function onActivate(e) {{
@@ -386,7 +398,7 @@ def render_inventory_table_bridge(
         if (e.key === "Enter" || e.key === " ") onActivate(e);
       }}, true);
     }});
-    doc.querySelectorAll(rowSel).forEach(function (row) {{
+    wrap.querySelectorAll(rowSel).forEach(function (row) {{
       if (row.dataset.ipsInvRowBound === "1") return;
       row.dataset.ipsInvRowBound = "1";
       row.addEventListener("click", function (e) {{
@@ -437,11 +449,14 @@ def render_inventory_table_bridge(
     }});
     doc.ipsInvTableBindObserver.observe(doc.body, {{ childList: true, subtree: true }});
   }}
+  try {{
+    w.postMessage({{ type: "streamlit:componentReady", apiVersion: 1 }}, "*");
+  }} catch (err) {{}}
 }})();
 </script>
         """,
         component_key=component_key,
-        height=1,
+        height=0,
     )
     action = str(picked or "").strip()
     if action:

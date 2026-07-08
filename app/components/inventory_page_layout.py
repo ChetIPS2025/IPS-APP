@@ -8,7 +8,7 @@ import streamlit as st
 def inject_inventory_page_layout_css() -> None:
     st.markdown(
         """
-<style id="ips-inventory-page-layout-v1">
+<style id="ips-inventory-page-layout-v2">
 section[data-testid="stMain"]:has(.ips-inventory-page) {
   background: #ffffff !important;
 }
@@ -126,6 +126,29 @@ section[data-testid="stMain"]:has(.ips-inventory-page) .ips-inventory-filter-bar
   text-align: center !important;
 }
 .st-key-inventory_table_wrap .ips-dash-est-link,
+.st-key-inventory_table_wrap .ips-inventory-desc-link,
+.st-key-inventory_table_wrap .ips-inventory-open-link {
+  color: #2563eb !important;
+  font-weight: 800 !important;
+  font-size: 0.8125rem !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  font-family: inherit !important;
+  line-height: inherit !important;
+  text-align: left !important;
+}
+.st-key-inventory_table_wrap .ips-inventory-open-link:hover,
+.st-key-inventory_table_wrap .ips-inventory-open-link:focus {
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
+  outline: none !important;
+}
+.st-key-inventory_table_wrap .ips-dash-est-link,
 .st-key-inventory_table_wrap .ips-inventory-desc-link {
   color: #2563eb !important;
   font-weight: 800 !important;
@@ -174,6 +197,25 @@ section[data-testid="stMain"]:has(.ips-inventory-page) .ips-inventory-filter-bar
 }
 .st-key-inventory_table_wrap .ips-inventory-image-td {
   justify-content: center !important;
+}
+.st-key-inventory_table_wrap .ips-inventory-thumb-cell-link {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  line-height: 0 !important;
+}
+.st-key-inventory_table_wrap .ips-inventory-thumb-cell-link:hover .ips-inventory-thumb-img,
+.st-key-inventory_table_wrap .ips-inventory-thumb-cell-link:focus-visible .ips-inventory-thumb-img,
+.st-key-inventory_table_wrap .ips-inventory-thumb-cell-link:hover .ips-inventory-thumb-placeholder,
+.st-key-inventory_table_wrap .ips-inventory-thumb-cell-link:focus-visible .ips-inventory-thumb-placeholder {
+  border-color: #93c5fd !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15) !important;
 }
 .st-key-inventory_table_wrap .ips-inventory-image-td .image-cell,
 .st-key-inventory_table_wrap .ips-inventory-image-td .ips-inventory-image-cell,

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from app.components.inventory_list_table import (
+    _inventory_link_html,
+    _inventory_thumb_link_html,
     build_inventory_html_table,
     handle_inventory_table_action,
     inventory_description,
@@ -22,6 +24,27 @@ def test_inventory_status_pill_html_includes_class():
     assert "ips-inventory-status-pill" in html_out
     assert "ips-inventory-status-in-stock" in html_out
     assert "In Stock" in html_out
+
+
+def test_inventory_link_html_uses_open_button():
+    html_out = _inventory_link_html("inv-1", "Copper fitting", extra_class="ips-dash-est-desc-link")
+    assert '<button type="button"' in html_out
+    assert 'data-inv-action="open"' in html_out
+    assert 'data-inventory-id="inv-1"' in html_out
+    assert "ips-inventory-open-link" in html_out
+    assert "Copper fitting" in html_out
+
+
+def test_inventory_thumb_link_html_wraps_thumbnail():
+    html_out = _inventory_thumb_link_html(
+        "inv-1",
+        {"id": "inv-1", "description": "Copper fitting"},
+    )
+    assert '<button type="button"' in html_out
+    assert "ips-inventory-thumb-cell-link" in html_out
+    assert 'data-inv-action="open"' in html_out
+    assert 'data-inventory-id="inv-1"' in html_out
+    assert "ips-inventory-thumb-img" in html_out or "ips-inventory-thumb-placeholder" in html_out
 
 
 def test_build_inventory_html_table_includes_columns_and_link():
@@ -45,6 +68,8 @@ def test_build_inventory_html_table_includes_columns_and_link():
     assert "VENDOR" in html_out
     assert 'data-inv-action="open"' in html_out
     assert 'data-inventory-id="inv-1"' in html_out
+    assert "ips-inventory-thumb-cell-link" in html_out
+    assert '<button type="button"' in html_out
     assert "Copper fitting" in html_out
     assert "Acme Supply" in html_out
     assert inventory_description(rows[0]) == "Copper fitting"
