@@ -26,16 +26,21 @@ try:
     from app.components.job_status_ui import (
         job_status_pill_html,
         render_job_status_badge_editor,
-        render_job_status_table_pill,
     )
-    from app.components.jobs_list_table import job_list_link_html, render_jobs_table_link_bridge
+    from app.components.job_row_actions_ui import render_job_row_actions
+    from app.components.jobs_list_table import (
+        JOBS_TABLE_PENDING_MENU_KEY,
+        JOBS_TABLE_PENDING_STATUS_KEY,
+        build_jobs_html_table,
+        job_list_link_html,
+        render_jobs_table_bridge,
+    )
     from app.components.jobs_page_layout import (
         close_jobs_filter_bar_shell,
         inject_jobs_page_layout_css,
         job_health_badge_html,
         render_jobs_filter_bar_shell,
         render_jobs_pagination_footer,
-        render_jobs_row_click_bridge,
         render_jobs_summary_badge_bar,
         render_jobs_summary_cards,
         render_jobs_table_pagination_header,
@@ -146,16 +151,21 @@ except ImportError:
     from components.job_status_ui import (  # type: ignore
         job_status_pill_html,
         render_job_status_badge_editor,
-        render_job_status_table_pill,
     )
-    from components.jobs_list_table import job_list_link_html, render_jobs_table_link_bridge  # type: ignore
+    from components.job_row_actions_ui import render_job_row_actions  # type: ignore
+    from components.jobs_list_table import (  # type: ignore
+        JOBS_TABLE_PENDING_MENU_KEY,
+        JOBS_TABLE_PENDING_STATUS_KEY,
+        build_jobs_html_table,
+        job_list_link_html,
+        render_jobs_table_bridge,
+    )
     from components.jobs_page_layout import (  # type: ignore
         close_jobs_filter_bar_shell,
         inject_jobs_page_layout_css,
         job_health_badge_html,
         render_jobs_filter_bar_shell,
         render_jobs_pagination_footer,
-        render_jobs_row_click_bridge,
         render_jobs_summary_badge_bar,
         render_jobs_summary_cards,
         render_jobs_table_pagination_header,
@@ -1158,6 +1168,81 @@ def _render_jobs_list_fragment(
     )
 
 
+def _jobs_table_cost_payload(job: dict, *, cost_cache: dict[str, dict[str, float | dict | bool]]) -> dict[str, Any]:
+    costs = _job_list_cost_fields(job, cost_cache=cost_cache)
+    return dict(costs)
+
+
+def _render_jobs_table_column_filters(
+    visible_headers: list[tuple[str, str | None]],
+    *,
+    filter_options: dict[str, list[str]],
+) -> None:
+    filter_specs = [(label, field) for label, field in visible_headers if field]
+    if not filter_specs:
+        return
+    st.markdown('<div class="ips-jobs-table-filter-toolbar">', unsafe_allow_html=True)
+    cols = st.columns(len(filter_specs), gap="small")
+    for col, (label, field) in zip(cols, filter_specs):
+        with col:
+            render_table_header_cell(
+                label,
+                table_key=_TABLE_KEY,
+                filter_field=field,
+                filter_options=filter_options.get(field or "", []),
+                base_class="ips-jobs-filter-toolbar-cell",
+            )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def _render_jobs_table_pending_panels(
+    jobs_by_id: dict[str, dict],
+) -> None:
+    status_jid = str(st.session_state.get(JOBS_TABLE_PENDING_STATUS_KEY) or "").strip()
+    if status_jid and status_jid in jobs_by_id:
+        job = jobs_by_id[status_jid]
+        job_no = _job_number(job)
+        st.markdown(
+            f'<div class="ips-jobs-table-action-panel ips-jobs-table-status-panel">'
+            f'<span class="ips-jobs-table-action-panel-title">Change status — '
+            f"{html.escape(job_no)}</span></div>",
+            unsafe_allow_html=True,
+        )
+        panel_cols = st.columns([4, 1], gap="small", vertical_alignment="center")
+        with panel_cols[0]:
+            render_job_status_badge_editor(job, key_prefix="job_table_panel", on_updated=_on_job_status_updated)
+        with panel_cols[1]:
+            if st.button("Close", key=f"jobs_status_panel_close_{status_jid}", use_container_width=True):
+                st.session_state.pop(JOBS_TABLE_PENDING_STATUS_KEY, None)
+                st.rerun()
+
+    menu_jid = str(st.session_state.get(JOBS_TABLE_PENDING_MENU_KEY) or "").strip()
+    if menu_jid and menu_jid in jobs_by_id:
+        job = jobs_by_id[menu_jid]
+        job_no = _job_number(job)
+        st.markdown(
+            f'<div class="ips-jobs-table-action-panel ips-jobs-table-menu-panel">'
+            f'<span class="ips-jobs-table-action-panel-title">Actions — '
+            f"{html.escape(job_no)}</span></div>",
+            unsafe_allow_html=True,
+        )
+        render_job_row_actions(
+            job,
+            on_open=_open_jobs_table_job,
+            on_edit=_set_job_edit_mode,
+            on_open_tab=lambda jid, row, tab: _open_job_detail_with_tab(row, tab),
+            on_assign_employees=_assign_employees_for_job,
+        )
+        if st.button("Close", key=f"jobs_menu_panel_close_{menu_jid}", use_container_width=False):
+            st.session_state.pop(JOBS_TABLE_PENDING_MENU_KEY, None)
+            st.rerun()
+
+
+def _on_jobs_table_expand(job_id: str, job: dict) -> None:
+    toggle_field_expanded(FIELD_EXPANDED_JOB_KEY, job_id)
+    set_field_job_id(job_id)
+
+
 def _render_custom_jobs_table(
     filtered: list[dict],
     *,
@@ -1173,165 +1258,52 @@ def _render_custom_jobs_table(
     all_job_ids = [str(j.get("id") or "").strip() for j in filtered if str(j.get("id") or "").strip()]
     st.session_state[_ALL_JOB_IDS_KEY] = all_job_ids
 
-    visible_markers, visible_headers, visible_weights = jobs_visible_table_layout(
+    visible_markers, visible_headers, _visible_weights = jobs_visible_table_layout(
         filtered,
         lambda job: _job_list_cost_fields(job, cost_cache=cost_cache),
     )
-    col_map = {marker: idx for idx, marker in enumerate(visible_markers)}
+    jobs_by_id = {
+        str(j.get("id") or "").strip(): j
+        for j in filtered
+        if str(j.get("id") or "").strip()
+    }
+    field_mode = is_field_context()
+    expanded_job_id = str(field_expanded_id(FIELD_EXPANDED_JOB_KEY) or "").strip() if field_mode else ""
 
     with st.container(key="jobs_table_wrap"):
-        st.markdown('<div class="ips-jobs-table-wrap jobs-table">', unsafe_allow_html=True)
+        _render_jobs_table_column_filters(visible_headers, filter_options=filter_options)
+        _render_jobs_table_pending_panels(jobs_by_id)
+        st.markdown(
+            build_jobs_html_table(
+                filtered,
+                visible_markers=visible_markers,
+                cost_fields_fn=lambda job: _jobs_table_cost_payload(job, cost_cache=cost_cache),
+                health_badge_fn=job_health_badge_html,
+                field_mode=field_mode,
+                expanded_job_id=expanded_job_id,
+            ),
+            unsafe_allow_html=True,
+        )
+        render_jobs_table_bridge(
+            jobs_by_id,
+            component_key="ips_jobs_list_bridge",
+            hook_key="ipsJobsList::action",
+            open_job_fn=_open_jobs_table_job,
+            on_expand_fn=_on_jobs_table_expand if field_mode else None,
+        )
 
-        header_cols = st.columns(visible_weights, gap="xxsmall", vertical_alignment="center")
-        for col, (label, field), marker in zip(header_cols, visible_headers, visible_markers):
-            with col:
-                st.markdown(_jobs_col_marker(marker), unsafe_allow_html=True)
-                if field:
-                    render_table_header_cell(
-                        label,
-                        table_key=_TABLE_KEY,
-                        filter_field=field,
-                        filter_options=filter_options.get(field, []),
-                        base_class="ips-jobs-header-row ips-jobs-cell",
-                    )
-                else:
-                    render_table_header_cell(
-                        label,
-                        base_class="ips-jobs-header-row ips-jobs-cell",
-                    )
-
-        for job in filtered:
-            jid = str(job.get("id") or "").strip()
-            if not jid:
-                continue
-
-            job_no = _job_number(job)
-            project = _job_project(job)
-            customer = _job_customer(job)
-            costs = _job_list_cost_fields(job, cost_cache=cost_cache)
-            estimated_val = float(costs["estimated_cost"])
-            actual_val = float(costs.get("actual_cost") or 0)
-            raw_summary = costs.get("raw_summary")
-            health_html = ""
-            if isinstance(raw_summary, dict) and raw_summary:
-                health_html = job_health_badge_html(raw_summary)
-            field_mode = is_field_context()
-            expanded = field_mode and field_expanded_id(FIELD_EXPANDED_JOB_KEY) == jid
-
-            cols = st.columns(visible_weights, gap="xxsmall", vertical_alignment="center")
-
-            with cols[col_map["num"]]:
-                st.markdown(
-                    f'<span class="ips-jobs-row-marker ips-jobs-table-row job-row jobs-table-row" '
-                    f'data-row-id="{html.escape(jid, quote=True)}" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                st.markdown(_jobs_col_marker("num"), unsafe_allow_html=True)
-                if field_mode:
-                    if st.button(
-                        "▾" if expanded else "▸",
-                        key=f"job_expand_{jid}",
-                        help="Expand job details",
-                    ):
-                        toggle_field_expanded(FIELD_EXPANDED_JOB_KEY, jid)
-                        set_field_job_id(jid)
-                        st.rerun()
-                num_label = job_no if job_no and job_no != "—" else "View job"
-                if st.button(
-                    num_label,
-                    key=f"job_open_num_{jid}",
-                    type="tertiary",
-                    help=f"View job {num_label}",
-                    use_container_width=False,
-                ):
-                    _open_jobs_table_job(jid, job)
-
-            with cols[col_map["desc"]]:
-                st.markdown(_jobs_col_marker("desc"), unsafe_allow_html=True)
-                title_label = project if project and project != "—" else "View job"
-                if st.button(
-                    title_label,
-                    key=f"job_open_title_{jid}",
-                    type="tertiary",
-                    help=f"View job {title_label}",
-                    use_container_width=True,
-                ):
-                    _open_jobs_table_job(jid, job)
-
-            with cols[col_map["customer"]]:
-                st.markdown(_jobs_col_marker("customer"), unsafe_allow_html=True)
-                customer_title = html.escape(customer, quote=True)
-                st.markdown(
-                    f'<div class="ips-jobs-cell job-cell jobs-table-cell ips-jobs-customer-cell ips-jobs-cell-truncate" '
-                    f'title="{customer_title}">{html.escape(customer)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[col_map["status"]]:
-                st.markdown(_jobs_col_marker("status"), unsafe_allow_html=True)
-                st.markdown(
-                    '<span class="job-status-cell ips-jobs-status-cell" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                render_job_status_table_pill(
-                    job,
-                    key_prefix="job_table",
-                    on_updated=_on_job_status_updated,
-                )
-                if health_html:
-                    st.markdown(health_html, unsafe_allow_html=True)
-
-            has_estimated = bool(costs.get("has_estimated"))
-            has_actual = bool(costs.get("has_actual"))
-
-            if "estimated" in col_map:
-                with cols[col_map["estimated"]]:
-                    st.markdown(_jobs_col_marker("estimated"), unsafe_allow_html=True)
-                    estimated_cls = _money_cell_class(estimated_val, available=has_estimated)
-                    st.markdown(
-                        f'<div class="ips-jobs-money ips-jobs-cell ips-jobs-col-money{estimated_cls}">'
-                        f"{html.escape(_money_cell(estimated_val, available=has_estimated))}</div>",
-                        unsafe_allow_html=True,
-                    )
-            if "actual" in col_map:
-                with cols[col_map["actual"]]:
-                    st.markdown(_jobs_col_marker("actual"), unsafe_allow_html=True)
-                    st.markdown(
-                        _actual_cost_cell_html(
-                            actual_val,
-                            estimated_val=estimated_val,
-                            has_actual=has_actual,
-                            has_estimated=has_estimated,
-                        ),
-                        unsafe_allow_html=True,
-                    )
-
-            if expanded:
-                st.markdown('<div class="ips-field-row-expand">', unsafe_allow_html=True)
-                _render_field_job_detail_tabs(job)
-                if st.button("All job details", key=f"job_full_modal_{jid}", use_container_width=True):
-                    _open_jobs_detail_modal(jid, job)
-                    st.rerun()
-                st.markdown("</div>", unsafe_allow_html=True)
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        if not is_field_context():
-            jobs_by_id = {
-                str(j.get("id") or "").strip(): j
-                for j in filtered
-                if str(j.get("id") or "").strip()
-            }
-            render_jobs_table_link_bridge(
-                jobs_by_id,
-                open_job_fn=_open_jobs_table_job,
-            )
-            picked = render_jobs_row_click_bridge()
-            if picked:
-                open_id = _normalize_job_open_id(picked)
-                open_job = jobs_by_id.get(open_id)
-                if open_job:
-                    _open_jobs_table_job(open_id, open_job)
+        if field_mode and expanded_job_id and expanded_job_id in jobs_by_id:
+            expanded_job = jobs_by_id[expanded_job_id]
+            st.markdown('<div class="ips-field-row-expand">', unsafe_allow_html=True)
+            _render_field_job_detail_tabs(expanded_job)
+            if st.button(
+                "All job details",
+                key=f"job_full_modal_{expanded_job_id}",
+                use_container_width=True,
+            ):
+                _open_jobs_detail_modal(expanded_job_id, expanded_job)
+                ips_app_rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
     return all_job_ids
 
