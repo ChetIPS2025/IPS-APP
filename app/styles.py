@@ -10270,7 +10270,7 @@ body.ips-auth-login .st-key-ips_login_card [data-testid="stHorizontalBlock"] > [
 def inject_authenticated_shell_css() -> None:
     """Full app layout after login."""
     st.markdown(
-        '<script>document.body.classList.remove("ips-auth-login");</script>',
+        '<script>document.body.classList.remove("ips-auth-login");document.body.classList.add("ips-authed-app");</script>',
         unsafe_allow_html=True,
     )
     try:

@@ -67,7 +67,7 @@ def store_sidebar_nav_fallback(items: list[tuple[str, ...]]) -> None:
         if len(item) >= 2:
             slug = str(item[0])
             label = str(item[1])
-            icon = str(item[2]) if len(item) >= 3 else nav_icon_for_slug(slug)
+            icon = nav_icon_for_slug(slug)
             rows.append({"slug": slug, "label": label, "icon": icon})
     st.session_state[IPS_SIDEBAR_NAV_FALLBACK_KEY] = rows
 
@@ -215,8 +215,10 @@ def _desktop_nav_rail_css() -> str:
     nav_h = IPS_SIDEBAR_COLLAPSED_NAV_HEIGHT_PX
     mobile_max = IPS_SIDEBAR_DESKTOP_MIN_PX - 1
     return f"""
-<style id="ips-desktop-nav-rail-v2">
+<style id="ips-desktop-nav-rail-v3">
 @media (min-width: {IPS_SIDEBAR_DESKTOP_MIN_PX}px) {{
+  body.ips-authed-app [data-testid="stSidebar"],
+  body.ips-authed-app section[data-testid="stSidebar"],
   .stApp:has(.ips-desktop-nav-rail) [data-testid="stSidebar"],
   .stApp:has(.ips-desktop-nav-rail) section[data-testid="stSidebar"] {{
     display: none !important;
@@ -227,11 +229,13 @@ def _desktop_nav_rail_css() -> str:
     overflow: hidden !important;
     visibility: hidden !important;
   }}
+  body.ips-authed-app [data-testid="stAppViewContainer"],
   .stApp:has(.ips-desktop-nav-rail) [data-testid="stAppViewContainer"] {{
     margin-left: {col}px !important;
     width: calc(100% - {col}px) !important;
     max-width: calc(100% - {col}px) !important;
   }}
+  body.ips-authed-app [data-testid="stHeader"],
   .stApp:has(.ips-desktop-nav-rail) [data-testid="stHeader"] {{
     margin-left: {col}px !important;
     width: calc(100% - {col}px) !important;
@@ -302,21 +306,29 @@ def _desktop_nav_rail_css() -> str:
   min-height: 0;
 }}
 .ips-desktop-nav-rail__link {{
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 10px;
-  width: calc(100% - 8px);
-  min-height: {nav_h}px;
-  margin: 0 4px;
-  padding: 0 10px;
-  border-radius: 10px;
-  color: #0f172a;
-  text-decoration: none;
-  font-size: 0.875rem;
-  font-weight: 500;
-  line-height: 1.2;
-  box-sizing: border-box;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 10px !important;
+  width: calc(100% - 8px) !important;
+  min-height: {nav_h}px !important;
+  margin: 0 4px !important;
+  padding: 0 10px !important;
+  border-radius: 10px !important;
+  color: #0f172a !important;
+  text-decoration: none !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  line-height: 1.2 !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}}
+.ips-desktop-nav-rail:not(:hover) .ips-desktop-nav-rail__link {{
+  justify-content: center !important;
+  padding: 0 !important;
+  width: {col}px !important;
+  margin: 0 !important;
 }}
 .ips-desktop-nav-rail__link:hover {{
   background: #f1f5f9;
@@ -328,25 +340,34 @@ def _desktop_nav_rail_css() -> str:
   font-weight: 600;
 }}
 .ips-desktop-nav-rail__icon {{
-  flex: 0 0 {IPS_SIDEBAR_COLLAPSED_ICON_PX}px;
-  width: {IPS_SIDEBAR_COLLAPSED_ICON_PX}px;
-  min-width: {IPS_SIDEBAR_COLLAPSED_ICON_PX}px;
-  text-align: center;
-  font-size: {IPS_SIDEBAR_COLLAPSED_ICON_PX}px;
-  line-height: 1;
+  flex: 0 0 {IPS_SIDEBAR_COLLAPSED_ICON_PX}px !important;
+  width: {IPS_SIDEBAR_COLLAPSED_ICON_PX}px !important;
+  min-width: {IPS_SIDEBAR_COLLAPSED_ICON_PX}px !important;
+  text-align: center !important;
+  font-size: {IPS_SIDEBAR_COLLAPSED_ICON_PX}px !important;
+  line-height: 1 !important;
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif !important;
 }}
 .ips-desktop-nav-rail__label {{
-  opacity: 0;
-  width: 0;
-  max-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  transition: opacity 0.15s ease;
+  display: none !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  max-width: 0 !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
 }}
 .ips-desktop-nav-rail:hover .ips-desktop-nav-rail__label {{
-  opacity: 1;
-  width: auto;
-  max-width: none;
+  display: inline !important;
+  opacity: 1 !important;
+  width: auto !important;
+  max-width: none !important;
+  overflow: visible !important;
+}}
+.ips-desktop-nav-rail:hover .ips-desktop-nav-rail__link {{
+  justify-content: flex-start !important;
+  padding: 0 10px !important;
+  width: calc(100% - 8px) !important;
+  margin: 0 4px !important;
 }}
 .ips-desktop-nav-rail__footer {{
   margin-top: auto;
@@ -358,12 +379,16 @@ def _desktop_nav_rail_css() -> str:
 
 
 def _desktop_nav_rail_html(rows: list[dict[str, str]], active_slug: str) -> str:
+    try:
+        from app.components.sidebar_nav_icons import nav_icon_for_slug
+    except ImportError:
+        from components.sidebar_nav_icons import nav_icon_for_slug  # type: ignore
     scan_slugs = frozenset({"scan_inventory", "scan_asset"})
     item_bits: list[str] = []
     for row in rows:
         slug = row["slug"]
         label = html.escape(row["label"])
-        icon = html.escape(row["icon"])
+        icon = html.escape(nav_icon_for_slug(slug))
         is_active = slug == active_slug or (slug in scan_slugs and active_slug in {"inventory", "assets"})
         if slug == "employee_qr_scan" and active_slug in {"inventory", "assets"}:
             is_active = True
@@ -410,10 +435,7 @@ def inject_desktop_nav_rail_markup(*, active_slug: str | None = None) -> None:
             from navigation import current_nav_slug  # type: ignore
         active_slug = current_nav_slug()
     markup = _desktop_nav_rail_html(rows, active_slug)
-    try:
-        st.html(markup)
-    except Exception:
-        st.markdown(markup, unsafe_allow_html=True)
+    st.markdown(markup, unsafe_allow_html=True)
 
 
 def inject_desktop_nav_rail(*, active_slug: str | None = None) -> None:

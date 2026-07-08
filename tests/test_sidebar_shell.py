@@ -35,6 +35,12 @@ def test_store_sidebar_nav_fallback_keeps_slug_label_and_icon():
     assert '"My Jobs"' in _fallback_nav_json()
 
 
+def test_store_sidebar_nav_fallback_ignores_lucide_token_for_rail_icons():
+    store_sidebar_nav_fallback([("dashboard", "Dashboard", "layout-dashboard")])
+    rows = st.session_state[IPS_SIDEBAR_NAV_FALLBACK_KEY]
+    assert rows == [{"slug": "dashboard", "label": "Dashboard", "icon": "⌂"}]
+
+
 def test_sidebar_collapse_session_helpers():
     set_sidebar_collapsed(False)
     assert is_sidebar_collapsed() is False
