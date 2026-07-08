@@ -35,8 +35,8 @@ try:
         JOBS_TABLE_PENDING_STATUS_KEY,
         build_jobs_html_table,
         job_list_link_html,
-        apply_jobs_table_bridge_action,
-        render_jobs_table_bridge,
+        render_jobs_table_bridge_legacy,
+        render_jobs_table_open_buttons,
     )
     from app.components.jobs_page_layout import (
         close_jobs_filter_bar_shell,
@@ -163,8 +163,8 @@ except ImportError:
         JOBS_TABLE_PENDING_STATUS_KEY,
         build_jobs_html_table,
         job_list_link_html,
-        apply_jobs_table_bridge_action,
-        render_jobs_table_bridge,
+        render_jobs_table_bridge_legacy,
+        render_jobs_table_open_buttons,
     )
     from components.jobs_page_layout import (  # type: ignore
         close_jobs_filter_bar_shell,
@@ -1290,6 +1290,18 @@ def _render_custom_jobs_table(
                 expanded_job_id=expanded_job_id,
             ),
             unsafe_allow_html=True,
+        )
+        render_jobs_table_open_buttons(
+            filtered,
+            open_job_fn=_activate_job_detail_modal,
+        )
+        render_jobs_table_bridge_legacy(
+            jobs_by_id,
+            component_key="ips_jobs_list_bridge",
+            hook_key="ipsJobsList::action",
+            open_job_fn=_activate_job_detail_modal,
+            on_expand_fn=_on_jobs_table_expand if field_mode else None,
+            field_mode=field_mode,
         )
 
         if field_mode and expanded_job_id and expanded_job_id in jobs_by_id:
@@ -3215,28 +3227,6 @@ def _render_jobs_page() -> None:
         filter_options=filter_options,
         cost_cache=None,
         subjob_counts=subjob_counts,
-    )
-
-    page_jobs_by_id = {
-        str(j.get("id") or "").strip(): j
-        for j in page_rows
-        if str(j.get("id") or "").strip()
-    }
-    field_mode = is_field_context()
-    st.markdown(
-        '<span class="ips-jobs-table-link-bridge-marker" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
-    table_action = render_jobs_table_bridge(
-        component_key="ips_jobs_list_bridge",
-        hook_key="ipsJobsList::action",
-        field_mode=field_mode,
-    )
-    apply_jobs_table_bridge_action(
-        table_action,
-        page_jobs_by_id,
-        open_job_fn=_activate_job_detail_modal,
-        on_expand_fn=_on_jobs_table_expand if field_mode else None,
     )
 
     render_jobs_pagination_footer(len(filtered), _TABLE_KEY, item_label="job")
