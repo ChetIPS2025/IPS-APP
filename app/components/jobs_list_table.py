@@ -19,6 +19,13 @@ JOBS_TABLE_LAST_ACTION_KEY = "jobs_list_last_action"
 JOBS_TABLE_PENDING_STATUS_KEY = "jobs_table_pending_status_id"
 JOBS_TABLE_PENDING_MENU_KEY = "jobs_table_pending_menu_id"
 
+
+def jobs_bridge_button_key(job: dict[str, Any]) -> str:
+    raw = str(job.get("id") or job.get("job_number") or "job").strip()
+    safe = "".join(ch if ch.isalnum() else "_" for ch in raw) or "job"
+    return f"job_bridge_open_{safe}"
+
+
 JOBS_TABLE_HEADER_LABELS: dict[str, str] = {
     "num": "JOB #",
     "desc": "PROJECT / DESCRIPTION",
@@ -59,14 +66,18 @@ def job_list_link_html(
     label: str,
     *,
     extra_class: str = "",
+    bridge_key: str = "",
 ) -> str:
     jid = html.escape(str(job_id or "").strip(), quote=True)
     text = html.escape(label)
     title = html.escape(label, quote=True)
-    cls = f"ips-dash-est-link ips-jobs-list-link {extra_class}".strip()
+    cls = f"ips-row-open-link ips-dash-est-link ips-jobs-list-link {extra_class}".strip()
+    bridge_attr = ""
+    if bridge_key:
+        bridge_attr = f' data-bridge-key="{html.escape(bridge_key, quote=True)}"'
     return (
-        f'<a href="#" class="{html.escape(cls)}" data-job-action="open" '
-        f'data-job-id="{jid}" title="{title}">{text}</a>'
+        f'<a href="#" class="{html.escape(cls)}" data-row-id="{jid}" data-job-id="{jid}" '
+        f'data-job-action="open"{bridge_attr} title="{title}">{text}</a>'
     )
 
 
@@ -218,19 +229,30 @@ def build_jobs_html_table(
         title_label = project if project and project != "—" else "View job"
         row_parity = "even" if row_idx % 2 else "odd"
         expanded = field_mode and expanded_job_id == jid
+        bridge_key = jobs_bridge_button_key(job)
 
         cell_builders: dict[str, tuple[str, str]] = {
             "num": (
                 "left",
                 _cell_wrapper(
-                    job_list_link_html(jid, num_label, extra_class="ips-dash-est-num-link"),
+                    job_list_link_html(
+                        jid,
+                        num_label,
+                        extra_class="ips-dash-est-num-link",
+                        bridge_key=bridge_key,
+                    ),
                     extra_class="ips-dash-est-num-cell",
                 ),
             ),
             "desc": (
                 "left",
                 _cell_wrapper(
-                    job_list_link_html(jid, title_label, extra_class="ips-dash-est-desc-link"),
+                    job_list_link_html(
+                        jid,
+                        title_label,
+                        extra_class="ips-dash-est-desc-link",
+                        bridge_key=bridge_key,
+                    ),
                     extra_class="ips-dash-est-desc-cell",
                 ),
             ),
@@ -301,7 +323,9 @@ def build_jobs_html_table(
             if key in cell_builders
         )
         body_rows.append(
-            f'<tr class="ips-dash-est-tr ips-dash-est-row-{row_parity}" data-job-id="{html.escape(jid, quote=True)}">'
+            f'<tr class="ips-dash-est-tr ips-dash-est-row-{row_parity}" '
+            f'data-row-id="{html.escape(jid, quote=True)}" data-job-id="{html.escape(jid, quote=True)}" '
+            f'data-bridge-key="{html.escape(bridge_key, quote=True)}">'
             f"{tds}"
             f"</tr>"
         )
@@ -368,6 +392,32 @@ def handle_jobs_table_action(
     st.session_state.pop(pending_status_key, None)
     st.session_state.pop(pending_menu_key, None)
     open_job_fn(job_id, open_job)
+    st.rerun()
+
+
+def render_jobs_table_open_buttons(
+    jobs: list[dict[str, Any]],
+    *,
+    open_job_fn: Callable[[str, dict[str, Any]], None],
+) -> None:
+    """Hidden Streamlit buttons — HTML link clicks trigger these via the bridge script."""
+    with st.container(key="jobs_open_button_harness"):
+        for job in jobs:
+            jid = str(job.get("id") or "").strip()
+            if not jid:
+                continue
+            bridge_key = jobs_bridge_button_key(job)
+
+            def _open(_jid: str = jid, _job: dict = job) -> None:
+                open_job_fn(_jid, _job)
+
+            st.button(
+                "Open job",
+                key=bridge_key,
+                type="tertiary",
+                on_click=_open,
+                label_visibility="collapsed",
+            )
 
 
 def render_jobs_table_bridge(
@@ -398,8 +448,31 @@ def render_jobs_table_bridge(
   const doc = w.document;
   const hookKey = {hook_key!r};
   const wrapSel = ".st-key-jobs_table_wrap";
-  const actionSel = wrapSel + " [data-job-id][data-job-action]";
-  const rowSel = wrapSel + " tbody tr[data-job-id]";
+  const actionSel = wrapSel + " [data-job-id][data-job-action]:not([data-job-action='open'])";
+  const openSel = wrapSel + " .ips-row-open-link[data-row-id]";
+  const rowSel = wrapSel + " tbody tr[data-row-id]";
+
+  function clickBridgeButton(bridgeKey) {{
+    if (!bridgeKey) return false;
+    const needle = "st-key-" + bridgeKey;
+    const hosts = doc.querySelectorAll('[class*="' + needle + '"]');
+    for (var i = 0; i < hosts.length; i++) {{
+      const btn = hosts[i].querySelector("button");
+      if (btn) {{
+        btn.click();
+        return true;
+      }}
+    }}
+    return false;
+  }}
+
+  function openJob(jobId, bridgeKey) {{
+    if (jobId) {{
+      sendValue("open:" + jobId);
+      return;
+    }}
+    clickBridgeButton(bridgeKey);
+  }}
 
   function sendValue(action) {{
     const payload = {{ type: "streamlit:setComponentValue", value: action }};
@@ -421,11 +494,26 @@ def render_jobs_table_bridge(
 
   function isInteractive(target) {{
     return !!(target && target.closest && target.closest(
-      "button, input, select, textarea, label, [data-job-action]"
+      "button, input, select, textarea, label, [data-job-action]:not([data-job-action='open'])"
     ));
   }}
 
   function bindTargets() {{
+    doc.querySelectorAll(openSel).forEach(function (el) {{
+      if (el.dataset.ipsJobsOpenBound === "1") return;
+      el.dataset.ipsJobsOpenBound = "1";
+      function onActivate(e) {{
+        e.preventDefault();
+        e.stopPropagation();
+        const id = el.getAttribute("data-row-id") || el.getAttribute("data-job-id");
+        const bridgeKey = el.getAttribute("data-bridge-key") || "";
+        openJob(id, bridgeKey);
+      }}
+      el.addEventListener("click", onActivate, true);
+      el.addEventListener("keydown", function (e) {{
+        if (e.key === "Enter" || e.key === " ") onActivate(e);
+      }}, true);
+    }});
     doc.querySelectorAll(actionSel).forEach(function (el) {{
       if (el.dataset.ipsJobsTableBound === "1") return;
       el.dataset.ipsJobsTableBound = "1";
@@ -447,13 +535,42 @@ def render_jobs_table_bridge(
       row.dataset.ipsJobsRowBound = "1";
       row.addEventListener("click", function (e) {{
         if (isInteractive(e.target)) return;
-        const id = row.getAttribute("data-job-id");
+        const id = row.getAttribute("data-row-id") || row.getAttribute("data-job-id");
+        const bridgeKey = row.getAttribute("data-bridge-key") || "";
         if (!id) return;
         e.preventDefault();
         e.stopPropagation();
-        sendValue("open:" + id);
-      }});
+        openJob(id, bridgeKey);
+      }}, true);
     }});
+  }}
+
+  if (!doc.ipsJobsTableDocClick) {{
+    doc.ipsJobsTableDocClick = true;
+    doc.addEventListener("click", function (e) {{
+      const t = e.target;
+      if (!t || !t.closest) return;
+      const wrap = doc.querySelector(wrapSel);
+      if (!wrap || !wrap.contains(t)) return;
+      const link = t.closest(".ips-row-open-link[data-row-id]");
+      if (link && wrap.contains(link)) {{
+        e.preventDefault();
+        e.stopPropagation();
+        const id = link.getAttribute("data-row-id") || link.getAttribute("data-job-id");
+        const bridgeKey = link.getAttribute("data-bridge-key") || "";
+        openJob(id, bridgeKey);
+        return;
+      }}
+      if (isInteractive(t)) return;
+      const row = t.closest("tbody tr[data-row-id]");
+      if (!row || !wrap.contains(row)) return;
+      const id = row.getAttribute("data-row-id") || row.getAttribute("data-job-id");
+      const bridgeKey = row.getAttribute("data-bridge-key") || "";
+      if (!id) return;
+      e.preventDefault();
+      e.stopPropagation();
+      openJob(id, bridgeKey);
+    }}, true);
   }}
 
   if (!doc.ipsJobsTableRegistry) doc.ipsJobsTableRegistry = {{}};

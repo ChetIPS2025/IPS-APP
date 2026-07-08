@@ -59,7 +59,7 @@ def _summary_money(value: float, *, has_data: bool) -> str:
 def inject_jobs_page_layout_css() -> None:
     st.markdown(
         """
-<style id="ips-jobs-page-layout-v21">
+<style id="ips-jobs-page-layout-v22">
 section[data-testid="stMain"]:has(.ips-jobs-page) {
   background: #ffffff !important;
 }
@@ -229,6 +229,38 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-filter-bar-wrap .stB
 .st-key-jobs_table_wrap .ips-dash-est-link:focus {
   color: #1d4ed8 !important;
   text-decoration: underline !important;
+}
+.st-key-jobs_open_button_harness,
+.st-key-jobs_open_button_harness [data-testid="stVerticalBlock"],
+.st-key-jobs_open_button_harness [data-testid="stElementContainer"] {
+  display: block !important;
+  width: 0 !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+.st-key-jobs_open_button_harness [class*="st-key-job_bridge_open_"] {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  pointer-events: auto !important;
+}
+.st-key-jobs_open_button_harness [class*="st-key-job_bridge_open_"] button {
+  width: 1px !important;
+  height: 1px !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  opacity: 0 !important;
+  pointer-events: auto !important;
 }
 .st-key-jobs_table_wrap .ips-dash-est-customer-cell {
   font-size: 0.8125rem !important;

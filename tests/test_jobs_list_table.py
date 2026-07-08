@@ -10,12 +10,21 @@ from app.components.jobs_list_table import (
 
 
 def test_job_list_link_html_includes_action_and_id():
-    html_out = job_list_link_html("j-123", "J26015", extra_class="ips-jobs-number-link")
+    html_out = job_list_link_html(
+        "j-123",
+        "J26015",
+        extra_class="ips-jobs-number-link",
+        bridge_key="job_bridge_open_j123",
+    )
     assert 'data-job-action="open"' in html_out
     assert 'data-job-id="j-123"' in html_out
+    assert 'data-row-id="j-123"' in html_out
+    assert 'data-bridge-key="job_bridge_open_j123"' in html_out
     assert "J26015" in html_out
     assert "ips-jobs-number-link" in html_out
     assert "ips-dash-est-link" in html_out
+    assert "ips-row-open-link" in html_out
+    assert '<a href="#"' in html_out
 
 
 def test_handle_jobs_table_action_strips_open_prefix():
