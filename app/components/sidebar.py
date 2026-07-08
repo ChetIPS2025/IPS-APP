@@ -27,6 +27,7 @@ try:
         normalize_role,
         role_can_access_page,
     )
+    from app.utils.view_as import is_real_admin, is_view_as_active, render_view_as_selector
 except ImportError:
     from auth import current_profile, current_role, effective_role, sign_out  # type: ignore
     from components.sidebar_nav_icons import nav_icon_for_slug  # type: ignore
@@ -47,6 +48,7 @@ except ImportError:
         normalize_role,
         role_can_access_page,
     )
+    from utils.view_as import is_real_admin, is_view_as_active, render_view_as_selector  # type: ignore
 
 _OT, _CT = "d" + "iv", "/" + "d" + "iv"
 
@@ -240,10 +242,6 @@ def render_sidebar(active_slug: str) -> None:
                 request_sidebar_collapse_after_nav()
                 st.rerun()
 
-        try:
-            from app.utils.view_as import is_real_admin, is_view_as_active, render_view_as_selector
-        except ImportError:
-            from utils.view_as import is_real_admin, is_view_as_active, render_view_as_selector  # type: ignore
         if is_real_admin():
             render_view_as_selector()
 
