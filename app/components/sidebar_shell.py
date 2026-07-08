@@ -187,7 +187,7 @@ def inject_sidebar_nav_override_css() -> None:
 def _sidebar_nav_override_css() -> str:
     """Final cascade override for sidebar navigation rows (not button chrome)."""
     return """
-<style id="ips-sidebar-nav-override-v6">
+<style id="ips-sidebar-nav-override-v7">
 section[data-testid="stSidebar"] > div,
 section[data-testid="stSidebar"] [data-testid="stSidebarContent"],
 section[data-testid="stSidebar"] .block-container {
@@ -473,8 +473,6 @@ section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):n
 }
 body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) .st-key-sidebar_expanded_header_wrap,
 body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stVerticalBlock"].st-key-sidebar_expanded_header_wrap,
-body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stVerticalBlockBorderWrapper"].st-key-sidebar_expanded_header_wrap,
-body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stVerticalBlock"]:has(.sidebar-header-expanded-rail-marker),
 body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stHorizontalBlock"]:has(.sidebar-header-brand-marker),
 body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stElementContainer"]:has(.sidebar-header-expanded-rail-marker),
 body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stElementContainer"]:has(.sidebar-header-brand-marker),
@@ -483,8 +481,6 @@ body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-te
 body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [class*="st-key-ips_sidebar_collapse_toggle"],
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) .st-key-sidebar_expanded_header_wrap,
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stVerticalBlock"].st-key-sidebar_expanded_header_wrap,
-section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stVerticalBlockBorderWrapper"].st-key-sidebar_expanded_header_wrap,
-section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stVerticalBlock"]:has(.sidebar-header-expanded-rail-marker),
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stHorizontalBlock"]:has(.sidebar-header-brand-marker),
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stElementContainer"]:has(.sidebar-header-expanded-rail-marker),
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stElementContainer"]:has(.sidebar-header-brand-marker),
@@ -724,7 +720,7 @@ def _shell_css() -> str:
     mobile_max = IPS_SIDEBAR_DESKTOP_MIN_PX - 1
     collapsed_sel = _collapsed_sidebar_selectors()
     return f"""
-<style id="ips-sidebar-shell-v12">
+<style id="ips-sidebar-shell-v13">
 section[data-testid="stSidebar"].app-sidebar,
 [data-testid="stSidebar"].app-sidebar {{
   transition: width 0.2s ease, min-width 0.2s ease, max-width 0.2s ease, flex-basis 0.2s ease !important;
@@ -999,8 +995,6 @@ button.ips-header-menu-btn {{
   }}
   {collapsed_sel}:not(:hover) .st-key-sidebar_expanded_header_wrap,
   {collapsed_sel}:not(:hover) [data-testid="stVerticalBlock"].st-key-sidebar_expanded_header_wrap,
-  {collapsed_sel}:not(:hover) [data-testid="stVerticalBlockBorderWrapper"].st-key-sidebar_expanded_header_wrap,
-  {collapsed_sel}:not(:hover) [data-testid="stVerticalBlock"]:has(.sidebar-header-expanded-rail-marker),
   {collapsed_sel}:not(:hover) [data-testid="stHorizontalBlock"]:has(.sidebar-header-brand-marker),
   {collapsed_sel}:not(:hover) [data-testid="stElementContainer"]:has(.sidebar-header-expanded-rail-marker),
   {collapsed_sel}:not(:hover) [data-testid="stElementContainer"]:has(.sidebar-header-brand-marker),
@@ -1309,7 +1303,7 @@ button.ips-header-menu-btn {{
     overflow: hidden !important;
   }}
   .st-key-sidebar_expanded_header_wrap,
-  [data-testid="stVerticalBlockBorderWrapper"]:has(.sidebar-header-expanded-rail-marker) {{
+  [data-testid="stVerticalBlock"].st-key-sidebar_expanded_header_wrap {{
     display: block !important;
     height: auto !important;
     min-height: 0 !important;

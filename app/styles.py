@@ -13838,8 +13838,6 @@ section[data-testid="stSidebar"] > div {{
 }}
 body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) .st-key-sidebar_expanded_header_wrap,
 body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stVerticalBlock"].st-key-sidebar_expanded_header_wrap,
-body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stVerticalBlockBorderWrapper"].st-key-sidebar_expanded_header_wrap,
-body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stVerticalBlock"]:has(.sidebar-header-expanded-rail-marker),
 body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stHorizontalBlock"]:has(.sidebar-header-brand-marker),
 body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stElementContainer"]:has(.sidebar-header-expanded-rail-marker),
 body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-testid="stElementContainer"]:has(.sidebar-header-brand-marker),
@@ -13848,8 +13846,6 @@ body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [data-te
 body.ips-sidebar-collapsed section[data-testid="stSidebar"]:not(:hover) [class*="st-key-ips_sidebar_collapse_toggle"],
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) .st-key-sidebar_expanded_header_wrap,
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stVerticalBlock"].st-key-sidebar_expanded_header_wrap,
-section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stVerticalBlockBorderWrapper"].st-key-sidebar_expanded_header_wrap,
-section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stVerticalBlock"]:has(.sidebar-header-expanded-rail-marker),
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stHorizontalBlock"]:has(.sidebar-header-brand-marker),
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stElementContainer"]:has(.sidebar-header-expanded-rail-marker),
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stElementContainer"]:has(.sidebar-header-brand-marker),
