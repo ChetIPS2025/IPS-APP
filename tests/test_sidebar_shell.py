@@ -98,6 +98,16 @@ def test_sidebar_shell_script_targets_streamlit_156_collapse_button():
     assert "forceExpandSidebar" in script
 
 
+def test_inject_sidebar_shell_injects_layout_on_every_render():
+    import inspect
+
+    from app.components.sidebar_shell import inject_sidebar_shell
+
+    source = inspect.getsource(inject_sidebar_shell)
+    assert "_shell_css()" in source
+    assert "if st.session_state.get(IPS_SIDEBAR_SHELL_KEY)" not in source
+
+
 def test_employee_field_nav_is_restricted_without_legacy_access():
     items = filter_field_nav_for_role(FIELD_NAV_PAGES, "employee")
     labels = [label for _slug, label in items]

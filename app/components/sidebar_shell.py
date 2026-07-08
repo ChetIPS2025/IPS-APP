@@ -107,7 +107,7 @@ def ensure_sidebar_collapsed_hydrated() -> None:
     var url = new URL(window.location.href);
     if (url.searchParams.has('ips_sb')) return;
     var collapsed = localStorage.getItem('{IPS_SIDEBAR_COLLAPSED_STORAGE_KEY}') === '1';
-    url.searchParams.set('ips_sb', 'c');
+    url.searchParams.set('ips_sb', collapsed ? 'c' : 'e');
     window.location.replace(url.toString());
   }} catch (e) {{}}
 }})();
@@ -156,27 +156,22 @@ def _fallback_nav_json() -> str:
 
 
 def inject_sidebar_shell() -> None:
-    """Inject sidebar layout CSS/JS once per authenticated session."""
+    """Inject sidebar layout CSS/JS on every authenticated render."""
     collapsed = True
     inject_sidebar_nav_override_css()
-    if st.session_state.get(IPS_SIDEBAR_SHELL_KEY):
-        inject_sidebar_menu_wire()
-        inject_sidebar_nav_align()
-        inject_sidebar_layout_state(collapsed)
-        if st.session_state.pop(IPS_SIDEBAR_TOGGLE_REQUEST_KEY, False):
-            components.html(_toggle_script(collapsed=collapsed, after_nav=True), height=0)
-        return
-    st.session_state[IPS_SIDEBAR_SHELL_KEY] = True
+    st.markdown(_shell_css(), unsafe_allow_html=True)
+
+    nav_json = _fallback_nav_json()
+    components.html(_shell_script(nav_json), height=0)
+
+    inject_sidebar_menu_wire()
+    inject_sidebar_nav_align()
+    inject_sidebar_layout_state(collapsed)
 
     if st.session_state.pop(IPS_SIDEBAR_TOGGLE_REQUEST_KEY, False):
         components.html(_toggle_script(collapsed=collapsed, after_nav=True), height=0)
 
-    nav_json = _fallback_nav_json()
-    components.html(_shell_script(nav_json), height=0)
-    st.markdown(_shell_css(), unsafe_allow_html=True)
-    inject_sidebar_menu_wire()
-    inject_sidebar_nav_align()
-    inject_sidebar_layout_state(collapsed)
+    st.session_state[IPS_SIDEBAR_SHELL_KEY] = True
 
 
 def inject_sidebar_nav_override_css() -> None:
@@ -187,7 +182,7 @@ def inject_sidebar_nav_override_css() -> None:
 def _sidebar_nav_override_css() -> str:
     """Final cascade override for sidebar navigation rows (not button chrome)."""
     return """
-<style id="ips-sidebar-nav-override-v8">
+<style id="ips-sidebar-nav-override-v9">
 section[data-testid="stSidebar"] > div,
 section[data-testid="stSidebar"] [data-testid="stSidebarContent"],
 section[data-testid="stSidebar"] .block-container {
@@ -720,7 +715,7 @@ def _shell_css() -> str:
     mobile_max = IPS_SIDEBAR_DESKTOP_MIN_PX - 1
     collapsed_sel = _collapsed_sidebar_selectors()
     return f"""
-<style id="ips-sidebar-shell-v14">
+<style id="ips-sidebar-shell-v15">
 section[data-testid="stSidebar"].app-sidebar,
 [data-testid="stSidebar"].app-sidebar {{
   transition: width 0.2s ease, min-width 0.2s ease, max-width 0.2s ease, flex-basis 0.2s ease !important;
