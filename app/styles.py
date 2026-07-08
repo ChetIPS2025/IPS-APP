@@ -3215,10 +3215,9 @@ def inject_inventory_module_css() -> None:
 
 def inject_pricing_guide_module_css() -> None:
     """Pricing Guide list custom table styling (matches Inventory table)."""
-    checkbox_css = _list_table_checkbox_column_css("pricing_guide_table_wrap")
     st.markdown(
         f"""
-<style id="ips-pricing-guide-module-v3">
+<style id="ips-pricing-guide-module-v4">
 .ips-pg-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -3275,6 +3274,83 @@ def inject_pricing_guide_module_css() -> None:
   overflow: hidden;
   background: #f1f5f9;
   border: 1px solid #e2e8f0;
+  padding: 0;
+}}
+.ips-pg-thumb-cell-link {{
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}}
+.ips-pg-thumb-cell-link:hover,
+.ips-pg-thumb-cell-link:focus-visible {{
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+  outline: none;
+}}
+.ips-pg-table-row {{
+  display: none !important;
+}}
+.st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-pg-table-row) {{
+  cursor: pointer;
+}}
+.st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-pg-table-row) [class*="st-key-pg_open_"] {{
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: auto !important;
+}}
+.st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-pg-table-row) [class*="st-key-pg_open_"] [data-testid="stButton"],
+.st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-pg-table-row) [class*="st-key-pg_open_"] .stButton {{
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+}}
+.st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-pg-table-row) [class*="st-key-pg_open_"] button,
+.st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-pg-table-row) [class*="st-key-pg_open_"] [data-testid="stButton"] > button,
+.st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-pg-table-row) [class*="st-key-pg_open_"] button[data-testid="stBaseButton-tertiary"] {{
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  width: auto !important;
+  max-width: 100% !important;
+  min-height: 0 !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: #2563eb !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  overflow: visible !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  text-overflow: clip !important;
+}}
+.st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-pg-table-row) [class*="st-key-pg_open_"] button:hover,
+.st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-pg-table-row) [class*="st-key-pg_open_"] [data-testid="stButton"] > button:hover {{
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}}
+.st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-pg-table-row) [class*="st-key-pg_open_"] button > div,
+.st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-pg-table-row) [class*="st-key-pg_open_"] button p {{
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: left !important;
+  white-space: normal !important;
+  word-break: break-word !important;
 }}
 .ips-pg-thumb-img {{
   width: 36px;
@@ -3391,9 +3467,6 @@ def inject_pricing_guide_module_css() -> None:
 .st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"]:not(:first-of-type):hover {{
   background: #eef5ff;
 }}
-.st-key-pricing_guide_table_wrap [data-testid="stHorizontalBlock"]:has([data-testid="stCheckbox"] input:checked) {{
-  background: #eaf2ff !important;
-}}
 .st-key-pricing_guide_table_wrap [data-testid="stElementContainer"] {{
   margin-top: 0 !important;
   margin-bottom: 0 !important;
@@ -3405,13 +3478,6 @@ def inject_pricing_guide_module_css() -> None:
 .st-key-pricing_guide_table_wrap .stMarkdown p {{
   margin: 0 !important;
   padding: 0 !important;
-}}
-.st-key-pricing_guide_table_wrap [data-testid="stCheckbox"] {{
-  margin: 0 !important;
-}}
-.st-key-pricing_guide_table_wrap [data-testid="stCheckbox"] label {{
-  min-height: 24px !important;
-  margin: 0 !important;
 }}
 </style>
 """,
