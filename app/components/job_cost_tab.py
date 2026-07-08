@@ -42,10 +42,68 @@ except ImportError:
     from utils.formatting import fmt_currency  # type: ignore
 
 
+def _join_employee_notes(employee: object, notes: object) -> str:
+    emp = str(employee or "").strip()
+    note = str(notes or "").strip()
+    if emp and emp != "—" and note:
+        return f"{emp} · {note}"
+    if emp and emp != "—":
+        return emp
+    return note or "—"
+
+
+def _format_qty_unit(qty: object, unit: object) -> str:
+    try:
+        q = float(qty or 0)
+    except (TypeError, ValueError):
+        q = 0.0
+    unit_label = str(unit or "").strip()
+    if abs(q - round(q)) < 0.0001:
+        qty_text = str(int(round(q)))
+    else:
+        qty_text = f"{q:g}"
+    return f"{qty_text} {unit_label}".strip() if unit_label else qty_text
+
+
+def _format_amount_line(unit_cost: object, total_cost: object, qty: object) -> str:
+    try:
+        total = float(total_cost or 0)
+        unit = float(unit_cost or 0)
+        q = float(qty or 0)
+    except (TypeError, ValueError):
+        return fmt_currency(0)
+    if q > 1.005 and unit > 0:
+        return f"{fmt_currency(unit)}/ea · {fmt_currency(total)}"
+    return fmt_currency(total)
+
+
+def _compact_cost_display_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Fewer, narrower columns so rows fit without horizontal scrolling."""
+    if df.empty:
+        return pd.DataFrame(
+            columns=["id", "description", "qty_unit", "amount", "detail", "show_on_invoice"]
+        )
+    out = df.copy()
+    out["qty_unit"] = [
+        _format_qty_unit(row.get("qty"), row.get("unit")) for _, row in out.iterrows()
+    ]
+    out["amount"] = [
+        _format_amount_line(row.get("unit_cost"), row.get("total_cost"), row.get("qty"))
+        for _, row in out.iterrows()
+    ]
+    out["detail"] = [
+        _join_employee_notes(row.get("employee"), row.get("notes")) for _, row in out.iterrows()
+    ]
+    keep = ["id", "description", "qty_unit", "amount", "detail"]
+    if "show_on_invoice" in out.columns:
+        keep.append("show_on_invoice")
+    return out[keep]
+
+
 def inject_job_cost_tab_css() -> None:
     st.markdown(
         """
-<style id="ips-job-cost-tab-v1">
+<style id="ips-job-cost-tab-v2">
 .ips-job-cost-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -80,6 +138,22 @@ def inject_job_cost_tab_css() -> None:
   border: 1px solid #dbe3ef;
   border-radius: 10px;
   overflow: hidden;
+}
+.st-key-job_cost_table_wrap [data-testid="stDataEditor"] > div,
+.st-key-job_cost_table_wrap [data-testid="stDataFrame"] > div {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+.st-key-job_cost_table_wrap [data-testid="stDataEditor"] [data-testid="glideDataEditor"],
+.st-key-job_cost_table_wrap [data-testid="stDataFrame"] [data-testid="glideDataEditor"] {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+.st-key-job_cost_table_wrap .dvn-scroller {
+  overflow-x: hidden !important;
+}
+.st-key-job_cost_table_wrap canvas {
+  max-width: 100% !important;
 }
 .ips-job-cost-thumb {
   width: 36px !important;
@@ -296,59 +370,70 @@ def render_job_cost_tab(job: dict[str, Any], *, key_prefix: str = "job_cost_tab"
     display_df = base_df
     if cat_filter != "All":
         display_df = base_df[base_df["source"] == cat_filter].copy()
+    compact_df = _compact_cost_display_df(display_df)
 
     with st.container(key="job_cost_table_wrap"):
         if is_admin:
             st.caption("Admins can toggle **Show on invoice** — hidden lines stay in job cost but are excluded from customer billing.")
             column_config = {
                 "id": None,
-                "date_time": st.column_config.TextColumn("Date / time", disabled=True),
-                "source": st.column_config.TextColumn("Source", disabled=True),
-                "description": st.column_config.TextColumn("Description", disabled=True, width="large"),
-                "qty": st.column_config.NumberColumn("Qty", format="%.4f", disabled=True),
-                "unit": st.column_config.TextColumn("Unit", disabled=True),
-                "unit_cost": st.column_config.NumberColumn("Unit cost", format="$%.2f", disabled=True),
-                "total_cost": st.column_config.NumberColumn("Total", format="$%.2f", disabled=True),
-                "employee": st.column_config.TextColumn("Employee / scanned by", disabled=True),
-                "notes": st.column_config.TextColumn("Notes", disabled=True, width="medium"),
+                "description": st.column_config.TextColumn("Description", disabled=True, width="medium"),
+                "qty_unit": st.column_config.TextColumn("Qty", disabled=True, width="small"),
+                "amount": st.column_config.TextColumn("Amount", disabled=True, width="small"),
+                "detail": st.column_config.TextColumn("Who / notes", disabled=True, width="small"),
                 "show_on_invoice": st.column_config.CheckboxColumn(
-                    "Show on invoice",
+                    "Invoice",
                     help="Include this line on customer invoice / T&M billing output.",
                     default=True,
+                    width="small",
                 ),
             }
             edited = st.data_editor(
-                display_df,
+                compact_df,
                 column_config=column_config,
                 hide_index=True,
                 use_container_width=True,
                 key=f"{key_prefix}_editor",
             )
             if st.button("Save invoice visibility", type="primary", key=f"{key_prefix}_save_invoice"):
-                changed = _apply_invoice_visibility_changes(jid, display_df, edited)
+                changed = _apply_invoice_visibility_changes(jid, compact_df, edited)
                 if changed:
                     st.success(f"Updated {changed} cost line(s).")
                     st.rerun()
                 else:
                     st.caption("No invoice visibility changes to save.")
         else:
-            view_df = display_df.drop(columns=["id", "show_on_invoice"], errors="ignore")
+            view_df = compact_df.drop(columns=["id", "show_on_invoice"], errors="ignore")
             st.dataframe(
                 view_df,
                 use_container_width=True,
                 hide_index=True,
                 column_config={
-                    "date_time": "Date / time",
-                    "source": "Source",
-                    "description": "Description",
-                    "qty": st.column_config.NumberColumn("Qty", format="%.4f"),
-                    "unit": "Unit",
-                    "unit_cost": st.column_config.NumberColumn("Unit cost", format="$%.2f"),
-                    "total_cost": st.column_config.NumberColumn("Total", format="$%.2f"),
-                    "employee": "Employee / scanned by",
-                    "notes": "Notes",
+                    "description": st.column_config.TextColumn("Description", width="medium"),
+                    "qty_unit": st.column_config.TextColumn("Qty", width="small"),
+                    "amount": st.column_config.TextColumn("Amount", width="small"),
+                    "detail": st.column_config.TextColumn("Who / notes", width="small"),
                 },
             )
+
+    with st.expander("Full line details (date, source, unit cost)", expanded=False):
+        detail_df = display_df.drop(columns=["id", "show_on_invoice"], errors="ignore")
+        st.dataframe(
+            detail_df,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "date_time": "Date / time",
+                "source": "Source",
+                "description": "Description",
+                "qty": st.column_config.NumberColumn("Qty", format="%.4f"),
+                "unit": "Unit",
+                "unit_cost": st.column_config.NumberColumn("Unit cost", format="$%.2f"),
+                "total_cost": st.column_config.NumberColumn("Total", format="$%.2f"),
+                "employee": "Employee / scanned by",
+                "notes": "Notes",
+            },
+        )
 
     with st.expander("Line thumbnails", expanded=False):
         thumb_rows = []
