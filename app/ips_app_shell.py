@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_APP_SHELL_CSS_KEY = "ips_app_shell_styles_injected_v12"
+IPS_APP_SHELL_CSS_KEY = "ips_app_shell_styles_injected_v13"
 
 
 def inject_ips_app_shell_styles() -> None:
@@ -646,6 +646,39 @@ def inject_ips_app_shell_styles() -> None:
             border-color: #f87171 !important;
             background: #fecaca !important;
             font-weight: 600 !important;
+        }
+
+        @media (max-width: 768px) {
+            section[data-testid="stMain"] > div {
+                max-width: 100% !important;
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+                min-width: 0 !important;
+                width: 100% !important;
+            }
+            section[data-testid="stMain"] .block-container {
+                width: 100% !important;
+                max-width: 100% !important;
+                min-width: 0 !important;
+                margin-left: 0 !important;
+                padding-left: 12px !important;
+                padding-right: 12px !important;
+                box-sizing: border-box !important;
+            }
+            section[data-testid="stMain"] .stButton > button,
+            section[data-testid="stMain"] [data-testid="stDownloadButton"] button {
+                min-width: 0 !important;
+                max-width: 100% !important;
+            }
+            section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] {
+                flex-wrap: wrap !important;
+                max-width: 100% !important;
+                min-width: 0 !important;
+            }
+            section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+                min-width: 0 !important;
+                max-width: 100% !important;
+            }
         }
         </style>
         """,

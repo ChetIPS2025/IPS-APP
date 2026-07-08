@@ -1360,7 +1360,7 @@ def inject_dashboard_active_jobs_table_css() -> None:
     """Scope real HTML table styling to the dashboard Active Jobs panel."""
     st.markdown(
         """
-<style id="ips-dashboard-active-jobs-table-v10">
+<style id="ips-dashboard-active-jobs-table-v11">
 .st-key-dashboard_active_jobs_table {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
@@ -1392,13 +1392,16 @@ def inject_dashboard_active_jobs_table_css() -> None:
 .ips-dash-jobs-table-scroll {
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   max-height: min(420px, 48vh);
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: auto;
   border: 1px solid #dbe3ef;
   border-radius: 10px;
   background: #ffffff;
   box-sizing: border-box;
   scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
 }
 .ips-dash-jobs-html-table {
   display: table !important;
@@ -1568,6 +1571,27 @@ def inject_dashboard_active_jobs_table_css() -> None:
   .ips-dash-th-subjobs,
   .ips-dash-td-subjobs {
     display: none;
+  }
+}
+@media (max-width: 768px) {
+  .st-key-dashboard_active_jobs_table {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+  }
+  .ips-dash-jobs-table-scroll {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .ips-dash-jobs-html-table .ips-dash-job-link,
+  .ips-dash-jobs-html-table .ips-dash-est-link {
+    white-space: nowrap !important;
   }
 }
 </style>

@@ -14970,7 +14970,7 @@ def inject_ops_dashboard_css() -> None:
     """Compact operations dashboard layout — KPI row, news, quick actions, activity grid."""
     st.markdown(
         """
-<style id="ips-ops-dashboard-v25">
+<style id="ips-ops-dashboard-v26">
 /* ── App shell: flex main beside sidebar (desktop only) ── */
 .stApp:has(.ips-ops-dashboard-marker) [data-testid="stAppViewContainer"] {
   width: 100% !important;
@@ -15005,9 +15005,17 @@ def inject_ops_dashboard_css() -> None:
   }
 }
 @media (max-width: 899px) {
+  .stApp:has(.ips-ops-dashboard-marker) [data-testid="stAppViewContainer"] {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    display: block !important;
+  }
   .stApp:has(.ips-ops-dashboard-marker) section[data-testid="stMain"] {
     flex: 1 1 100% !important;
     width: 100% !important;
+    margin-left: 0 !important;
   }
 }
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .block-container {
@@ -16376,8 +16384,79 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stExp
   section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-title {
     font-size: 1.5rem !important;
   }
+  section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stHorizontalBlock"]:has(.ips-page-title-block):has(.ips-page-actions-marker) {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+  section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="column"]:has(.ips-page-actions-marker) {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    justify-content: flex-start !important;
+  }
+  section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="column"]:has(.ips-page-actions-marker) > [data-testid="stHorizontalBlock"] {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    gap: 0.5rem !important;
+  }
+  section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="column"]:has(.ips-page-actions-marker) [data-testid="column"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 100% !important;
+  }
+  section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="column"]:has(.ips-page-actions-marker) .stButton {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="column"]:has(.ips-page-actions-marker) .stButton > button {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
   .ips-ops-kpi-grid {
-    grid-template-columns: repeat(2, minmax(150px, 1fr)) !important;
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  .st-key-dashboard_ops_row2 [data-testid="stElementContainer"]:has(.ips-ops-row2-grid-marker) + [data-testid="stElementContainer"] [data-testid="column"]:first-child,
+  .st-key-dashboard_ops_row2 [data-testid="stElementContainer"]:has(.ips-ops-row2-grid-marker) + [data-testid="stElementContainer"] [data-testid="column"]:last-child {
+    flex: 1 1 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+  .st-key-dashboard_ops_row2 [data-testid="stElementContainer"]:has(.ips-ops-row2-grid-marker) + [data-testid="stElementContainer"] [data-testid="stHorizontalBlock"] {
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+  .st-key-dashboard_active_jobs_table,
+  .st-key-dashboard_estimates_waiting_table,
+  .st-key-dashboard_ops_kpis,
+  .st-key-dashboard_ops_row2,
+  .st-key-dashboard_company_updates,
+  .st-key-dashboard_ops_shell {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+  }
+  .ips-dash-jobs-table-scroll,
+  .ips-dash-est-table-scroll {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .ips-ops-welcome-greet {
+    font-size: 1rem !important;
+    word-break: break-word !important;
+  }
+  .ips-ops-welcome-meta {
+    word-break: break-word !important;
   }
 }
 @media (max-width: 480px) {

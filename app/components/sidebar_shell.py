@@ -215,7 +215,7 @@ def _desktop_nav_rail_css() -> str:
     nav_h = IPS_SIDEBAR_COLLAPSED_NAV_HEIGHT_PX
     mobile_max = IPS_SIDEBAR_DESKTOP_MIN_PX - 1
     return f"""
-<style id="ips-desktop-nav-rail-v3">
+<style id="ips-desktop-nav-rail-v4">
 @media (min-width: {IPS_SIDEBAR_DESKTOP_MIN_PX}px) {{
   body.ips-authed-app [data-testid="stSidebar"],
   body.ips-authed-app section[data-testid="stSidebar"],
@@ -248,9 +248,12 @@ def _desktop_nav_rail_css() -> str:
   .ips-desktop-nav-rail {{
     display: none !important;
   }}
+  body.ips-authed-app [data-testid="stAppViewContainer"],
+  body.ips-authed-app [data-testid="stHeader"],
   .stApp:has(.ips-desktop-nav-rail) [data-testid="stAppViewContainer"],
   .stApp:has(.ips-desktop-nav-rail) [data-testid="stHeader"] {{
     margin-left: 0 !important;
+    padding-left: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
   }}
@@ -1019,7 +1022,7 @@ def _shell_css() -> str:
     mobile_max = IPS_SIDEBAR_DESKTOP_MIN_PX - 1
     collapsed_sel = _collapsed_sidebar_selectors()
     return f"""
-<style id="ips-sidebar-shell-v15">
+<style id="ips-sidebar-shell-v16">
 section[data-testid="stSidebar"].app-sidebar,
 [data-testid="stSidebar"].app-sidebar {{
   transition: width 0.2s ease, min-width 0.2s ease, max-width 0.2s ease, flex-basis 0.2s ease !important;
@@ -1655,6 +1658,40 @@ button.ips-header-menu-btn {{
   [data-testid="stSidebarCollapseButton"],
   button[data-testid="stSidebarCollapseButton"] {{
     display: none !important;
+  }}
+}}
+@media (max-width: 768px) {{
+  body.ips-authed-app [data-testid="stAppViewContainer"],
+  .stApp [data-testid="stAppViewContainer"] {{
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    display: block !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+  }}
+  body.ips-authed-app [data-testid="stHeader"],
+  .stApp [data-testid="stHeader"] {{
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+  }}
+  section[data-testid="stMain"] {{
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 100% !important;
+  }}
+  section[data-testid="stSidebar"][aria-expanded="false"],
+  [data-testid="stSidebar"][aria-expanded="false"] {{
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    flex: 0 0 0 !important;
+    overflow: hidden !important;
+    visibility: hidden !important;
   }}
 }}
 section[data-testid="stMain"] {{

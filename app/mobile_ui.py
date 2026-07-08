@@ -239,10 +239,139 @@ section[data-testid="stSidebar"],
 
 /* Phones: overlay sidebar handled by sidebar_shell.py (<=899px). */
 @media (max-width: 768px) {
+  html, body, [data-testid="stAppViewContainer"] {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+  .main, .block-container, section.main > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+    box-sizing: border-box !important;
+  }
+  .dashboard-container,
+  .content-container,
+  .page-container,
+  .card,
+  .metric-card,
+  .dashboard-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box;
+  }
+  .stColumns,
+  [data-testid="column"] {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    flex: 1 1 100% !important;
+  }
+  .responsive-table,
+  .table-wrapper,
+  div[data-testid="stDataFrame"],
+  div[data-testid="stTable"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  img, svg {
+    max-width: 100%;
+    height: auto;
+  }
+  button {
+    max-width: 100%;
+  }
+
+  body.ips-authed-app [data-testid="stAppViewContainer"],
+  .stApp [data-testid="stAppViewContainer"] {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    display: block !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+  }
+  body.ips-authed-app [data-testid="stHeader"],
+  .stApp [data-testid="stHeader"] {
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+  }
+  section[data-testid="stMain"] {
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 100% !important;
+    overflow-x: hidden !important;
+  }
+  section[data-testid="stMain"] > div {
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    min-width: 0 !important;
+  }
   section[data-testid="stMain"] .block-container,
   [data-testid="stMain"] .block-container {
-    padding-left: max(1rem, env(safe-area-inset-left)) !important;
-    padding-right: max(1rem, env(safe-area-inset-right)) !important;
+    padding-left: max(12px, env(safe-area-inset-left)) !important;
+    padding-right: max(12px, env(safe-area-inset-right)) !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+  section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVerticalBlock"] > div {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+  .ips-main-header {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+  .ips-main-header-logo {
+    max-width: min(240px, 72vw) !important;
+    height: auto !important;
+    max-height: 34px !important;
+  }
+  .ips-page-content {
+    padding: 12px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+  .ips-dash-jobs-table-scroll,
+  .ips-dash-est-table-scroll,
+  .st-key-pricing_guide_table_wrap,
+  .st-key-users_table_wrap,
+  .st-key-jobs_table_wrap,
+  .st-key-inventory_table_wrap,
+  .st-key-assets_table_wrap,
+  .st-key-dashboard_active_jobs_table,
+  .st-key-dashboard_estimates_waiting_table {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box !important;
+  }
+  [data-testid="stMain"] div[data-testid="stHorizontalBlock"] {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex-wrap: wrap !important;
+  }
+  [data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+    flex: 1 1 100% !important;
   }
 
   .stApp .stButton > button,
