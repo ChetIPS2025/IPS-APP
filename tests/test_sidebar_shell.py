@@ -126,34 +126,23 @@ def test_desktop_nav_rail_renders_icon_links_for_nav_items():
     assert 'data-ips-nav-slug="logout"' in markup
 
 
-def test_desktop_nav_rail_markup_has_no_inline_style_or_script():
+def test_desktop_nav_rail_markup_has_no_inline_style():
     from app.components.sidebar_shell import _desktop_nav_rail_html
 
     rows = [{"slug": "jobs", "label": "Jobs", "icon": "💼"}]
     markup = _desktop_nav_rail_html(rows, "dashboard")
     assert "<style" not in markup
-    assert "<script" not in markup
     assert "ips-desktop-nav-rail" in markup
 
 
-def test_handle_desktop_nav_rail_pick_sets_nav_slug(monkeypatch):
-    from app.components.sidebar_shell import IPS_DESKTOP_NAV_RAIL_LAST_KEY, handle_desktop_nav_rail_pick
+def test_desktop_nav_rail_wire_script_navigates_in_same_window():
+    from app.components.sidebar_shell import _desktop_nav_rail_wire_script
 
-    calls: list[str] = []
-
-    def _set_nav_slug(slug: str) -> None:
-        calls.append(slug)
-
-    def _rerun() -> None:
-        calls.append("rerun")
-
-    monkeypatch.setattr("app.navigation.set_nav_slug", _set_nav_slug)
-    monkeypatch.setattr("streamlit.rerun", _rerun)
-    st.session_state.pop(IPS_DESKTOP_NAV_RAIL_LAST_KEY, None)
-
-    handle_desktop_nav_rail_pick("jobs")
-
-    assert calls == ["jobs", "rerun"]
+    script = _desktop_nav_rail_wire_script()
+    assert "ips_nav" in script
+    assert "ips_logout" in script
+    assert "location.assign" in script
+    assert "window.top" in script
 
 
 def test_employee_field_nav_is_restricted_without_legacy_access():

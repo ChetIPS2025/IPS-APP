@@ -18,7 +18,6 @@ IPS_SIDEBAR_COLLAPSED_SESSION_KEY = "ips_sidebar_collapsed"
 IPS_SIDEBAR_COLLAPSE_AFTER_NAV_KEY = "ips_sidebar_collapse_after_nav"
 IPS_SIDEBAR_COLLAPSED_STORAGE_KEY = "ips_sidebar_collapsed"
 IPS_SIDEBAR_COLLAPSED_HYDRATED_KEY = "_ips_sidebar_collapsed_hydrated"
-IPS_DESKTOP_NAV_RAIL_LAST_KEY = "_ips_desktop_nav_rail_last"
 IPS_SIDEBAR_DESKTOP_MIN_PX = 900
 IPS_SIDEBAR_EXPANDED_WIDTH_PX = 232
 IPS_SIDEBAR_COLLAPSED_WIDTH_PX = 48
@@ -425,99 +424,42 @@ def _desktop_nav_rail_html(rows: list[dict[str, str]], active_slug: str) -> str:
 """
 
 
-def handle_desktop_nav_rail_pick(raw: str) -> None:
-    """Navigate in-app from the fixed desktop rail (no browser link / new window)."""
-    slug = str(raw or "").strip()
-    if not slug:
-        return
-    if slug == str(st.session_state.get(IPS_DESKTOP_NAV_RAIL_LAST_KEY) or ""):
-        return
-    st.session_state[IPS_DESKTOP_NAV_RAIL_LAST_KEY] = slug
-
-    if slug == "logout":
-        try:
-            from app.auth import sign_out
-        except ImportError:
-            from auth import sign_out  # type: ignore
-        sign_out()
-        st.rerun()
-        return
-
-    try:
-        from app.navigation import set_nav_slug
-    except ImportError:
-        from navigation import set_nav_slug  # type: ignore
-    set_nav_slug(slug)
-    request_sidebar_collapse_after_nav()
-    st.rerun()
-
-
-def render_desktop_nav_rail_bridge(*, component_key: str = "ips_desktop_nav_rail_bridge") -> None:
-    """Wire desktop rail buttons to Streamlit session navigation."""
-    try:
-        from app.ui.clean_table import _components_html
-    except ImportError:
-        from ui.clean_table import _components_html  # type: ignore
-
-    picked = _components_html(
-        """
+def _desktop_nav_rail_wire_script() -> str:
+    """Bind rail clicks in the main document (components.html cannot reach parent on Cloud)."""
+    return """
 <script>
 (function () {
-  const w = window.parent || window;
-  const doc = w.document;
-  const sel = ".ips-desktop-nav-rail__link[data-ips-nav-slug]";
-
-  function sendValue(slug) {
-    const payload = { type: "streamlit:setComponentValue", value: slug };
-    const frames = [window, window.parent, w].filter(function (f, i, arr) {
-      return f && arr.indexOf(f) === i;
-    });
-    for (var i = 0; i < frames.length; i++) {
-      try {
-        if (frames[i].Streamlit && typeof frames[i].Streamlit.setComponentValue === "function") {
-          frames[i].Streamlit.setComponentValue(slug);
-          return;
-        }
-      } catch (err) {}
+  function navigateRail(slug) {
+    var top = window.top || window;
+    var url = new URL(top.location.href);
+    url.searchParams.delete("ips_nav");
+    url.searchParams.delete("ips_logout");
+    if (slug === "logout") {
+      url.searchParams.set("ips_logout", "1");
+    } else {
+      url.searchParams.set("ips_nav", slug);
     }
-    for (var j = 0; j < frames.length; j++) {
-      try { frames[j].postMessage(payload, "*"); } catch (err) {}
-    }
+    top.location.assign(url.toString());
   }
-
-  function bindTargets() {
-    doc.querySelectorAll(sel).forEach(function (el) {
+  function bind() {
+    document.querySelectorAll(".ips-desktop-nav-rail__link[data-ips-nav-slug]").forEach(function (el) {
       if (el.dataset.ipsNavRailBound === "1") return;
       el.dataset.ipsNavRailBound = "1";
       el.addEventListener("click", function (e) {
         e.preventDefault();
         e.stopPropagation();
-        const slug = el.getAttribute("data-ips-nav-slug");
+        var slug = el.getAttribute("data-ips-nav-slug");
         if (!slug) return;
-        sendValue(slug);
+        navigateRail(slug);
       });
     });
   }
-
-  if (!doc.ipsDesktopNavRailRegistry) doc.ipsDesktopNavRailRegistry = {};
-  doc.ipsDesktopNavRailRegistry.bind = bindTargets;
-  bindTargets();
-  if (!doc.ipsDesktopNavRailObserver) {
-    doc.ipsDesktopNavRailObserver = new MutationObserver(function () {
-      if (doc.ipsDesktopNavRailRegistry && typeof doc.ipsDesktopNavRailRegistry.bind === "function") {
-        doc.ipsDesktopNavRailRegistry.bind();
-      }
-    });
-    doc.ipsDesktopNavRailObserver.observe(doc.body, { childList: true, subtree: true });
-  }
+  bind();
+  setTimeout(bind, 40);
+  setTimeout(bind, 180);
 })();
 </script>
-        """,
-        component_key=component_key,
-        height=0,
-    )
-    if picked:
-        handle_desktop_nav_rail_pick(str(picked))
+"""
 
 
 def inject_desktop_nav_rail_css() -> None:
@@ -526,7 +468,7 @@ def inject_desktop_nav_rail_css() -> None:
 
 
 def inject_desktop_nav_rail_markup(*, active_slug: str | None = None) -> None:
-    """Inject visible desktop nav markup without style/script tags."""
+    """Inject visible desktop nav markup and same-document click wiring."""
     rows = _nav_fallback_rows()
     if not rows:
         return
@@ -536,7 +478,7 @@ def inject_desktop_nav_rail_markup(*, active_slug: str | None = None) -> None:
         except ImportError:
             from navigation import current_nav_slug  # type: ignore
         active_slug = current_nav_slug()
-    markup = _desktop_nav_rail_html(rows, active_slug)
+    markup = _desktop_nav_rail_html(rows, active_slug) + _desktop_nav_rail_wire_script()
     st.markdown(markup, unsafe_allow_html=True)
 
 
@@ -544,7 +486,6 @@ def inject_desktop_nav_rail(*, active_slug: str | None = None) -> None:
     """Fixed desktop icon rail in the main document (Streamlit sidebar is unreliable on Cloud)."""
     inject_desktop_nav_rail_css()
     inject_desktop_nav_rail_markup(active_slug=active_slug)
-    render_desktop_nav_rail_bridge()
 
 
 def inject_sidebar_shell() -> None:
@@ -552,7 +493,6 @@ def inject_sidebar_shell() -> None:
     collapsed = True
     inject_sidebar_nav_override_css()
     inject_desktop_nav_rail_markup()
-    render_desktop_nav_rail_bridge()
     st.markdown(_shell_css(), unsafe_allow_html=True)
 
     nav_json = _fallback_nav_json()
