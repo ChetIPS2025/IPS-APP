@@ -93,6 +93,7 @@ def _active_picker_mode() -> str:
 def _clear_view_as_picker_widgets() -> None:
     for suffix in VIEW_AS_PICKER_SUFFIXES:
         st.session_state.pop(f"ips_view_as_select_{suffix}", None)
+        st.session_state.pop(f"ips_view_as_picker_sync_{suffix}", None)
 
 
 def ensure_view_as_navigation() -> None:
@@ -364,13 +365,15 @@ def _render_view_as_picker(*, key_suffix: str, show_help: bool = False) -> None:
     values = [value for value, _ in VIEW_AS_OPTIONS]
     active_mode = _active_picker_mode()
     widget_key = f"ips_view_as_select_{key_suffix}"
-    expected_label = _picker_label_for_mode(active_mode)
-    if st.session_state.get(widget_key) not in labels:
-        st.session_state[widget_key] = expected_label
+    sync_key = f"ips_view_as_picker_sync_{key_suffix}"
+    if st.session_state.get(sync_key) != active_mode:
+        st.session_state.pop(widget_key, None)
+        st.session_state[sync_key] = active_mode
+    current_ix = labels.index(_picker_label_for_mode(active_mode))
     picked_label = st.selectbox(
         "View As",
         labels,
-        value=st.session_state.get(widget_key, expected_label),
+        index=current_ix,
         key=widget_key,
         help=(
             "Preview the app as another role without changing your signed-in account."
