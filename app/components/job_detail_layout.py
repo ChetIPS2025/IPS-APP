@@ -18,7 +18,7 @@ except ImportError:
 def inject_job_detail_layout_css() -> None:
     st.markdown(
         """
-<style id="ips-job-detail-layout-v3">
+<style id="ips-job-detail-layout-v4">
 .ips-job-detail-control-page {
   width: 100%;
 }
@@ -337,9 +337,39 @@ div[data-testid="stDialog"]:has(.ips-job-status-badge-editor-marker.ips-job-stat
 div[data-testid="stDialog"]:has(.ips-job-status-badge-editor-marker) [data-testid="stPopover"] > button:hover {
   filter: brightness(0.96) !important;
 }
-div[data-testid="stDialog"]:has(.ips-job-detail-control-page) > div,
-div[data-testid="stDialog"]:has(.ips-job-detail-control-page) div[role="dialog"] {
+div[data-testid="stDialog"]:has(.ips-job-detail-control-page):not(:has(.ips-job-edit-mode)) > div,
+div[data-testid="stDialog"]:has(.ips-job-detail-control-page):not(:has(.ips-job-edit-mode)) div[role="dialog"] {
   overflow: visible !important;
+}
+div[data-testid="stDialog"]:has(.ips-job-edit-mode) > div,
+div[data-testid="stDialog"]:has(.ips-job-edit-mode) div[role="dialog"] {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  max-width: 100% !important;
+}
+div[data-testid="stDialog"]:has(.ips-job-edit-mode) [data-testid="stHorizontalBlock"],
+div[data-testid="stDialog"]:has(.ips-job-edit-mode) [data-testid="column"],
+div[data-testid="stDialog"]:has(.ips-job-edit-mode) [data-testid="stVerticalBlock"] {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+div[data-testid="stDialog"]:has(.ips-job-edit-mode) [data-testid="stForm"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+}
+div[data-testid="stDialog"]:has(.ips-job-edit-form-footer-marker) [data-testid="stHorizontalBlock"]:has([data-testid="stFormSubmitButton"]) {
+  margin-top: 0.75rem !important;
+  padding-top: 0.85rem !important;
+  border-top: 1px solid #e8edf3 !important;
+  align-items: stretch !important;
+}
+div[data-testid="stDialog"]:has(.ips-job-edit-form-footer-marker) [data-testid="stFormSubmitButton"] button {
+  min-height: 40px !important;
+}
+body:has(div[data-testid="stDialog"]:has(.ips-job-edit-mode)) section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap {
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 div[data-testid="stDialog"]:has(.ips-job-detail-control-page) [data-testid="column"]:has(.ips-job-status-badge-editor-marker),
 div[data-testid="stDialog"]:has(.ips-job-detail-control-page) [data-testid="column"]:has(.job-detail-header-menu-marker),

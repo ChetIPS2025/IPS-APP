@@ -16,6 +16,7 @@ try:
         fetch_list,
         fetch_rows,
         fetch_rows_admin,
+        filter_payload_to_table,
         insert_row,
         insert_row_admin,
         table_column_names,
@@ -29,6 +30,7 @@ except ImportError:
         fetch_list,
         fetch_rows,
         fetch_rows_admin,
+        filter_payload_to_table,
         insert_row,
         insert_row_admin,
         table_column_names,
@@ -471,7 +473,11 @@ def normalize_job(row: dict[str, Any]) -> dict[str, Any]:
     loc_id = str(row.get("customer_location_id") or row.get("location_id") or "").strip()
     contact_id = str(row.get("customer_contact_id") or "").strip()
     location_text = str(row.get("location") or "").strip()
-    notes = str(row.get("notes") or row.get("description") or row.get("scope_of_work") or "")
+    notes = str(row.get("notes") or "").strip()
+    scope_of_work = str(row.get("scope_of_work") or row.get("scope") or "").strip()
+    if not scope_of_work:
+        scope_of_work = str(row.get("description") or "").strip()
+    legacy_desc = scope_of_work or notes
     return {
         "id": jid or num,
         "job_number": num,
@@ -497,9 +503,10 @@ def normalize_job(row: dict[str, Any]) -> dict[str, Any]:
         "created_at": str(row.get("created_at") or "")[:10],
         "end_date": end,
         "progress": int(row.get("progress") or row.get("percent_complete") or 0),
-        "description": notes,
+        "scope_of_work": scope_of_work,
+        "description": legacy_desc,
         "notes": notes,
-        "scope": notes,
+        "scope": scope_of_work or legacy_desc,
         "is_deleted": bool(row.get("is_deleted")),
         "completed_at": row.get("completed_at"),
         "cancelled_at": row.get("cancelled_at"),
@@ -1316,6 +1323,29 @@ def _find_timekeeping_week(employee_id: str, week_start: date) -> dict[str, Any]
 
 # --- Writes (map UI -> DB) ---
 
+_JOB_SAVE_READONLY_FIELDS = frozenset(
+    {
+        "actual_cost",
+        "estimated_profit",
+        "profit_percent",
+        "projected_gross_profit",
+        "projected_margin",
+        "projected_margin_pct",
+    }
+)
+
+
+def _job_save_money_normalized(value: Any, *, blank_as_zero: bool = True) -> float | None:
+    parsed = _job_save_money(value)
+    if parsed is not None:
+        return parsed
+    return 0.0 if blank_as_zero else None
+
+
+def _filter_job_save_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    filtered = filter_payload_to_table("jobs", payload)
+    return {k: v for k, v in filtered.items() if k not in _JOB_SAVE_READONLY_FIELDS}
+
 
 def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
     customer_name = str(ui.get("customer") or "").strip()
@@ -1334,8 +1364,12 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
         "project_manager": _job_save_text(ui.get("project_manager")),
         "start_date": _job_save_date(ui.get("start_date")),
         "target_completion_date": _job_save_date(ui.get("end_date")),
-        "notes": _job_save_text(ui.get("description") or ui.get("notes")),
     }
+    scope_src = ui.get("scope_of_work") if "scope_of_work" in ui else ui.get("description")
+    if scope_src is not None or "scope_of_work" in ui or "description" in ui:
+        payload["scope_of_work"] = _job_save_text(scope_src)
+    if "notes" in ui:
+        payload["notes"] = _job_save_text(ui.get("notes"))
     if not row_id:
         payload["job_number"] = job_number
     elif job_number:
@@ -1368,12 +1402,11 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
         else:
             payload["location"] = str(ui.get("location") or "").strip()
 
-    contract_value = _job_save_money(ui.get("contract_value") if "contract_value" in ui else ui.get("awarded_amount"))
-    estimated_cost = _job_save_money(ui.get("estimated_cost"))
-    if contract_value is not None:
-        payload["awarded_amount"] = contract_value
-    if estimated_cost is not None:
-        payload["estimated_cost"] = estimated_cost
+    if "contract_value" in ui or "awarded_amount" in ui:
+        raw_contract = ui.get("contract_value") if "contract_value" in ui else ui.get("awarded_amount")
+        payload["awarded_amount"] = _job_save_money_normalized(raw_contract)
+    if "estimated_cost" in ui:
+        payload["estimated_cost"] = _job_save_money_normalized(ui.get("estimated_cost"))
 
     if "billing_type" in ui:
         try:
@@ -1393,9 +1426,8 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
         if not cols or "po_date" in cols:
             payload["po_date"] = po_date
     if "po_amount" in ui:
-        po_amount = _job_save_money(ui.get("po_amount"))
         if not cols or "po_amount" in cols:
-            payload["po_amount"] = po_amount if po_amount is not None else None
+            payload["po_amount"] = _job_save_money_normalized(ui.get("po_amount"))
 
     prior: dict[str, Any] = {}
     if row_id:
@@ -1404,16 +1436,6 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
         except ImportError:
             from db import fetch_one  # type: ignore
         prior = fetch_one("jobs", {"id": row_id}) or {}
-
-    try:
-        from app.services.job_financial_ui import apply_projected_financials_to_job_payload
-    except ImportError:
-        from services.job_financial_ui import apply_projected_financials_to_job_payload  # type: ignore
-    projected = apply_projected_financials_to_job_payload({**prior, **payload})
-    if not cols or "projected_gross_profit" in cols:
-        payload["projected_gross_profit"] = projected["projected_gross_profit"]
-    if not cols or "projected_margin_pct" in cols:
-        payload["projected_margin_pct"] = projected["projected_margin_pct"]
 
     if row_id:
         try:
@@ -1440,9 +1462,13 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
             else:
                 job_patch = sync_data.get("job_patch") or {}
                 if isinstance(job_patch, dict):
-                    payload.update(job_patch)
+                    payload.update(
+                        {k: v for k, v in job_patch.items() if k not in _JOB_SAVE_READONLY_FIELDS}
+                    )
+        payload = _filter_job_save_payload(payload)
         result = update_row("jobs", payload, {"id": row_id})
         return result
+    payload = _filter_job_save_payload(payload)
     return insert_row("jobs", payload)
 
 

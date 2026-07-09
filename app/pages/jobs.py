@@ -1164,6 +1164,42 @@ def _clear_jobs_detail_modal() -> None:
     st.session_state.pop(JOB_DOC_PENDING_DELETE_JOB_KEY, None)
 
 
+def _refresh_job_modal_cache(job_id: str) -> None:
+    jid = str(job_id or "").strip()
+    if not jid:
+        return
+    try:
+        from app.services.repository import fetch_by_id
+        from app.services.phase2_modules_service import normalize_job
+    except ImportError:
+        from services.repository import fetch_by_id  # type: ignore
+        from services.phase2_modules_service import normalize_job  # type: ignore
+    row = fetch_by_id("jobs", jid)
+    if not row:
+        return
+    fresh = normalize_job(row)
+    cache = st.session_state.get(CACHE_KEY)
+    if isinstance(cache, dict):
+        updated = dict(cache)
+        updated[jid] = fresh
+        st.session_state[CACHE_KEY] = updated
+
+
+def _show_job_persist_error(msg: str, dev_detail: str | None = None) -> None:
+    st.error(msg or "Could not save job.")
+    detail = str(dev_detail or "").strip()
+    if not detail:
+        return
+    try:
+        from app.config import settings
+    except ImportError:
+        from config import settings  # type: ignore
+    if settings.is_production:
+        return
+    with st.expander("Development error detail", expanded=True):
+        st.code(detail)
+
+
 def _render_jobs_list_fragment(
     filtered: list[dict],
     *,
@@ -1457,7 +1493,9 @@ def _seed_job_edit_form(job: dict) -> None:
     st.session_state[f"job_edit_start_{job_key}"] = _as_date(job.get("start_date"))
     st.session_state[f"job_edit_end_{job_key}"] = _as_date(job.get("end_date"))
     st.session_state[f"job_edit_prog_{job_key}"] = int(job.get("progress") or 0)
-    st.session_state[f"job_edit_scope_{job_key}"] = str(job.get("scope") or job.get("description") or "")
+    st.session_state[f"job_edit_scope_{job_key}"] = str(
+        job.get("scope_of_work") or job.get("scope") or job.get("description") or ""
+    )
     st.session_state[f"job_edit_notes_{job_key}"] = str(job.get("notes") or "")
     fin = _job_financial_snapshot(job)
     st.session_state[f"job_edit_contract_{job_key}"] = float(fin.get("contract_value") or 0)
@@ -2743,7 +2781,8 @@ def _render_job_edit_form(job: dict) -> None:
         _seed_job_edit_form(job)
 
     st.markdown(
-        '<div class="ips-edit-form-card"><div class="ips-form-section-title">Edit Job</div></div>',
+        '<div class="ips-edit-form-card"><div class="ips-form-section-title">Edit Job</div></div>'
+        '<span class="ips-job-edit-mode ips-job-edit-form-shell-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
 
@@ -2825,11 +2864,12 @@ def _render_job_edit_form(job: dict) -> None:
             ),
         )
 
-        btn_cancel, btn_spacer, btn_save = st.columns([1, 4, 1], gap="small")
-        with btn_cancel:
-            cancelled = st.form_submit_button("Cancel")
-        with btn_save:
-            submitted = st.form_submit_button("Save Changes", type="primary")
+        st.markdown('<span class="ips-job-edit-form-footer-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
+        fc1, fc2 = st.columns(2, gap="medium")
+        with fc1:
+            cancelled = st.form_submit_button("Cancel", use_container_width=True)
+        with fc2:
+            submitted = st.form_submit_button("Save Changes", type="primary", use_container_width=True)
 
     if cancelled:
         _set_job_view_mode(job)
@@ -2848,8 +2888,8 @@ def _render_job_edit_form(job: dict) -> None:
             "start_date": st.session_state.get(f"job_edit_start_{job_key}"),
             "end_date": st.session_state.get(f"job_edit_end_{job_key}"),
             "progress": st.session_state.get(f"job_edit_prog_{job_key}"),
-            "description": scope_text,
-            "notes": notes_text or scope_text,
+            "scope_of_work": scope_text,
+            "notes": notes_text,
         }
         if _job_financials_editable(job):
             ui["contract_value"] = st.session_state.get(f"job_edit_contract_{job_key}")
@@ -2859,13 +2899,19 @@ def _render_job_edit_form(job: dict) -> None:
             ui["po_date"] = st.session_state.get(f"job_edit_po_date_{job_key}")
             ui["po_amount"] = st.session_state.get(f"job_edit_po_amt_{job_key}")
         ui["billing_type"] = st.session_state.get(f"job_edit_billing_{job_key}")
-        ok, msg = persist_job(ui, row_id=jid or None)
+        ok, msg, dev_detail = persist_job(ui, row_id=jid or None)
         if ok:
             st.session_state[edit_mode_key] = False
-            st.success(msg or "Job saved.")
+            _refresh_job_modal_cache(jid)
+            try:
+                from app.pages._core._data import clear_jobs_list_cache
+            except ImportError:
+                from pages._core._data import clear_jobs_list_cache  # type: ignore
+            clear_jobs_list_cache()
+            st.success(msg or "Job updated successfully.")
             st.rerun()
         else:
-            st.error(msg or "Could not save job.")
+            _show_job_persist_error(msg, dev_detail)
 
     if bool(st.session_state.get(_job_edit_mode_key(job))):
         _render_job_customer_po_upload(job)
@@ -3138,7 +3184,7 @@ def _render_jobs_page() -> None:
                 clear_new_job_number_state()
                 st.rerun()
             if submitted:
-                ok, msg = persist_job(
+                ok, msg, dev_detail = persist_job(
                     {
                         "job_number": str(st.session_state.get("job_new_num") or "").strip(),
                         "job_name": st.session_state.get("job_new_name"),
@@ -3150,7 +3196,7 @@ def _render_jobs_page() -> None:
                         "supervisor": st.session_state.get("job_new_sup"),
                         "start_date": st.session_state.get("job_new_start"),
                         "end_date": st.session_state.get("job_new_end"),
-                        "description": st.session_state.get("job_new_desc"),
+                        "scope_of_work": st.session_state.get("job_new_desc"),
                         "contract_value": st.session_state.get("job_new_contract"),
                         "estimated_cost": st.session_state.get("job_new_estimated"),
                         "billing_type": st.session_state.get("job_new_billing"),
@@ -3161,7 +3207,7 @@ def _render_jobs_page() -> None:
                     clear_new_job_number_state()
                     st.rerun()
                 else:
-                    st.error(msg or "Could not save job.")
+                    _show_job_persist_error(msg, dev_detail)
 
     def _filters() -> None:
         c1, c2 = st.columns([9, 1], gap="small")

@@ -2308,14 +2308,24 @@ def delete_customer_location_row(row_id: str) -> tuple[bool, str]:
     return _persist_result(delete_customer_location(row_id), success="Location removed.")
 
 
-def persist_job(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
+def persist_job(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str, str | None]:
     if _demo_blocked(row_id):
-        return False, _DEMO_SAVE_MSG
+        return False, _DEMO_SAVE_MSG, None
     try:
         from app.services.jobs_service import save_job
     except ImportError:
         from services.jobs_service import save_job  # type: ignore
-    return _persist_result(save_job(ui, row_id=row_id), success="Job saved.")
+    result = save_job(ui, row_id=row_id)
+    err = None
+    try:
+        from app.services.repository import user_facing_error
+    except ImportError:
+        from services.repository import user_facing_error  # type: ignore
+    err = user_facing_error(result)
+    if err:
+        detail = str(getattr(result, "detail", None) or "").strip() or None
+        return False, err, detail
+    return True, "Job saved.", None
 
 
 def persist_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:

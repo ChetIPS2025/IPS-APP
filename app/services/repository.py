@@ -20,6 +20,46 @@ def get_last_fetch_error(table: str) -> str | None:
 # Fallback when the table has no rows yet — prevents sending columns that do not exist
 # (e.g. cost_total on estimate_line_items, which uses total_cost instead).
 TABLE_COLUMN_ALLOWLIST: dict[str, frozenset[str]] = {
+    "jobs": frozenset(
+        {
+            "customer_id",
+            "customer_location_id",
+            "location_id",
+            "customer_contact_id",
+            "estimate_id",
+            "job_number",
+            "job_name",
+            "customer_name",
+            "location",
+            "status",
+            "project_manager",
+            "supervisor",
+            "supervisor_id",
+            "start_date",
+            "end_date",
+            "target_completion_date",
+            "completed_date",
+            "percent_complete",
+            "awarded_amount",
+            "estimated_cost",
+            "billing_type",
+            "scope_of_work",
+            "notes",
+            "source_type",
+            "estimate_number",
+            "source_estimate_number",
+            "approved_at",
+            "approved_by",
+            "po_number",
+            "po_date",
+            "po_amount",
+            "is_deleted",
+            "completed_at",
+            "cancelled_at",
+            "deleted_at",
+            "updated_at",
+        }
+    ),
     "estimate_line_items": frozenset(
         {
             "estimate_id",
@@ -89,6 +129,7 @@ class ServiceResult:
     data: Any = None
     error: str | None = None
     used_demo: bool = False
+    detail: str | None = None
 
 
 def clear_all_data_caches() -> None:
@@ -457,7 +498,7 @@ def _insert_with_optional_columns(
 
     msg = _friendly_repo_error(last_exc or RuntimeError("Insert failed"), table=table, action=action)
     _LOG.warning("insert %s (%s) failed: %s", table, "admin" if use_admin else "user", last_exc)
-    return ServiceResult(ok=False, error=msg)
+    return ServiceResult(ok=False, error=msg, detail=str(last_exc) if last_exc else None)
 
 
 def insert_row(table: str, payload: dict[str, Any]) -> ServiceResult:
@@ -514,7 +555,7 @@ def _update_with_optional_columns(
 
     msg = _friendly_repo_error(last_exc or RuntimeError("Update failed"), table=table, action=action)
     _LOG.warning("update %s (%s) failed: %s", table, "admin" if use_admin else "user", last_exc)
-    return ServiceResult(ok=False, error=msg)
+    return ServiceResult(ok=False, error=msg, detail=str(last_exc) if last_exc else None)
 
 
 def update_row(table: str, payload: dict[str, Any], match: dict[str, Any]) -> ServiceResult:
