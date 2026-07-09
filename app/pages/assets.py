@@ -110,20 +110,18 @@ try:
         render_equipment_bulk_move_toolbar,
         seed_tracking_form_state,
     )
-    from app.components.asset_row_actions_ui import (
-        ASSET_OPEN_ACTIVITY_KEY,
-        render_asset_activity_snippet,
-        render_asset_row_actions,
+    from app.components.asset_row_actions_ui import ASSET_OPEN_ACTIVITY_KEY
+    from app.components.assets_list_table import (
+        ASSETS_TABLE_LAST_ACTION_KEY,
+        apply_assets_table_bridge_action,
+        build_assets_html_table,
+        render_assets_table_bridge,
+        render_assets_table_open_buttons,
     )
     from app.components.assets_page_layout import (
         close_assets_filter_bar_shell,
         inject_assets_page_layout_css,
-        render_assets_equipment_banner,
-        render_assets_equipment_row_click_bridge,
         render_assets_filter_bar_shell,
-        render_assets_pagination_footer,
-        render_assets_summary_cards,
-        render_assets_table_pagination_header,
     )
     from app.components.quick_add_tool_ui import (
         QUICK_ADD_OPEN_KEY,
@@ -249,20 +247,18 @@ except ImportError:
         render_equipment_bulk_move_toolbar,
         seed_tracking_form_state,
     )
-    from components.asset_row_actions_ui import (  # type: ignore
-        ASSET_OPEN_ACTIVITY_KEY,
-        render_asset_activity_snippet,
-        render_asset_row_actions,
+    from components.asset_row_actions_ui import ASSET_OPEN_ACTIVITY_KEY  # type: ignore
+    from components.assets_list_table import (  # type: ignore
+        ASSETS_TABLE_LAST_ACTION_KEY,
+        apply_assets_table_bridge_action,
+        build_assets_html_table,
+        render_assets_table_bridge,
+        render_assets_table_open_buttons,
     )
     from components.assets_page_layout import (  # type: ignore
         close_assets_filter_bar_shell,
         inject_assets_page_layout_css,
-        render_assets_equipment_banner,
-        render_assets_equipment_row_click_bridge,
         render_assets_filter_bar_shell,
-        render_assets_pagination_footer,
-        render_assets_summary_cards,
-        render_assets_table_pagination_header,
     )
     from components.quick_add_tool_ui import (  # type: ignore
         QUICK_ADD_OPEN_KEY,
@@ -299,12 +295,9 @@ SHOW_ASSET_MODAL_KEY = "show_asset_detail_modal"
 ASSET_DETAIL_TAB_FOCUS_KEY = "ast_detail_tab_focus"
 _SHOW_NEW_ASSET_FORM_KEY = "assets_show_new_asset_form"
 _ALL_ASSET_IDS_KEY = "_ips_assets_visible_ids"
-_ASSETS_EQUIPMENT_LAYOUT_KEY = "_ips_assets_equipment_layout_ready"
-_ASSETS_EQUIPMENT_LAYOUT_BUMP_KEY = "_ips_assets_equipment_layout_bump"
 _ALL_SMALL_TOOL_IDS_KEY = "_ips_small_tools_visible_ids"
 _TABLE_KEY = "assets_list"
 _SMALL_TOOLS_TABLE_KEY = "assets_small_tools_list"
-_ASSET_COLS = [0.85, 3.0, 1.0, 1.15, 1.2, 1.05, 1.3, 1.05, 0.85]
 _SMALL_TOOL_COLS = [0.4, 0.8, 1.85, 0.95, 0.95, 1.25, 1.1, 0.9, 0.75]
 _SMALL_TOOL_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
@@ -324,16 +317,10 @@ _SMALL_TOOL_FILTER_SPECS: list[tuple[str, object]] = [
     ("status", lambda r: _small_tool_status(r)),
     ("condition", lambda r: _small_tool_condition_label(r)),
 ]
-_ASSET_HEADER_SPECS: list[tuple[str, str | None]] = [
-    ("IMAGE", None),
-    ("ASSET NAME", None),
-    ("ASSET #", None),
+_ASSETS_FILTER_SPECS: list[tuple[str, str]] = [
     ("CATEGORY", "category"),
     ("LOCATION", "location"),
     ("STATUS", "status"),
-    ("ASSIGNED TO", None),
-    ("NEXT SERVICE DUE", None),
-    ("ACTIONS", None),
 ]
 _COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
     ("category", lambda r: _asset_category(r)),
@@ -902,6 +889,34 @@ def _render_asset_expand_panel(asset: dict) -> None:
     st.markdown("</div>", unsafe_allow_html=True)
 
 
+def _render_assets_table_column_filters(
+    *,
+    filter_options: dict[str, list[str]],
+) -> None:
+    if not _ASSETS_FILTER_SPECS:
+        return
+    st.markdown('<div class="ips-assets-table-filter-toolbar">', unsafe_allow_html=True)
+    cols = st.columns(len(_ASSETS_FILTER_SPECS), gap="small")
+    for col, (label, field) in zip(cols, _ASSETS_FILTER_SPECS):
+        with col:
+            render_table_header_cell(
+                label,
+                table_key=_TABLE_KEY,
+                filter_field=field,
+                filter_options=filter_options.get(field, []),
+                base_class="ips-assets-filter-toolbar-cell",
+            )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def _on_assets_table_expand(asset_id: str, asset: dict) -> None:
+    toggle_field_expanded(FIELD_EXPANDED_ASSET_KEY, asset_id)
+
+
+def _open_assets_table_item(asset_id: str, asset: dict) -> None:
+    _handle_open_asset(asset)
+
+
 def _render_custom_assets_table(
     filtered: list[dict],
     *,
@@ -915,146 +930,46 @@ def _render_custom_assets_table(
     all_asset_ids = [str(a.get("id") or "").strip() for a in filtered if str(a.get("id") or "").strip()]
     st.session_state[_ALL_ASSET_IDS_KEY] = all_asset_ids
 
+    assets_by_id = {
+        str(a.get("id") or "").strip(): a
+        for a in filtered
+        if str(a.get("id") or "").strip()
+    }
+    field_mode = is_field_context()
+    expanded_asset_id = str(field_expanded_id(FIELD_EXPANDED_ASSET_KEY) or "").strip() if field_mode else ""
+
     with st.container(key="assets_table_wrap"):
-        st.markdown('<div class="ips-assets-table-wrap asset-table">', unsafe_allow_html=True)
+        _render_assets_table_column_filters(filter_options=filter_options)
+        st.markdown(
+            build_assets_html_table(
+                filtered,
+                field_mode=field_mode,
+                expanded_asset_id=expanded_asset_id,
+            ),
+            unsafe_allow_html=True,
+        )
+        render_assets_table_open_buttons(
+            filtered,
+            open_asset_fn=_open_assets_table_item,
+        )
+        bridge_action = render_assets_table_bridge(
+            component_key="ips_assets_list_bridge",
+            hook_key="ipsAssetsList::action",
+            field_mode=field_mode,
+        )
+        apply_assets_table_bridge_action(
+            bridge_action,
+            assets_by_id,
+            last_action_key=ASSETS_TABLE_LAST_ACTION_KEY,
+            open_asset_fn=_open_assets_table_item,
+            on_expand_fn=_on_assets_table_expand if field_mode else None,
+        )
 
-        header_cols = st.columns(_ASSET_COLS, gap="xxsmall", vertical_alignment="center")
-        for hidx, (col, (label, field)) in enumerate(zip(header_cols, _ASSET_HEADER_SPECS)):
-            with col:
-                if hidx == 0:
-                    st.markdown(
-                        '<span class="ips-assets-table-header-marker ips-assets-equipment-table-header assets-table-header" aria-hidden="true"></span>',
-                        unsafe_allow_html=True,
-                    )
-                if field:
-                    render_table_header_cell(
-                        label,
-                        table_key=_TABLE_KEY,
-                        filter_field=field,
-                        filter_options=filter_options.get(field, []),
-                        base_class="ips-assets-header-row ips-assets-cell",
-                    )
-                else:
-                    render_table_header_cell(
-                        label,
-                        base_class="ips-assets-header-row ips-assets-cell",
-                    )
-
-        for asset in filtered:
-            aid = str(asset.get("id") or "").strip()
-            if not aid:
-                continue
-
-            stripe_cls = "ips-assets-row-odd"
-
-            name = _asset_name(asset)
-            category = _asset_category(asset)
-            location = _asset_location(asset)
-            status = _normalize_asset_status(asset.get("status"))
-            assigned = _asset_assigned_to(asset)
-            next_service = _asset_next_service(asset)
-            field_mode = is_field_context()
-            expanded = field_mode and field_expanded_id(FIELD_EXPANDED_ASSET_KEY) == aid
-
-            cols = st.columns(_ASSET_COLS, gap="xxsmall", vertical_alignment="center")
-
-            with cols[0]:
-                st.markdown(
-                    f'<span class="ips-assets-row-marker ips-assets-equipment-table-row assets-table-row {stripe_cls}" data-row-id="{html.escape(aid, quote=True)}" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                _render_asset_thumbnail(asset)
-                if field_mode:
-                    if st.button(
-                        "▾" if expanded else "▸",
-                        key=f"ast_expand_{aid}",
-                        help="Expand asset details",
-                    ):
-                        toggle_field_expanded(FIELD_EXPANDED_ASSET_KEY, aid)
-                        st.rerun()
-
-            with cols[1]:
-                rentable_badge = _asset_rentable_badge_html(asset)
-                name_label = name if name and name != "—" else "View asset"
-                if st.button(
-                    name_label,
-                    key=f"assets_open_{aid}",
-                    type="tertiary",
-                    help=f"View {name_label}",
-                    use_container_width=True,
-                ):
-                    _handle_open_asset(asset)
-                if rentable_badge:
-                    st.markdown(
-                        f'<div class="ips-assets-name-badges">{rentable_badge}</div>',
-                        unsafe_allow_html=True,
-                    )
-
-            with cols[2]:
-                st.markdown(
-                    f'<div class="ips-assets-cell ips-assets-muted">{html.escape(_asset_number(asset))}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[3]:
-                st.markdown(
-                    f'<div class="ips-assets-cell asset-category-cell">{html.escape(category)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[4]:
-                st.markdown(
-                    f'<div class="ips-assets-cell">{html.escape(location)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[5]:
-                st.markdown(_asset_status_pill_html(status), unsafe_allow_html=True)
-
-            with cols[6]:
-                st.markdown(
-                    f'<div class="ips-assets-muted ips-assets-cell">{html.escape(assigned)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[7]:
-                st.markdown(
-                    f'<div class="ips-assets-muted ips-assets-cell">{html.escape(next_service)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[8]:
-                if not is_field_context():
-                    st.markdown('<span class="asset-actions-cell" aria-hidden="true"></span>', unsafe_allow_html=True)
-                    render_asset_row_actions(
-                        asset,
-                        key_prefix=f"ast_eq_{aid}",
-                        on_view=lambda row: _handle_open_asset(row),
-                        on_edit=_set_asset_edit_mode,
-                        on_open_tab=lambda row, tab: _open_assets_detail_modal(
-                            str(row.get("id") or "").strip(),
-                            row,
-                            tab_focus=tab,
-                        ),
-                        on_after_change=clear_assets_cache,
-                    )
-
-            if expanded:
-                st.markdown('<div class="ips-field-row-expand">', unsafe_allow_html=True)
-                _render_asset_expand_panel(asset)
-                st.markdown("</div>", unsafe_allow_html=True)
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    if not is_field_context():
-        assets_by_id = {str(a.get("id") or "").strip(): a for a in filtered if str(a.get("id") or "").strip()}
-        picked = render_assets_equipment_row_click_bridge()
-        if picked:
-            open_id = str(picked).strip()
-            open_asset = assets_by_id.get(open_id)
-            if open_asset:
-                _handle_open_asset(open_asset)
-                st.rerun()
+        if field_mode and expanded_asset_id and expanded_asset_id in assets_by_id:
+            expanded_asset = assets_by_id[expanded_asset_id]
+            st.markdown('<div class="ips-field-row-expand">', unsafe_allow_html=True)
+            _render_asset_expand_panel(expanded_asset)
+            st.markdown("</div>", unsafe_allow_html=True)
 
     return all_asset_ids
 
@@ -1301,18 +1216,10 @@ def _render_equipment_list(
         department=str(st.session_state.get("ast_bar_department") or "All Departments"),
     )
 
-    summary = _equipment_summary_counts(filtered)
-    render_assets_summary_cards(
-        total=summary["total"],
-        available=summary["available"],
-        checked_out=summary["checked_out"],
-        out_for_repair=summary["out_for_repair"],
-        service_due=summary["service_due"],
-    )
-    render_assets_table_pagination_header(len(filtered), _TABLE_KEY)
+    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="asset")
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
     _render_custom_assets_table(page_rows, filter_options=filter_options)
-    render_assets_pagination_footer(len(filtered), _TABLE_KEY, item_label="asset")
+    render_table_pagination_footer(len(filtered), _TABLE_KEY)
 
 
 def _render_small_tools_list(rows: list[dict]) -> None:
@@ -1376,7 +1283,9 @@ def _render_small_tools_list(rows: list[dict]) -> None:
                 _clear_small_tool_selection(st.session_state.get(_ALL_SMALL_TOOL_IDS_KEY))
                 st.rerun()
 
+    render_assets_filter_bar_shell()
     layout_filter_bar(_filters)
+    close_assets_filter_bar_shell()
 
     filtered = _filter_small_tool_rows(
         small_tool_rows,
@@ -2501,7 +2410,6 @@ def render() -> None:
     )
 
     with tab_equipment:
-        render_assets_equipment_banner()
         with st.expander("Tool Trailers & Kits", expanded=False):
             if st.button("Load kit summary", key="ast_kit_summary_load", use_container_width=True):
                 st.session_state["ast_kit_summary_on"] = True
@@ -2510,12 +2418,6 @@ def render() -> None:
             else:
                 st.caption("Load kit accountability metrics on demand to speed up the assets page.")
         _render_equipment_list(rows)
-        if st.session_state.pop(_ASSETS_EQUIPMENT_LAYOUT_BUMP_KEY, False):
-            pass
-        elif not st.session_state.get(_ASSETS_EQUIPMENT_LAYOUT_KEY):
-            st.session_state[_ASSETS_EQUIPMENT_LAYOUT_KEY] = True
-            st.session_state[_ASSETS_EQUIPMENT_LAYOUT_BUMP_KEY] = True
-            st.rerun()
 
     with tab_serialized_tools:
         st.caption(
