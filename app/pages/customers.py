@@ -10,6 +10,17 @@ import streamlit as st
 
 try:
     from app.components.headers import render_page_brand_header
+    from app.components.customers_list_table import (
+        build_customers_html_table,
+        normalize_customer_status,
+        render_customers_table_bridge_legacy,
+        render_customers_table_open_buttons,
+    )
+    from app.components.customers_page_layout import (
+        close_customers_filter_bar_shell,
+        inject_customers_page_layout_css,
+        render_customers_filter_bar_shell,
+    )
     from app.components.layout import render_filter_bar as layout_filter_bar
     from app.components.table_filters import (
         apply_column_filters,
@@ -72,6 +83,17 @@ try:
     from app.ui.streamlit_perf import fragment
 except ImportError:
     from components.headers import render_page_brand_header  # type: ignore
+    from components.customers_list_table import (  # type: ignore
+        build_customers_html_table,
+        normalize_customer_status,
+        render_customers_table_bridge_legacy,
+        render_customers_table_open_buttons,
+    )
+    from components.customers_page_layout import (  # type: ignore
+        close_customers_filter_bar_shell,
+        inject_customers_page_layout_css,
+        render_customers_filter_bar_shell,
+    )
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
     from components.table_filters import (  # type: ignore
         apply_column_filters,
@@ -186,12 +208,7 @@ _CONTACT_TABS = [
 SELECTED_CUSTOMER_KEY = "selected_customer_id"
 SHOW_CUSTOMER_MODAL_KEY = "show_customer_detail_modal"
 _ALL_CUSTOMER_IDS_KEY = "_ips_customers_visible_ids"
-_CUSTOMER_COLS = [4.85, 1.2, 1.2, 1.4, 1.3]
-_CUSTOMER_HEADER_SPECS: list[tuple[str, str | None]] = [
-    ("CUSTOMER", None),
-    ("CONTACTS", None),
-    ("OPEN JOBS", None),
-    ("OPEN ESTIMATES", None),
+_CUSTOMER_FILTER_SPECS: list[tuple[str, str]] = [
     ("STATUS", "status"),
 ]
 SELECTED_CONTACT_KEY = "selected_contact_id"
@@ -216,26 +233,6 @@ _LOCATION_HEADERS = [
 _LOCATION_STATUS_OPTS = ["Active", "Inactive", "On Hold"]
 
 
-def _normalize_customer_status(raw: object) -> str:
-    s = str(raw or "").strip().lower().replace("_", " ")
-    mapping = {
-        "": "Active",
-        "active": "Active",
-        "inactive": "Inactive",
-        "prospect": "Prospect",
-        "on hold": "On Hold",
-    }
-    if s in mapping:
-        return mapping[s]
-    label = str(raw or "").strip()
-    return label if label else "Active"
-
-
-def _customer_name(row: dict) -> str:
-    val = str(row.get("customer_name") or row.get("company_name") or "").strip()
-    return val or "—"
-
-
 def _customer_primary_location(row: dict) -> str:
     val = str(row.get("primary_location_name") or row.get("location_name") or "").strip()
     return val or "—"
@@ -251,19 +248,8 @@ def _customer_state(row: dict) -> str:
     return val or "—"
 
 
-def _customer_status_pill_html(status: str) -> str:
-    cls_map = {
-        "Active": "ips-customer-status-active",
-        "Inactive": "ips-customer-status-inactive",
-        "Prospect": "ips-customer-status-prospect",
-        "On Hold": "ips-customer-status-on-hold",
-    }
-    cls = cls_map.get(status, "ips-customer-status-active")
-    return f'<span class="ips-customer-status-pill {cls}">{html.escape(status)}</span>'
-
-
 _CUSTOMER_COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
-    ("status", lambda c: _normalize_customer_status(c.get("status"))),
+    ("status", lambda c: normalize_customer_status(c.get("status"))),
 ]
 _CUSTOMER_BAR_FILTER_FIELDS = ["status"]
 
@@ -299,102 +285,24 @@ def _open_customers_table_customer(customer: dict) -> None:
     _open_customer_from_list(customer)
 
 
-def _customer_name_open_label(name: str) -> str:
-    return name if name and name != "—" else "Open customer"
-
-
-def _customer_row_marker_html(customer_id: str) -> str:
-    cid_attr = html.escape(customer_id, quote=True)
-    return (
-        f'<span class="ips-customers-table-row" data-row-id="{cid_attr}" aria-hidden="true"></span>'
-    )
-
-
-def _render_customers_row_click_bridge() -> str | None:
-    try:
-        from app.ui.clean_table import _components_html
-    except ImportError:
-        from ui.clean_table import _components_html  # type: ignore
-
-    st.markdown(
-        '<span class="ips-customers-row-click-bridge-marker" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
-    return _components_html(
-        """
-<script>
-(function () {
-  const w = window.parent || window;
-  const doc = w.document;
-  const hookKey = "ipsCustomersRowClick::list";
-  const tblSel = ".st-key-customers_table_wrap";
-  const rowSel = '[data-testid="stHorizontalBlock"]:has(.ips-customers-table-row)';
-
-  function sendValue(id) {
-    const payload = { type: "streamlit:setComponentValue", value: id };
-    const frames = [window, window.parent, w].filter(function (f, i, arr) {
-      return f && arr.indexOf(f) === i;
-    });
-    for (var i = 0; i < frames.length; i++) {
-      try {
-        if (frames[i].Streamlit && typeof frames[i].Streamlit.setComponentValue === "function") {
-          frames[i].Streamlit.setComponentValue(id);
-          return;
-        }
-      } catch (err) {}
-    }
-    for (var j = 0; j < frames.length; j++) {
-      try { frames[j].postMessage(payload, "*"); } catch (err) {}
-    }
-  }
-
-  function isInteractive(target) {
-    return !!(target && target.closest && target.closest(
-      "button, input, select, textarea, label, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox'], [class*='st-key-customers_open_']"
-    ));
-  }
-
-  function tableScope() {
-    const anchor = doc.querySelector(tblSel);
-    if (!anchor) return null;
-    return anchor.closest('[data-testid="stVerticalBlockBorderWrapper"]') || anchor.parentElement;
-  }
-
-  function bindRows() {
-    const scope = tableScope();
-    if (!scope) return;
-    scope.querySelectorAll(rowSel).forEach(function (row) {
-      if (row.dataset.ipsCustomersRowBound === "1") return;
-      row.dataset.ipsCustomersRowBound = "1";
-      row.addEventListener("click", function (e) {
-        if (isInteractive(e.target)) return;
-        const marker = row.querySelector(".ips-customers-table-row[data-row-id]");
-        const id = marker && marker.getAttribute("data-row-id");
-        if (!id) return;
-        e.preventDefault();
-        e.stopPropagation();
-        sendValue(id);
-      });
-    });
-  }
-
-  if (!doc.ipsCustomersRowClickRegistry) doc.ipsCustomersRowClickRegistry = {};
-  doc.ipsCustomersRowClickRegistry[hookKey] = { bind: bindRows };
-  bindRows();
-  if (!doc.ipsCustomersRowBindObserver) {
-    doc.ipsCustomersRowBindObserver = new MutationObserver(function () {
-      Object.values(doc.ipsCustomersRowClickRegistry || {}).forEach(function (cfg) {
-        if (cfg && typeof cfg.bind === "function") cfg.bind();
-      });
-    });
-    doc.ipsCustomersRowBindObserver.observe(doc.body, { childList: true, subtree: true });
-  }
-})();
-</script>
-        """,
-        component_key="ips_customers_list_row_click",
-        height=1,
-    )
+def _render_customers_table_column_filters(
+    *,
+    filter_options: dict[str, list[str]],
+) -> None:
+    if not _CUSTOMER_FILTER_SPECS:
+        return
+    st.markdown('<div class="ips-customers-table-filter-toolbar">', unsafe_allow_html=True)
+    cols = st.columns(len(_CUSTOMER_FILTER_SPECS), gap="small")
+    for col, (label, field) in zip(cols, _CUSTOMER_FILTER_SPECS):
+        with col:
+            render_table_header_cell(
+                label,
+                table_key=_CUSTOMERS_TABLE_KEY,
+                filter_field=field,
+                filter_options=filter_options.get(field, []),
+                base_class="ips-customers-filter-toolbar-cell",
+            )
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 @fragment
@@ -422,84 +330,26 @@ def _render_custom_customers_table(
     ]
     st.session_state[_ALL_CUSTOMER_IDS_KEY] = all_customer_ids
 
-    with st.container(key="customers_table_wrap"):
-        st.markdown('<div class="ips-customers-table-wrap">', unsafe_allow_html=True)
-
-        header_cols = st.columns(_CUSTOMER_COLS, gap="small", vertical_alignment="center")
-        for col, (label, field) in zip(header_cols, _CUSTOMER_HEADER_SPECS):
-            with col:
-                if field:
-                    render_table_header_cell(
-                        label,
-                        table_key=_CUSTOMERS_TABLE_KEY,
-                        filter_field=field,
-                        filter_options=filter_options.get(field, []),
-                        base_class="ips-customers-header-row ips-customers-cell",
-                    )
-                else:
-                    render_table_header_cell(
-                        label,
-                        base_class="ips-customers-header-row ips-customers-cell",
-                    )
-
-        for customer in filtered:
-            cid = str(customer.get("id") or "").strip()
-            if not cid:
-                continue
-
-            name = _customer_name(customer)
-            contacts = str(customer.get("contact_count") or 0)
-            open_jobs = str(customer.get("open_jobs") or 0)
-            open_estimates = str(customer.get("open_estimates") or 0)
-            status = _normalize_customer_status(customer.get("status"))
-
-            cols = st.columns(_CUSTOMER_COLS, gap="small", vertical_alignment="center")
-
-            with cols[0]:
-                st.markdown(_customer_row_marker_html(cid), unsafe_allow_html=True)
-                if st.button(
-                    _customer_name_open_label(name),
-                    key=f"customers_open_{cid}",
-                    type="tertiary",
-                    help=f"View {name}",
-                    use_container_width=True,
-                ):
-                    _open_customers_table_customer(customer)
-
-            with cols[1]:
-                st.markdown(
-                    f'<div class="ips-customers-cell ips-customers-count-cell">{html.escape(contacts)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[2]:
-                st.markdown(
-                    f'<div class="ips-customers-cell ips-customers-count-cell">{html.escape(open_jobs)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[3]:
-                st.markdown(
-                    f'<div class="ips-customers-cell ips-customers-count-cell">{html.escape(open_estimates)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[4]:
-                st.markdown(_customer_status_pill_html(status), unsafe_allow_html=True)
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
     customers_by_id = {
         str(c.get("id") or "").strip(): c
         for c in filtered
         if str(c.get("id") or "").strip()
     }
-    picked = _render_customers_row_click_bridge()
-    if picked:
-        open_id = str(picked).strip()
-        open_customer = customers_by_id.get(open_id)
-        if open_customer:
-            _open_customers_table_customer(open_customer)
+
+    with st.container(key="customers_table_wrap"):
+        _render_customers_table_column_filters(filter_options=filter_options)
+        st.markdown(
+            build_customers_html_table(filtered),
+            unsafe_allow_html=True,
+        )
+        render_customers_table_open_buttons(
+            filtered,
+            open_item_fn=_open_customers_table_customer,
+        )
+        render_customers_table_bridge_legacy(
+            customers_by_id,
+            open_item_fn=_open_customers_table_customer,
+        )
 
     return all_customer_ids
 
@@ -596,7 +446,7 @@ def _apply_customers_bar_status_filter(rows: list[dict], status: str) -> list[di
     return [
         r
         for r in rows
-        if _normalize_customer_status(r.get("status")) == status_val
+        if normalize_customer_status(r.get("status")) == status_val
         or str(r.get("status") or "").strip() == status_val
     ]
 
@@ -2610,6 +2460,7 @@ def render() -> None:
         return
 
     inject_customers_module_css()
+    inject_customers_page_layout_css()
     st.markdown(
         '<span class="ips-customers-page ips-module-page ips-page-shell-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
@@ -2707,7 +2558,9 @@ def render() -> None:
                 _clear_customer_selection(st.session_state.get(_ALL_CUSTOMER_IDS_KEY))
                 st.rerun()
 
+    render_customers_filter_bar_shell()
     layout_filter_bar(_filters)
+    close_customers_filter_bar_shell()
 
     filtered = _filter_customers(
         all_rows,
