@@ -321,13 +321,15 @@ _ASSETS_FILTER_SPECS: list[tuple[str, str]] = [
     ("CATEGORY", "category"),
     ("LOCATION", "location"),
     ("STATUS", "status"),
+    ("DEPARTMENT", "department"),
 ]
 _COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
     ("category", lambda r: _asset_category(r)),
     ("location", lambda r: _asset_location(r)),
     ("status", lambda r: _normalize_asset_status(r.get("status"))),
+    ("department", lambda r: _asset_department(r)),
 ]
-_ASSET_BAR_FILTER_FIELDS = ["category", "location", "department", "status"]
+_ASSET_BAR_FILTER_FIELDS = ["status"]
 _ASSET_TABS = [
     "Overview",
     "Kit / Contents",
@@ -1121,73 +1123,34 @@ def _render_equipment_list(
 ) -> None:
     equipment_rows = [r for r in rows if is_equipment_tab_asset(r)]
     filter_options = build_filter_options(equipment_rows, _COLUMN_FILTER_SPECS)
-    categories = sorted(
-        {_asset_category(r) for r in equipment_rows if _asset_category(r) and _asset_category(r) != "—"}
-    )
-    locations = sorted(
-        {_asset_location(r) for r in equipment_rows if _asset_location(r) and _asset_location(r) != "—"}
-    )
-    departments = sorted(
-        {_asset_department(r) for r in equipment_rows if _asset_department(r) and _asset_department(r) != "—"}
-    )
     status_options = sorted(
         {_normalize_asset_status(r.get("status")) for r in equipment_rows if _normalize_asset_status(r.get("status"))}
     )
 
     def _filters() -> None:
-        c1, c2, c3, c4, c5, c6 = st.columns([2.2, 1.0, 1.0, 1.0, 1.0, 0.6])
+        c1, c2, c3 = st.columns([3.2, 2.2, 0.6])
         with c1:
             st.text_input(
                 "Search",
-                placeholder="Search asset #, name, category, location…",
+                placeholder="Search assets...",
                 key="ast_search",
                 label_visibility="collapsed",
             )
         with c2:
-            st.selectbox(
-                "Category",
-                ["All Categories", *categories],
-                key="ast_bar_category",
-                label_visibility="collapsed",
-            )
-        with c3:
-            st.selectbox(
-                "Location",
-                ["All Locations", *locations],
-                key="ast_bar_location",
-                label_visibility="collapsed",
-            )
-        with c4:
             st.selectbox(
                 "Status",
                 ["All Statuses", *status_options],
                 key="ast_bar_status",
                 label_visibility="collapsed",
             )
-        with c5:
-            st.selectbox(
-                "Department",
-                ["All Departments", *departments],
-                key="ast_bar_department",
-                label_visibility="collapsed",
-            )
-        with c6:
+        with c3:
             if st.button("Clear", key="ast_clear", use_container_width=True):
                 clear_table_filters(
                     _TABLE_KEY,
                     _ASSET_BAR_FILTER_FIELDS,
-                    extra_keys=[
-                        "ast_search",
-                        "ast_bar_category",
-                        "ast_bar_location",
-                        "ast_bar_status",
-                        "ast_bar_department",
-                    ],
+                    extra_keys=["ast_search", "ast_bar_status"],
                 )
-                st.session_state["ast_bar_category"] = "All Categories"
-                st.session_state["ast_bar_location"] = "All Locations"
                 st.session_state["ast_bar_status"] = "All Statuses"
-                st.session_state["ast_bar_department"] = "All Departments"
                 reset_table_page(_TABLE_KEY)
                 _clear_asset_selection(st.session_state.get(_ALL_ASSET_IDS_KEY))
                 clear_field_expanded(FIELD_EXPANDED_ASSET_KEY)
@@ -1200,20 +1163,18 @@ def _render_equipment_list(
     assets_lookup = {
         str(a.get("id") or "").strip(): a for a in rows if str(a.get("id") or "").strip()
     }
-    render_equipment_bulk_move_toolbar(
-        _get_selected_asset_ids(),
-        assets_lookup,
-        on_clear_selection=lambda: _clear_asset_selection(st.session_state.get(_ALL_ASSET_IDS_KEY)),
-        on_success_cache_clear=clear_assets_cache,
-    )
+    with st.expander("Bulk move tools", expanded=False):
+        render_equipment_bulk_move_toolbar(
+            _get_selected_asset_ids(),
+            assets_lookup,
+            on_clear_selection=lambda: _clear_asset_selection(st.session_state.get(_ALL_ASSET_IDS_KEY)),
+            on_success_cache_clear=clear_assets_cache,
+        )
 
     filtered = _filter_rows(
         equipment_rows,
         q=str(st.session_state.get("ast_search") or "").strip(),
-        category=str(st.session_state.get("ast_bar_category") or "All Categories"),
-        location=str(st.session_state.get("ast_bar_location") or "All Locations"),
         status=str(st.session_state.get("ast_bar_status") or "All Statuses"),
-        department=str(st.session_state.get("ast_bar_department") or "All Departments"),
     )
 
     render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="asset")
@@ -1322,50 +1283,21 @@ def _apply_assets_search_filter(rows: list[dict], q: str) -> list[dict]:
         or ql in str(r.get("asset_name") or "").lower()
         or ql in _asset_category(r).lower()
         or ql in _asset_location(r).lower()
+        or ql in _asset_department(r).lower()
+        or ql in _normalize_asset_status(r.get("status")).lower()
     ]
-
-
-def _apply_assets_bar_filters(
-    rows: list[dict],
-    *,
-    category: str,
-    location: str,
-    status: str,
-    department: str,
-) -> list[dict]:
-    out = rows
-    category_val = str(category or "All Categories").strip()
-    if category_val and category_val != "All Categories":
-        out = [r for r in out if _asset_category(r) == category_val]
-    location_val = str(location or "All Locations").strip()
-    if location_val and location_val != "All Locations":
-        out = [r for r in out if _asset_location(r) == location_val]
-    status_val = str(status or "All Statuses").strip()
-    if status_val and status_val != "All Statuses":
-        out = [r for r in out if _normalize_asset_status(r.get("status")) == status_val]
-    department_val = str(department or "All Departments").strip()
-    if department_val and department_val != "All Departments":
-        out = [r for r in out if _asset_department(r) == department_val]
-    return out
 
 
 def _filter_rows(
     rows: list[dict],
     *,
     q: str = "",
-    category: str = "All Categories",
-    location: str = "All Locations",
     status: str = "All Statuses",
-    department: str = "All Departments",
 ) -> list[dict]:
     out = _apply_assets_search_filter(rows, q)
-    out = _apply_assets_bar_filters(
-        out,
-        category=category,
-        location=location,
-        status=status,
-        department=department,
-    )
+    status_val = str(status or "All Statuses").strip()
+    if status_val and status_val != "All Statuses":
+        out = [r for r in out if _normalize_asset_status(r.get("status")) == status_val]
     return apply_column_filters(out, _TABLE_KEY, _COLUMN_FILTER_SPECS)
 
 
