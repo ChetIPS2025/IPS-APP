@@ -189,7 +189,7 @@ def navigate_to_estimate_materials(estimate_id: str) -> None:
 
 
 def navigate_to_estimate_detail(estimate_id: str, *, tab: str = "Details") -> None:
-    """Open Estimates module with the estimate detail modal focused."""
+    """Open Estimates module with the estimate detail view focused."""
     eid = str(estimate_id or "").strip()
     if not eid:
         return
@@ -199,7 +199,8 @@ def navigate_to_estimate_detail(estimate_id: str, *, tab: str = "Details") -> No
         from pages._core._data import ACTIVE_ESTIMATE_KEY  # type: ignore
     st.session_state[ACTIVE_ESTIMATE_KEY] = eid
     st.session_state["selected_estimate_id"] = eid
-    st.session_state["show_estimate_detail_modal"] = True
+    st.session_state["estimates_mode"] = "detail"
+    st.session_state["show_estimate_detail_modal"] = False
     st.session_state[ESTIMATE_DETAIL_TAB_KEY] = str(tab or "Details").strip() or "Details"
     set_nav_slug("estimates")
 

@@ -47,7 +47,8 @@ class TestNavigationHandoffs(unittest.TestCase):
         navigate_to_estimate_detail("est-77")
         self.assertEqual(st.session_state["ips_active_estimate_id"], "est-77")
         self.assertEqual(st.session_state["selected_estimate_id"], "est-77")
-        self.assertTrue(st.session_state["show_estimate_detail_modal"])
+        self.assertEqual(st.session_state["estimates_mode"], "detail")
+        self.assertFalse(st.session_state["show_estimate_detail_modal"])
         self.assertEqual(st.session_state["ips_nav_page"], "estimates")
 
     def test_navigate_to_weekly_timesheet_prefill(self) -> None:

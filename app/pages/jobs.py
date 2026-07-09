@@ -2748,9 +2748,12 @@ def _render_job_estimates_section(job: dict) -> None:
         bc1, bc2 = st.columns(2, gap="small")
         with bc1:
             if st.button("View Estimate", key=f"job_est_view_{jid}_{est.get('id')}", use_container_width=True):
-                st.session_state["selected_estimate_id"] = str(est.get("id") or "")
-                st.session_state["show_estimate_detail_modal"] = True
-                st.info("Open the **Estimates** page to view full estimate details.")
+                try:
+                    from app.navigation import navigate_to_estimate_detail
+                except ImportError:
+                    from navigation import navigate_to_estimate_detail  # type: ignore
+                navigate_to_estimate_detail(str(est.get("id") or ""))
+                st.rerun()
         with bc2:
             if st.button("Proposal PDF", key=f"job_est_pdf_{jid}_{est.get('id')}", use_container_width=True):
                 try:

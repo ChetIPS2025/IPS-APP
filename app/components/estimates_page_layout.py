@@ -62,7 +62,7 @@ def estimate_col_marker(name: str) -> str:
 def inject_estimates_page_layout_css() -> None:
     st.markdown(
         """
-<style id="ips-estimates-page-layout-v7">
+<style id="ips-estimates-page-layout-v8">
 section[data-testid="stMain"]:has(.ips-estimates-page) {
   background: #ffffff !important;
 }
@@ -517,6 +517,94 @@ section[data-testid="stMain"]:has(.ips-estimates-page) .ips-estimates-filter-bar
 .st-key-estimates_table_wrap [data-testid="stVerticalBlockBorderWrapper"] > div {
   padding: 0 !important;
   background: #ffffff !important;
+}
+.st-key-estimates_table_wrap .ips-estimates-sl-table-body {
+  width: 100% !important;
+  border-top: 1px solid #e8edf4 !important;
+}
+.st-key-estimates_table_wrap .ips-estimates-sl-th {
+  display: flex !important;
+  align-items: center !important;
+  min-height: 44px !important;
+  padding: 0 10px !important;
+  background: #eef2f7 !important;
+  color: #64748b !important;
+  font-size: 0.68rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+  white-space: nowrap !important;
+  border-bottom: 1px solid #e8edf4 !important;
+  box-sizing: border-box !important;
+}
+.st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-estimates-sl-th) {
+  background: #eef2f7 !important;
+}
+.st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-estimates-sl-row) {
+  min-height: 46px !important;
+  border-bottom: 1px solid #e8edf4 !important;
+  background: #ffffff !important;
+}
+.st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-estimates-sl-row):hover {
+  background: #f8fbff !important;
+}
+.st-key-estimates_table_wrap .ips-estimates-sl-cell {
+  display: flex !important;
+  align-items: center !important;
+  min-height: 46px !important;
+  padding: 0 10px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  font-size: 0.8125rem !important;
+  color: #0f172a !important;
+}
+.st-key-estimates_table_wrap .ips-estimates-sl-customer {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+.st-key-estimates_table_wrap .ips-estimates-sl-total {
+  justify-content: flex-end !important;
+  text-align: right !important;
+  font-variant-numeric: tabular-nums !important;
+}
+.st-key-estimates_table_wrap .ips-estimates-sl-status {
+  justify-content: center !important;
+}
+.st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-estimates-sl-row) [data-testid="stColumn"]:nth-child(1) button,
+.st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-estimates-sl-row) [data-testid="stColumn"]:nth-child(2) button {
+  width: 100% !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  padding: 0 !important;
+  min-height: 46px !important;
+  border: none !important;
+  background: transparent !important;
+  color: #1d4ed8 !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  box-shadow: none !important;
+}
+.st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-estimates-sl-row) [data-testid="stColumn"]:nth-child(2) button {
+  font-weight: 500 !important;
+  color: #0f172a !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+.st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-estimates-sl-row) [data-testid="stColumn"]:nth-child(1) button:hover,
+.st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-estimates-sl-row) [data-testid="stColumn"]:nth-child(2) button:hover {
+  color: #1e40af !important;
+  text-decoration: underline !important;
+  background: transparent !important;
+}
+.st-key-estimates_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-estimates-sl-row) [data-testid="stColumn"]:last-child button {
+  min-height: 30px !important;
+  padding: 0 10px !important;
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  border-radius: 6px !important;
 }
 .ips-est-revision-banner {
   background: #eff6ff;

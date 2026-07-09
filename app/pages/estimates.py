@@ -72,13 +72,13 @@ try:
         render_estimates_view_navigation,
     )
     from app.components.estimates_list_table import (
-        ESTIMATES_TABLE_LAST_ACTION_KEY,
+        ESTIMATES_MODE_KEY,
         build_approve_flags,
         build_approved_flags,
-        build_estimates_html_table,
         filter_waiting_approval_rows,
-        render_estimates_table_bridge,
-        render_estimates_table_open_buttons,
+        open_estimate_detail,
+        render_estimates_list_table_body,
+        render_estimates_list_table_header,
     )
     from app.components.headers import render_page_brand_header
     from app.components.layout import render_filter_bar as layout_filter_bar
@@ -188,13 +188,13 @@ except ImportError:
         render_estimates_view_navigation,
     )
     from components.estimates_list_table import (  # type: ignore
-        ESTIMATES_TABLE_LAST_ACTION_KEY,
+        ESTIMATES_MODE_KEY,
         build_approve_flags,
         build_approved_flags,
-        build_estimates_html_table,
         filter_waiting_approval_rows,
-        render_estimates_table_bridge,
-        render_estimates_table_open_buttons,
+        open_estimate_detail,
+        render_estimates_list_table_body,
+        render_estimates_list_table_header,
     )
     from components.headers import render_page_brand_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
@@ -276,6 +276,7 @@ _REVISE_BEGIN_CONFIRM_PREFIX = "est_revise_begin_confirm_"
 _REVISE_COMPLETE_CONFIRM_PREFIX = "est_revise_complete_confirm_"
 _REVISE_CANCEL_CONFIRM_PREFIX = "est_revise_cancel_confirm_"
 SELECTED_ESTIMATE_KEY = "selected_estimate_id"
+ESTIMATES_MODE_KEY = "estimates_mode"
 SHOW_ESTIMATE_MODAL_KEY = "show_estimate_detail_modal"
 _ALL_ESTIMATE_IDS_KEY = "_ips_estimates_visible_ids"
 _COST_BUILDER_OPTS_CACHE_KEY = "_ips_cost_builder_select_opts"
@@ -734,6 +735,7 @@ def _estimate_select_key(estimate_id: str) -> str:
 
 def _clear_estimate_selection(estimate_ids: list[str] | None = None) -> None:
     st.session_state[SELECTED_ESTIMATE_KEY] = None
+    st.session_state[ESTIMATES_MODE_KEY] = "list"
     st.session_state[SHOW_ESTIMATE_MODAL_KEY] = False
     ids = list(estimate_ids or [])
     for eid in ids:
@@ -758,16 +760,18 @@ def _on_estimate_checkbox_change(estimate_id: str, all_estimate_ids: list[str]) 
 
 
 def _activate_estimate_detail_modal(estimate_id: str, estimate: dict | None = None) -> None:
-    """Open the estimate detail/editor modal (shared by checkbox and table links)."""
+    """Open estimate detail inline (list page navigation uses estimate id)."""
     eid = str(estimate_id or "").strip()
     if not eid:
         return
-    st.session_state[SELECTED_ESTIMATE_KEY] = eid
-    st.session_state[SHOW_ESTIMATE_MODAL_KEY] = True
-    if not isinstance(estimate, dict):
-        cache = st.session_state.get(_ESTIMATES_CACHE_KEY) or {}
-        estimate = cache.get(eid) if isinstance(cache, dict) else None
-    _open_estimates_detail_modal(eid, estimate)
+    open_estimate_detail(eid)
+    if isinstance(estimate, dict):
+        st.session_state[ACTIVE_ESTIMATE_KEY] = eid
+        cache = st.session_state.get(_ESTIMATES_CACHE_KEY)
+        if isinstance(cache, dict):
+            cache = dict(cache)
+            cache[eid] = estimate
+            st.session_state[_ESTIMATES_CACHE_KEY] = cache
 
 
 def _open_estimate_from_list(est: dict) -> None:
@@ -817,37 +821,18 @@ def _render_custom_estimates_table(
 
     approve_flags = build_approve_flags(filtered)
     approved_flags = build_approved_flags(filtered)
-    estimates_by_id = {
-        str(e.get("id") or "").strip(): e
-        for e in filtered
-        if str(e.get("id") or "").strip()
-    }
 
     with st.container(key="estimates_table_wrap"):
         _render_estimates_table_column_filters(
             estimates_list_header_specs(),
             filter_options=filter_options,
         )
-        st.markdown(
-            build_estimates_html_table(
-                filtered,
-                approve_flags=approve_flags,
-                approved_flags=approved_flags,
-                layout="list",
-            ),
-            unsafe_allow_html=True,
-        )
-        render_estimates_table_open_buttons(
+        render_estimates_list_table_header()
+        render_estimates_list_table_body(
             filtered,
-            open_estimate_fn=_activate_estimate_detail_modal,
-        )
-        render_estimates_table_bridge(
-            estimates_by_id,
-            component_key="ips_estimates_list_bridge",
-            hook_key="ipsEstimatesList::action",
-            last_action_key=ESTIMATES_TABLE_LAST_ACTION_KEY,
+            approve_flags=approve_flags,
+            approved_flags=approved_flags,
             pending_approve_key=_PENDING_APPROVE_KEY,
-            open_estimate_fn=_activate_estimate_detail_modal,
         )
 
     return all_estimate_ids
@@ -1089,7 +1074,14 @@ def _filter_rows(
 def _clear_estimates_detail_modal() -> None:
     estimate_ids = st.session_state.get(_ALL_ESTIMATE_IDS_KEY) or []
     _clear_estimate_selection([str(eid) for eid in estimate_ids])
+    st.session_state[ESTIMATES_MODE_KEY] = "list"
     clear_edit_modes(_MOD)
+    clear_record_modal(
+        table_key=_TABLE_KEY,
+        session_select_key=_SEL,
+        modal_key=_ESTIMATES_MODAL_KEY,
+        module=_MOD,
+    )
     clear_record_modal(
         table_key=_TABLE_KEY,
         session_select_key=_SEL,
@@ -1732,6 +1724,28 @@ def _render_estimate_actions_panel(est: dict) -> None:
     render_estimate_action_buttons(est, on_approve=_after_action, on_delete=_after_action)
 
 
+def render_estimate_detail(estimate_id: str) -> None:
+    """Full-page estimate detail (opened from list navigation)."""
+    eid = str(estimate_id or "").strip()
+    if st.button("← Back to Estimates", key="est_detail_back"):
+        st.session_state[ESTIMATES_MODE_KEY] = "list"
+        st.session_state[SELECTED_ESTIMATE_KEY] = None
+        _clear_estimate_selection(st.session_state.get(_ALL_ESTIMATE_IDS_KEY))
+        st.rerun()
+
+    if not eid:
+        st.error("Estimate not found.")
+        return
+
+    est = get_estimate(eid)
+    if not est:
+        st.error("Estimate not found.")
+        return
+
+    st.session_state[ACTIVE_ESTIMATE_KEY] = eid
+    render_estimate_detail_dialog(est)
+
+
 def render_estimate_detail_dialog(est: dict) -> None:
     rk = record_session_key(est, "id", "estimate_number")
     eid = str(est.get("id") or "")
@@ -1934,6 +1948,13 @@ def render() -> None:
         from pages._core._access import begin_module  # type: ignore
     if not begin_module("estimates"):
         return
+
+    if st.session_state.get(ESTIMATES_MODE_KEY) == "detail" and st.session_state.get(SELECTED_ESTIMATE_KEY):
+        inject_estimates_module_css()
+        inject_estimates_page_layout_css()
+        render_estimate_detail(str(st.session_state[SELECTED_ESTIMATE_KEY]))
+        st.stop()
+
     inject_estimates_module_css()
     inject_estimates_page_layout_css()
     st.markdown(
@@ -2035,8 +2056,3 @@ def render() -> None:
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
     _render_custom_estimates_table(page_rows, filter_options=filter_options)
     render_estimates_pagination_footer(len(filtered), _TABLE_KEY)
-
-    if st.session_state.get(SHOW_ESTIMATE_MODAL_KEY) or str(
-        st.session_state.get(_ESTIMATES_MODAL_KEY) or ""
-    ).strip():
-        show_modal_if_pending(_ESTIMATES_MODAL_KEY, _show_estimates_detail_modal)

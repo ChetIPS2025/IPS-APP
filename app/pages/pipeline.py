@@ -65,7 +65,8 @@ def _open_estimate(estimate_id: str) -> None:
     if not eid:
         return
     st.session_state["selected_estimate_id"] = eid
-    st.session_state["show_estimate_detail_modal"] = True
+    st.session_state["estimates_mode"] = "detail"
+    st.session_state["show_estimate_detail_modal"] = False
     _set_nav_slug("estimates")
     st.rerun()
 

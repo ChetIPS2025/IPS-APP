@@ -69,6 +69,10 @@ ESTIMATES_TABLE_COL_WIDTHS_PX: dict[str, int] = {
 }
 
 ESTIMATES_TABLE_LAST_ACTION_KEY = "estimates_list_last_action"
+ESTIMATES_MODE_KEY = "estimates_mode"
+ESTIMATES_SELECTED_ID_KEY = "selected_estimate_id"
+
+_ESTIMATES_LIST_COL_RATIOS = tuple(ESTIMATES_LIST_COL_WIDTHS_PX.values())
 
 
 def normalize_estimate_status(raw: object) -> str:
@@ -109,7 +113,9 @@ def estimate_status_pill_html(status: str) -> str:
 
 
 def estimate_number(row: dict[str, Any]) -> str:
-    val = str(row.get("estimate_number") or row.get("number") or "").strip()
+    val = str(
+        row.get("estimate_number") or row.get("number") or row.get("quote_number") or ""
+    ).strip()
     return val or "—"
 
 
@@ -236,6 +242,139 @@ def _actions_html(eid: str, *, show_approve: bool, show_approved_label: bool) ->
 def _cell_wrapper(inner: str, *, extra_class: str = "", align: str = "left") -> str:
     cls = f"cell-wrapper ips-dash-est-cell ips-dash-est-cell-{align} {extra_class}".strip()
     return f'<div class="{html.escape(cls)}">{inner}</div>'
+
+
+def open_estimate_detail(estimate_id: str) -> None:
+    """Navigate to the Estimates page inline detail view using the estimate primary key."""
+    eid = str(estimate_id or "").strip()
+    if not eid:
+        return
+    st.session_state[ESTIMATES_SELECTED_ID_KEY] = eid
+    st.session_state[ESTIMATES_MODE_KEY] = "detail"
+    st.session_state["show_estimate_detail_modal"] = False
+
+
+def render_estimates_list_table_header() -> None:
+    labels = [label for _key, label in ESTIMATES_LIST_TABLE_HEADERS]
+    cols = st.columns(list(_ESTIMATES_LIST_COL_RATIOS), gap="small")
+    for col, label in zip(cols, labels):
+        with col:
+            st.markdown(
+                f'<div class="ips-estimates-sl-th">{html.escape(label)}</div>',
+                unsafe_allow_html=True,
+            )
+
+
+def render_estimates_list_table_body(
+    rows: list[dict[str, Any]],
+    *,
+    approve_flags: dict[str, bool],
+    approved_flags: dict[str, bool] | None = None,
+    pending_approve_key: str = "est_pending_approve_id",
+) -> None:
+    """Estimates list rows with Streamlit open buttons for estimate # and project/description."""
+    approved_lookup = approved_flags or {}
+    st.markdown('<div class="ips-estimates-sl-table-body">', unsafe_allow_html=True)
+    for row_idx, est in enumerate(rows):
+        eid = str(est.get("id") or "").strip()
+        if not eid:
+            continue
+
+        est_no = estimate_number(est)
+        project = estimate_project(est)
+        customer = estimate_customer(est)
+        status = normalize_estimate_status(est.get("status"))
+        total = estimate_total_display(est)
+        num_label = est_no if est_no and est_no != "—" else "Estimate"
+        title_label = str(
+            est.get("project_description")
+            or est.get("description")
+            or estimate_project(est)
+            or ""
+        ).strip() or "Untitled Estimate"
+        row_parity = "even" if row_idx % 2 else "odd"
+
+        st.markdown(
+            f'<div class="ips-estimates-sl-row ips-estimates-sl-row-{row_parity}" '
+            f'data-estimate-id="{html.escape(eid, quote=True)}"></div>',
+            unsafe_allow_html=True,
+        )
+        cols = st.columns(list(_ESTIMATES_LIST_COL_RATIOS), gap="small")
+
+        with cols[0]:
+            if st.button(
+                num_label,
+                key=f"open_est_num_{eid}",
+                type="tertiary",
+            ):
+                open_estimate_detail(eid)
+                st.rerun()
+
+        with cols[1]:
+            if st.button(
+                title_label,
+                key=f"open_est_desc_{eid}",
+                type="tertiary",
+            ):
+                open_estimate_detail(eid)
+                st.rerun()
+
+        with cols[2]:
+            st.markdown(
+                f'<div class="ips-estimates-sl-cell ips-estimates-sl-customer">{html.escape(customer)}</div>',
+                unsafe_allow_html=True,
+            )
+
+        with cols[3]:
+            st.markdown(
+                f'<div class="ips-estimates-sl-cell ips-estimates-sl-status">'
+                f"{estimate_status_pill_html(status)}</div>",
+                unsafe_allow_html=True,
+            )
+
+        with cols[4]:
+            st.markdown(
+                f'<div class="ips-estimates-sl-cell ips-estimates-sl-total">{html.escape(total)}</div>',
+                unsafe_allow_html=True,
+            )
+
+        with cols[5]:
+            show_approve = approve_flags.get(eid, False)
+            show_approved_label = approved_lookup.get(eid, False)
+            if show_approve or show_approved_label:
+                action_cols = st.columns(2, gap="small")
+                if show_approve:
+                    with action_cols[0]:
+                        if st.button(
+                            "Approve",
+                            key=f"est_approve_{eid}",
+                            type="secondary",
+                        ):
+                            st.session_state[pending_approve_key] = eid
+                            st.rerun()
+                elif show_approved_label:
+                    with action_cols[0]:
+                        st.markdown(
+                            '<span class="ips-est-approve-done">Job Approved</span>',
+                            unsafe_allow_html=True,
+                        )
+                with action_cols[1]:
+                    if st.button(
+                        "View",
+                        key=f"open_est_view_{eid}",
+                        type="secondary",
+                    ):
+                        open_estimate_detail(eid)
+                        st.rerun()
+            elif st.button(
+                "View",
+                key=f"open_est_view_{eid}",
+                type="secondary",
+            ):
+                open_estimate_detail(eid)
+                st.rerun()
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def build_estimates_html_table(
