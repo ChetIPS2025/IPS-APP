@@ -110,7 +110,7 @@ try:
         render_equipment_bulk_move_toolbar,
         seed_tracking_form_state,
     )
-    from app.components.asset_row_actions_ui import ASSET_OPEN_ACTIVITY_KEY
+    from app.components.asset_row_actions_ui import ASSET_OPEN_ACTIVITY_KEY, render_asset_activity_snippet
     from app.components.assets_list_table import (
         ASSETS_TABLE_LAST_ACTION_KEY,
         apply_assets_table_bridge_action,
@@ -247,7 +247,7 @@ except ImportError:
         render_equipment_bulk_move_toolbar,
         seed_tracking_form_state,
     )
-    from components.asset_row_actions_ui import ASSET_OPEN_ACTIVITY_KEY  # type: ignore
+    from components.asset_row_actions_ui import ASSET_OPEN_ACTIVITY_KEY, render_asset_activity_snippet  # type: ignore
     from components.assets_list_table import (  # type: ignore
         ASSETS_TABLE_LAST_ACTION_KEY,
         apply_assets_table_bridge_action,
@@ -2018,7 +2018,10 @@ def _render_asset_detail_tabs(asset: dict) -> None:
     with tab_activity:
         if str(st.session_state.get(ASSET_OPEN_ACTIVITY_KEY) or "") == aid:
             st.session_state.pop(ASSET_OPEN_ACTIVITY_KEY, None)
-        render_asset_activity_snippet(asset)
+        try:
+            render_asset_activity_snippet(asset)
+        except Exception:
+            st.info("No recent activity for this asset.")
         st.caption("Checkout, audit, and document events will expand here as integrations are connected.")
 
 

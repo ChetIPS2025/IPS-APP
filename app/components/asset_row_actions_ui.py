@@ -214,25 +214,35 @@ def render_asset_row_actions(
 
 def render_asset_activity_snippet(asset: dict[str, Any]) -> None:
     """Compact activity lines for History row action or Activity tab."""
-    lines: list[str] = []
-    tab = tracking_type_label(asset)
-    lines.append(f"Assets tab: {tab}")
-    for label, key in (
-        ("Last checkout", "last_checkout_at"),
-        ("Last check-in", "last_checkin_at"),
-        ("Last seen", "last_seen_at"),
-        ("Last audit", "last_audited_at"),
-        ("Acquired", "acquired_date"),
-    ):
-        val = str(asset.get(key) or "").strip()
-        if val and val not in {"—", "None"}:
-            lines.append(f"{label}: {val[:19]}")
-    status = str(asset.get("status") or "").strip()
-    if status:
-        lines.append(f"Status: {status}")
-    if not lines:
-        st.caption("No activity recorded yet.")
+    if not isinstance(asset, dict):
+        st.info("No asset activity available.")
         return
+    if not str(asset.get("id") or "").strip():
+        st.info("No asset activity available.")
+        return
+    try:
+        lines: list[str] = []
+        tab = tracking_type_label(asset)
+        lines.append(f"Assets tab: {tab}")
+        for label, key in (
+            ("Last checkout", "last_checkout_at"),
+            ("Last check-in", "last_checkin_at"),
+            ("Last seen", "last_seen_at"),
+            ("Last audit", "last_audited_at"),
+            ("Acquired", "acquired_date"),
+        ):
+            val = str(asset.get(key) or "").strip()
+            if val and val not in {"—", "None"}:
+                lines.append(f"{label}: {val[:19]}")
+        status = str(asset.get("status") or "").strip()
+        if status:
+            lines.append(f"Status: {status}")
+    except Exception:
+        lines = []
+    if not lines:
+        st.info("No recent activity for this asset.")
+        return
+    st.markdown("### Recent Activity")
     for line in lines:
         st.markdown(f"- {line}")
 
