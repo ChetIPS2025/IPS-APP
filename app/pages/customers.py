@@ -280,9 +280,15 @@ def _open_customer_from_list(customer: dict) -> None:
     _open_customers_detail_modal(cid, cached or customer)
 
 
-def _open_customers_table_customer(customer: dict) -> None:
+def _open_customers_table_customer(customer_id: str, customer: dict | None = None) -> None:
     """Set selected customer state; the page render opens the dialog once."""
-    _open_customer_from_list(customer)
+    cid = str(customer_id or (customer or {}).get("id") or "").strip()
+    if not cid:
+        return
+    row = customer if isinstance(customer, dict) else None
+    cache = st.session_state.get(_CUSTOMERS_CACHE_KEY) or {}
+    cached = cache.get(cid) if isinstance(cache, dict) else None
+    _open_customer_from_list(cached or row or {"id": cid})
 
 
 def _render_customers_table_column_filters(
