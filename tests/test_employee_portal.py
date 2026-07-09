@@ -144,6 +144,23 @@ def test_assigned_job_ids_from_time_entries(monkeypatch):
     assert list_assigned_job_ids_for_employee("emp-a") == ["j1", "j2"]
 
 
+def test_employee_portal_quick_action_keys_are_unique_for_employee_role():
+    from app.pages.employee_portal import _quick_action_button_key, build_employee_portal_quick_actions
+
+    actions = [a for a in build_employee_portal_quick_actions("employee") if a.get("enabled")]
+    keys = [
+        _quick_action_button_key(
+            str(a["action_id"]),
+            employee_id="emp-42",
+            view_mode="employee",
+        )
+        for a in actions
+    ]
+    assert len(keys) == len(set(keys))
+    nav_slugs = [str(a["nav_slug"]) for a in actions]
+    assert nav_slugs.count("employee_qr_scan") == 2
+
+
 def test_portal_dashboard_jobs_assigned_first_and_limited(monkeypatch):
     monkeypatch.setattr(
         "app.services.employee_portal_service.list_assigned_job_ids_for_employee",

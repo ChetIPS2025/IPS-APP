@@ -67,6 +67,68 @@ _PORTAL_BID_KEY = "ips_portal_selected_bid"
 _SHOW_ALL_JOBS_KEY = "ips_ep_show_all_jobs"
 
 
+def _quick_actions_view_mode() -> str:
+    try:
+        from app.utils.view_as import is_view_as_active, view_as_mode
+    except ImportError:
+        from utils.view_as import is_view_as_active, view_as_mode  # type: ignore
+    if is_view_as_active():
+        return f"preview_{view_as_mode()}"
+    return "employee"
+
+
+def _quick_action_button_key(action_id: str, *, employee_id: str, view_mode: str) -> str:
+    eid = str(employee_id or "none").strip() or "none"
+    return f"ep_quick_{action_id}_{view_mode}_{eid}"
+
+
+def build_employee_portal_quick_actions(role: str) -> list[dict[str, object]]:
+    """Quick-action definitions; ``action_id`` is unique per button (nav slug may repeat)."""
+    upload_slug = "scan_asset" if role_can_access_page(role, "scan_asset") else "employee_qr_scan"
+    return [
+        {
+            "icon": "📷",
+            "label": "Scan QR Code",
+            "nav_slug": "employee_qr_scan",
+            "enabled": True,
+            "action_id": "qr_scan",
+            "primary": True,
+        },
+        {
+            "icon": "💼",
+            "label": "My Jobs",
+            "nav_slug": "__my_jobs__",
+            "enabled": True,
+            "action_id": "my_jobs",
+            "primary": False,
+        },
+        {
+            "icon": "⏱",
+            "label": "Timekeeping",
+            "nav_slug": "timekeeping",
+            "enabled": role_can_access_page(role, "timekeeping"),
+            "action_id": "timekeeping",
+            "primary": False,
+        },
+        {
+            "icon": "📸",
+            "label": "Upload Photo",
+            "nav_slug": upload_slug,
+            "enabled": True,
+            "action_id": "upload_photo",
+            "primary": False,
+        },
+        {
+            "icon": "📄",
+            "label": "Documents",
+            "nav_slug": "employee_resources",
+            "enabled": role_can_access_page(role, "employee_resources"),
+            "action_id": "documents",
+            "primary": False,
+        },
+    ]
+
+
 def _status_pill(label: str, tone: str = "neutral") -> str:
     text = html.escape(str(label or "—"))
     return f'<span class="ips-ep-status ips-ep-status-{tone}">{text}</span>'
@@ -101,28 +163,29 @@ def _render_welcome_card(
     )
 
 
-def _render_quick_actions(role: str) -> None:
+def _render_quick_actions(role: str, *, employee_id: str = "") -> None:
     st.markdown('<h3 class="ips-ep-section-title">Quick Actions</h3>', unsafe_allow_html=True)
-    upload_slug = "scan_asset" if role_can_access_page(role, "scan_asset") else "employee_qr_scan"
-    actions: list[tuple[str, str, str, bool]] = [
-        ("📷", "Scan QR Code", "employee_qr_scan", True),
-        ("💼", "My Jobs", "__my_jobs__", True),
-        ("⏱", "Timekeeping", "timekeeping", role_can_access_page(role, "timekeeping")),
-        ("📸", "Upload Photo", upload_slug, True),
-        ("📄", "Documents", "employee_resources", role_can_access_page(role, "employee_resources")),
-    ]
-    visible = [a for a in actions if a[3]]
-    if not visible:
+    view_mode = _quick_actions_view_mode()
+    actions = [a for a in build_employee_portal_quick_actions(role) if a.get("enabled")]
+    if not actions:
         return
 
-    cols = st.columns(min(len(visible), 3))
-    for idx, (icon, label, slug, _) in enumerate(visible):
+    cols = st.columns(min(len(actions), 3))
+    for idx, action in enumerate(actions):
+        icon = str(action.get("icon") or "")
+        label = str(action.get("label") or "")
+        slug = str(action.get("nav_slug") or "")
+        action_id = str(action.get("action_id") or f"action_{idx}")
         with cols[idx % len(cols)]:
             if st.button(
                 f"{icon}  {label}",
-                key=f"ep_quick_{slug}",
+                key=_quick_action_button_key(
+                    action_id,
+                    employee_id=employee_id,
+                    view_mode=view_mode,
+                ),
                 use_container_width=True,
-                type="primary" if slug == "employee_qr_scan" else "secondary",
+                type="primary" if action.get("primary") else "secondary",
             ):
                 if slug == "__my_jobs__":
                     st.session_state[_SHOW_ALL_JOBS_KEY] = True
@@ -353,7 +416,7 @@ def render() -> None:
 
     _render_welcome_card(profile, employee, role)
     if not show_all_jobs:
-        _render_quick_actions(role)
+        _render_quick_actions(role, employee_id=employee_id)
         _render_updates_section(role)
         _render_certifications_section(employee_id)
         _render_recent_jobs_section(employee_id)
