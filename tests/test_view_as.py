@@ -66,10 +66,10 @@ def test_clear_view_as_clears_picker_widget_state(monkeypatch):
     _reset_view_as()
     monkeypatch.setattr("app.utils.view_as.current_role", lambda: "admin")
     monkeypatch.setattr("app.navigation.set_nav_slug", lambda _slug: None)
-    st.session_state["ips_view_as_select_header_bar"] = "Field Mode (Mobile Preview)"
+    st.session_state["ips_view_as_select_admin_page"] = "Field Mode / Mobile Preview"
     set_view_as("employee")
     clear_view_as()
-    assert "ips_view_as_select_header_bar" not in st.session_state
+    assert "ips_view_as_select_admin_page" not in st.session_state
 
 
 def test_ensure_view_as_navigation_redirects_off_admin_pages(monkeypatch):

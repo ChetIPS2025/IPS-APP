@@ -179,24 +179,13 @@ def render_module(slug: str | None = None) -> None:
             try:
                 from app.auth import current_role
                 from app.utils.permissions import normalize_role
-                from app.utils.view_as import (
-                    is_view_as_active,
-                    render_view_as_active_toolbar,
-                    render_view_as_header_bar,
-                )
+                from app.utils.view_as import is_view_as_active, render_view_as_banner
             except ImportError:
                 from auth import current_role  # type: ignore
                 from utils.permissions import normalize_role  # type: ignore
-                from utils.view_as import (  # type: ignore
-                    is_view_as_active,
-                    render_view_as_active_toolbar,
-                    render_view_as_header_bar,
-                )
-            if normalize_role(current_role()) == "admin":
-                if is_view_as_active():
-                    render_view_as_active_toolbar()
-                else:
-                    render_view_as_header_bar()
+                from utils.view_as import is_view_as_active, render_view_as_banner  # type: ignore
+            if normalize_role(current_role()) == "admin" and is_view_as_active():
+                render_view_as_banner()
             with perf_span(f"module.render:{active}"):
                 fn()  # type: ignore[operator]
         except Exception as exc:

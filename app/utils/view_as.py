@@ -26,15 +26,15 @@ VIEW_AS_OPTIONS: tuple[tuple[str, str], ...] = (
     ("admin", "Admin"),
     ("supervisor", "Supervisor"),
     ("employee", "Employee"),
-    ("field_mobile", "Field Mode (Mobile Preview)"),
+    ("field_mobile", "Field Mode / Mobile Preview"),
 )
 
-VIEW_AS_PICKER_SUFFIXES: tuple[str, ...] = ("admin_page", "header_bar", "sidebar", "active_toolbar")
+VIEW_AS_PICKER_SUFFIXES: tuple[str, ...] = ("admin_page",)
 
 _VIEW_AS_LABELS = {
     "supervisor": "Supervisor",
     "employee": "Employee",
-    "field_mobile": "Field Mode (Mobile Preview)",
+    "field_mobile": "Field Mode / Mobile Preview",
 }
 
 
@@ -328,29 +328,30 @@ def render_view_as_banner() -> None:
 
 
 def render_view_as_active_toolbar() -> None:
-    """Prominent preview status bar with role picker and Return to Admin."""
+    """Compact preview banner with Return to Admin View (selector lives on Admin page only)."""
     if not is_view_as_active():
         return
     inject_view_as_styles()
     label = html.escape(view_as_display_label())
-    st.markdown(
-        f"""
+    banner_col, return_col = st.columns([4, 1], gap="small", vertical_alignment="center")
+    with banner_col:
+        st.markdown(
+            f"""
 <div class="ips-view-as-banner-wrap">
   <div class="ips-view-as-banner">
-    <div>
-      <p class="ips-view-as-banner-text">Viewing As: <strong>{label}</strong> (Preview Mode)</p>
-      <p class="ips-view-as-banner-sub">UI preview only — your signed-in role is still Admin.</p>
-    </div>
+    <p class="ips-view-as-banner-text">Viewing as {label} — Preview Mode</p>
   </div>
 </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    picker_col, return_col = st.columns([5, 1], gap="small")
-    with picker_col:
-        _render_view_as_picker(key_suffix="active_toolbar", show_help=True)
+            """,
+            unsafe_allow_html=True,
+        )
     with return_col:
-        if st.button("Return to Admin", key="ips_view_as_return_admin", type="primary", use_container_width=True):
+        if st.button(
+            "Return to Admin View",
+            key="ips_view_as_return_admin",
+            type="primary",
+            use_container_width=True,
+        ):
             clear_view_as()
             try:
                 from app.navigation import set_nav_slug
@@ -389,45 +390,23 @@ def _render_view_as_picker(*, key_suffix: str, show_help: bool = False) -> None:
 
 
 def render_view_as_admin_panel() -> None:
-    """Prominent View As control on the Admin page."""
+    """Admin-only View App As control on the Admin page."""
     if not is_real_admin():
         return
     inject_view_as_styles()
     st.markdown(
         """
 <div class="ips-view-as-admin-panel">
-  <p class="ips-view-as-admin-title">View As (Preview Mode)</p>
+  <p class="ips-view-as-admin-title">View App As</p>
   <p class="ips-view-as-admin-copy">
-    Safely preview Supervisor, Employee, or mobile field workflows. This only changes what you see in the UI —
-    your account stays Admin and nothing is written to the database.
+    Preview Mode — safely preview Supervisor, Employee, or mobile field workflows. This only changes what you see
+    in the UI; your signed-in role stays Admin and database permissions are unchanged.
   </p>
 </div>
         """,
         unsafe_allow_html=True,
     )
     _render_view_as_picker(key_suffix="admin_page", show_help=True)
-
-
-def render_view_as_header_bar() -> None:
-    """Compact View As picker below the main brand bar (admin only, preview off)."""
-    if not is_real_admin() or is_view_as_active():
-        return
-    inject_view_as_styles()
-    with st.container(key="ips_view_as_header_bar"):
-        st.markdown(
-            '<p class="ips-view-as-header-label">Admin preview</p>',
-            unsafe_allow_html=True,
-        )
-        _render_view_as_picker(key_suffix="header_bar", show_help=True)
-
-
-def render_view_as_selector() -> None:
-    """Sidebar control — admin only."""
-    if not is_real_admin():
-        return
-    inject_view_as_styles()
-    st.markdown('<p class="sidebar-section-title sidebar-footer-label section-header">View As</p>', unsafe_allow_html=True)
-    _render_view_as_picker(key_suffix="sidebar")
 
 
 def render_view_as_mobile_bottom_nav(active_slug: str) -> None:
