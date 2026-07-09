@@ -32,7 +32,7 @@ def inject_assets_page_layout_css() -> None:
     """Always inject — assets page layout overrides."""
     st.markdown(
         """
-<style id="ips-assets-page-layout-v6">
+<style id="ips-assets-page-layout-v7">
 section[data-testid="stMain"]:has(.ips-assets-page) {
   background: #ffffff !important;
 }
@@ -163,8 +163,63 @@ section[data-testid="stMain"]:has(.ips-assets-page) .ips-assets-filter-bar-wrap 
   padding: 0 !important;
   margin: 0 !important;
   font-family: inherit !important;
-  line-height: inherit !important;
+  line-height: 1.25 !important;
   text-align: left !important;
+  position: relative !important;
+  z-index: 2 !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+.st-key-assets_table_wrap .ips-assets-html-equipment-table .ips-dash-est-desc-cell {
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  gap: 0.08rem !important;
+}
+.st-key-assets_table_wrap .ips-assets-html-equipment-table .ips-inventory-text-cell,
+.st-key-assets_table_wrap .ips-assets-html-equipment-table .ips-inventory-muted,
+.st-key-assets_table_wrap .ips-assets-html-equipment-table .ips-dash-est-link,
+.st-key-assets_table_wrap .ips-assets-html-equipment-table .ips-inventory-desc-link,
+.st-key-assets_table_wrap .ips-assets-html-equipment-table .ips-assets-open-link,
+.st-key-assets_table_wrap .ips-assets-html-equipment-table [role="button"][data-asset-action="open"] {
+  visibility: visible !important;
+  opacity: 1 !important;
+  display: inline-block !important;
+  max-width: 100% !important;
+  width: auto !important;
+  min-width: 0 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  line-height: 1.25 !important;
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 2 !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+.st-key-assets_table_wrap .ips-assets-html-equipment-table .ips-inventory-text-cell {
+  color: #0f172a !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+}
+.st-key-assets_table_wrap .ips-assets-html-equipment-table .ips-inventory-muted {
+  color: #64748b !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+}
+.st-key-assets_table_wrap .ips-assets-html-equipment-table .ips-dash-est-link,
+.st-key-assets_table_wrap .ips-assets-html-equipment-table .ips-inventory-desc-link,
+.st-key-assets_table_wrap .ips-assets-html-equipment-table .ips-assets-open-link,
+.st-key-assets_table_wrap .ips-assets-html-equipment-table [role="button"][data-asset-action="open"] {
+  color: #2563eb !important;
+  -webkit-text-fill-color: #2563eb !important;
+}
+.st-key-assets_table_wrap [data-testid="stMarkdownContainer"] .ips-assets-html-equipment-table,
+.st-key-assets_table_wrap [data-testid="stMarkdownContainer"] .ips-assets-html-equipment-table * {
+  pointer-events: auto;
+}
+.st-key-assets_table_wrap [data-testid="stMarkdownContainer"]:has(.ips-assets-html-equipment-table) {
+  overflow: visible !important;
+  width: 100% !important;
+  max-width: 100% !important;
 }
 .st-key-assets_open_button_harness,
 .st-key-assets_open_button_harness [data-testid="stVerticalBlock"],

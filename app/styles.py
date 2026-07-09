@@ -4134,21 +4134,29 @@ def inject_assets_module_css() -> None:
         "40px 52px minmax(160px, 1.8fr) minmax(100px, 0.9fr) minmax(110px, 1fr) "
         "minmax(100px, 0.95fr) minmax(110px, 1fr) minmax(90px, 0.8fr) minmax(90px, 0.8fr)"
     )
+    ast_legacy_row_markers = (
+        ".ips-assets-equipment-table-row, .ips-assets-equipment-table-header, "
+        ".assets-table-header, .assets-table-row"
+    )
     ast_grid_rows = (
-        ".st-key-assets_table_wrap [data-testid=\"stVerticalBlock\"] > [data-testid=\"stHorizontalBlock\"], "
-        ".st-key-assets_table_wrap [data-testid=\"stVerticalBlock\"] > [data-testid=\"stElementContainer\"] > [data-testid=\"stHorizontalBlock\"], "
+        ".st-key-assets_table_wrap [data-testid=\"stVerticalBlock\"] > [data-testid=\"stHorizontalBlock\"]:has("
+        f"{ast_legacy_row_markers}), "
+        ".st-key-assets_table_wrap [data-testid=\"stVerticalBlock\"] > [data-testid=\"stElementContainer\"] > [data-testid=\"stHorizontalBlock\"]:has("
+        f"{ast_legacy_row_markers}), "
         ".st-key-assets_small_tools_table_wrap [data-testid=\"stVerticalBlock\"] > [data-testid=\"stHorizontalBlock\"], "
         ".st-key-assets_small_tools_table_wrap [data-testid=\"stVerticalBlock\"] > [data-testid=\"stElementContainer\"] > [data-testid=\"stHorizontalBlock\"]"
     )
     ast_grid_cols = (
-        ".st-key-assets_table_wrap [data-testid=\"stVerticalBlock\"] > [data-testid=\"stHorizontalBlock\"] > [data-testid=\"column\"], "
-        ".st-key-assets_table_wrap [data-testid=\"stVerticalBlock\"] > [data-testid=\"stElementContainer\"] > [data-testid=\"stHorizontalBlock\"] > [data-testid=\"column\"], "
+        ".st-key-assets_table_wrap [data-testid=\"stVerticalBlock\"] > [data-testid=\"stHorizontalBlock\"]:has("
+        f"{ast_legacy_row_markers}) > [data-testid=\"column\"], "
+        ".st-key-assets_table_wrap [data-testid=\"stVerticalBlock\"] > [data-testid=\"stElementContainer\"] > [data-testid=\"stHorizontalBlock\"]:has("
+        f"{ast_legacy_row_markers}) > [data-testid=\"column\"], "
         ".st-key-assets_small_tools_table_wrap [data-testid=\"stVerticalBlock\"] > [data-testid=\"stHorizontalBlock\"] > [data-testid=\"column\"], "
         ".st-key-assets_small_tools_table_wrap [data-testid=\"stVerticalBlock\"] > [data-testid=\"stElementContainer\"] > [data-testid=\"stHorizontalBlock\"] > [data-testid=\"column\"]"
     )
     st.markdown(
         f"""
-<style id="ips-assets-module-v19">
+<style id="ips-assets-module-v20">
 .ips-assets-table-wrap,
 .ips-assets-table-wrap.asset-table {{
   background: #ffffff;
@@ -4338,8 +4346,14 @@ def inject_assets_module_css() -> None:
   flex-wrap: nowrap !important;
   background: #ffffff !important;
 }}
-.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"],
-.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] {{
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has(.ips-assets-html-equipment-table) {{
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}}
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has({ast_legacy_row_markers}),
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has({ast_legacy_row_markers}) {{
   grid-template-columns: {assets_equipment_grid} !important;
   column-gap: 16px !important;
 }}
@@ -4380,40 +4394,40 @@ def inject_assets_module_css() -> None:
   padding: 0 6px !important;
   justify-content: center !important;
 }}
-.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2),
-.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) {{
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has({ast_legacy_row_markers}) > [data-testid="column"]:nth-child(2),
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has({ast_legacy_row_markers}) > [data-testid="column"]:nth-child(2) {{
   flex: 0 0 80px !important;
   width: 80px !important;
   min-width: 80px !important;
   max-width: 80px !important;
 }}
-.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3),
-.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {{
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has({ast_legacy_row_markers}) > [data-testid="column"]:nth-child(3),
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has({ast_legacy_row_markers}) > [data-testid="column"]:nth-child(3) {{
   flex: 0 0 auto !important;
   min-width: 360px !important;
   max-width: none !important;
   overflow: hidden !important;
 }}
-.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) > [data-testid="stVerticalBlock"],
-.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) > [data-testid="stVerticalBlock"] {{
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has({ast_legacy_row_markers}) > [data-testid="column"]:nth-child(3) > [data-testid="stVerticalBlock"],
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has({ast_legacy_row_markers}) > [data-testid="column"]:nth-child(3) > [data-testid="stVerticalBlock"] {{
   min-width: 360px !important;
   max-width: 100% !important;
   overflow: hidden !important;
 }}
-.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4),
-.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {{
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has({ast_legacy_row_markers}) > [data-testid="column"]:nth-child(4),
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has({ast_legacy_row_markers}) > [data-testid="column"]:nth-child(4) {{
   flex: 0 0 auto !important;
   min-width: 150px !important;
   overflow: hidden !important;
 }}
-.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) > [data-testid="stVerticalBlock"],
-.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) > [data-testid="stVerticalBlock"] {{
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has({ast_legacy_row_markers}) > [data-testid="column"]:nth-child(4) > [data-testid="stVerticalBlock"],
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has({ast_legacy_row_markers}) > [data-testid="column"]:nth-child(4) > [data-testid="stVerticalBlock"] {{
   min-width: 150px !important;
   max-width: 100% !important;
   overflow: hidden !important;
 }}
-.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(9),
-.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(9),
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:has({ast_legacy_row_markers}) > [data-testid="column"]:nth-child(9),
+.st-key-assets_table_wrap [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] > [data-testid="stHorizontalBlock"]:has({ast_legacy_row_markers}) > [data-testid="column"]:nth-child(9),
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-cell),
 .st-key-assets_table_wrap [data-testid="column"]:has(.ips-assets-actions-header-cell) {{
   flex: 0 0 120px !important;

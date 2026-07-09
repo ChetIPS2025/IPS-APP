@@ -142,9 +142,9 @@ def _asset_link_html(
     if bridge_key:
         bridge_attr = f' data-bridge-key="{html.escape(bridge_key, quote=True)}"'
     return (
-        f'<button type="button" class="{html.escape(cls)}" data-asset-action="open" '
+        f'<span role="button" tabindex="0" class="{html.escape(cls)}" data-asset-action="open" '
         f'data-asset-id="{asset_id}" data-row-id="{asset_id}"{bridge_attr} '
-        f'title="{title}">{text}</button>'
+        f'title="{title}">{text}</span>'
     )
 
 
@@ -306,7 +306,8 @@ def build_assets_html_table(
     min_width = sum(ASSETS_TABLE_COL_WIDTHS_PX.values())
     return (
         f'<div class="ips-dash-est-table-scroll" style="min-width:0;">'
-        f'<table class="ips-dash-est-html-table" style="min-width:{min_width}px;">'
+        f'<table class="ips-dash-est-html-table ips-assets-html-equipment-table" '
+        f'style="min-width:{min_width}px;">'
         f"<colgroup>{''.join(col_parts)}</colgroup>"
         f'<thead><tr class="ips-dash-est-tr ips-dash-est-head-row">{"".join(head_parts)}</tr></thead>'
         f"<tbody>{''.join(body_rows)}</tbody>"
@@ -431,7 +432,7 @@ def render_assets_table_bridge(
 
   function isInteractive(target) {{
     return !!(target && target.closest && target.closest(
-      "button, input, select, textarea, label, a, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox']"
+      "button, [role='button'], input, select, textarea, label, a, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox']"
     ));
   }}
 
