@@ -427,6 +427,11 @@ def render_admin_page() -> None:
         "Manage lookup tables, system configuration, and preview other roles.",
     )
     try:
+        from app.auth import render_auth_identity_debug_panel
+    except ImportError:
+        from auth import render_auth_identity_debug_panel  # type: ignore
+    render_auth_identity_debug_panel()
+    try:
         from app.utils.view_as import render_view_as_admin_panel
     except ImportError:
         from utils.view_as import render_view_as_admin_panel  # type: ignore
