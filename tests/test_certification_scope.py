@@ -76,3 +76,22 @@ def test_open_certification_detail_enables_preview_when_attachment_exists():
     assert st.session_state.get("emp_cert_selected_certification_id") == "cert-1"
     assert st.session_state.get("emp_cert_show_certification_detail") is True
     assert st.session_state.get("emp_cert_show_cert_doc_cert-1") is True
+
+
+def test_sync_certification_checkbox_selection_before_widgets():
+    from app.pages.employee_certifications import (
+        _selected_id_key,
+        _sync_certification_checkbox_selection,
+    )
+    import streamlit as st
+
+    st.session_state.clear()
+    prefix = "emp_cert"
+    st.session_state[_selected_id_key(prefix=prefix)] = "cert-2"
+    _sync_certification_checkbox_selection(
+        ["cert-1", "cert-2", "cert-3"],
+        prefix=prefix,
+    )
+    assert st.session_state.get(f"{prefix}certification_select_cert-1") is False
+    assert st.session_state.get(f"{prefix}certification_select_cert-2") is True
+    assert st.session_state.get(f"{prefix}certification_select_cert-3") is False

@@ -224,7 +224,18 @@ def _clear_certification_selection(cert_ids: list[str] | None = None, *, prefix:
     st.session_state.pop(_cert_pending_delete_key(prefix=prefix), None)
     if cert_ids:
         for cid in cert_ids:
-            st.session_state[_cert_select_key(cid, prefix=prefix)] = False
+            st.session_state.pop(_show_doc_key(str(cid), prefix=prefix), None)
+
+
+def _sync_certification_checkbox_selection(
+    all_cert_ids: list[str],
+    *,
+    prefix: str = "",
+) -> None:
+    """Set row checkbox state before widgets render (never after)."""
+    selected = str(st.session_state.get(_selected_id_key(prefix=prefix)) or "").strip()
+    for cid in all_cert_ids:
+        st.session_state[_cert_select_key(cid, prefix=prefix)] = cid == selected
 
 
 def _cert_rows_cache_key(*, prefix: str = "") -> str:
@@ -274,7 +285,8 @@ def _open_certification_detail(
     if not cid:
         return
     for other_id in all_cert_ids:
-        st.session_state[_cert_select_key(other_id, prefix=session_prefix)] = other_id == cid
+        if other_id != cid:
+            st.session_state.pop(_show_doc_key(other_id, prefix=session_prefix), None)
     st.session_state[_selected_id_key(prefix=session_prefix)] = cid
     st.session_state[_show_detail_key(prefix=session_prefix)] = True
     st.session_state.pop(_cert_pending_delete_key(prefix=session_prefix), None)
@@ -691,6 +703,7 @@ def _render_certifications_table(
     ]
     st.session_state[_ALL_CERT_IDS_KEY] = all_cert_ids
     _cache_certification_rows(certifications, session_prefix=session_prefix)
+    _sync_certification_checkbox_selection(all_cert_ids, prefix=session_prefix)
 
     col_ratios = _CERT_COLS_EMP if hide_employee else _CERT_COLS_ALL
     header_specs = _CERT_HEADER_SPECS_EMP if hide_employee else _CERT_HEADER_SPECS_ALL
