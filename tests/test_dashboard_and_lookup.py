@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from app.services.dashboard_metrics_service import (
+    _total_active_asset_value,
+    _total_active_inventory_value,
     compute_dashboard_kpis,
     job_status_overview,
     open_quotes_aging_bars,
@@ -33,6 +35,44 @@ def test_compute_dashboard_kpis_from_live_rows():
     assert kpis["inventory_value"] == 255.0
     assert kpis["active_jobs"] == 1
     assert kpis["has_live_data"] is True
+
+
+def test_total_active_inventory_value_excludes_inactive_and_missing_costs():
+    total = _total_active_inventory_value(
+        [
+            {"quantity_on_hand": 10, "unit_cost": 25.5, "is_active": True},
+            {"quantity_on_hand": 5, "unit_cost": 10, "status": "Discontinued"},
+            {"quantity_on_hand": 3, "is_active": True},
+            {"qty_on_hand": 2, "unit_cost": 4, "status": "In Stock"},
+        ]
+    )
+    assert total == 263.0
+
+
+def test_total_active_asset_value_uses_value_field_priority():
+    total = _total_active_asset_value(
+        [
+            {"status": "In Service", "purchase_cost": 1000, "current_value": 500},
+            {"status": "In Service", "replacement_value": 750},
+            {"status": "Retired", "purchase_cost": 9000},
+            {"status": "Active", "value": 200},
+        ]
+    )
+    assert total == 1950.0
+
+
+def test_compute_dashboard_kpis_includes_inventory_and_asset_totals():
+    today = date.today()
+    kpis = compute_dashboard_kpis(
+        [],
+        [],
+        [{"quantity_on_hand": 4, "unit_cost": 10, "is_active": True}],
+        [{"status": "In Service", "current_value": 3000}],
+        period_start=today.replace(day=1),
+        period_end=today,
+    )
+    assert kpis["total_inventory_value"] == 40.0
+    assert kpis["total_asset_value"] == 3000.0
 
 
 def test_open_quotes_aging_buckets():

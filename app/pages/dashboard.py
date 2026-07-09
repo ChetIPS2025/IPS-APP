@@ -194,6 +194,8 @@ def render() -> None:
                 ("My To-Do", str(_my_todo_count()), "✅", "#e0f2fe"),
                 ("Open Invoices", fmt_currency(kpis.get("open_invoices", 0)), "🧾", "#dbeafe"),
                 ("Revenue This Month", fmt_currency(kpis.get("total_sales", 0)), "💵", "#fef3c7"),
+                ("Inventory Value", fmt_currency(kpis.get("total_inventory_value", 0)), "📦", "#ede9fe"),
+                ("Asset Value", fmt_currency(kpis.get("total_asset_value", 0)), "🚛", "#fce7f3"),
             ]
             render_ops_kpi_row(kpi_items)
 

@@ -55,6 +55,60 @@ def _inventory_on_hand_value(items: list[dict[str, Any]]) -> float:
     return round(total, 2)
 
 
+def _inventory_item_active(item: dict[str, Any]) -> bool:
+    if item.get("is_active") is False:
+        return False
+    status = _norm_status(item.get("status"))
+    if status in {"discontinued", "inactive", "deleted", "archived"}:
+        return False
+    return True
+
+
+def _total_active_inventory_value(items: list[dict[str, Any]]) -> float:
+    """Sum quantity_on_hand × unit_cost for active inventory SKUs."""
+    total = 0.0
+    active_count = 0
+    for item in items:
+        if not isinstance(item, dict) or not _inventory_item_active(item):
+            continue
+        active_count += 1
+        qty = _money(item, "quantity_on_hand", "qty_on_hand", "on_hand")
+        cost = _money(item, "unit_cost", "cost")
+        total += qty * cost
+    return round(total, 2)
+
+
+def _asset_row_active(row: dict[str, Any]) -> bool:
+    status = _norm_status(row.get("status"))
+    if status in {"retired", "deleted", "inactive", "disposed", "scrapped"}:
+        return False
+    if row.get("is_active") is False:
+        return False
+    return True
+
+
+def _asset_row_value(row: dict[str, Any]) -> float:
+    """Prefer purchase cost, then replacement/current value fields."""
+    return _money(
+        row,
+        "purchase_cost",
+        "purchase_price",
+        "replacement_value",
+        "current_value",
+        "value",
+    )
+
+
+def _total_active_asset_value(assets: list[dict[str, Any]]) -> float:
+    """Sum asset values for active equipment records."""
+    total = 0.0
+    for row in assets:
+        if not isinstance(row, dict) or not _asset_row_active(row):
+            continue
+        total += _asset_row_value(row)
+    return round(total, 2)
+
+
 def _row_in_period(row: dict[str, Any], start: date, end: date, *date_keys: str) -> bool:
     for key in date_keys:
         d = _parse_iso_date(row.get(key))
@@ -97,6 +151,7 @@ def compute_dashboard_kpis(
     estimates: list[dict[str, Any]],
     jobs: list[dict[str, Any]],
     inventory: list[dict[str, Any]],
+    assets: list[dict[str, Any]] | None = None,
     *,
     period_start: date | None = None,
     period_end: date | None = None,
@@ -152,6 +207,15 @@ def compute_dashboard_kpis(
     open_invoices = _open_quotes_value()
     open_est = _open_estimates_count()
     inv_value = _inventory_on_hand_value(inventory)
+    asset_rows = list(assets or [])
+    total_inventory_value = _total_active_inventory_value(inventory)
+    total_asset_value = _total_active_asset_value(asset_rows)
+    active_inventory_count = sum(
+        1 for item in inventory if isinstance(item, dict) and _inventory_item_active(item)
+    )
+    active_asset_count = sum(
+        1 for row in asset_rows if isinstance(row, dict) and _asset_row_active(row)
+    )
 
     prev_open = sum(
         _estimate_amount(e)
@@ -166,6 +230,8 @@ def compute_dashboard_kpis(
         "open_invoices": open_invoices,
         "open_estimates": open_est,
         "inventory_value": inv_value,
+        "total_inventory_value": total_inventory_value,
+        "total_asset_value": total_asset_value,
         "sales_caption": sales_caption,
         "sales_trend": sales_trend,
         "quotes_caption": quotes_caption if open_invoices else "No sent quotes outstanding",
@@ -174,10 +240,18 @@ def compute_dashboard_kpis(
         "estimates_trend": "flat",
         "inventory_caption": f"{len(inventory)} SKU{'s' if len(inventory) != 1 else ''} tracked",
         "inventory_trend": "flat",
+        "total_inventory_caption": (
+            f"{active_inventory_count} active SKU{'s' if active_inventory_count != 1 else ''}"
+        ),
+        "total_inventory_trend": "flat",
+        "total_asset_caption": (
+            f"{active_asset_count} active asset{'s' if active_asset_count != 1 else ''}"
+        ),
+        "total_asset_trend": "flat",
         **dashboard_job_metrics(jobs),
         "period_start": start.isoformat(),
         "period_end": end.isoformat(),
-        "has_live_data": bool(estimates or jobs or inventory),
+        "has_live_data": bool(estimates or jobs or inventory or asset_rows),
     }
 
 

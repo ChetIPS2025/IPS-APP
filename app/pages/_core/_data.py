@@ -196,10 +196,12 @@ def load_dashboard_kpis(
     estimates = load_estimates()
     jobs = load_jobs()
     inventory = load_inventory()
+    assets = load_assets()
     kpis = compute_dashboard_kpis(
         estimates,
         jobs,
         inventory,
+        assets,
         period_start=period_start,
         period_end=period_end,
     )
@@ -213,6 +215,8 @@ def load_dashboard_kpis(
         "open_invoices": kpis.get("open_invoices") or 125430.25,
         "open_estimates": kpis.get("open_estimates") or 14,
         "inventory_value": kpis.get("inventory_value") or 98765.30,
+        "total_inventory_value": kpis.get("total_inventory_value") or 98765.30,
+        "total_asset_value": kpis.get("total_asset_value") or 58000.00,
         "jobs_awarded": kpis.get("jobs_awarded") or 2,
         "active_jobs": kpis.get("active_jobs") or 1,
         "pending_jobs": kpis.get("pending_jobs") or 0,
