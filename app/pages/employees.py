@@ -15,7 +15,26 @@ try:
         render_user_action_button_row,
         render_user_action_confirm_panel,
     )
-    from app.components.headers import render_users_page_header
+    from app.components.headers import render_page_brand_header
+    from app.components.layout import render_filter_bar as layout_filter_bar
+    from app.components.table_pagination import (
+        paginate_rows,
+        render_table_pagination_footer,
+        render_table_pagination_header,
+        reset_table_page,
+    )
+    from app.components.users_list_table import (
+        USERS_TABLE_LAST_ACTION_KEY,
+        build_users_html_table,
+        render_users_table_bridge_legacy,
+        render_users_table_open_buttons,
+        user_status_pill_html,
+    )
+    from app.components.users_page_layout import (
+        close_users_filter_bar_shell,
+        inject_users_page_layout_css,
+        render_users_filter_bar_shell,
+    )
     from app.components.table_filters import (
         apply_column_filters,
         build_filter_options,
@@ -87,7 +106,26 @@ except ImportError:
         render_user_action_button_row,
         render_user_action_confirm_panel,
     )
-    from components.headers import render_users_page_header  # type: ignore
+    from components.headers import render_page_brand_header  # type: ignore
+    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
+    from components.table_pagination import (  # type: ignore
+        paginate_rows,
+        render_table_pagination_footer,
+        render_table_pagination_header,
+        reset_table_page,
+    )
+    from components.users_list_table import (  # type: ignore
+        USERS_TABLE_LAST_ACTION_KEY,
+        build_users_html_table,
+        render_users_table_bridge_legacy,
+        render_users_table_open_buttons,
+        user_status_pill_html,
+    )
+    from components.users_page_layout import (  # type: ignore
+        close_users_filter_bar_shell,
+        inject_users_page_layout_css,
+        render_users_filter_bar_shell,
+    )
     from components.table_filters import (  # type: ignore
         apply_column_filters,
         build_filter_options,
@@ -164,6 +202,12 @@ SELECTED_USER_KEY = "selected_user_id"
 SHOW_MODAL_KEY = "show_user_detail_modal"
 _ALL_USER_IDS_KEY = "_ips_users_visible_ids"
 _USER_COLS = [3.25, 2.85, 1.45, 1.7, 1.35, 1.05, 0.95]
+_USER_TABLE_FILTER_SPECS: list[tuple[str, str]] = [
+    ("BILLING CLASS", "billing_class"),
+    ("PERMISSION", "permission_role"),
+    ("EMPLOYEE", "employee_type"),
+    ("STATUS", "status"),
+]
 _USER_HEADER_SPECS: list[tuple[str, str | None]] = [
     ("NAME", None),
     ("EMAIL", None),
@@ -431,114 +475,42 @@ def _open_user_from_list(user: dict) -> None:
         id_fields=("id", "email"),
     )
     st.session_state[ACTIVE_EMPLOYEE_KEY] = uid
-
-
-def _open_users_table_user(user: dict) -> None:
-    """Set selected user state; the page render opens the dialog once."""
-    _open_user_from_list(user)
-
-
-def _normalize_user_open_id(raw: object) -> str:
-    val = str(raw or "").strip()
-    if val.startswith("open:"):
-        return val.split(":", 1)[1].strip()
-    return val
-
-
-def _user_name_open_label(name: str) -> str:
-    return name if name and name != "—" else "Open user"
-
-
-def _user_row_marker_html(user_id: str) -> str:
-    uid_attr = html.escape(user_id, quote=True)
-    return f'<span class="ips-users-table-row" data-row-id="{uid_attr}" aria-hidden="true"></span>'
-
-
-def _render_users_row_click_bridge() -> str | None:
     try:
-        from app.ui.clean_table import _components_html
+        from app.ui.streamlit_perf import ips_app_rerun
     except ImportError:
-        from ui.clean_table import _components_html  # type: ignore
+        from ui.streamlit_perf import ips_app_rerun  # type: ignore
+    ips_app_rerun()
 
-    st.markdown(
-        '<span class="ips-users-row-click-bridge-marker" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
-    return _components_html(
-        """
-<script>
-(function () {
-  const w = window.parent || window;
-  const doc = w.document;
-  const hookKey = "ipsUsersRowClick::list";
-  const tblSel = ".st-key-users_table_wrap";
-  const rowSel = '[data-testid="stHorizontalBlock"]:has(.ips-users-table-row)';
 
-  function sendValue(id) {
-    const payload = { type: "streamlit:setComponentValue", value: id };
-    const frames = [window, window.parent, w].filter(function (f, i, arr) {
-      return f && arr.indexOf(f) === i;
-    });
-    for (var i = 0; i < frames.length; i++) {
-      try {
-        if (frames[i].Streamlit && typeof frames[i].Streamlit.setComponentValue === "function") {
-          frames[i].Streamlit.setComponentValue(id);
-          return;
-        }
-      } catch (err) {}
-    }
-    for (var j = 0; j < frames.length; j++) {
-      try { frames[j].postMessage(payload, "*"); } catch (err) {}
-    }
-  }
+def _open_users_table_user(user_id: str, user: dict | None = None) -> None:
+    """Set selected user state; the page render opens the dialog once."""
+    uid = str(user_id or (user or {}).get("id") or "").strip()
+    if not uid:
+        return
+    row = user if isinstance(user, dict) else None
+    cache = st.session_state.get(CACHE_KEY) or {}
+    cached = cache.get(uid) if isinstance(cache, dict) else None
+    _open_user_from_list(cached or row or {"id": uid})
 
-  function isInteractive(target) {
-    return !!(target && target.closest && target.closest(
-      "button, input, select, textarea, label, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox'], [class*='st-key-users_open_']"
-    ));
-  }
 
-  function tableScope() {
-    const anchor = doc.querySelector(tblSel);
-    if (!anchor) return null;
-    return anchor.closest('[data-testid="stVerticalBlockBorderWrapper"]') || anchor.parentElement;
-  }
-
-  function bindRows() {
-    const scope = tableScope();
-    if (!scope) return;
-    scope.querySelectorAll(rowSel).forEach(function (row) {
-      if (row.dataset.ipsUsersRowBound === "1") return;
-      row.dataset.ipsUsersRowBound = "1";
-      row.addEventListener("click", function (e) {
-        if (isInteractive(e.target)) return;
-        const marker = row.querySelector(".ips-users-table-row[data-row-id]");
-        const id = marker && marker.getAttribute("data-row-id");
-        if (!id) return;
-        e.preventDefault();
-        e.stopPropagation();
-        sendValue(id);
-      });
-    });
-  }
-
-  if (!doc.ipsUsersRowClickRegistry) doc.ipsUsersRowClickRegistry = {};
-  doc.ipsUsersRowClickRegistry[hookKey] = { bind: bindRows };
-  bindRows();
-  if (!doc.ipsUsersRowBindObserver) {
-    doc.ipsUsersRowBindObserver = new MutationObserver(function () {
-      Object.values(doc.ipsUsersRowClickRegistry || {}).forEach(function (cfg) {
-        if (cfg && typeof cfg.bind === "function") cfg.bind();
-      });
-    });
-    doc.ipsUsersRowBindObserver.observe(doc.body, { childList: true, subtree: true });
-  }
-})();
-</script>
-        """,
-        component_key="ips_users_list_row_click",
-        height=1,
-    )
+def _render_users_table_column_filters(
+    *,
+    filter_options: dict[str, list[str]],
+) -> None:
+    if not _USER_TABLE_FILTER_SPECS:
+        return
+    st.markdown('<div class="ips-users-table-filter-toolbar">', unsafe_allow_html=True)
+    cols = st.columns(len(_USER_TABLE_FILTER_SPECS), gap="small")
+    for col, (label, field) in zip(cols, _USER_TABLE_FILTER_SPECS):
+        with col:
+            render_table_header_cell(
+                label,
+                table_key=_TABLE_KEY,
+                filter_field=field,
+                filter_options=filter_options.get(field, []),
+                base_class="ips-users-filter-toolbar-cell",
+            )
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _clear_employee_modal() -> None:
@@ -575,103 +547,32 @@ def _render_custom_users_table(
     st.session_state[_ALL_USER_IDS_KEY] = all_user_ids
 
     with st.container(key="users_table_wrap"):
-        st.markdown('<span class="users-table-surface-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
-
-        header_cols = st.columns(_USER_COLS, gap="xxsmall", vertical_alignment="center")
-        for col, (label, field) in zip(header_cols, _USER_HEADER_SPECS):
-            with col:
-                if field:
-                    render_table_header_cell(
-                        label,
-                        table_key=_TABLE_KEY,
-                        filter_field=field,
-                        filter_options=filter_options.get(field, []),
-                        base_class="ips-users-header-row ips-users-cell",
-                    )
-                else:
-                    render_table_header_cell(
-                        label,
-                        base_class="ips-users-header-row ips-users-cell",
-                    )
-
-        for user in filtered:
-            uid = str(user.get("id") or "").strip()
-            if not uid:
-                continue
-
-            name = _user_display_name(user)
-            email = _user_display_email(user)
-            phone = _user_display_phone(user)
-            billing_class = _user_display_billing_class(user)
-            permission_role = _user_display_permission_role(user)
-            status = _user_filter_status(user)
-
-            cols = st.columns(_USER_COLS, gap="xxsmall", vertical_alignment="center")
-
-            with cols[0]:
-                if st.button(
-                    _user_name_open_label(name),
-                    key=f"users_open_{uid}",
-                    type="tertiary",
-                    help=f"View {name}",
-                    use_container_width=True,
-                ):
-                    _open_users_table_user(user)
-
-            with cols[1]:
-                st.markdown(
-                    _users_cell_html(email, "ips-users-cell ips-users-cell-email"),
-                    unsafe_allow_html=True,
-                )
-
-            with cols[2]:
-                st.markdown(
-                    _users_cell_html(phone, "ips-users-cell ips-users-cell-left"),
-                    unsafe_allow_html=True,
-                )
-
-            with cols[3]:
-                st.markdown(
-                    _users_cell_html(
-                        billing_class,
-                        "ips-users-cell ips-users-cell-left",
-                    ),
-                    unsafe_allow_html=True,
-                )
-
-            with cols[4]:
-                st.markdown(
-                    _users_cell_html(
-                        permission_role,
-                        "ips-users-cell ips-users-cell-left",
-                    ),
-                    unsafe_allow_html=True,
-                )
-
-            with cols[5]:
-                st.markdown(
-                    f'<div class="ips-users-pill-col ips-users-pill-col-center">{_employee_type_pill_html(user)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[6]:
-                st.markdown(
-                    f'<div class="ips-users-pill-col ips-users-pill-col-center">{_user_status_pill_html(status)}</div>',
-                    unsafe_allow_html=True,
-                )
-                st.markdown(_user_row_marker_html(uid), unsafe_allow_html=True)
-
+        _render_users_table_column_filters(filter_options=filter_options)
+        st.markdown(
+            build_users_html_table(
+                filtered,
+                display_name_fn=_user_display_name,
+                display_email_fn=_user_display_email,
+                display_role_fn=_user_display_permission_role,
+                display_phone_fn=_user_display_phone,
+                display_last_login_fn=lambda u: _fmt_last_login(u.get("last_login")),
+                display_status_fn=_user_filter_status,
+            ),
+            unsafe_allow_html=True,
+        )
+        render_users_table_open_buttons(
+            filtered,
+            open_user_fn=_open_users_table_user,
+        )
         users_by_id = {
             str(u.get("id") or "").strip(): u
             for u in filtered
             if str(u.get("id") or "").strip()
         }
-        picked_row = _render_users_row_click_bridge()
-        if picked_row:
-            open_id = _normalize_user_open_id(picked_row)
-            open_user = users_by_id.get(open_id)
-            if open_user:
-                _open_users_table_user(open_user)
+        render_users_table_bridge_legacy(
+            users_by_id,
+            open_user_fn=_open_users_table_user,
+        )
 
     return all_user_ids
 
@@ -1363,6 +1264,7 @@ def render() -> None:
     if not begin_module("employees"):
         return
     inject_users_module_css()
+    inject_users_page_layout_css()
     st.markdown('<span class="ips-users-page ips-page-shell-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
     flash = st.session_state.pop("users_action_flash", None)
     if flash:
@@ -1387,40 +1289,18 @@ def render() -> None:
     if sanitize_column_filters(_TABLE_KEY, filter_options, filter_fields=_FILTER_FIELDS):
         st.rerun()
 
-    def _render_users_toolbar() -> None:
-        with st.container(key="users_toolbar_wrap"):
-            st.markdown(
-                '<span class="users-toolbar-marker ips-filter-bar-marker" aria-hidden="true"></span>',
-                unsafe_allow_html=True,
-            )
-            search_col, export_col, new_col, clear_col = st.columns(
-                [12, 1.05, 1.35, 1.15],
-                gap="small",
-                vertical_alignment="center",
-            )
-            with search_col:
-                st.text_input(
-                    "Search users",
-                    placeholder="Search name, email, role, or status…",
-                    key=_SEARCH_KEY,
-                    label_visibility="collapsed",
-                )
-            with export_col:
-                st.button("Export", key="users_export", use_container_width=True)
-            with new_col:
-                if st.button("+ New User", key="emp_add", type="primary", use_container_width=True):
-                    st.session_state["ips_emp_form"] = True
-            with clear_col:
-                if st.button("Clear Filters", key="users_clear_filters", use_container_width=True):
-                    clear_table_filters(_TABLE_KEY, _FILTER_FIELDS, extra_keys=[_SEARCH_KEY])
-                    st.rerun()
+    def _users_export() -> None:
+        st.button("Export", key="users_export", use_container_width=True)
 
-    render_users_page_header(
+    def _users_new() -> None:
+        if st.button("+ New User", key="emp_add", type="primary", use_container_width=True):
+            st.session_state["ips_emp_form"] = True
+
+    render_page_brand_header(
         "Users",
         "Manage system users, roles, and permissions.",
+        actions=[_users_export, _users_new],
     )
-
-    _render_users_toolbar()
 
     if st.session_state.get("ips_emp_form"):
         with st.expander("New User", expanded=True):
@@ -1509,10 +1389,32 @@ def render() -> None:
                     st.session_state["users_action_flash"] = (flash_kind, flash_msg)
                     st.rerun()
 
+    def _filters() -> None:
+        c1, c2 = st.columns([5.4, 0.6])
+        with c1:
+            st.text_input(
+                "Search users",
+                placeholder="Search name, email, role, or status…",
+                key=_SEARCH_KEY,
+                label_visibility="collapsed",
+            )
+        with c2:
+            if st.button("Clear", key="users_clear_filters", use_container_width=True):
+                clear_table_filters(_TABLE_KEY, _FILTER_FIELDS, extra_keys=[_SEARCH_KEY])
+                reset_table_page(_TABLE_KEY)
+                _clear_user_selection(st.session_state.get(_ALL_USER_IDS_KEY))
+                st.session_state.pop(USERS_TABLE_LAST_ACTION_KEY, None)
+                st.rerun()
+
+    render_users_filter_bar_shell()
+    layout_filter_bar(_filters)
+    close_users_filter_bar_shell()
+
     search_q = str(st.session_state.get(_SEARCH_KEY) or "").strip()
     filtered = _filter_employees(all_emp, search=search_q)
 
-    st.caption(f"{len(filtered)} user(s)")
+    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="user")
+    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
 
     modal_cache = build_modal_cache(filtered, cache_key=CACHE_KEY)
     selected_user_id = str(st.session_state.get(SELECTED_USER_KEY) or "").strip()
@@ -1524,11 +1426,13 @@ def render() -> None:
                 break
 
     _render_custom_users_table(
-        filtered,
+        page_rows,
         filter_options=filter_options,
         total_count=len(all_emp),
         search=search_q,
     )
 
-    if st.session_state.get(SHOW_MODAL_KEY):
+    render_table_pagination_footer(len(filtered), _TABLE_KEY)
+
+    if st.session_state.get(SHOW_MODAL_KEY) or str(st.session_state.get(MODAL_KEY) or "").strip():
         show_modal_if_pending(MODAL_KEY, _show_employee_modal)
