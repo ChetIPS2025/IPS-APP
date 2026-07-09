@@ -71,11 +71,7 @@ try:
         render_estimates_view_navigation,
     )
     from app.components.estimates_list_table import (
-        build_approve_flags,
-        build_approved_flags,
-        build_estimates_html_table,
         filter_waiting_approval_rows,
-        render_estimates_table_bridge,
     )
     from app.components.headers import render_page_brand_header
     from app.components.layout import render_filter_bar as layout_filter_bar
@@ -182,11 +178,7 @@ except ImportError:
         render_estimates_view_navigation,
     )
     from components.estimates_list_table import (  # type: ignore
-        build_approve_flags,
-        build_approved_flags,
-        build_estimates_html_table,
         filter_waiting_approval_rows,
-        render_estimates_table_bridge,
     )
     from components.headers import render_page_brand_header  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
@@ -781,6 +773,26 @@ def _open_estimate_from_list(est: dict) -> None:
     st.rerun()
 
 
+def _render_estimates_col_marker(marker: str, *, row_class: str = "") -> None:
+    extra = f" {row_class}" if row_class else ""
+    st.markdown(
+        f'<span class="ips-estimates-col-marker ips-estimates-col-{marker}{extra}" '
+        f'aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+
+
+def _render_estimates_table_header() -> None:
+    cols = st.columns(_ESTIMATE_COLS, gap="small")
+    for col, (label, _field), marker in zip(cols, _ESTIMATE_HEADER_SPECS, _ESTIMATE_COL_MARKERS):
+        with col:
+            _render_estimates_col_marker(marker)
+            st.markdown(
+                f'<div class="ips-estimates-header-row">{html.escape(label)}</div>',
+                unsafe_allow_html=True,
+            )
+
+
 def _render_estimate_list_link_button(
     label: str,
     *,
@@ -875,32 +887,72 @@ def _render_custom_estimates_table(filtered: list[dict]) -> list[str]:
     ]
     st.session_state[_ALL_ESTIMATE_IDS_KEY] = all_estimate_ids
 
-    approve_flags = build_approve_flags(filtered)
-    approved_flags = build_approved_flags(filtered)
-    estimates_by_id = {
-        str(est.get("id") or "").strip(): est
-        for est in filtered
-        if str(est.get("id") or "").strip()
-    }
-
     with st.container(key="estimates_table_wrap"):
-        st.markdown(
-            build_estimates_html_table(
-                filtered,
-                approve_flags=approve_flags,
-                approved_flags=approved_flags,
-                total_fn=_estimate_customer_price,
-            ),
-            unsafe_allow_html=True,
-        )
-        render_estimates_table_bridge(
-            estimates_by_id,
-            component_key="ips_est_list_bridge",
-            hook_key="ipsEstList::action",
-            last_action_key=_EST_LIST_LAST_KEY,
-            pending_approve_key=_PENDING_APPROVE_KEY,
-            open_estimate_fn=_activate_estimate_detail_modal,
-        )
+        _render_estimates_table_header()
+        for row_idx, est in enumerate(filtered):
+            eid = str(est.get("id") or "").strip()
+            if not eid:
+                continue
+            parity = "even" if row_idx % 2 else "odd"
+            row_class = f"ips-estimates-table-row ips-estimates-row-{parity}"
+            est_no = _estimate_number(est)
+            num_label = est_no if est_no and est_no != "—" else "Open estimate"
+            project = _estimate_project(est)
+            title_label = project if project and project != "—" else "Open estimate"
+            est_date = fmt_date(str(est.get("estimate_date") or "")[:10]) if est.get("estimate_date") else "—"
+            status = _normalize_estimate_status(est.get("status"))
+            row_cols = st.columns(_ESTIMATE_COLS, gap="small")
+            with row_cols[0]:
+                _render_estimates_col_marker("sel", row_class=row_class)
+            with row_cols[1]:
+                _render_estimates_col_marker("num", row_class=row_class)
+                _render_estimate_list_link_button(
+                    num_label,
+                    key=f"est_open_num_{eid}",
+                    est=est,
+                    extra_class="ips-estimates-number-link ips-estimates-table-link",
+                )
+            with row_cols[2]:
+                _render_estimates_col_marker("desc", row_class=row_class)
+                _render_estimate_list_link_button(
+                    title_label,
+                    key=f"est_open_desc_{eid}",
+                    est=est,
+                    extra_class="ips-estimates-title-link ips-estimates-table-link",
+                    help_text=project,
+                    truncate=True,
+                )
+            with row_cols[3]:
+                _render_estimates_col_marker("customer", row_class=row_class)
+                st.markdown(
+                    f'<div class="ips-estimates-cell ips-estimates-customer-cell">'
+                    f"{html.escape(_estimate_customer(est))}</div>",
+                    unsafe_allow_html=True,
+                )
+            with row_cols[4]:
+                _render_estimates_col_marker("date", row_class=row_class)
+                st.markdown(
+                    f'<div class="ips-estimates-cell ips-estimates-date-cell">'
+                    f"{html.escape(est_date)}</div>",
+                    unsafe_allow_html=True,
+                )
+            with row_cols[5]:
+                _render_estimates_col_marker("total", row_class=row_class)
+                st.markdown(
+                    f'<div class="ips-estimates-cell ips-estimates-total-value">'
+                    f"{html.escape(_estimate_customer_price(est))}</div>",
+                    unsafe_allow_html=True,
+                )
+            with row_cols[6]:
+                _render_estimates_col_marker("status", row_class=row_class)
+                st.markdown(
+                    f'<div class="ips-estimates-cell ips-estimates-col-status">'
+                    f"{_estimate_status_pill_html(status)}</div>",
+                    unsafe_allow_html=True,
+                )
+            with row_cols[7]:
+                _render_estimates_col_marker("actions", row_class=row_class)
+                _render_estimate_list_actions(est, eid=eid)
 
     return all_estimate_ids
 
@@ -2087,5 +2139,7 @@ def render() -> None:
     _render_custom_estimates_table(page_rows)
     render_estimates_pagination_footer(len(filtered), _TABLE_KEY)
 
-    if st.session_state.get(SHOW_ESTIMATE_MODAL_KEY):
+    if st.session_state.get(SHOW_ESTIMATE_MODAL_KEY) or str(
+        st.session_state.get(_ESTIMATES_MODAL_KEY) or ""
+    ).strip():
         show_modal_if_pending(_ESTIMATES_MODAL_KEY, _show_estimates_detail_modal)
