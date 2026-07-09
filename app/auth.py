@@ -26,6 +26,11 @@ _COOKIE_PERSIST = "ips_auth_persist"  # "1" when user chose "Remember this devic
 
 _log = logging.getLogger(__name__)
 
+IPS_CURRENT_USER_ID_KEY = "ips_current_user_id"
+IPS_CURRENT_USER_EMAIL_KEY = "ips_current_user_email"
+IPS_CURRENT_USER_FULL_NAME_KEY = "ips_current_user_full_name"
+IPS_CURRENT_USER_ROLE_KEY = "ips_current_user_role"
+
 
 def _auth_debug_enabled() -> bool:
     if os.getenv("IPS_AUTH_DEBUG", "").strip().lower() in ("1", "true", "yes"):
@@ -71,6 +76,10 @@ def init_session() -> None:
         "user": None,
         "user_email": None,
         "auth_employee": None,
+        IPS_CURRENT_USER_ID_KEY: None,
+        IPS_CURRENT_USER_EMAIL_KEY: None,
+        IPS_CURRENT_USER_FULL_NAME_KEY: None,
+        IPS_CURRENT_USER_ROLE_KEY: None,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -158,6 +167,127 @@ def _norm_phone(v: str) -> str:
     return digits
 
 
+def _auth_user_id(user: Any = None) -> str:
+    u = user if user is not None else st.session_state.get("auth_user")
+    if u is None:
+        return ""
+    uid = getattr(u, "id", None)
+    if uid is None and isinstance(u, dict):
+        uid = u.get("id")
+    return str(uid or "").strip()
+
+
+def _clear_current_user_snapshot() -> None:
+    for key in (
+        IPS_CURRENT_USER_ID_KEY,
+        IPS_CURRENT_USER_EMAIL_KEY,
+        IPS_CURRENT_USER_FULL_NAME_KEY,
+        IPS_CURRENT_USER_ROLE_KEY,
+    ):
+        st.session_state.pop(key, None)
+
+
+def _sync_current_user_snapshot(profile: dict[str, Any]) -> None:
+    pid = str(profile.get("id") or "").strip()
+    email = str(profile.get("email") or st.session_state.get("user_email") or "").strip()
+    full_name = str(profile.get("full_name") or profile.get("name") or "").strip()
+    role = str(profile.get("role") or "viewer").strip()
+    st.session_state[IPS_CURRENT_USER_ID_KEY] = pid or None
+    st.session_state[IPS_CURRENT_USER_EMAIL_KEY] = email or None
+    st.session_state[IPS_CURRENT_USER_FULL_NAME_KEY] = full_name or None
+    st.session_state[IPS_CURRENT_USER_ROLE_KEY] = role or None
+
+
+def _clear_stale_user_identity() -> None:
+    """Drop cached profile/employee identity before binding a new authenticated user."""
+    st.session_state["auth_profile"] = None
+    st.session_state["auth_employee"] = None
+    _clear_current_user_snapshot()
+    try:
+        from app.utils.view_as import clear_view_as
+    except ImportError:
+        from utils.view_as import clear_view_as  # type: ignore
+    clear_view_as()
+    try:
+        from app.db import clear_streamlit_db_read_cache
+    except ImportError:
+        from db import clear_streamlit_db_read_cache  # type: ignore
+    clear_streamlit_db_read_cache()
+
+
+def _live_auth_user_from_client() -> Any | None:
+    client = _try_get_client()
+    if client is None:
+        return None
+    try:
+        gu = client.auth.get_user()
+        user = getattr(gu, "user", None)
+        if user is None and isinstance(gu, dict):
+            user = gu.get("user")
+        return user
+    except Exception:
+        return None
+
+
+def _reload_profile_for_user_id(uid: str) -> dict[str, Any] | None:
+    user_id = str(uid or "").strip()
+    if not user_id:
+        return None
+    try:
+        from app.db import clear_streamlit_db_read_cache
+    except ImportError:
+        from db import clear_streamlit_db_read_cache  # type: ignore
+    clear_streamlit_db_read_cache()
+    return fetch_one("profiles", {"id": user_id})
+
+
+def _attach_employee_for_profile(profile: dict[str, Any]) -> None:
+    st.session_state["auth_employee"] = None
+    emp_id = str(profile.get("employee_id") or "").strip()
+    if not emp_id:
+        return
+    try:
+        emp = fetch_one("employees", {"id": emp_id})
+        if emp:
+            st.session_state["auth_employee"] = emp
+    except Exception:
+        st.session_state["auth_employee"] = None
+
+
+def sync_authenticated_user(*, force_profile_reload: bool = False) -> bool:
+    """Ensure ``auth_profile`` and snapshot fields match the live Supabase auth user."""
+    if not is_authenticated():
+        _clear_current_user_snapshot()
+        return False
+
+    live_user = _live_auth_user_from_client()
+    live_uid = _auth_user_id(live_user) if live_user is not None else ""
+    session_uid = _auth_user_id()
+    if live_uid and session_uid and live_uid != session_uid and live_user is not None:
+        _apply_user_and_profile_from_auth_user(live_user)
+        return True
+
+    uid = live_uid or session_uid
+    if not uid:
+        return False
+
+    prof = st.session_state.get("auth_profile") or {}
+    prof_id = str(prof.get("id") or "").strip()
+    if force_profile_reload or not prof_id or prof_id != uid:
+        profile = _reload_profile_for_user_id(uid)
+        if not profile:
+            return False
+        if not bool(profile.get("is_active", True)):
+            return False
+        st.session_state["auth_profile"] = profile
+        _attach_employee_for_profile(profile)
+        _sync_current_user_snapshot(profile)
+        return True
+
+    _sync_current_user_snapshot(prof)
+    return True
+
+
 def _apply_user_and_profile_from_auth_user(user: Any, *, email_hint: str = "", phone_hint: str = "") -> None:
     user_id = getattr(user, "id", None)
     if user_id is None and isinstance(user, dict):
@@ -165,6 +295,12 @@ def _apply_user_and_profile_from_auth_user(user: Any, *, email_hint: str = "", p
     uid = str(user_id or "").strip()
     if not uid:
         raise RuntimeError("Login failed: Supabase returned a user without an id.")
+
+    try:
+        from app.db import clear_streamlit_db_read_cache
+    except ImportError:
+        from db import clear_streamlit_db_read_cache  # type: ignore
+    clear_streamlit_db_read_cache()
 
     profile = fetch_one("profiles", {"id": uid})
     if not profile:
@@ -193,17 +329,10 @@ def _apply_user_and_profile_from_auth_user(user: Any, *, email_hint: str = "", p
     st.session_state["user_email"] = (
         str(user_email or profile.get("email") or email_hint or "").strip() or None
     )
+    _sync_current_user_snapshot(profile)
 
     # Optional employee link (does not gate login)
-    st.session_state["auth_employee"] = None
-    emp_id = str(profile.get("employee_id") or "").strip() if isinstance(profile, dict) else ""
-    if emp_id:
-        try:
-            emp = fetch_one("employees", {"id": emp_id})
-            if emp:
-                st.session_state["auth_employee"] = emp
-        except Exception:
-            st.session_state["auth_employee"] = None
+    _attach_employee_for_profile(profile)
 
     try:
         _sync_auth_session_from_client(get_client())
@@ -228,6 +357,7 @@ def _try_hydrate_auth_from_supabase_client() -> bool:
     copy it into ``st.session_state`` without a browser reload.
     """
     if is_authenticated():
+        sync_authenticated_user()
         return True
     client = _try_get_client()
     if client is None:
@@ -258,6 +388,7 @@ def bootstrap_auth_at_startup() -> None:
     process_auth_browser_sign_out()
     try_restore_supabase_session_from_cookies()
     _try_hydrate_auth_from_supabase_client()
+    sync_authenticated_user()
     sync_auth_flags()
     st.session_state["auth_checked"] = True
     log_auth_state("bootstrap")
@@ -267,9 +398,10 @@ def try_restore_supabase_session_from_cookies() -> None:
     """
     If the browser sent saved Supabase tokens, call ``set_session`` and load the profile.
 
-    Skips when already logged in. Clears invalid cookie pairs by scheduling a clear bridge.
+    Skips cookie restore when already logged in, but still reconciles profile identity.
     """
     if is_authenticated():
+        sync_authenticated_user()
         return
     try:
         cookies = st.context.cookies
@@ -480,6 +612,7 @@ def sign_in(email: str, password: str, *, remember_device: bool = False) -> None
     if not user:
         raise RuntimeError("Login failed: no user returned from Supabase.")
 
+    _clear_stale_user_identity()
     _apply_user_and_profile_from_auth_user(user, email_hint=email)
 
     try:
@@ -555,6 +688,7 @@ def verify_phone_otp(*, phone_number: str, code: str, remember_device: bool = Fa
     if not user:
         raise RuntimeError("Login failed: no user returned from Supabase.")
 
+    _clear_stale_user_identity()
     _apply_user_and_profile_from_auth_user(user, phone_hint=ph)
 
     try:
@@ -588,6 +722,7 @@ def sign_out() -> None:
     st.session_state["auth_employee"] = None
     st.session_state["authenticated"] = False
     st.session_state["is_authenticated"] = False
+    _clear_current_user_snapshot()
     # Keep auth_checked True so bootstrap does not re-show login during sign-out reload.
     st.session_state["auth_checked"] = True
     st.session_state["_ips_auth_clear_pending"] = True
@@ -605,7 +740,40 @@ def sign_out() -> None:
 
 
 def current_profile() -> dict:
+    if is_authenticated():
+        prof = st.session_state.get("auth_profile") or {}
+        uid = _auth_user_id()
+        prof_id = str(prof.get("id") or "").strip()
+        if uid and prof_id != uid:
+            sync_authenticated_user(force_profile_reload=True)
     return st.session_state.get("auth_profile") or {}
+
+
+def current_user_display_name() -> str:
+    """Display name for greetings — always the signed-in user, never preview mode."""
+    if is_authenticated():
+        uid = _auth_user_id()
+        snap_id = str(st.session_state.get(IPS_CURRENT_USER_ID_KEY) or "").strip()
+        nm = str(st.session_state.get(IPS_CURRENT_USER_FULL_NAME_KEY) or "").strip()
+        if nm and uid and snap_id == uid:
+            return nm
+        sync_authenticated_user()
+        nm = str(st.session_state.get(IPS_CURRENT_USER_FULL_NAME_KEY) or "").strip()
+        if nm:
+            return nm
+    prof = st.session_state.get("auth_profile") or {}
+    nm = str(prof.get("full_name") or prof.get("name") or "").strip()
+    if nm:
+        return nm
+    email = str(
+        st.session_state.get(IPS_CURRENT_USER_EMAIL_KEY)
+        or prof.get("email")
+        or st.session_state.get("user_email")
+        or ""
+    ).strip()
+    if email and "@" in email:
+        return email.split("@")[0]
+    return "there"
 
 
 def current_role() -> str:

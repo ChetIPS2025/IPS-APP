@@ -8,7 +8,7 @@ from pathlib import Path
 import streamlit as st
 
 try:
-    from app.auth import current_profile, current_role, effective_role, sign_out
+    from app.auth import current_role, current_user_display_name, effective_role, sign_out
     from app.components.sidebar_nav_icons import nav_icon_for_slug
     from app.components.sidebar_shell import (
         apply_pending_sidebar_collapse,
@@ -29,7 +29,7 @@ try:
     )
     from app.utils.view_as import is_view_as_active
 except ImportError:
-    from auth import current_profile, current_role, effective_role, sign_out  # type: ignore
+    from auth import current_role, current_user_display_name, effective_role, sign_out  # type: ignore
     from components.sidebar_nav_icons import nav_icon_for_slug  # type: ignore
     from components.sidebar_shell import (  # type: ignore
         apply_pending_sidebar_collapse,
@@ -242,8 +242,7 @@ def render_sidebar(active_slug: str) -> None:
                 request_sidebar_collapse_after_nav()
                 st.rerun()
 
-        prof = current_profile()
-        name = html.escape(str(prof.get("full_name") or prof.get("email") or "User"))
+        name = html.escape(current_user_display_name())
         role_lbl = html.escape(role.replace("_", " ").title())
         st.markdown(
             f'<{_OT} class="ips-sidebar-user sidebar-user sidebar-brand-text"><strong>{name}</strong><br>{role_lbl}<{_CT}>',

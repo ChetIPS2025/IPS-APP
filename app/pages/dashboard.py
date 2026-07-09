@@ -8,7 +8,7 @@ from datetime import date, timedelta
 import streamlit as st
 
 try:
-    from app.auth import current_profile, current_role, effective_role
+    from app.auth import current_profile, current_role, current_user_display_name, effective_role
     from app.components.cards import render_ops_kpi_row
     from app.components.dashboard_active_jobs_table import render_dashboard_active_jobs_table
     from app.components.dashboard_estimates_waiting_table import render_dashboard_estimates_waiting_table
@@ -29,7 +29,7 @@ try:
     from app.styles import inject_global_css, inject_ops_dashboard_css
     from app.utils.formatting import fmt_currency
 except ImportError:
-    from auth import current_profile, current_role, effective_role  # type: ignore
+    from auth import current_profile, current_role, current_user_display_name, effective_role  # type: ignore
     from components.cards import render_ops_kpi_row  # type: ignore
     from components.dashboard_active_jobs_table import render_dashboard_active_jobs_table  # type: ignore
     from components.dashboard_estimates_waiting_table import render_dashboard_estimates_waiting_table  # type: ignore
@@ -52,9 +52,7 @@ except ImportError:
 
 
 def _welcome_name() -> str:
-    prof = current_profile() or {}
-    nm = str(prof.get("full_name") or "").strip()
-    return nm or str(prof.get("email") or "there").split("@")[0]
+    return current_user_display_name()
 
 
 def _date_range_state() -> tuple[date, date]:
