@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.services.certification_helpers import (
+    can_delete_employee_certifications,
     can_manage_employee_certifications,
     certification_visible_to_user,
     resolve_logged_in_employee_id,
@@ -40,3 +41,10 @@ def test_supervisor_sees_all_certifications():
     assert certification_visible_to_user(cert, role="supervisor", viewer_employee_id="") is True
     assert can_manage_employee_certifications("project manager") is True
     assert can_manage_employee_certifications("employee") is False
+
+
+def test_only_admin_can_delete_certifications():
+    assert can_delete_employee_certifications("admin") is True
+    assert can_delete_employee_certifications("supervisor") is False
+    assert can_delete_employee_certifications("project manager") is False
+    assert can_delete_employee_certifications("employee") is False

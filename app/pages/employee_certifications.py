@@ -42,8 +42,10 @@ try:
         load_certifications,
         load_employees,
     )
+    from app.components.action_styles import danger_outline, danger_solid
     from app.services.certification_helpers import (
         CERT_STATUS_VALUES,
+        can_delete_employee_certifications,
         can_manage_employee_certifications,
         can_view_certification_attachment,
         cert_status_pill_html,
@@ -56,6 +58,7 @@ try:
     from app.services.employees_service import (
         clear_certifications_cache,
         create_employee_certification,
+        delete_employee_certification,
         get_certification_attachment_url,
         update_employee_certification,
         upload_certification_attachment,
@@ -96,8 +99,10 @@ except ImportError:
         load_certifications,
         load_employees,
     )
+    from components.action_styles import danger_outline, danger_solid  # type: ignore
     from services.certification_helpers import (  # type: ignore
         CERT_STATUS_VALUES,
+        can_delete_employee_certifications,
         can_manage_employee_certifications,
         can_view_certification_attachment,
         cert_status_pill_html,
@@ -110,6 +115,7 @@ except ImportError:
     from services.employees_service import (  # type: ignore
         clear_certifications_cache,
         create_employee_certification,
+        delete_employee_certification,
         get_certification_attachment_url,
         update_employee_certification,
         upload_certification_attachment,
@@ -213,6 +219,7 @@ def _show_detail_key(*, prefix: str = "") -> str:
 def _clear_certification_selection(cert_ids: list[str] | None = None, *, prefix: str = "") -> None:
     st.session_state[_selected_id_key(prefix=prefix)] = None
     st.session_state[_show_detail_key(prefix=prefix)] = False
+    st.session_state.pop(_cert_pending_delete_key(prefix=prefix), None)
     if cert_ids:
         for cid in cert_ids:
             st.session_state[_cert_select_key(cid, prefix=prefix)] = False
@@ -262,6 +269,95 @@ def _current_employee_id() -> str:
 
 def _can_manage_certifications() -> bool:
     return can_manage_employee_certifications(_effective_role())
+
+
+def _can_delete_certifications() -> bool:
+    return can_delete_employee_certifications(_effective_role())
+
+
+def _cert_pending_delete_key(*, prefix: str = "") -> str:
+    return f"{prefix}cert_pending_delete_id" if prefix else "cert_pending_delete_id"
+
+
+def _execute_certification_delete(
+    cert: dict,
+    *,
+    all_cert_ids: list[str],
+    session_prefix: str,
+) -> None:
+    cid = str(cert.get("id") or "").strip()
+    if not cid or is_demo_id(cid):
+        st.error("This certification cannot be deleted.")
+        return
+    result = delete_employee_certification(cid)
+    if not result.ok:
+        st.error(result.error or "Could not delete certification.")
+        return
+
+    rk = record_session_key(cert, "id")
+    st.session_state.pop(_cert_pending_delete_key(prefix=session_prefix), None)
+    set_view_mode(_MODULE, rk)
+    _clear_certification_selection(all_cert_ids, prefix=session_prefix)
+    clear_certifications_cache()
+    st.success("Certification deleted.")
+    st.rerun()
+
+
+def _render_certification_delete_actions(
+    cert: dict,
+    *,
+    all_cert_ids: list[str],
+    session_prefix: str = "",
+) -> None:
+    if not _can_delete_certifications():
+        return
+
+    cid = str(cert.get("id") or "").strip()
+    if not cid:
+        return
+
+    rk = record_session_key(cert, "id")
+    pending_key = _cert_pending_delete_key(prefix=session_prefix)
+    pending_id = str(st.session_state.get(pending_key) or "").strip()
+
+    st.markdown("---")
+    if pending_id == cid:
+        st.markdown(
+            '<p class="ips-cert-delete-confirm-message">'
+            "Are you sure you want to delete this certification?"
+            "</p>",
+            unsafe_allow_html=True,
+        )
+        confirm_col, cancel_col = st.columns(2, gap="small")
+        with confirm_col:
+            with danger_solid(f"cert_del_confirm_{session_prefix}_{rk}"):
+                if st.button(
+                    "Delete",
+                    key=f"{session_prefix}cert_confirm_delete_{rk}",
+                    use_container_width=True,
+                ):
+                    _execute_certification_delete(
+                        cert,
+                        all_cert_ids=all_cert_ids,
+                        session_prefix=session_prefix,
+                    )
+        with cancel_col:
+            if st.button(
+                "Cancel",
+                key=f"{session_prefix}cert_cancel_delete_{rk}",
+                use_container_width=True,
+            ):
+                st.session_state.pop(pending_key, None)
+                st.rerun()
+    else:
+        with danger_outline(f"cert_del_btn_{session_prefix}_{rk}"):
+            if st.button(
+                "Delete",
+                key=f"{session_prefix}cert_delete_{rk}",
+                use_container_width=False,
+            ):
+                st.session_state[pending_key] = cid
+                st.rerun()
 
 
 def _current_user_id() -> str | None:
@@ -739,6 +835,11 @@ def render_certification_detail_dialog(
         _render_cert_edit_form(cert, employee_names, emp_opts, key_prefix=session_prefix)
     else:
         _render_cert_detail_tabs(cert, key_prefix=session_prefix)
+        _render_certification_delete_actions(
+            cert,
+            all_cert_ids=all_cert_ids,
+            session_prefix=session_prefix,
+        )
 
 
 def _clear_cert_detail_dialog() -> None:

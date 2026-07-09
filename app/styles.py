@@ -2505,6 +2505,12 @@ def inject_certifications_module_css() -> None:
   color: #94a3b8;
   font-size: 13px;
 }}
+.ips-cert-delete-confirm-message {{
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  color: #b91c1c;
+  font-weight: 600;
+}}
 .ips-attachment-card {{
   background: #ffffff;
   border: 1px solid #e2e8f0;

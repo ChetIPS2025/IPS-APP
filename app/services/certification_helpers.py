@@ -143,6 +143,15 @@ def can_manage_employee_certifications(role: str) -> bool:
     return can_view_field_certifications(role)
 
 
+def can_delete_employee_certifications(role: str) -> bool:
+    """Only administrators may delete employee certification records."""
+    try:
+        from app.utils.permissions import normalize_role
+    except ImportError:
+        from utils.permissions import normalize_role  # type: ignore
+    return normalize_role(role) == "admin"
+
+
 def certification_visible_to_user(
     cert: dict[str, Any],
     *,
