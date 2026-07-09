@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import traceback
 from datetime import date, datetime, timezone
 from typing import Any
 
@@ -1334,12 +1335,71 @@ _JOB_SAVE_READONLY_FIELDS = frozenset(
     }
 )
 
+_JOB_UPDATE_EDITABLE_COLUMNS = frozenset(
+    {
+        "status",
+        "supervisor",
+        "supervisor_id",
+        "billing_type",
+        "scope_of_work",
+        "notes",
+        "awarded_amount",
+        "estimated_cost",
+        "po_number",
+        "po_date",
+        "po_amount",
+        "customer_id",
+        "customer_location_id",
+        "customer_contact_id",
+        "location_id",
+        "location",
+        "job_name",
+        "start_date",
+        "target_completion_date",
+        "percent_complete",
+    }
+)
 
-def _job_save_money_normalized(value: Any, *, blank_as_zero: bool = True) -> float | None:
+_JOB_SAVE_EXCLUDED_UPDATE_COLUMNS = frozenset(
+    {
+        "job_number",
+        "customer_name",
+        "created_at",
+        "updated_at",
+        "project_manager",
+        *_JOB_SAVE_READONLY_FIELDS,
+    }
+)
+
+_SUPERVISOR_BLANK_LABELS = frozenset({"—", "— Select —"})
+
+
+def _job_save_money_normalized(value: Any, *, blank_as_zero: bool = False) -> float | None:
     parsed = _job_save_money(value)
     if parsed is not None:
         return parsed
     return 0.0 if blank_as_zero else None
+
+
+def _job_save_supervisor_text(value: Any) -> str:
+    s = str(value or "").strip()
+    if not s or s in _SUPERVISOR_BLANK_LABELS:
+        return ""
+    return s
+
+
+def _resolve_supervisor_id_for_job(supervisor_name: str) -> str | None:
+    name = _job_save_supervisor_text(supervisor_name)
+    if not name:
+        return None
+    rows, err = fetch_rows("employees", limit=5000, order_by="name")
+    if err or not rows:
+        return None
+    for row in rows:
+        if str(row.get("name") or "").strip() == name:
+            eid = str(row.get("id") or "").strip()
+            return eid or None
+    return None
 
 
 def _filter_job_save_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -1347,21 +1407,109 @@ def _filter_job_save_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in filtered.items() if k not in _JOB_SAVE_READONLY_FIELDS}
 
 
+def _filter_job_update_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    filtered = _filter_job_save_payload(payload)
+    return {
+        k: v
+        for k, v in filtered.items()
+        if k in _JOB_UPDATE_EDITABLE_COLUMNS and k not in _JOB_SAVE_EXCLUDED_UPDATE_COLUMNS
+    }
+
+
+def _format_job_save_dev_detail(
+    exc: BaseException | None,
+    *,
+    job_id: str | None = None,
+    payload: dict[str, Any] | None = None,
+    traceback_str: str | None = None,
+) -> str:
+    lines = [
+        f"Job ID: {job_id or '—'}",
+        f"Payload keys: {sorted(payload.keys()) if payload else []}",
+        f"Error type: {type(exc).__name__ if exc else 'Unknown'}",
+        f"Error message: {exc if exc else '—'}",
+    ]
+    tb = str(traceback_str or "").strip()
+    if not tb and exc is not None:
+        tb = traceback.format_exc().strip()
+    if tb:
+        lines.extend(["", "Traceback:", tb])
+    return "\n".join(lines)
+
+
+def _enrich_job_update_failure(
+    result: ServiceResult,
+    *,
+    job_id: str,
+    payload: dict[str, Any],
+) -> ServiceResult:
+    if result.ok:
+        return result
+    ctx = dict(getattr(result, "dev_context", None) or {})
+    exc_type = str(ctx.get("error_type") or "Exception")
+    exc_msg = str(ctx.get("error_message") or result.detail or result.error or "Update failed")
+    exc = RuntimeError(exc_msg)
+    detail = _format_job_save_dev_detail(
+        exc,
+        job_id=job_id,
+        payload=payload,
+        traceback_str=str(ctx.get("traceback") or "").strip() or None,
+    )
+    detail_lines = detail.split("\n")
+    for idx, line in enumerate(detail_lines):
+        if line.startswith("Error type:"):
+            detail_lines[idx] = f"Error type: {exc_type}"
+            break
+    return ServiceResult(
+        ok=False,
+        error=result.error,
+        detail="\n".join(detail_lines),
+        dev_context={**ctx, "job_id": job_id, "payload_keys": sorted(payload.keys())},
+        used_demo=result.used_demo,
+    )
+
+
+def _job_save_failure(
+    msg: str,
+    *,
+    job_id: str | None = None,
+    payload: dict[str, Any] | None = None,
+    exc: BaseException | None = None,
+) -> ServiceResult:
+    if exc is not None:
+        _LOG.exception("Job update failed")
+    else:
+        _LOG.error("Job update failed: %s", msg)
+    detail = _format_job_save_dev_detail(exc or RuntimeError(msg), job_id=job_id, payload=payload)
+    return ServiceResult(ok=False, error=msg, detail=detail)
+
+
 def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
+    try:
+        from app.services.jobs_service import normalize_job_status
+    except ImportError:
+        from services.jobs_service import normalize_job_status  # type: ignore
+
     customer_name = str(ui.get("customer") or "").strip()
     customer_id = _resolve_customer_id_for_job(ui)
     if customer_name and not customer_id:
-        return ServiceResult(ok=False, error=f"Customer not found: {customer_name}")
+        return _job_save_failure(
+            f"Customer not found: {customer_name}",
+            job_id=row_id,
+            payload={},
+        )
 
     job_number = str(ui.get("job_number") or "").strip()
     if not row_id and not job_number:
-        return ServiceResult(ok=False, error="Job number is required.")
+        return _job_save_failure("Job number is required.", job_id=row_id, payload={})
+
+    money_blank_as_zero = not bool(row_id)
+    supervisor_text = _job_save_supervisor_text(ui.get("supervisor"))
 
     payload: dict[str, Any] = {
         "job_name": _job_save_text(ui.get("job_name")),
-        "status": _job_save_text(ui.get("status"), default="Active"),
-        "supervisor": _job_save_text(ui.get("supervisor")),
-        "project_manager": _job_save_text(ui.get("project_manager")),
+        "status": normalize_job_status(ui.get("status") or "Active"),
+        "supervisor": supervisor_text,
         "start_date": _job_save_date(ui.get("start_date")),
         "target_completion_date": _job_save_date(ui.get("end_date")),
     }
@@ -1372,8 +1520,7 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
         payload["notes"] = _job_save_text(ui.get("notes"))
     if not row_id:
         payload["job_number"] = job_number
-    elif job_number:
-        payload["job_number"] = job_number
+        payload["project_manager"] = _job_save_text(ui.get("project_manager"))
     if ui.get("progress") is not None:
         payload["percent_complete"] = int(ui.get("progress") or 0)
     if customer_id:
@@ -1402,11 +1549,20 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
         else:
             payload["location"] = str(ui.get("location") or "").strip()
 
+    if not cols or "supervisor_id" in cols:
+        payload["supervisor_id"] = _resolve_supervisor_id_for_job(supervisor_text)
+
     if "contract_value" in ui or "awarded_amount" in ui:
         raw_contract = ui.get("contract_value") if "contract_value" in ui else ui.get("awarded_amount")
-        payload["awarded_amount"] = _job_save_money_normalized(raw_contract)
+        payload["awarded_amount"] = _job_save_money_normalized(
+            raw_contract,
+            blank_as_zero=money_blank_as_zero,
+        )
     if "estimated_cost" in ui:
-        payload["estimated_cost"] = _job_save_money_normalized(ui.get("estimated_cost"))
+        payload["estimated_cost"] = _job_save_money_normalized(
+            ui.get("estimated_cost"),
+            blank_as_zero=money_blank_as_zero,
+        )
 
     if "billing_type" in ui:
         try:
@@ -1427,7 +1583,10 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
             payload["po_date"] = po_date
     if "po_amount" in ui:
         if not cols or "po_amount" in cols:
-            payload["po_amount"] = _job_save_money_normalized(ui.get("po_amount"))
+            payload["po_amount"] = _job_save_money_normalized(
+                ui.get("po_amount"),
+                blank_as_zero=money_blank_as_zero,
+            )
 
     prior: dict[str, Any] = {}
     if row_id:
@@ -1440,10 +1599,8 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
     if row_id:
         try:
             from app.services.estimate_job_workflow_service import award_job_and_sync_estimate
-            from app.services.jobs_service import normalize_job_status
         except ImportError:
             from services.estimate_job_workflow_service import award_job_and_sync_estimate  # type: ignore
-            from services.jobs_service import normalize_job_status  # type: ignore
 
         new_status = normalize_job_status(ui.get("status") or prior.get("status"))
         old_status = normalize_job_status(prior.get("status"))
@@ -1455,7 +1612,7 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
                 job_row={**prior, **payload},
             )
             if not sync.ok:
-                return sync
+                return _enrich_job_update_failure(sync, job_id=row_id, payload=payload)
             sync_data = sync.data if isinstance(sync.data, dict) else {}
             if sync_data.get("skipped"):
                 pass
@@ -1465,8 +1622,18 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
                     payload.update(
                         {k: v for k, v in job_patch.items() if k not in _JOB_SAVE_READONLY_FIELDS}
                     )
-        payload = _filter_job_save_payload(payload)
-        result = update_row("jobs", payload, {"id": row_id})
+        payload = _filter_job_update_payload(payload)
+        try:
+            result = update_row("jobs", payload, {"id": row_id})
+        except Exception as exc:
+            return _job_save_failure(
+                str(exc),
+                job_id=row_id,
+                payload=payload,
+                exc=exc,
+            )
+        if not result.ok:
+            return _enrich_job_update_failure(result, job_id=row_id, payload=payload)
         return result
     payload = _filter_job_save_payload(payload)
     return insert_row("jobs", payload)

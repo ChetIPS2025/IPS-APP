@@ -2323,8 +2323,10 @@ def persist_job(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool,
         from services.repository import user_facing_error  # type: ignore
     err = user_facing_error(result)
     if err:
-        detail = str(getattr(result, "detail", None) or "").strip() or None
-        return False, err, detail
+        detail = str(getattr(result, "detail", None) or "").strip()
+        if detail and detail == err:
+            detail = None
+        return False, err, detail or None
     return True, "Job saved.", None
 
 

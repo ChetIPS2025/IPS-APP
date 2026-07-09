@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+import traceback
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -130,6 +131,7 @@ class ServiceResult:
     error: str | None = None
     used_demo: bool = False
     detail: str | None = None
+    dev_context: dict[str, Any] | None = None
 
 
 def clear_all_data_caches() -> None:
@@ -454,6 +456,16 @@ def _friendly_repo_error(exc: Exception, *, table: str, action: str) -> str:
     return friendly_auth_error_message(exc, operation=f"{action} {table}")
 
 
+def _exception_dev_context(exc: Exception | None) -> dict[str, Any] | None:
+    if exc is None:
+        return None
+    return {
+        "error_type": type(exc).__name__,
+        "error_message": str(exc),
+        "traceback": traceback.format_exc(),
+    }
+
+
 def _insert_with_optional_columns(
     table: str,
     payload: dict[str, Any],
@@ -497,8 +509,13 @@ def _insert_with_optional_columns(
             break
 
     msg = _friendly_repo_error(last_exc or RuntimeError("Insert failed"), table=table, action=action)
-    _LOG.warning("insert %s (%s) failed: %s", table, "admin" if use_admin else "user", last_exc)
-    return ServiceResult(ok=False, error=msg, detail=str(last_exc) if last_exc else None)
+    _LOG.exception("insert %s (%s) failed", table, "admin" if use_admin else "user")
+    return ServiceResult(
+        ok=False,
+        error=msg,
+        detail=str(last_exc) if last_exc else None,
+        dev_context=_exception_dev_context(last_exc),
+    )
 
 
 def insert_row(table: str, payload: dict[str, Any]) -> ServiceResult:
@@ -554,8 +571,13 @@ def _update_with_optional_columns(
             break
 
     msg = _friendly_repo_error(last_exc or RuntimeError("Update failed"), table=table, action=action)
-    _LOG.warning("update %s (%s) failed: %s", table, "admin" if use_admin else "user", last_exc)
-    return ServiceResult(ok=False, error=msg, detail=str(last_exc) if last_exc else None)
+    _LOG.exception("update %s (%s) failed", table, "admin" if use_admin else "user")
+    return ServiceResult(
+        ok=False,
+        error=msg,
+        detail=str(last_exc) if last_exc else None,
+        dev_context=_exception_dev_context(last_exc),
+    )
 
 
 def update_row(table: str, payload: dict[str, Any], match: dict[str, Any]) -> ServiceResult:

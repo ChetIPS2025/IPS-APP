@@ -8,8 +8,11 @@ from unittest.mock import patch
 
 from app.services.phase2_modules_service import (
     _filter_job_save_payload,
+    _filter_job_update_payload,
+    _format_job_save_dev_detail,
     _job_save_date,
     _job_save_money_normalized,
+    _job_save_supervisor_text,
     _job_save_text,
     save_job,
 )
@@ -26,10 +29,19 @@ class TestJobSavePayload(unittest.TestCase):
         self.assertIsNone(_job_save_date(None))
         self.assertIsNone(_job_save_date(""))
 
-    def test_job_save_money_normalized_blank_to_zero(self) -> None:
-        self.assertEqual(_job_save_money_normalized(None), 0.0)
-        self.assertEqual(_job_save_money_normalized(""), 0.0)
+    def test_job_save_money_normalized_blank_defaults_to_none(self) -> None:
+        self.assertIsNone(_job_save_money_normalized(None))
+        self.assertIsNone(_job_save_money_normalized(""))
         self.assertEqual(_job_save_money_normalized("1250.5"), 1250.5)
+
+    def test_job_save_money_normalized_blank_as_zero_for_insert(self) -> None:
+        self.assertEqual(_job_save_money_normalized(None, blank_as_zero=True), 0.0)
+        self.assertEqual(_job_save_money_normalized("", blank_as_zero=True), 0.0)
+
+    def test_job_save_supervisor_text_maps_blank_labels_to_empty(self) -> None:
+        self.assertEqual(_job_save_supervisor_text("—"), "")
+        self.assertEqual(_job_save_supervisor_text("— Select —"), "")
+        self.assertEqual(_job_save_supervisor_text("Pat Smith"), "Pat Smith")
 
     def test_filter_job_save_payload_drops_readonly_fields(self) -> None:
         payload = {
@@ -50,12 +62,43 @@ class TestJobSavePayload(unittest.TestCase):
         self.assertNotIn("estimated_profit", filtered)
         self.assertNotIn("profit_percent", filtered)
 
+    def test_filter_job_update_payload_excludes_job_number_and_readonly(self) -> None:
+        payload = {
+            "status": "Active",
+            "job_number": "J-100",
+            "customer_name": "Acme",
+            "awarded_amount": 5000.0,
+            "projected_margin_pct": 12.0,
+            "updated_at": "2024-01-01",
+        }
+        filtered = _filter_job_update_payload(payload)
+        self.assertEqual(filtered["status"], "Active")
+        self.assertEqual(filtered["awarded_amount"], 5000.0)
+        self.assertNotIn("job_number", filtered)
+        self.assertNotIn("customer_name", filtered)
+        self.assertNotIn("projected_margin_pct", filtered)
+        self.assertNotIn("updated_at", filtered)
+
+    def test_format_job_save_dev_detail_includes_required_fields(self) -> None:
+        detail = _format_job_save_dev_detail(
+            RuntimeError("column jobs.foo does not exist"),
+            job_id="job-9",
+            payload={"status": "Active", "notes": "x"},
+        )
+        self.assertIn("Job ID: job-9", detail)
+        self.assertIn("Payload keys:", detail)
+        self.assertIn("notes", detail)
+        self.assertIn("Error type: RuntimeError", detail)
+        self.assertIn("column jobs.foo does not exist", detail)
+
     @patch("app.db.fetch_one")
     @patch("app.services.phase2_modules_service.update_row")
     @patch("app.services.phase2_modules_service.table_column_names")
     @patch("app.services.phase2_modules_service._resolve_customer_id_for_job", return_value="cust-1")
+    @patch("app.services.phase2_modules_service._resolve_supervisor_id_for_job", return_value=None)
     def test_save_job_update_maps_scope_and_notes_separately(
         self,
+        _supervisor_mock,
         _resolve_mock,
         cols_mock,
         update_mock,
@@ -66,6 +109,7 @@ class TestJobSavePayload(unittest.TestCase):
                 "job_name",
                 "status",
                 "supervisor",
+                "supervisor_id",
                 "start_date",
                 "target_completion_date",
                 "scope_of_work",
@@ -89,8 +133,9 @@ class TestJobSavePayload(unittest.TestCase):
 
         ui = {
             "job_name": "Paint job",
+            "job_number": "J-999",
             "status": "Active",
-            "supervisor": "Pat",
+            "supervisor": "— Select —",
             "scope_of_work": "Prep and paint tank exterior",
             "notes": "Customer wants weekend work",
             "contract_value": 12000,
@@ -111,10 +156,46 @@ class TestJobSavePayload(unittest.TestCase):
         self.assertEqual(payload["notes"], "Customer wants weekend work")
         self.assertEqual(payload["awarded_amount"], 12000.0)
         self.assertEqual(payload["estimated_cost"], 8000.0)
-        self.assertEqual(payload["po_amount"], 0.0)
+        self.assertIsNone(payload["po_amount"])
         self.assertIsNone(payload["po_date"])
+        self.assertEqual(payload["supervisor"], "")
+        self.assertIsNone(payload["supervisor_id"])
+        self.assertNotIn("job_number", payload)
         self.assertNotIn("projected_gross_profit", payload)
         self.assertNotIn("projected_margin_pct", payload)
+
+    @patch("app.db.fetch_one")
+    @patch("app.services.phase2_modules_service.update_row")
+    @patch("app.services.phase2_modules_service.table_column_names")
+    @patch("app.services.phase2_modules_service._resolve_customer_id_for_job", return_value="cust-1")
+    def test_save_job_update_failure_returns_structured_dev_detail(
+        self,
+        _resolve_mock,
+        cols_mock,
+        update_mock,
+        fetch_one_mock,
+    ) -> None:
+        cols_mock.return_value = frozenset({"status", "notes"})
+        fetch_one_mock.return_value = {"id": "job-2", "status": "Active", "awarded_amount": 100}
+        update_mock.return_value = ServiceResult(
+            ok=False,
+            error="Could not complete your update jobs. Please try again.",
+            detail='{"code":"23514","message":"invalid input"}',
+            dev_context={
+                "error_type": "APIError",
+                "error_message": '{"code":"23514","message":"invalid input"}',
+                "traceback": "Traceback (most recent call last):\n  File fake.py",
+            },
+        )
+
+        result = save_job({"status": "Active", "notes": "x"}, row_id="job-2")
+        self.assertFalse(result.ok)
+        detail = str(result.detail or "")
+        self.assertIn("Job ID: job-2", detail)
+        self.assertIn("Payload keys:", detail)
+        self.assertIn("Error type: APIError", detail)
+        self.assertIn("invalid input", detail)
+        self.assertIn("Traceback:", detail)
 
 
 if __name__ == "__main__":
