@@ -18,7 +18,7 @@ except ImportError:
 def inject_job_detail_layout_css() -> None:
     st.markdown(
         """
-<style id="ips-job-detail-layout-v4">
+<style id="ips-job-detail-layout-v5">
 .ips-job-detail-control-page {
   width: 100%;
 }
@@ -252,13 +252,52 @@ div[data-testid="stDialog"]:has(.ips-job-detail-header-menu-marker) button[data-
   border-color: #e2e8f0 !important;
   color: #0f172a !important;
 }
+div[data-testid="stDialog"]:has(.job-detail-header-menu-anchor) [data-testid="column"] {
+  position: relative !important;
+  overflow: visible !important;
+  z-index: 24 !important;
+}
+div[data-testid="stDialog"]:has(.job-detail-header-menu-flyout-open) [data-testid="column"]:has(.job-detail-header-menu-anchor) [data-testid="stVerticalBlockBorderWrapper"] {
+  position: absolute !important;
+  top: 2rem !important;
+  right: 0 !important;
+  left: auto !important;
+  width: min(220px, 92vw) !important;
+  min-width: 200px !important;
+  max-width: 220px !important;
+  margin-top: 0 !important;
+  z-index: 100020 !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14) !important;
+  pointer-events: auto !important;
+}
 div[data-testid="stDialog"]:has(.job-detail-header-menu-marker) [data-testid="column"] {
   position: relative !important;
   overflow: visible !important;
+  z-index: 24 !important;
+}
+div[data-testid="stDialog"]:has(.job-detail-header-menu-flyout-open) [data-testid="stVerticalBlockBorderWrapper"]:has(.job-detail-header-menu-panel) {
+  position: absolute !important;
+  top: calc(100% + 2px) !important;
+  right: 0 !important;
+  left: auto !important;
+  width: min(220px, 92vw) !important;
+  min-width: 200px !important;
+  max-width: 220px !important;
+  margin-top: 0 !important;
+  z-index: 100020 !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14) !important;
+  pointer-events: auto !important;
 }
 div[data-testid="stDialog"]:has(.job-detail-header-menu-panel) [data-testid="stVerticalBlockBorderWrapper"] {
-  min-width: 210px !important;
-  margin-top: 0.25rem !important;
+  min-width: 200px !important;
+  margin-top: 0 !important;
+  background: #ffffff !important;
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08) !important;
   pointer-events: auto !important;
 }
@@ -367,9 +406,18 @@ div[data-testid="stDialog"]:has(.ips-job-edit-form-footer-marker) [data-testid="
 div[data-testid="stDialog"]:has(.ips-job-edit-form-footer-marker) [data-testid="stFormSubmitButton"] button {
   min-height: 40px !important;
 }
-body:has(div[data-testid="stDialog"]:has(.ips-job-edit-mode)) section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap {
+body:has(div[data-testid="stDialog"]:has(.ips-job-detail-control-page)) section[data-testid="stMain"]:has(.ips-jobs-page) .st-key-jobs_table_wrap,
+body:has(div[data-testid="stDialog"]:has(.ips-job-detail-control-page)) section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-summary-cards,
+body:has(div[data-testid="stDialog"]:has(.ips-job-detail-control-page)) section[data-testid="stMain"]:has(.ips-jobs-page) .ips-jobs-summary-bar {
   visibility: hidden !important;
   pointer-events: none !important;
+}
+body:has(div[data-testid="stDialog"]:has(.ips-job-detail-control-page)) div[data-testid="stBackdrop"] {
+  background: rgba(15, 23, 42, 0.52) !important;
+  backdrop-filter: blur(4px) !important;
+}
+div[data-testid="stDialog"]:has(.ips-job-detail-control-page) {
+  z-index: 100000 !important;
 }
 div[data-testid="stDialog"]:has(.ips-job-detail-control-page) [data-testid="column"]:has(.ips-job-status-badge-editor-marker),
 div[data-testid="stDialog"]:has(.ips-job-detail-control-page) [data-testid="column"]:has(.job-detail-header-menu-marker),

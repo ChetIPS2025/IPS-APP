@@ -197,7 +197,7 @@ def render_job_detail_header_menu(
     menu_open = bool(st.session_state.get(open_key))
 
     st.markdown(
-        '<span class="job-detail-header-menu-marker ips-jobs-row-menu-marker" aria-hidden="true"></span>',
+        '<span class="job-detail-header-menu-marker ips-jobs-row-menu-marker job-detail-header-menu-anchor" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
     st.button(
