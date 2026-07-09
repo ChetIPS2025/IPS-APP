@@ -134,6 +134,8 @@ _TABLE_KEY = "timekeeping_list"
 _MODAL_KEY = "ips_timekeeping_detail_modal_id"
 _CACHE_KEY = "_ips_timekeeping_modal_by_id"
 _WEEK_KEY = "ips_timekeeping_week_start"
+_TK_ASSIGNMENT_OPTS_KEY = "ips_tk_assignment_options"
+_TK_ASSIGNMENT_OPTS_SIG_KEY = "ips_tk_assignment_options_sig"
 SELECTED_TIMECARD_KEY = "selected_timecard_id"
 SHOW_TIMECARD_MODAL_KEY = "show_timecard_detail_modal"
 _ALL_TIMECARD_IDS_KEY = "_ips_timekeeping_visible_ids"
@@ -293,8 +295,8 @@ def _job_assignment_label(job: dict[str, Any]) -> str:
     return num or name
 
 
-def _assignment_options_for_timekeeping() -> list[str]:
-    """Assignable jobs from the jobs table, their subjobs, Shop, Administrative, and Vacation."""
+def _build_assignment_options_for_timekeeping() -> list[str]:
+    """Build assignable job/subjob labels (uncached)."""
     try:
         from app.services.tasks_service import get_tasks_by_job
     except ImportError:
@@ -328,6 +330,31 @@ def _assignment_options_for_timekeeping() -> list[str]:
     for special in ("Shop", "Administrative", "Vacation"):
         _add(special)
 
+    return opts
+
+
+def _assignment_options_cache_sig(*, week_start_d: date | None = None) -> str:
+    ws = week_start_d or _current_week_start()
+    jobs = load_jobs()
+    return f"{ws.isoformat()}:{len(jobs)}"
+
+
+def clear_timekeeping_assignment_options_cache() -> None:
+    st.session_state.pop(_TK_ASSIGNMENT_OPTS_KEY, None)
+    st.session_state.pop(_TK_ASSIGNMENT_OPTS_SIG_KEY, None)
+
+
+def _assignment_options_for_timekeeping(*, week_start_d: date | None = None) -> list[str]:
+    """Assignable jobs from the jobs table, their subjobs, Shop, Administrative, and Vacation."""
+    sig = _assignment_options_cache_sig(week_start_d=week_start_d)
+    if (
+        st.session_state.get(_TK_ASSIGNMENT_OPTS_SIG_KEY) == sig
+        and isinstance(st.session_state.get(_TK_ASSIGNMENT_OPTS_KEY), list)
+    ):
+        return list(st.session_state[_TK_ASSIGNMENT_OPTS_KEY])
+    opts = _build_assignment_options_for_timekeeping()
+    st.session_state[_TK_ASSIGNMENT_OPTS_KEY] = opts
+    st.session_state[_TK_ASSIGNMENT_OPTS_SIG_KEY] = sig
     return opts
 
 
@@ -421,7 +448,7 @@ def _render_horizontal_week_grid(
         return
 
     days = week_dates(week_start_d)
-    job_opts = _assignment_options_for_timekeeping()
+    job_opts = _assignment_options_for_timekeeping(week_start_d=week_start_d)
     field_job = _active_field_job_label()
 
     toolbar_left, toolbar_right = st.columns([2.2, 1], gap="small")
@@ -1339,7 +1366,7 @@ def _allocation_lines_to_persist_grid(
     """Flatten allocation lines for persist_timekeeping_days; auto-fill unassigned remainder."""
     errors: list[str] = []
     persist_rows: list[dict[str, Any]] = []
-    job_opts = _assignment_options_for_timekeeping()
+    job_opts = _assignment_options_for_timekeeping(week_start_d=week_start_d)
     no_job = job_opts[0] if job_opts else "— No assignment —"
     focus = str(focus_iso or "")[:10] or None
 
@@ -1455,7 +1482,7 @@ def _save_allocation_week(
     _sync_allocation_from_widgets(by_date, eid=eid, week_sig=week_sig)
     grid = _ensure_weekly_grid(emp, week_start_d)
     _apply_row_hrs_to_grid(grid, eid=eid, week_sig=week_sig)
-    job_opts = _assignment_options_for_timekeeping()
+    job_opts = _assignment_options_for_timekeeping(week_start_d=week_start_d)
     _bootstrap_week_allocation_lines(
         by_date,
         week_start_d=week_start_d,
@@ -1552,7 +1579,7 @@ def _resolve_saved_allocation_line_id(
     wd = str(work_date or "")[:10]
     if not wd:
         return ""
-    job_opts = _assignment_options_for_timekeeping()
+    job_opts = _assignment_options_for_timekeeping(week_start_d=week_start_d)
     job = _coerce_assignment_label(str(line.get("job") or ""), job_opts)
     hrs = _line_allocated_hours(line)
     if hrs <= _ALLOC_TOLERANCE:
@@ -2689,7 +2716,7 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
     gk = _grid_key(eid)
     week_sig = week_start_d.isoformat()
     grid = _ensure_weekly_grid(emp, week_start_d)
-    job_opts = _assignment_options_for_timekeeping()
+    job_opts = _assignment_options_for_timekeeping(week_start_d=week_start_d)
     can_approve = _can_approve_timekeeping()
     can_submit = _can_submit_timekeeping()
 
@@ -2942,7 +2969,7 @@ def _render_list_allocation_detail(
     week_sig = week_start_d.isoformat()
     scope = str(panel_scope or eid or week_sig).strip()
     admin_edit = _can_admin_edit_approved_timekeeping()
-    job_opts = _assignment_options_for_timekeeping()
+    job_opts = _assignment_options_for_timekeeping(week_start_d=week_start_d)
     can_approve = _can_approve_timekeeping()
     can_submit = _can_submit_timekeeping()
     grid = _ensure_weekly_grid(emp, week_start_d)
@@ -3127,6 +3154,19 @@ def _render_inline_daily_entries(row: dict, week_start_d: date) -> None:
             st.session_state[SHOW_TIMECARD_MODAL_KEY] = True
             st.session_state[_MODAL_KEY] = timecard_id
             _timekeeping_app_rerun()
+
+
+@fragment
+def _render_timekeeping_expand_fragment(row: dict, week_start_d: date) -> None:
+    """Expanded allocation panel — local reruns when assigning jobs/hours per day."""
+    timecard_id = str(row.get("timecard_id") or "").strip()
+    with st.container(key=f"tk_expand_detail_{timecard_id}"):
+        st.markdown(
+            '<span class="timekeeping-expand-detail-panel timekeeping-detail-expand-host '
+            'timesheet-employee-expand-detail ips-timekeeping-row-expand" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        _render_inline_daily_entries(row, week_start_d)
 
 
 def _render_daily_entries_tab(emp: dict, week_start_d: date) -> None:
@@ -3462,13 +3502,7 @@ def _render_custom_timekeeping_table(
                         )
 
                 if expanded:
-                    with st.container(key=f"tk_expand_detail_{timecard_id}"):
-                        st.markdown(
-                            '<span class="timekeeping-expand-detail-panel timekeeping-detail-expand-host '
-                            'timesheet-employee-expand-detail ips-timekeeping-row-expand" aria-hidden="true"></span>',
-                            unsafe_allow_html=True,
-                        )
-                        _render_inline_daily_entries(row, week_start_d)
+                    _render_timekeeping_expand_fragment(row, week_start_d)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -3499,6 +3533,7 @@ def render() -> None:
     if pre_week_raw:
         try:
             st.session_state[_WEEK_KEY] = date.fromisoformat(pre_week_raw)
+            clear_timekeeping_assignment_options_cache()
         except ValueError:
             pass
 
@@ -3570,18 +3605,21 @@ def render() -> None:
                 st.session_state[_WEEK_KEY] = ws - timedelta(days=7)
                 reset_table_page(_TABLE_KEY)
                 _clear_expanded_timecard()
+                clear_timekeeping_assignment_options_cache()
                 st.rerun()
         with nav2:
             if st.button("📅 Current Week", key="tk_current_week", use_container_width=True, type="secondary"):
                 st.session_state[_WEEK_KEY] = week_start()
                 reset_table_page(_TABLE_KEY)
                 _clear_expanded_timecard()
+                clear_timekeeping_assignment_options_cache()
                 st.rerun()
         with nav3:
             if st.button("Next Week →", key="tk_next_week", use_container_width=True, type="secondary"):
                 st.session_state[_WEEK_KEY] = ws + timedelta(days=7)
                 reset_table_page(_TABLE_KEY)
                 _clear_expanded_timecard()
+                clear_timekeeping_assignment_options_cache()
                 st.rerun()
         with week_col:
             st.markdown(
