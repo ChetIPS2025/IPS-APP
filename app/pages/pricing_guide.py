@@ -12,6 +12,16 @@ try:
     from app.components.catalog_presence_panel import render_catalog_presence_panel
     from app.components.catalog_stock_policy_panel import render_catalog_stock_policy_panel
     from app.components.pricing_guide_actions import render_pricing_guide_action_buttons
+    from app.components.pricing_guide_list_table import (
+        build_pricing_guide_html_table,
+        render_pricing_guide_table_bridge_legacy,
+        render_pricing_guide_table_open_buttons,
+    )
+    from app.components.pricing_guide_page_layout import (
+        close_pricing_guide_filter_bar_shell,
+        inject_pricing_guide_page_layout_css,
+        render_pricing_guide_filter_bar_shell,
+    )
     from app.components.headers import render_page_brand_header
     from app.components.item_photo_manager import render_item_photo_manager
     from app.components.layout import render_filter_bar as layout_filter_bar
@@ -84,7 +94,6 @@ try:
     )
     from app.services.pricing_guide_images import (
         clear_pricing_guide_image,
-        get_pricing_guide_image_url,
         pricing_guide_display_record,
         pricing_guide_image_is_inherited,
         upload_pricing_guide_image,
@@ -97,6 +106,16 @@ except ImportError:
     from components.catalog_presence_panel import render_catalog_presence_panel  # type: ignore
     from components.catalog_stock_policy_panel import render_catalog_stock_policy_panel  # type: ignore
     from components.pricing_guide_actions import render_pricing_guide_action_buttons  # type: ignore
+    from components.pricing_guide_list_table import (  # type: ignore
+        build_pricing_guide_html_table,
+        render_pricing_guide_table_bridge_legacy,
+        render_pricing_guide_table_open_buttons,
+    )
+    from components.pricing_guide_page_layout import (  # type: ignore
+        close_pricing_guide_filter_bar_shell,
+        inject_pricing_guide_page_layout_css,
+        render_pricing_guide_filter_bar_shell,
+    )
     from components.headers import render_page_brand_header  # type: ignore
     from components.item_photo_manager import render_item_photo_manager  # type: ignore
     from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
@@ -169,7 +188,6 @@ except ImportError:
     )
     from services.pricing_guide_images import (  # type: ignore
         clear_pricing_guide_image,
-        get_pricing_guide_image_url,
         pricing_guide_display_record,
         pricing_guide_image_is_inherited,
         upload_pricing_guide_image,
@@ -186,16 +204,9 @@ _CACHE_KEY = "_ips_pg_modal_by_id"
 SELECTED_PG_KEY = "selected_pricing_guide_id"
 SHOW_PG_MODAL_KEY = "show_pricing_guide_detail_modal"
 _ALL_PG_IDS_KEY = "_ips_pg_visible_ids"
-_PG_COLS = [0.55, 2.5, 1.05, 1.15, 0.7, 0.95, 0.8, 1.0, 1.15, 0.9]
-_PG_HEADER_SPECS: list[tuple[str, str | None]] = [
-    ("IMAGE", None),
-    ("DESCRIPTION", None),
+_PG_FILTER_SPECS: list[tuple[str, str]] = [
     ("CLASS", "item_class"),
     ("CATEGORY", "category"),
-    ("UNIT", None),
-    ("COST", None),
-    ("MARKUP %", None),
-    ("SELL PRICE", None),
     ("VENDOR", "vendor"),
     ("STATUS", "status"),
 ]
@@ -359,158 +370,61 @@ def _clear_pg_selection() -> None:
     st.session_state[SHOW_PG_MODAL_KEY] = False
 
 
-def _pg_item_open_label(item: str) -> str:
-    return item if item and item != "—" else "View item"
+def _render_pricing_guide_table_column_filters(
+    *,
+    filter_options: dict[str, list[str]],
+) -> None:
+    if not _PG_FILTER_SPECS:
+        return
+    st.markdown('<div class="ips-pg-table-filter-toolbar">', unsafe_allow_html=True)
+    cols = st.columns(len(_PG_FILTER_SPECS), gap="small")
+    for col, (label, field) in zip(cols, _PG_FILTER_SPECS):
+        with col:
+            render_table_header_cell(
+                label,
+                table_key=_TABLE_KEY,
+                filter_field=field,
+                filter_options=filter_options.get(field, []),
+                base_class="ips-pg-filter-toolbar-cell",
+            )
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
-def _pg_row_marker_html(row_id: str) -> str:
-    rid_attr = html.escape(row_id, quote=True)
-    return f'<span class="ips-pg-table-row" data-row-id="{rid_attr}" aria-hidden="true"></span>'
+def _render_custom_pricing_guide_table(
+    filtered: list[dict[str, Any]],
+    *,
+    filter_options: dict[str, list[str]],
+) -> list[str]:
+    if not filtered:
+        st.info("No pricing guide items match your filters.")
+        st.session_state[_ALL_PG_IDS_KEY] = []
+        return []
 
+    all_row_ids = [str(r.get("id") or "").strip() for r in filtered if str(r.get("id") or "").strip()]
+    st.session_state[_ALL_PG_IDS_KEY] = all_row_ids
 
-def _render_pg_row_click_bridge() -> str | None:
-    try:
-        from app.ui.clean_table import _components_html
-    except ImportError:
-        from ui.clean_table import _components_html  # type: ignore
-
-    st.markdown(
-        '<span class="ips-pg-row-click-bridge-marker" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
-    return _components_html(
-        """
-<script>
-(function () {
-  const w = window.parent || window;
-  const doc = w.document;
-  const hookKey = "ipsPgRowClick::catalog";
-  const tblSel = ".st-key-pricing_guide_table_wrap";
-  const rowSel = '[data-testid="stHorizontalBlock"]:has(.ips-pg-table-row)';
-
-  function sendValue(id) {
-    const payload = { type: "streamlit:setComponentValue", value: id };
-    const frames = [window, window.parent, w].filter(function (f, i, arr) {
-      return f && arr.indexOf(f) === i;
-    });
-    for (var i = 0; i < frames.length; i++) {
-      try {
-        if (frames[i].Streamlit && typeof frames[i].Streamlit.setComponentValue === "function") {
-          frames[i].Streamlit.setComponentValue(id);
-          return;
-        }
-      } catch (err) {}
+    rows_by_id = {
+        str(r.get("id") or "").strip(): r
+        for r in filtered
+        if str(r.get("id") or "").strip()
     }
-    for (var j = 0; j < frames.length; j++) {
-      try { frames[j].postMessage(payload, "*"); } catch (err) {}
-    }
-  }
 
-  function isInteractive(target) {
-    return !!(target && target.closest && target.closest(
-      "button, input, select, textarea, label, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox'], [class*='st-key-pg_open_'], .ips-pg-thumb-cell-link"
-    ));
-  }
-
-  function tableScope() {
-    const anchor = doc.querySelector(tblSel);
-    if (!anchor) return null;
-    return anchor.closest('[data-testid="stVerticalBlockBorderWrapper"]') || anchor.parentElement;
-  }
-
-  function bindThumbLinks() {
-    const scope = tableScope();
-    if (!scope) return;
-    scope.querySelectorAll(".ips-pg-thumb-cell-link[data-row-id]").forEach(function (cell) {
-      if (cell.dataset.ipsPgThumbBound === "1") return;
-      cell.dataset.ipsPgThumbBound = "1";
-      function openDetail(ev) {
-        ev.preventDefault();
-        ev.stopPropagation();
-        const id = cell.getAttribute("data-row-id");
-        if (id) sendValue(id);
-      }
-      cell.addEventListener("click", openDetail);
-      cell.addEventListener("keydown", function (ev) {
-        if (ev.key === "Enter" || ev.key === " ") openDetail(ev);
-      });
-    });
-  }
-
-  function bindRows() {
-    const scope = tableScope();
-    if (!scope) return;
-    scope.querySelectorAll(rowSel).forEach(function (row) {
-      if (row.dataset.ipsPgRowBound === "1") return;
-      row.dataset.ipsPgRowBound = "1";
-      row.addEventListener("click", function (e) {
-        if (isInteractive(e.target)) return;
-        const marker = row.querySelector(".ips-pg-table-row[data-row-id]");
-        const id = marker && marker.getAttribute("data-row-id");
-        if (!id) return;
-        e.preventDefault();
-        e.stopPropagation();
-        sendValue(id);
-      });
-    });
-    bindThumbLinks();
-  }
-
-  if (!doc.ipsPgRowClickRegistry) doc.ipsPgRowClickRegistry = {};
-  doc.ipsPgRowClickRegistry[hookKey] = { bind: bindRows };
-  bindRows();
-  if (!doc.ipsPgRowBindObserver) {
-    doc.ipsPgRowBindObserver = new MutationObserver(function () {
-      Object.values(doc.ipsPgRowClickRegistry || {}).forEach(function (cfg) {
-        if (cfg && typeof cfg.bind === "function") cfg.bind();
-      });
-    });
-    doc.ipsPgRowBindObserver.observe(doc.body, { childList: true, subtree: true });
-  }
-})();
-</script>
-        """,
-        component_key="ips_pg_catalog_row_click",
-        height=1,
-    )
-
-
-def _pg_status_pill_html(status: str) -> str:
-    cls_map = {
-        "Active": "ips-pg-status-active",
-        "Inactive": "ips-pg-status-inactive",
-    }
-    cls = cls_map.get(status, "ips-pg-status-active")
-    return f'<span class="ips-pg-status-pill {cls}">{html.escape(status)}</span>'
-
-
-def _render_pg_thumbnail(row: dict[str, Any]) -> None:
-    rid = str(row.get("id") or "").strip()
-    item = str(row.get("item") or "item").strip()
-    aria = html.escape(f"Open pricing item {item}", quote=True)
-    image_url = get_pricing_guide_image_url(row)
-    if image_url:
-        inner = (
-            f'<img class="pricing-thumb table-image-preview ips-pg-thumb-img" '
-            f'src="{html.escape(image_url, quote=True)}" alt="" aria-hidden="true" />'
+    with st.container(key="pricing_guide_table_wrap"):
+        _render_pricing_guide_table_column_filters(filter_options=filter_options)
+        st.markdown(
+            build_pricing_guide_html_table(filtered),
+            unsafe_allow_html=True,
         )
-    else:
-        inner = (
-            '<span class="pricing-thumb table-image-preview ips-pg-thumb-placeholder" '
-            'aria-hidden="true">—</span>'
+        render_pricing_guide_table_open_buttons(
+            filtered,
+            open_item_fn=_open_pg_table_item,
         )
-    st.markdown(
-        (
-            f'<div class="image-cell ips-pg-image-cell">'
-            f'<button type="button" class="ips-pg-thumb-cell-link" '
-            f'data-row-id="{html.escape(rid, quote=True)}" '
-            f'aria-label="{aria}" tabindex="0">'
-            f"{inner}"
-            f"</button>"
-            f"</div>"
-        ),
-        unsafe_allow_html=True,
-    )
+        render_pricing_guide_table_bridge_legacy(
+            rows_by_id,
+            open_item_fn=_open_pg_table_item,
+        )
+
+    return all_row_ids
 
 
 def _can_manage_pricing() -> bool:
@@ -546,132 +460,6 @@ def _render_pg_photo_manager(row: dict[str, Any]) -> None:
 
 def _render_pg_detail_image(row: dict[str, Any]) -> None:
     _render_pg_photo_manager(row)
-
-
-def _render_custom_pricing_guide_table(
-    filtered: list[dict[str, Any]],
-    *,
-    filter_options: dict[str, list[str]],
-) -> list[str]:
-    if not filtered:
-        st.info("No pricing guide items match your filters.")
-        st.session_state[_ALL_PG_IDS_KEY] = []
-        return []
-
-    all_row_ids = [str(r.get("id") or "").strip() for r in filtered if str(r.get("id") or "").strip()]
-    st.session_state[_ALL_PG_IDS_KEY] = all_row_ids
-
-    with st.container(key="pricing_guide_table_wrap"):
-        st.markdown('<div class="ips-pg-table-wrap">', unsafe_allow_html=True)
-
-        header_cols = st.columns(_PG_COLS, gap="small", vertical_alignment="center")
-        for col, (label, field) in zip(header_cols, _PG_HEADER_SPECS):
-            with col:
-                if field:
-                    render_table_header_cell(
-                        label,
-                        table_key=_TABLE_KEY,
-                        filter_field=field,
-                        filter_options=filter_options.get(field, []),
-                        base_class="ips-pg-header-row ips-pg-cell",
-                    )
-                else:
-                    render_table_header_cell(
-                        label,
-                        base_class="ips-pg-header-row ips-pg-cell",
-                    )
-
-        for row in filtered:
-            rid = str(row.get("id") or "").strip()
-            if not rid:
-                continue
-
-            item = str(row.get("item") or "—")
-            item_class = str(row.get("item_class") or "Non-Inventory")
-            category = str(row.get("category") or "—")
-            unit = str(row.get("unit") or "—")
-            default_cost = fmt_currency(row.get("default_cost"))
-            markup = f"{float(row.get('markup_pct') or 0):.1f}%"
-            sell_price = fmt_currency(row.get("customer_price"))
-            vendor = str(row.get("vendor") or "—")
-            status = str(row.get("status") or "Active")
-
-            cols = st.columns(_PG_COLS, gap="small", vertical_alignment="center")
-
-            with cols[0]:
-                _render_pg_thumbnail(row)
-
-            with cols[1]:
-                open_label = _pg_item_open_label(item)
-                if st.button(
-                    open_label,
-                    key=f"pg_open_{rid}",
-                    type="tertiary",
-                    help=f"View {open_label}",
-                    use_container_width=True,
-                ):
-                    _open_pg_table_item(rid, row)
-
-            with cols[2]:
-                st.markdown(class_pill_html(item_class), unsafe_allow_html=True)
-
-            with cols[3]:
-                st.markdown(
-                    f'<div class="ips-pg-cell">{html.escape(category)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[4]:
-                st.markdown(
-                    f'<div class="ips-pg-muted ips-pg-cell">{html.escape(unit)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[5]:
-                st.markdown(
-                    f'<div class="ips-pg-cell ips-pg-money">{html.escape(default_cost)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[6]:
-                st.markdown(
-                    f'<div class="ips-pg-cell ips-pg-money">{html.escape(markup)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[7]:
-                st.markdown(
-                    f'<div class="ips-pg-cell ips-pg-money">{html.escape(sell_price)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[8]:
-                st.markdown(
-                    f'<div class="ips-pg-muted ips-pg-cell">{html.escape(vendor)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[9]:
-                st.markdown(
-                    f'{_pg_status_pill_html(status)}{_pg_row_marker_html(rid)}',
-                    unsafe_allow_html=True,
-                )
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    rows_by_id = {
-        str(r.get("id") or "").strip(): r
-        for r in filtered
-        if str(r.get("id") or "").strip()
-    }
-    picked_row = _render_pg_row_click_bridge()
-    if picked_row:
-        open_id = str(picked_row).strip()
-        open_row = rows_by_id.get(open_id)
-        if open_row:
-            _open_pg_table_item(open_id, open_row)
-
-    return all_row_ids
 
 
 def _filter_rows(rows: list[dict[str, Any]], *, q: str) -> list[dict[str, Any]]:
@@ -1219,6 +1007,7 @@ def render() -> None:
         return
 
     inject_pricing_guide_module_css()
+    inject_pricing_guide_page_layout_css()
     st.markdown(
         '<span class="ips-pricing-guide-page ips-page-shell-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
@@ -1275,7 +1064,9 @@ def render() -> None:
                 reset_table_page(_TABLE_KEY)
                 st.rerun()
 
+    render_pricing_guide_filter_bar_shell()
     layout_filter_bar(_filters)
+    close_pricing_guide_filter_bar_shell()
 
     filtered = _filter_rows(
         rows,
