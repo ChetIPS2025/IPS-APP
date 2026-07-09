@@ -9,14 +9,14 @@ from typing import Any
 import streamlit as st
 
 try:
-    from app.auth import current_profile, current_role, effective_role
+    from app.auth import current_profile, effective_role
     from app.components.company_updates_feed import (
         _mark_dashboard_update_read,
         _is_update_unread,
     )
-    from app.config import ROOT_DIR
     from app.navigation import set_nav_slug
     from app.pages._core._access import begin_module
+    from app.pages._core._data import get_employee
     from app.services.certification_attachments_service import cert_has_attachment
     from app.services.certification_helpers import cert_status_pill_html, resolve_logged_in_employee_id
     from app.services.employee_portal_service import (
@@ -24,21 +24,25 @@ try:
         list_bidding_estimates_for_employee,
         list_employee_portal_updates,
         list_my_certifications_for_portal,
+        list_portal_dashboard_jobs,
+        portal_employee_avatar_html,
+        portal_employee_title,
         portal_greeting_name,
         portal_greeting_period,
     )
     from app.services.employees_service import get_certification_attachment_url
     from app.styles import inject_employee_portal_css, inject_global_css
     from app.utils.formatting import fmt_date
+    from app.utils.permissions import role_can_access_page
 except ImportError:
-    from auth import current_profile, current_role, effective_role  # type: ignore
+    from auth import current_profile, effective_role  # type: ignore
     from components.company_updates_feed import (  # type: ignore
         _mark_dashboard_update_read,
         _is_update_unread,
     )
-    from config import ROOT_DIR  # type: ignore
     from navigation import set_nav_slug  # type: ignore
     from pages._core._access import begin_module  # type: ignore
+    from pages._core._data import get_employee  # type: ignore
     from services.certification_attachments_service import cert_has_attachment  # type: ignore
     from services.certification_helpers import cert_status_pill_html, resolve_logged_in_employee_id  # type: ignore
     from services.employee_portal_service import (  # type: ignore
@@ -46,24 +50,21 @@ except ImportError:
         list_bidding_estimates_for_employee,
         list_employee_portal_updates,
         list_my_certifications_for_portal,
+        list_portal_dashboard_jobs,
+        portal_employee_avatar_html,
+        portal_employee_title,
         portal_greeting_name,
         portal_greeting_period,
     )
     from services.employees_service import get_certification_attachment_url  # type: ignore
     from styles import inject_employee_portal_css, inject_global_css  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
+    from utils.permissions import role_can_access_page  # type: ignore
 
 _PORTAL_UPDATE_KEY = "ips_portal_selected_update"
 _PORTAL_JOB_KEY = "ips_portal_selected_job"
 _PORTAL_BID_KEY = "ips_portal_selected_bid"
-
-
-def _logo_path():
-    for name in ("ips_logo_header.png", "IPS Icon.png", "company_logo.png", "ips_logo_round.png"):
-        p = ROOT_DIR / "assets" / name
-        if p.is_file():
-            return p
-    return None
+_SHOW_ALL_JOBS_KEY = "ips_ep_show_all_jobs"
 
 
 def _status_pill(label: str, tone: str = "neutral") -> str:
@@ -71,29 +72,27 @@ def _status_pill(label: str, tone: str = "neutral") -> str:
     return f'<span class="ips-ep-status ips-ep-status-{tone}">{text}</span>'
 
 
-def _render_portal_header(profile: dict[str, Any], role: str) -> None:
+def _render_welcome_card(
+    profile: dict[str, Any],
+    employee: dict[str, Any] | None,
+    role: str,
+) -> None:
     name = portal_greeting_name(profile)
     period = portal_greeting_period()
     today = fmt_date(date.today().isoformat())
+    title = html.escape(portal_employee_title(profile, employee, role=role))
     role_label = html.escape(str(role or "Employee").replace("_", " ").title())
-    logo = _logo_path()
-    logo_html = ""
-    if logo:
-        import base64
-
-        b64 = base64.b64encode(logo.read_bytes()).decode("ascii")
-        logo_html = (
-            f'<img class="ips-ep-logo" src="data:image/png;base64,{b64}" alt="IPS logo" />'
-        )
+    avatar_html = portal_employee_avatar_html(profile, employee)
     st.markdown(
         f"""
-<div class="ips-ep-header">
-  <div class="ips-ep-header-top">
-    {logo_html}
-    <div class="ips-ep-header-text">
+<div class="ips-ep-welcome-card">
+  <div class="ips-ep-welcome-top">
+    {avatar_html}
+    <div class="ips-ep-welcome-text">
       <p class="ips-ep-greeting">{html.escape(period)}, {html.escape(name)}</p>
       <p class="ips-ep-date">{html.escape(today)}</p>
-      <p class="ips-ep-role">{role_label}</p>
+      <p class="ips-ep-role">{title}</p>
+      <p class="ips-ep-role-sub">{role_label}</p>
     </div>
   </div>
 </div>
@@ -102,10 +101,34 @@ def _render_portal_header(profile: dict[str, Any], role: str) -> None:
     )
 
 
-def _render_qr_scan_button() -> None:
-    if st.button("📷  Scan QR Code", key="ep_qr_scan_main", type="primary", use_container_width=True):
-        set_nav_slug("employee_qr_scan")
-        st.rerun()
+def _render_quick_actions(role: str) -> None:
+    st.markdown('<h3 class="ips-ep-section-title">Quick Actions</h3>', unsafe_allow_html=True)
+    upload_slug = "scan_asset" if role_can_access_page(role, "scan_asset") else "employee_qr_scan"
+    actions: list[tuple[str, str, str, bool]] = [
+        ("📷", "Scan QR Code", "employee_qr_scan", True),
+        ("💼", "My Jobs", "__my_jobs__", True),
+        ("⏱", "Timekeeping", "timekeeping", role_can_access_page(role, "timekeeping")),
+        ("📸", "Upload Photo", upload_slug, True),
+        ("📄", "Documents", "employee_resources", role_can_access_page(role, "employee_resources")),
+    ]
+    visible = [a for a in actions if a[3]]
+    if not visible:
+        return
+
+    cols = st.columns(min(len(visible), 3))
+    for idx, (icon, label, slug, _) in enumerate(visible):
+        with cols[idx % len(cols)]:
+            if st.button(
+                f"{icon}  {label}",
+                key=f"ep_quick_{slug}",
+                use_container_width=True,
+                type="primary" if slug == "employee_qr_scan" else "secondary",
+            ):
+                if slug == "__my_jobs__":
+                    st.session_state[_SHOW_ALL_JOBS_KEY] = True
+                else:
+                    set_nav_slug(slug)
+                st.rerun()
 
 
 def _render_updates_section(role: str) -> None:
@@ -183,7 +206,13 @@ def _render_certifications_section(employee_id: str) -> None:
                 st.info("No document is attached to this certification yet.")
 
 
-def _compact_job_row(row: dict[str, Any], *, prefix: str, session_key: str) -> None:
+def _compact_job_row(
+    row: dict[str, Any],
+    *,
+    prefix: str,
+    session_key: str,
+    assigned: bool = False,
+) -> None:
     rid = str(row.get("id") or "")
     title = html.escape(str(row.get("job_name") or row.get("project_name") or "—"))
     customer = html.escape(str(row.get("customer") or "—"))
@@ -193,6 +222,7 @@ def _compact_job_row(row: dict[str, Any], *, prefix: str, session_key: str) -> N
     start = fmt_date(str(row.get("start_date") or row.get("estimate_date") or "")[:10])
     end_raw = str(row.get("end_date") or row.get("expiration_date") or "")[:10]
     end = fmt_date(end_raw) if end_raw else "—"
+    assigned_badge = _status_pill("Assigned", "info") if assigned else ""
     st.markdown(
         f"""
 <div class="ips-ep-list-row">
@@ -202,6 +232,7 @@ def _compact_job_row(row: dict[str, Any], *, prefix: str, session_key: str) -> N
     <span>{location}</span>
   </div>
   <div class="ips-ep-list-meta">
+    {assigned_badge}
     {_status_pill(status, "info")}
     <span>Supervisor: {supervisor}</span>
     <span>{start} → {html.escape(end)}</span>
@@ -215,66 +246,93 @@ def _compact_job_row(row: dict[str, Any], *, prefix: str, session_key: str) -> N
         st.rerun()
 
 
-def _render_active_jobs_section() -> None:
+def _render_job_detail(job: dict[str, Any], *, close_key: str, session_key: str) -> None:
+    with st.expander(str(job.get("job_name") or job.get("project_name") or "Job"), expanded=True):
+        st.markdown(f"**Customer:** {job.get('customer', '—')}")
+        st.markdown(f"**Location:** {job.get('location') or job.get('location_name') or '—'}")
+        st.markdown(f"**Status:** {job.get('status', '—')}")
+        st.markdown(f"**Supervisor:** {job.get('supervisor') or job.get('created_by') or '—'}")
+        start_raw = str(job.get("start_date") or job.get("estimate_date") or "")[:10]
+        end_raw = str(job.get("end_date") or job.get("expiration_date") or "")[:10]
+        st.markdown(f"**Start:** {fmt_date(start_raw) or '—'}")
+        st.markdown(f"**End:** {fmt_date(end_raw) or '—'}")
+        notes = str(job.get("description") or job.get("notes") or job.get("scope_of_work") or "").strip()
+        if notes:
+            st.markdown("**Scope**")
+            st.markdown(notes)
+        if st.button("Close job", key=close_key):
+            st.session_state.pop(session_key, None)
+            st.rerun()
+
+
+def _render_recent_jobs_section(employee_id: str) -> None:
+    st.markdown('<h3 class="ips-ep-section-title">Recent Jobs</h3>', unsafe_allow_html=True)
+    jobs = list_portal_dashboard_jobs(employee_id, limit=4)
+    if not jobs:
+        st.markdown('<p class="ips-ep-empty">No jobs to show right now.</p>', unsafe_allow_html=True)
+    else:
+        for job in jobs:
+            _compact_job_row(
+                job,
+                prefix="ep_job",
+                session_key=_PORTAL_JOB_KEY,
+                assigned=bool(job.get("_portal_assigned")),
+            )
+        selected = st.session_state.get(_PORTAL_JOB_KEY)
+        if selected:
+            detail = next((j for j in jobs if str(j.get("id")) == str(selected)), None)
+            if detail:
+                _render_job_detail(detail, close_key="ep_job_close", session_key=_PORTAL_JOB_KEY)
+
+    if st.button("View All Jobs", key="ep_view_all_jobs", use_container_width=True, type="primary"):
+        st.session_state[_SHOW_ALL_JOBS_KEY] = True
+        st.rerun()
+
+
+def _render_all_jobs_section() -> None:
+    if st.button("← Back to Dashboard", key="ep_back_dashboard", use_container_width=True):
+        st.session_state.pop(_SHOW_ALL_JOBS_KEY, None)
+        st.session_state.pop(_PORTAL_JOB_KEY, None)
+        st.session_state.pop(_PORTAL_BID_KEY, None)
+        st.rerun()
+
     st.markdown('<h3 class="ips-ep-section-title">Active Jobs</h3>', unsafe_allow_html=True)
     jobs = list_active_jobs_for_employee()
     if not jobs:
         st.markdown('<p class="ips-ep-empty">No active jobs to show.</p>', unsafe_allow_html=True)
-        return
-    for job in jobs[:12]:
-        _compact_job_row(job, prefix="ep_job", session_key=_PORTAL_JOB_KEY)
-    selected = st.session_state.get(_PORTAL_JOB_KEY)
-    if selected:
-        detail = next((j for j in jobs if str(j.get("id")) == str(selected)), None)
-        if detail:
-            with st.expander(str(detail.get("job_name") or "Job"), expanded=True):
-                st.markdown(f"**Customer:** {detail.get('customer', '—')}")
-                st.markdown(f"**Location:** {detail.get('location') or detail.get('location_name') or '—'}")
-                st.markdown(f"**Status:** {detail.get('status', '—')}")
-                st.markdown(f"**Supervisor:** {detail.get('supervisor', '—')}")
-                st.markdown(f"**Start:** {fmt_date(str(detail.get('start_date') or '')[:10]) or '—'}")
-                st.markdown(f"**End:** {fmt_date(str(detail.get('end_date') or '')[:10]) or '—'}")
-                notes = str(detail.get("description") or detail.get("notes") or "").strip()
-                if notes:
-                    st.markdown("**Scope**")
-                    st.markdown(notes)
-                if st.button("Close job", key="ep_job_close"):
-                    st.session_state.pop(_PORTAL_JOB_KEY, None)
-                    st.rerun()
+    else:
+        for job in jobs:
+            _compact_job_row(job, prefix="ep_job_all", session_key=_PORTAL_JOB_KEY)
+        selected = st.session_state.get(_PORTAL_JOB_KEY)
+        if selected:
+            detail = next((j for j in jobs if str(j.get("id")) == str(selected)), None)
+            if detail:
+                _render_job_detail(detail, close_key="ep_job_close", session_key=_PORTAL_JOB_KEY)
 
-
-def _render_bidding_section() -> None:
     st.markdown('<h3 class="ips-ep-section-title">Jobs We Are Bidding</h3>', unsafe_allow_html=True)
     bids = list_bidding_estimates_for_employee()
     if not bids:
         st.markdown('<p class="ips-ep-empty">No open bids right now.</p>', unsafe_allow_html=True)
-        return
-    for est in bids[:12]:
-        _compact_job_row(est, prefix="ep_bid", session_key=_PORTAL_BID_KEY)
-    selected = st.session_state.get(_PORTAL_BID_KEY)
-    if selected:
-        detail = next((e for e in bids if str(e.get("id")) == str(selected)), None)
-        if detail:
-            with st.expander(str(detail.get("project_name") or "Bid"), expanded=True):
-                st.markdown(f"**Customer:** {detail.get('customer', '—')}")
-                st.markdown(f"**Location:** {detail.get('location') or '—'}")
-                st.markdown(f"**Status:** {detail.get('status', '—')}")
-                st.markdown(f"**Due:** {fmt_date(str(detail.get('expiration_date') or '')[:10]) or '—'}")
-                st.markdown(f"**Estimator:** {detail.get('created_by', '—')}")
-                desc = str(detail.get("description") or detail.get("scope_of_work") or "").strip()
-                if desc:
-                    st.markdown("**Scope**")
-                    st.markdown(desc)
-                if st.button("Close bid", key="ep_bid_close"):
-                    st.session_state.pop(_PORTAL_BID_KEY, None)
-                    st.rerun()
-
-
-def _render_resources_preview() -> None:
-    st.markdown('<h3 class="ips-ep-section-title">Employee Resources</h3>', unsafe_allow_html=True)
-    if st.button("Open Employee Resources", key="ep_resources_link", use_container_width=True):
-        set_nav_slug("employee_resources")
-        st.rerun()
+    else:
+        for est in bids:
+            _compact_job_row(est, prefix="ep_bid", session_key=_PORTAL_BID_KEY)
+        selected_bid = st.session_state.get(_PORTAL_BID_KEY)
+        if selected_bid:
+            detail = next((e for e in bids if str(e.get("id")) == str(selected_bid)), None)
+            if detail:
+                with st.expander(str(detail.get("project_name") or "Bid"), expanded=True):
+                    st.markdown(f"**Customer:** {detail.get('customer', '—')}")
+                    st.markdown(f"**Location:** {detail.get('location') or '—'}")
+                    st.markdown(f"**Status:** {detail.get('status', '—')}")
+                    st.markdown(f"**Due:** {fmt_date(str(detail.get('expiration_date') or '')[:10]) or '—'}")
+                    st.markdown(f"**Estimator:** {detail.get('created_by', '—')}")
+                    desc = str(detail.get("description") or detail.get("scope_of_work") or "").strip()
+                    if desc:
+                        st.markdown("**Scope**")
+                        st.markdown(desc)
+                    if st.button("Close bid", key="ep_bid_close"):
+                        st.session_state.pop(_PORTAL_BID_KEY, None)
+                        st.rerun()
 
 
 def render() -> None:
@@ -290,11 +348,14 @@ def render() -> None:
     profile = current_profile() or {}
     role = effective_role()
     employee_id = resolve_logged_in_employee_id(profile)
+    employee = get_employee(employee_id) if employee_id else None
+    show_all_jobs = bool(st.session_state.get(_SHOW_ALL_JOBS_KEY))
 
-    _render_portal_header(profile, role)
-    _render_qr_scan_button()
-    _render_updates_section(role)
-    _render_certifications_section(employee_id)
-    _render_active_jobs_section()
-    _render_bidding_section()
-    _render_resources_preview()
+    _render_welcome_card(profile, employee, role)
+    if not show_all_jobs:
+        _render_quick_actions(role)
+        _render_updates_section(role)
+        _render_certifications_section(employee_id)
+        _render_recent_jobs_section(employee_id)
+    else:
+        _render_all_jobs_section()

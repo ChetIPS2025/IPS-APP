@@ -16560,6 +16560,46 @@ def inject_employee_portal_css() -> None:
   padding: 14px 16px;
   margin-bottom: 12px;
 }
+.ips-ep-welcome-card {
+  background: linear-gradient(135deg, #0b1f3a 0%, #12325c 100%);
+  color: #ffffff;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+}
+.ips-ep-welcome-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.ips-ep-welcome-text {
+  flex: 1;
+  min-width: 0;
+}
+.ips-ep-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  background: #ffffff;
+}
+.ips-ep-avatar-initials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0b1f3a;
+  background: #e2e8f0;
+}
+.ips-ep-role-sub {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  opacity: 0.8;
+}
 .ips-ep-header-top {
   display: flex;
   align-items: center;
@@ -16671,6 +16711,18 @@ def inject_employee_portal_css() -> None:
   gap: 6px 10px;
   font-size: 0.78rem;
   color: #64748b;
+}
+@media (max-width: 640px) {
+  .ips-ep-welcome-top {
+    gap: 12px;
+  }
+  .ips-ep-avatar {
+    width: 48px;
+    height: 48px;
+  }
+  .ips-ep-greeting {
+    font-size: 1.05rem;
+  }
 }
 .ips-ep-cert-btn {
   display: block;
