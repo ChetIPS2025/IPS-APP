@@ -18,19 +18,23 @@ def customer_bridge_button_key(row: dict[str, Any]) -> str:
 
 
 CUSTOMERS_TABLE_HEADERS: tuple[tuple[str, str], ...] = (
+    ("avatar", ""),
     ("customer", "CUSTOMER"),
     ("contacts", "CONTACTS"),
     ("open_jobs", "OPEN JOBS"),
     ("open_estimates", "OPEN ESTIMATES"),
     ("status", "STATUS"),
+    ("actions", "ACTIONS"),
 )
 
 CUSTOMERS_TABLE_COL_WIDTHS_PX: dict[str, int] = {
-    "customer": 320,
+    "avatar": 64,
+    "customer": 240,
     "contacts": 96,
     "open_jobs": 104,
     "open_estimates": 128,
     "status": 108,
+    "actions": 88,
 }
 
 
@@ -52,6 +56,39 @@ def normalize_customer_status(raw: object) -> str:
 def customer_name(row: dict[str, Any]) -> str:
     val = str(row.get("customer_name") or row.get("company_name") or "").strip()
     return val or "—"
+
+
+def customer_initials(name: str) -> str:
+    parts = [p for p in str(name or "").strip().split() if p]
+    if not parts:
+        return "?"
+    if len(parts) == 1:
+        return parts[0][:2].upper()
+    return (parts[0][0] + parts[-1][0]).upper()
+
+
+def customer_avatar_html(customer: dict[str, Any]) -> str:
+    name = customer_name(customer)
+    label = name if name and name != "—" else "Customer"
+    initials = customer_initials(label)
+    return (
+        f'<span class="ips-customers-avatar-initials" aria-label="{html.escape(label)}">'
+        f"{html.escape(initials)}</span>"
+    )
+
+
+def customer_count_cell_html(value: object) -> str:
+    text = str(value if value is not None else 0)
+    return (
+        f'<span class="ips-customers-count-cell ips-customers-text-cell" '
+        f'title="{html.escape(text, quote=True)}">{html.escape(text)}</span>'
+    )
+
+
+def customer_text_cell_html(value: object, *, muted: bool = False) -> str:
+    text = str(value or "—").strip() or "—"
+    cls = "ips-customers-muted-cell" if muted else "ips-customers-text-cell"
+    return f'<span class="{cls}" title="{html.escape(text, quote=True)}">{html.escape(text)}</span>'
 
 
 def customer_status_pill_html(status: str) -> str:
@@ -117,13 +154,22 @@ def build_customers_html_table(rows: list[dict[str, Any]]) -> str:
         bridge_key = customer_bridge_button_key(row)
         name = customer_name(row)
         desc_label = name if name and name != "—" else "Open customer"
-        contacts = str(row.get("contact_count") or 0)
-        open_jobs = str(row.get("open_jobs") or 0)
-        open_estimates = str(row.get("open_estimates") or 0)
+        contacts = customer_count_cell_html(row.get("contact_count") or 0)
+        open_jobs = customer_count_cell_html(row.get("open_jobs") or 0)
+        open_estimates = customer_count_cell_html(row.get("open_estimates") or 0)
         status = normalize_customer_status(row.get("status"))
         row_parity = "even" if row_idx % 2 else "odd"
 
         cells = [
+            (
+                "avatar",
+                "center",
+                _cell_wrapper(
+                    customer_avatar_html(row),
+                    extra_class="ips-customers-avatar-cell",
+                    align="center",
+                ),
+            ),
             (
                 "customer",
                 "left",
@@ -140,26 +186,17 @@ def build_customers_html_table(rows: list[dict[str, Any]]) -> str:
             (
                 "contacts",
                 "right",
-                _cell_wrapper(
-                    f'<span class="ips-customers-count-cell">{html.escape(contacts)}</span>',
-                    align="right",
-                ),
+                _cell_wrapper(contacts, align="right"),
             ),
             (
                 "open_jobs",
                 "right",
-                _cell_wrapper(
-                    f'<span class="ips-customers-count-cell">{html.escape(open_jobs)}</span>',
-                    align="right",
-                ),
+                _cell_wrapper(open_jobs, align="right"),
             ),
             (
                 "open_estimates",
                 "right",
-                _cell_wrapper(
-                    f'<span class="ips-customers-count-cell">{html.escape(open_estimates)}</span>',
-                    align="right",
-                ),
+                _cell_wrapper(open_estimates, align="right"),
             ),
             (
                 "status",
@@ -167,6 +204,19 @@ def build_customers_html_table(rows: list[dict[str, Any]]) -> str:
                 _cell_wrapper(
                     customer_status_pill_html(status),
                     extra_class="ips-dash-est-status-cell",
+                    align="center",
+                ),
+            ),
+            (
+                "actions",
+                "center",
+                _cell_wrapper(
+                    _customer_link_html(
+                        cid,
+                        "View",
+                        extra_class="ips-customers-action-link",
+                        bridge_key=bridge_key,
+                    ),
                     align="center",
                 ),
             ),

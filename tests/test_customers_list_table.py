@@ -5,6 +5,8 @@ from __future__ import annotations
 from app.components.customers_list_table import (
     _customer_link_html,
     build_customers_html_table,
+    customer_avatar_html,
+    customer_initials,
     customer_name,
     customer_status_pill_html,
     handle_customers_table_action,
@@ -34,6 +36,17 @@ def test_customer_link_html_uses_open_span():
     assert "Acme Corp" in html_out
 
 
+def test_customer_initials_from_name():
+    assert customer_initials("Acme Corp") == "AC"
+    assert customer_initials("Bob") == "BO"
+
+
+def test_customer_avatar_html_uses_initials():
+    html_out = customer_avatar_html({"customer_name": "Acme Corp"})
+    assert "ips-customers-avatar-initials" in html_out
+    assert "AC" in html_out
+
+
 def test_build_customers_html_table_includes_columns_and_link():
     rows = [
         {
@@ -50,6 +63,7 @@ def test_build_customers_html_table_includes_columns_and_link():
     assert "ips-customers-html-list-table" in html_out
     assert "CUSTOMER" in html_out
     assert "OPEN JOBS" in html_out
+    assert "ACTIONS" in html_out
     assert 'data-cust-action="open"' in html_out
     assert 'data-customer-id="cust-1"' in html_out
     assert "Acme Corp" in html_out

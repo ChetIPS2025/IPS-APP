@@ -11,6 +11,8 @@ import streamlit as st
 try:
     from app.components.headers import render_page_brand_header
     from app.components.customers_list_table import (
+        customer_avatar_html,
+        customer_count_cell_html,
         customer_status_pill_html,
         normalize_customer_status,
     )
@@ -24,7 +26,9 @@ try:
         apply_column_filters,
         build_filter_options,
         clear_table_filters,
+        has_active_column_filters,
         render_table_header_cell,
+        sanitize_column_filters,
     )
     from app.components.table_pagination import (
         paginate_rows,
@@ -82,6 +86,8 @@ try:
 except ImportError:
     from components.headers import render_page_brand_header  # type: ignore
     from components.customers_list_table import (  # type: ignore
+        customer_avatar_html,
+        customer_count_cell_html,
         customer_status_pill_html,
         normalize_customer_status,
     )
@@ -95,7 +101,9 @@ except ImportError:
         apply_column_filters,
         build_filter_options,
         clear_table_filters,
+        has_active_column_filters,
         render_table_header_cell,
+        sanitize_column_filters,
     )
     from components.table_pagination import (  # type: ignore
         paginate_rows,
@@ -205,7 +213,7 @@ SELECTED_CUSTOMER_KEY = "selected_customer_id"
 CUSTOMERS_MODE_KEY = "customers_mode"
 CUSTOMERS_SELECTED_ID_KEY = "customers_selected_id"
 SHOW_CUSTOMER_MODAL_KEY = "show_customer_detail_modal"
-_CUSTOMER_LIST_COLS = [4.2, 1.0, 1.1, 1.35, 1.15]
+_CUSTOMER_LIST_COLS = [0.72, 2.45, 0.92, 1.0, 1.24, 1.05, 0.82]
 _ALL_CUSTOMER_IDS_KEY = "_ips_customers_visible_ids"
 _CUSTOMER_FILTER_SPECS: list[tuple[str, str]] = [
     ("STATUS", "status"),
@@ -311,15 +319,22 @@ def _render_customers_list_table(
     filtered: list[dict],
     *,
     filter_options: dict[str, list[str]],
+    total_count: int,
+    search: str,
 ) -> list[str]:
     """Customer list rows with Streamlit open buttons."""
-    return _render_custom_customers_table(filtered, filter_options=filter_options)
+    return _render_custom_customers_table(
+        filtered,
+        filter_options=filter_options,
+        total_count=total_count,
+        search=search,
+    )
 
 
 def _render_customers_table_header_row() -> None:
     head_cols = st.columns(_CUSTOMER_LIST_COLS, gap="small")
-    labels = ["CUSTOMER", "CONTACTS", "OPEN JOBS", "OPEN ESTIMATES", "STATUS"]
-    aligns = ["left", "right", "right", "right", "center"]
+    labels = ["", "CUSTOMER", "CONTACTS", "OPEN JOBS", "OPEN ESTIMATES", "STATUS", "ACTIONS"]
+    aligns = ["center", "left", "right", "right", "right", "center", "center"]
     for col, label, align in zip(head_cols, labels, aligns):
         with col:
             st.markdown(
@@ -333,9 +348,15 @@ def _render_custom_customers_table(
     filtered: list[dict],
     *,
     filter_options: dict[str, list[str]],
+    total_count: int,
+    search: str,
 ) -> list[str]:
     if not filtered:
-        st.info("No customers match your filters.")
+        _render_customers_empty_state(
+            total_count=total_count,
+            filtered_count=0,
+            search=search,
+        )
         st.session_state[_ALL_CUSTOMER_IDS_KEY] = []
         return []
 
@@ -352,6 +373,7 @@ def _render_custom_customers_table(
 
     with st.container(key="customers_table_wrap"):
         _render_customers_table_column_filters(filter_options=filter_options)
+        st.markdown('<div class="ips-customers-native-table">', unsafe_allow_html=True)
         _render_customers_table_header_row()
         for customer in filtered:
             cid = str(customer.get("id") or "").strip()
@@ -359,12 +381,15 @@ def _render_custom_customers_table(
                 continue
             row = customers_by_id.get(cid, customer)
             name = _customer_list_name(row)
-            contacts = str(row.get("contact_count") or 0)
-            open_jobs = str(row.get("open_jobs") or 0)
-            open_estimates = str(row.get("open_estimates") or 0)
             status = normalize_customer_status(row.get("status"))
             row_cols = st.columns(_CUSTOMER_LIST_COLS, gap="small")
             with row_cols[0]:
+                st.markdown(
+                    f'<div class="ips-customers-native-cell ips-customers-native-cell-center">'
+                    f"{customer_avatar_html(row)}</div>",
+                    unsafe_allow_html=True,
+                )
+            with row_cols[1]:
                 if st.button(
                     name,
                     key=f"customer_open_{cid}",
@@ -373,30 +398,40 @@ def _render_custom_customers_table(
                 ):
                     _open_customer_detail(cid)
                     st.rerun()
-            with row_cols[1]:
-                st.markdown(
-                    f'<div class="ips-customers-native-cell ips-customers-native-cell-right">'
-                    f'<span class="ips-customers-count-cell">{html.escape(contacts)}</span></div>',
-                    unsafe_allow_html=True,
-                )
             with row_cols[2]:
                 st.markdown(
                     f'<div class="ips-customers-native-cell ips-customers-native-cell-right">'
-                    f'<span class="ips-customers-count-cell">{html.escape(open_jobs)}</span></div>',
+                    f"{customer_count_cell_html(row.get('contact_count') or 0)}</div>",
                     unsafe_allow_html=True,
                 )
             with row_cols[3]:
                 st.markdown(
                     f'<div class="ips-customers-native-cell ips-customers-native-cell-right">'
-                    f'<span class="ips-customers-count-cell">{html.escape(open_estimates)}</span></div>',
+                    f"{customer_count_cell_html(row.get('open_jobs') or 0)}</div>",
                     unsafe_allow_html=True,
                 )
             with row_cols[4]:
+                st.markdown(
+                    f'<div class="ips-customers-native-cell ips-customers-native-cell-right">'
+                    f"{customer_count_cell_html(row.get('open_estimates') or 0)}</div>",
+                    unsafe_allow_html=True,
+                )
+            with row_cols[5]:
                 st.markdown(
                     f'<div class="ips-customers-native-cell ips-customers-native-cell-center">'
                     f"{customer_status_pill_html(status)}</div>",
                     unsafe_allow_html=True,
                 )
+            with row_cols[6]:
+                if st.button(
+                    "View",
+                    key=f"customer_view_{cid}",
+                    type="tertiary",
+                    use_container_width=True,
+                ):
+                    _open_customer_detail(cid)
+                    st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
     return all_customer_ids
 
@@ -502,11 +537,25 @@ def _filter_customers(
     rows: list[dict],
     *,
     q: str = "",
-    bar_status: str = "All Statuses",
 ) -> list[dict]:
     out = _apply_customers_search_filter(rows, q)
-    out = _apply_customers_bar_status_filter(out, bar_status)
     return apply_column_filters(out, _CUSTOMERS_TABLE_KEY, _CUSTOMER_COLUMN_FILTER_SPECS)
+
+
+def _render_customers_empty_state(
+    *,
+    total_count: int,
+    filtered_count: int,
+    search: str,
+) -> None:
+    if total_count == 0:
+        st.info("No customers found.")
+        return
+    if filtered_count == 0:
+        if search.strip() or has_active_column_filters(_CUSTOMERS_TABLE_KEY, _CUSTOMER_BAR_FILTER_FIELDS):
+            st.info("No customers match your filters.")
+        else:
+            st.info("No customers found.")
 
 
 def _location_name_map(locations: list[dict]) -> dict[str, dict]:
@@ -2538,7 +2587,7 @@ def render() -> None:
     inject_customers_module_css()
     inject_customers_page_layout_css()
     st.markdown(
-        '<span class="ips-customers-page ips-module-page ips-page-shell-marker" aria-hidden="true"></span>',
+        '<span class="ips-customers-page ips-page-shell-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
 
@@ -2551,6 +2600,11 @@ def render() -> None:
 
     all_rows = _enrich_list_rows(get_customers())
     filter_options = build_filter_options(all_rows, _CUSTOMER_COLUMN_FILTER_SPECS)
+    if sanitize_column_filters(_CUSTOMERS_TABLE_KEY, filter_options, filter_fields=_CUSTOMER_BAR_FILTER_FIELDS):
+        st.rerun()
+
+    def _customers_export() -> None:
+        st.button("Export", key="customers_export", use_container_width=True)
 
     def _customers_new() -> None:
         if st.button("+ New Customer", key="cust_new", type="primary", use_container_width=True):
@@ -2559,15 +2613,11 @@ def render() -> None:
     render_page_brand_header(
         "Customers",
         "Manage customer companies, locations, and contacts.",
-        actions=[_customers_new],
+        actions=[_customers_export, _customers_new],
     )
 
     if st.session_state.get("ips_cust_form"):
-        with st.container(border=True):
-            st.markdown(
-                '<p class="ips-page-subtitle" style="margin:0 0 0.5rem;font-weight:600;color:#0f172a">New customer</p>',
-                unsafe_allow_html=True,
-            )
+        with st.expander("New Customer", expanded=True):
             nc1, nc2 = st.columns(2)
             with nc1:
                 st.text_input("Company name", key="cust_new_company")
@@ -2614,7 +2664,7 @@ def render() -> None:
                     st.rerun()
 
     def _filters() -> None:
-        c1, c2, c3 = st.columns([3.2, 2.2, 0.6])
+        c1, c2 = st.columns([5.4, 0.6])
         with c1:
             st.text_input(
                 "Search",
@@ -2623,20 +2673,12 @@ def render() -> None:
                 label_visibility="collapsed",
             )
         with c2:
-            st.selectbox(
-                "Status",
-                ["All Statuses", "Active", "Inactive", "Prospect", "On Hold"],
-                key="cust_bar_status",
-                label_visibility="collapsed",
-            )
-        with c3:
             if st.button("Clear", key="cust_clear", use_container_width=True):
                 clear_table_filters(
                     _CUSTOMERS_TABLE_KEY,
                     _CUSTOMER_BAR_FILTER_FIELDS,
-                    extra_keys=["cust_search", "cust_bar_status"],
+                    extra_keys=["cust_search"],
                 )
-                st.session_state["cust_bar_status"] = "All Statuses"
                 reset_table_page(_CUSTOMERS_TABLE_KEY)
                 _clear_customer_selection(st.session_state.get(_ALL_CUSTOMER_IDS_KEY))
                 st.rerun()
@@ -2645,15 +2687,17 @@ def render() -> None:
     layout_filter_bar(_filters)
     close_customers_filter_bar_shell()
 
-    filtered = _filter_customers(
-        all_rows,
-        q=str(st.session_state.get("cust_search") or "").strip(),
-        bar_status=str(st.session_state.get("cust_bar_status") or "All Statuses"),
-    )
+    search_q = str(st.session_state.get("cust_search") or "").strip()
+    filtered = _filter_customers(all_rows, q=search_q)
 
     render_table_pagination_header(len(filtered), _CUSTOMERS_TABLE_KEY, item_label="customer")
     page_rows, _, _, _ = paginate_rows(filtered, _CUSTOMERS_TABLE_KEY)
 
     build_modal_cache(filtered, cache_key=_CUSTOMERS_CACHE_KEY)
-    _render_customers_list_table(page_rows, filter_options=filter_options)
+    _render_customers_list_table(
+        page_rows,
+        filter_options=filter_options,
+        total_count=len(all_rows),
+        search=search_q,
+    )
     render_table_pagination_footer(len(filtered), _CUSTOMERS_TABLE_KEY)
