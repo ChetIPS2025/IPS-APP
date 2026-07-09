@@ -48,3 +48,15 @@ def test_only_admin_can_delete_certifications():
     assert can_delete_employee_certifications("supervisor") is False
     assert can_delete_employee_certifications("project manager") is False
     assert can_delete_employee_certifications("employee") is False
+
+
+def test_cert_attachment_file_name_from_path():
+    from app.pages.employee_certifications import _cert_attachment_file_name
+
+    cert = {"attachment_path": "employee-certifications/c1/20260101_report.pdf"}
+    assert _cert_attachment_file_name(cert) == "20260101_report.pdf"
+    cert_named = {
+        "attachment_path": "employee-certifications/c1/20260101_report.pdf",
+        "attachment_file_name": "Forklift Card.pdf",
+    }
+    assert _cert_attachment_file_name(cert_named) == "Forklift Card.pdf"

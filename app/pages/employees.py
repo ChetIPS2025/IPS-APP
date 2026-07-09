@@ -71,7 +71,6 @@ try:
     from app.pages._core._data import (
         ACTIVE_EMPLOYEE_KEY,
         clear_employees_catalog_cache,
-        load_certifications,
         load_employee_documents,
         load_employees,
         lookup_options,
@@ -162,7 +161,6 @@ except ImportError:
     from pages._core._data import (  # type: ignore
         ACTIVE_EMPLOYEE_KEY,
         clear_employees_catalog_cache,
-        load_certifications,
         load_employee_documents,
         load_employees,
         lookup_options,
@@ -577,24 +575,13 @@ def _render_custom_users_table(
     return all_user_ids
 
 
-def _cert_table(certs: list[dict]) -> None:
-    if not certs:
-        st.caption("No certifications on file.")
-        return
+def _render_user_certifications_tab(emp: dict) -> None:
+    eid = str(emp.get("id") or "").strip()
     try:
-        from app.pages.employee_certifications import render_certifications_table_block
-        from app.styles import inject_certifications_module_css
+        from app.pages.employee_certifications import render_employee_detail_certifications_tab
     except ImportError:
-        from pages.employee_certifications import render_certifications_table_block  # type: ignore
-        from styles import inject_certifications_module_css  # type: ignore
-    inject_certifications_module_css()
-    render_certifications_table_block(
-        certs,
-        hide_employee=True,
-        table_wrap_key="emp_certifications_table_wrap",
-        session_prefix="emp_cert_",
-        inline_detail=True,
-    )
+        from pages.employee_certifications import render_employee_detail_certifications_tab  # type: ignore
+    render_employee_detail_certifications_tab(eid, employee=emp, session_prefix="emp_cert_")
 
 
 def _doc_table(docs: list[dict]) -> None:
@@ -726,24 +713,7 @@ def _render_employee_detail_tabs(emp: dict) -> None:
         placeholder_html("Assigned jobs will load from Supabase in a later phase.")
 
     with tab_certs:
-        certs = load_certifications(eid)
-        expired = [c for c in certs if str(c.get("status", "")).lower() == "expired"]
-        expiring = [c for c in certs if str(c.get("status", "")).lower() == "expiring soon"]
-        if expired or expiring:
-            msg = []
-            if expired:
-                msg.append(f"{len(expired)} expired")
-            if expiring:
-                msg.append(f"{len(expiring)} expiring soon")
-            st.markdown(
-                f'<p class="ips-alert-banner">Certification alerts: {html.escape(", ".join(msg))}</p>',
-                unsafe_allow_html=True,
-            )
-        _cert_table(certs)
-        if st.button("Open Certifications Module", key=f"emp_open_certs_{eid}"):
-            st.session_state[ACTIVE_EMPLOYEE_KEY] = eid
-            st.session_state[SESSION_NAV_KEY] = "employee_certifications"
-            st.rerun()
+        _render_user_certifications_tab(emp)
 
     with tab_docs:
         docs = load_employee_documents(eid, role=role_norm)

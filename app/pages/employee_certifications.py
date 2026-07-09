@@ -401,6 +401,18 @@ def _sanitize_cert_date_state(key: str, raw: object) -> None:
         st.session_state.pop(key, None)
 
 
+def _cert_attachment_file_name(cert: dict[str, Any]) -> str:
+    fname = str(cert.get("attachment_file_name") or "").strip()
+    if fname:
+        return fname
+    path = str(cert.get("attachment_path") or "").strip().replace("\\", "/")
+    if path:
+        return path.rsplit("/", 1)[-1]
+    if str(cert.get("attachment_url") or "").strip():
+        return "Attachment"
+    return ""
+
+
 def _attachment_view_label(cert: dict) -> str:
     mime = str(cert.get("attachment_mime_type") or "").lower()
     if mime.startswith("image/"):
@@ -410,12 +422,16 @@ def _attachment_view_label(cert: dict) -> str:
 
 def _render_attachment_preview(cert: dict, *, key_prefix: str = "") -> None:
     cid = str(cert.get("id") or "")
+    has_attachment = cert_has_attachment(cert)
     if not _can_view_cert_attachment(cert):
         st.caption("You do not have permission to view this attachment.")
         return
     url = get_certification_attachment_url(cert)
     if not url:
-        st.warning("Storage bucket not configured. Create certification-documents bucket in Supabase.")
+        if has_attachment:
+            st.warning("Attachment found but preview unavailable.")
+        else:
+            st.warning("Storage bucket not configured. Create certification-documents bucket in Supabase.")
         return
 
     mime = str(cert.get("attachment_mime_type") or "").lower()
@@ -442,7 +458,7 @@ def _render_attachment_section(
 ) -> None:
     cid = str(cert.get("id") or "")
     has_attachment = cert_has_attachment(cert)
-    fname = str(cert.get("attachment_file_name") or "").strip()
+    fname = _cert_attachment_file_name(cert)
     uploaded_at = str(cert.get("attachment_uploaded_at") or "")[:19].replace("T", " ")
 
     st.markdown('<div class="ips-attachment-card">', unsafe_allow_html=True)
@@ -460,21 +476,40 @@ def _render_attachment_section(
                 unsafe_allow_html=True,
             )
     elif has_attachment:
+        if fname:
+            st.markdown(
+                f'<p class="ips-attachment-file-name">{html.escape(fname)}</p>',
+                unsafe_allow_html=True,
+            )
+        if uploaded_at:
+            st.caption(f"Uploaded {uploaded_at}")
         if not _can_view_cert_attachment(cert):
             st.caption("Attachment on file. View restricted for your role.")
         else:
-            label = _attachment_view_label(cert)
+            url = get_certification_attachment_url(cert)
             toggle_key = _show_doc_key(cid, prefix=key_prefix)
-            if st.button(label, key=f"{key_prefix}view_cert_doc_{cid}"):
-                st.session_state[toggle_key] = not st.session_state.get(toggle_key, False)
-            if fname:
-                st.markdown(
-                    f'<p class="ips-attachment-file-name">{html.escape(fname)}</p>',
-                    unsafe_allow_html=True,
-                )
-            if uploaded_at:
-                st.caption(f"Uploaded {uploaded_at}")
-            if st.session_state.get(toggle_key, False):
+            preview_col, download_col = st.columns(2, gap="small")
+            with preview_col:
+                if st.button(
+                    "Preview",
+                    key=f"{key_prefix}cert_preview_{cid}",
+                    use_container_width=True,
+                ):
+                    st.session_state[toggle_key] = not st.session_state.get(toggle_key, False)
+                    st.rerun()
+            with download_col:
+                if url:
+                    st.link_button(
+                        "Download",
+                        url,
+                        key=f"{key_prefix}cert_download_{cid}",
+                        use_container_width=True,
+                    )
+                else:
+                    st.caption("Download unavailable")
+            if not url:
+                st.warning("Attachment found but preview unavailable.")
+            elif st.session_state.get(toggle_key, False):
                 _render_attachment_preview(cert, key_prefix=key_prefix)
     else:
         st.caption("No certification document uploaded.")
@@ -506,21 +541,47 @@ def _render_cert_document_cell(cert: dict[str, Any], *, session_prefix: str = ""
     if not cert_has_attachment(cert):
         st.markdown('<span class="ips-cert-doc-empty">—</span>', unsafe_allow_html=True)
         return
+
+    fname = _cert_attachment_file_name(cert)
+    display_name = fname if len(fname) <= 22 else f"{fname[:19]}..."
+    st.markdown(
+        f'<div class="ips-cert-doc-name" title="{html.escape(fname, quote=True)}">'
+        f"{html.escape(display_name)}"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
     if not _can_view_cert_attachment(cert):
         st.markdown('<span class="ips-cert-doc-empty">Restricted</span>', unsafe_allow_html=True)
         return
+
     url = get_certification_attachment_url(cert)
     if not url:
-        st.markdown('<span class="ips-cert-doc-empty">Unavailable</span>', unsafe_allow_html=True)
+        st.markdown(
+            '<span class="ips-cert-doc-empty">Preview unavailable</span>',
+            unsafe_allow_html=True,
+        )
         return
-    label = _cert_document_button_label(cert)
-    st.link_button(
-        label,
-        url,
-        key=f"{session_prefix}cert_doc_open_{cid}",
-        use_container_width=True,
-        help="Open certification document",
-    )
+
+    action_col1, action_col2 = st.columns(2, gap="small")
+    toggle_key = _show_doc_key(cid, prefix=session_prefix)
+    with action_col1:
+        if st.button(
+            "Preview",
+            key=f"{session_prefix}cert_doc_preview_{cid}",
+            use_container_width=True,
+        ):
+            st.session_state[_selected_id_key(prefix=session_prefix)] = cid
+            st.session_state[_show_detail_key(prefix=session_prefix)] = True
+            st.session_state[toggle_key] = True
+            st.rerun()
+    with action_col2:
+        st.link_button(
+            "Download",
+            url,
+            key=f"{session_prefix}cert_doc_open_{cid}",
+            use_container_width=True,
+            help="Download certification document",
+        )
 
 
 def _render_certifications_table(
@@ -661,9 +722,11 @@ def _render_cert_edit_form(
     emp_opts: dict[str, str],
     *,
     key_prefix: str = "",
+    lock_employee_id: str = "",
 ) -> None:
     rk = record_session_key(cert, "id")
     cid = str(cert.get("id") or "")
+    locked_eid = str(lock_employee_id or cert.get("employee_id") or "").strip()
     if f"cert_edit_type_{rk}" not in st.session_state:
         _seed_cert_edit_form(cert, employee_names, emp_opts)
 
@@ -677,7 +740,19 @@ def _render_cert_edit_form(
     render_edit_form_header("Edit Certification")
     ec1, ec2 = st.columns(2)
     with ec1:
-        st.selectbox("Employee", employee_names, key=f"cert_edit_emp_{rk}")
+        if lock_employee_id:
+            locked_name = next(
+                (n for n, eid in emp_opts.items() if eid == locked_eid),
+                str(cert.get("employee_name") or "Employee"),
+            )
+            st.text_input(
+                "Employee",
+                value=locked_name,
+                disabled=True,
+                key=f"cert_edit_emp_locked_{rk}",
+            )
+        else:
+            st.selectbox("Employee", employee_names, key=f"cert_edit_emp_{rk}")
         st.selectbox("Certification Type", CERTIFICATION_TYPES, key=f"cert_edit_type_{rk}")
         st.text_input("Certification Number", key=f"cert_edit_num_{rk}")
         st.text_input("Issuing Organization", key=f"cert_edit_issuer_{rk}")
@@ -705,9 +780,13 @@ def _render_cert_edit_form(
         set_view_mode(_MODULE, rk)
         st.rerun()
     if saved:
-        emp_name = st.session_state.get(f"cert_edit_emp_{rk}")
+        if lock_employee_id:
+            resolved_employee_id = locked_eid
+        else:
+            emp_name = st.session_state.get(f"cert_edit_emp_{rk}")
+            resolved_employee_id = emp_opts.get(str(emp_name or ""), str(cert.get("employee_id") or ""))
         ui = {
-            "employee_id": emp_opts.get(str(emp_name or ""), str(cert.get("employee_id") or "")),
+            "employee_id": resolved_employee_id,
             "cert_type": st.session_state.get(f"cert_edit_type_{rk}"),
             "cert_number": st.session_state.get(f"cert_edit_num_{rk}"),
             "issuer": st.session_state.get(f"cert_edit_issuer_{rk}"),
@@ -803,6 +882,7 @@ def render_certification_detail_dialog(
     *,
     inline: bool = False,
     session_prefix: str = "",
+    lock_employee_id: str = "",
 ) -> None:
     cert = selected_certification
     rk = record_session_key(cert, "id")
@@ -832,7 +912,13 @@ def render_certification_detail_dialog(
     )
 
     if edit_mode:
-        _render_cert_edit_form(cert, employee_names, emp_opts, key_prefix=session_prefix)
+        _render_cert_edit_form(
+            cert,
+            employee_names,
+            emp_opts,
+            key_prefix=session_prefix,
+            lock_employee_id=lock_employee_id,
+        )
     else:
         _render_cert_detail_tabs(cert, key_prefix=session_prefix)
         _render_certification_delete_actions(
@@ -860,6 +946,7 @@ def render_certifications_table_block(
     session_prefix: str = "",
     inline_detail: bool = False,
     filter_options: dict[str, list[str]] | None = None,
+    lock_employee_id: str = "",
 ) -> list[str]:
     all_cert_ids = _render_certifications_table(
         certifications,
@@ -887,6 +974,7 @@ def render_certifications_table_block(
                     all_cert_ids,
                     inline=True,
                     session_prefix=session_prefix,
+                    lock_employee_id=lock_employee_id,
                 )
     return all_cert_ids
 
@@ -949,6 +1037,159 @@ def _show_add_certification_dialog(default_employee_id: str) -> None:
         if st.button("Cancel", key="cert_cancel_new", use_container_width=True):
             st.session_state["ips_cert_form_open"] = False
             st.rerun()
+
+
+def _cert_add_open_key(*, session_prefix: str) -> str:
+    return f"{session_prefix}cert_add_open"
+
+
+def _render_add_certification_form(
+    default_employee_id: str,
+    *,
+    session_prefix: str = "emp_cert_",
+    lock_employee: bool = False,
+    employee_label: str = "",
+) -> None:
+    prefix = session_prefix
+    rk = "new"
+
+    with st.container(border=True):
+        st.markdown("### New Certification")
+        if lock_employee and employee_label:
+            st.text_input(
+                "Employee",
+                value=employee_label,
+                disabled=True,
+                key=f"{prefix}new_emp_label",
+            )
+        c1, c2 = st.columns(2)
+        with c1:
+            if not lock_employee:
+                employee_names, emp_opts = _employee_options()
+                default_name = next(
+                    (n for n, eid in emp_opts.items() if eid == default_employee_id),
+                    employee_names[0] if employee_names else "",
+                )
+                idx = employee_names.index(default_name) if default_name in employee_names else 0
+                st.selectbox("Employee", employee_names, index=idx, key=f"{prefix}new_emp")
+            st.selectbox("Certification Type", CERTIFICATION_TYPES, key=f"{prefix}new_type")
+            st.text_input("Certification Number", key=f"{prefix}new_number")
+            st.text_input("Issuing Organization", key=f"{prefix}new_issuer")
+        with c2:
+            st.date_input("Issue Date", key=f"{prefix}new_issue")
+            st.date_input("Expiration Date", key=f"{prefix}new_exp")
+        st.file_uploader(
+            "Upload certification image or document",
+            type=["png", "jpg", "jpeg", "webp", "pdf"],
+            key=_cert_upload_key(key_prefix=prefix, rk=rk),
+        )
+        st.text_area("Notes", key=f"{prefix}new_notes", height=80)
+
+        bc1, bc2 = st.columns(2)
+        with bc1:
+            if st.button(
+                "Save Certification",
+                key=f"{prefix}save_new",
+                type="primary",
+                use_container_width=True,
+            ):
+                if lock_employee:
+                    resolved_employee_id = str(default_employee_id or "").strip()
+                else:
+                    employee_names, emp_opts = _employee_options()
+                    picked = st.session_state.get(f"{prefix}new_emp")
+                    resolved_employee_id = emp_opts.get(str(picked or ""), default_employee_id)
+                ui = {
+                    "employee_id": resolved_employee_id,
+                    "cert_type": st.session_state.get(f"{prefix}new_type"),
+                    "cert_number": st.session_state.get(f"{prefix}new_number"),
+                    "issuer": st.session_state.get(f"{prefix}new_issuer"),
+                    "issue_date": st.session_state.get(f"{prefix}new_issue"),
+                    "expiration_date": st.session_state.get(f"{prefix}new_exp"),
+                    "notes": st.session_state.get(f"{prefix}new_notes"),
+                }
+                result = create_employee_certification(ui)
+                if result.ok:
+                    new_id = _resolve_saved_cert_id("", result, None)
+                    upload_ok, upload_msg = _persist_certification_upload(
+                        cert_id=new_id,
+                        key_prefix=prefix,
+                        rk=rk,
+                    )
+                    if not upload_ok:
+                        st.warning(upload_msg or "Certification saved, but attachment upload failed.")
+                    clear_certifications_cache()
+                    st.session_state.pop(_cert_add_open_key(session_prefix=prefix), None)
+                    st.success("Certification saved.")
+                    st.rerun()
+                else:
+                    st.error(result.error or "Could not save certification.")
+        with bc2:
+            if st.button("Cancel", key=f"{prefix}cancel_new", use_container_width=True):
+                st.session_state.pop(_cert_add_open_key(session_prefix=prefix), None)
+                st.rerun()
+
+
+def render_employee_detail_certifications_tab(
+    employee_id: str,
+    *,
+    employee: dict[str, Any] | None = None,
+    session_prefix: str = "emp_cert_",
+) -> None:
+    """Full certification management inside Users > User Details > Certifications."""
+    inject_certifications_module_css()
+    eid = str(employee_id or "").strip()
+    if not eid:
+        st.caption("No employee selected.")
+        return
+
+    certs = load_certifications(eid)
+    expired_n, expiring_n = certification_alerts(certs)
+    if expired_n or expiring_n:
+        parts = []
+        if expired_n:
+            parts.append(f"{expired_n} expired")
+        if expiring_n:
+            parts.append(f"{expiring_n} expiring within 30 days")
+        st.markdown(
+            f'<p class="ips-alert-banner">⚠ Certification alerts: {html.escape(" · ".join(parts))}</p>',
+            unsafe_allow_html=True,
+        )
+
+    if _can_manage_certifications():
+        if st.button(
+            "+ Add Certification",
+            key=f"{session_prefix}add_btn",
+            type="primary",
+        ):
+            st.session_state[_cert_add_open_key(session_prefix=session_prefix)] = True
+            st.rerun()
+        if st.session_state.get(_cert_add_open_key(session_prefix=session_prefix)):
+            employee_label = str((employee or {}).get("name") or "").strip()
+            _render_add_certification_form(
+                eid,
+                session_prefix=session_prefix,
+                lock_employee=True,
+                employee_label=employee_label,
+            )
+
+    if not certs:
+        if _can_manage_certifications():
+            st.caption("No certifications on file yet. Use Add Certification above.")
+        else:
+            st.caption("No certifications on file.")
+        return
+
+    filter_options = build_filter_options(certs, _COLUMN_FILTER_SPECS_EMP)
+    render_certifications_table_block(
+        certs,
+        hide_employee=True,
+        table_wrap_key="emp_certifications_table_wrap",
+        session_prefix=session_prefix,
+        inline_detail=True,
+        filter_options=filter_options,
+        lock_employee_id=eid,
+    )
 
 
 def render() -> None:

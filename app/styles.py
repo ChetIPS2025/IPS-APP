@@ -2505,6 +2505,16 @@ def inject_certifications_module_css() -> None:
   color: #94a3b8;
   font-size: 13px;
 }}
+.ips-cert-doc-name {{
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}}
 .ips-cert-delete-confirm-message {{
   margin: 0 0 0.5rem;
   font-size: 0.875rem;
