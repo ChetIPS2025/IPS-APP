@@ -27,7 +27,16 @@ except ImportError:
     )
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
 
-ESTIMATES_TABLE_HEADERS: tuple[tuple[str, str], ...] = (
+ESTIMATES_LIST_TABLE_HEADERS: tuple[tuple[str, str], ...] = (
+    ("num", "ESTIMATE #"),
+    ("desc", "PROJECT / DESCRIPTION"),
+    ("customer", "CUSTOMER"),
+    ("status", "STATUS"),
+    ("total", "TOTAL / CONTRACT VALUE"),
+    ("actions", "ACTIONS"),
+)
+
+ESTIMATES_DASHBOARD_TABLE_HEADERS: tuple[tuple[str, str], ...] = (
     ("num", "ESTIMATE #"),
     ("desc", "PROJECT / DESCRIPTION"),
     ("customer", "CUSTOMER"),
@@ -36,6 +45,18 @@ ESTIMATES_TABLE_HEADERS: tuple[tuple[str, str], ...] = (
     ("status", "STATUS"),
     ("actions", "ACTIONS"),
 )
+
+# Backward-compatible alias for dashboard callers.
+ESTIMATES_TABLE_HEADERS = ESTIMATES_DASHBOARD_TABLE_HEADERS
+
+ESTIMATES_LIST_COL_WIDTHS_PX: dict[str, int] = {
+    "num": 96,
+    "desc": 240,
+    "customer": 160,
+    "status": 112,
+    "total": 104,
+    "actions": 132,
+}
 
 ESTIMATES_TABLE_COL_WIDTHS_PX: dict[str, int] = {
     "num": 96,
@@ -46,6 +67,8 @@ ESTIMATES_TABLE_COL_WIDTHS_PX: dict[str, int] = {
     "status": 96,
     "actions": 148,
 }
+
+ESTIMATES_TABLE_LAST_ACTION_KEY = "estimates_list_last_action"
 
 
 def normalize_estimate_status(raw: object) -> str:
@@ -157,15 +180,35 @@ def build_approved_flags(rows: list[dict[str, Any]]) -> dict[str, bool]:
     }
 
 
-def _estimate_link_html(eid: str, label: str, *, extra_class: str = "") -> str:
-    est_id = html.escape(str(eid or "").strip(), quote=True)
+def estimates_bridge_button_key(row: dict[str, Any]) -> str:
+    raw = str(row.get("id") or row.get("estimate_number") or "estimate").strip()
+    safe = "".join(ch if ch.isalnum() else "_" for ch in raw) or "estimate"
+    return f"est_bridge_open_{safe}"
+
+
+def estimate_list_link_html(
+    estimate_id: str,
+    label: str,
+    *,
+    extra_class: str = "",
+    bridge_key: str = "",
+) -> str:
+    eid = html.escape(str(estimate_id or "").strip(), quote=True)
     text = html.escape(label)
     title = html.escape(label, quote=True)
-    cls = f"ips-dash-est-link {extra_class}".strip()
+    cls = f"ips-row-open-link ips-dash-est-link ips-estimates-list-link ips-estimates-open-link {extra_class}".strip()
+    bridge_attr = ""
+    if bridge_key:
+        bridge_attr = f' data-bridge-key="{html.escape(bridge_key, quote=True)}"'
     return (
-        f'<a href="#" class="{html.escape(cls)}" data-est-action="open" '
-        f'data-estimate-id="{est_id}" title="{title}">{text}</a>'
+        f'<button type="button" class="{html.escape(cls)}" '
+        f'data-row-id="{eid}" data-estimate-id="{eid}" data-est-action="open"{bridge_attr} '
+        f'title="{title}">{text}</button>'
     )
+
+
+def _estimate_link_html(eid: str, label: str, *, extra_class: str = "") -> str:
+    return estimate_list_link_html(eid, label, extra_class=extra_class)
 
 
 def _actions_html(eid: str, *, show_approve: bool, show_approved_label: bool) -> str:
@@ -201,20 +244,27 @@ def build_estimates_html_table(
     approve_flags: dict[str, bool],
     approved_flags: dict[str, bool] | None = None,
     total_fn: Callable[[dict[str, Any]], str] | None = None,
+    layout: str = "dashboard",
 ) -> str:
     approved_lookup = approved_flags or {}
     format_total = total_fn or estimate_total_display
+    if layout == "list":
+        headers = ESTIMATES_LIST_TABLE_HEADERS
+        widths = ESTIMATES_LIST_COL_WIDTHS_PX
+    else:
+        headers = ESTIMATES_DASHBOARD_TABLE_HEADERS
+        widths = ESTIMATES_TABLE_COL_WIDTHS_PX
     col_parts = [
         f'<col class="ips-dash-est-col-{html.escape(key)}" style="width:{px}px;" />'
-        for key, px in ESTIMATES_TABLE_COL_WIDTHS_PX.items()
+        for key, px in widths.items()
     ]
     head_parts = [
         (
             f'<th scope="col" class="ips-dash-est-th ips-dash-est-th-{html.escape(key)}" '
-            f'style="width:{ESTIMATES_TABLE_COL_WIDTHS_PX[key]}px;max-width:{ESTIMATES_TABLE_COL_WIDTHS_PX[key]}px;">'
+            f'style="width:{widths[key]}px;max-width:{widths[key]}px;">'
             f"{html.escape(label)}</th>"
         )
-        for key, label in ESTIMATES_TABLE_HEADERS
+        for key, label in headers
     ]
 
     body_rows: list[str] = []
@@ -232,71 +282,138 @@ def build_estimates_html_table(
         num_label = est_no if est_no and est_no != "—" else "Open estimate"
         title_label = project if project and project != "—" else "Open estimate"
         row_parity = "even" if row_idx % 2 else "odd"
+        bridge_key = estimates_bridge_button_key(est)
 
-        cells = [
-            (
-                "num",
-                "left",
-                _cell_wrapper(
-                    _estimate_link_html(eid, num_label, extra_class="ips-dash-est-num-link"),
-                    extra_class="ips-dash-est-num-cell",
-                ),
-            ),
-            (
-                "desc",
-                "left",
-                _cell_wrapper(
-                    _estimate_link_html(eid, title_label, extra_class="ips-dash-est-desc-link"),
-                    extra_class="ips-dash-est-desc-cell",
-                ),
-            ),
-            (
-                "customer",
-                "left",
-                _cell_wrapper(html.escape(customer), extra_class="ips-dash-est-customer-cell"),
-            ),
-            (
-                "date",
-                "left",
-                _cell_wrapper(html.escape(est_date), extra_class="ips-dash-est-date-cell"),
-            ),
-            (
-                "total",
-                "right",
-                _cell_wrapper(
-                    html.escape(total),
-                    extra_class="ips-dash-est-total-cell",
-                    align="right",
-                ),
-            ),
-            (
-                "status",
-                "center",
-                _cell_wrapper(
-                    estimate_status_pill_html(status),
-                    extra_class="ips-dash-est-status-cell",
-                    align="center",
-                ),
-            ),
-            (
-                "actions",
-                "right",
-                _cell_wrapper(
-                    _actions_html(
-                        eid,
-                        show_approve=approve_flags.get(eid, False),
-                        show_approved_label=approved_lookup.get(eid, False),
+        if layout == "list":
+            cells = [
+                (
+                    "num",
+                    "left",
+                    _cell_wrapper(
+                        estimate_list_link_html(
+                            eid,
+                            num_label,
+                            extra_class="ips-dash-est-num-link",
+                            bridge_key=bridge_key,
+                        ),
+                        extra_class="ips-dash-est-num-cell",
                     ),
-                    extra_class="ips-dash-est-actions-cell",
-                    align="right",
                 ),
-            ),
-        ]
+                (
+                    "desc",
+                    "left",
+                    _cell_wrapper(
+                        estimate_list_link_html(
+                            eid,
+                            title_label,
+                            extra_class="ips-dash-est-desc-link",
+                            bridge_key=bridge_key,
+                        ),
+                        extra_class="ips-dash-est-desc-cell",
+                    ),
+                ),
+                (
+                    "customer",
+                    "left",
+                    _cell_wrapper(html.escape(customer), extra_class="ips-dash-est-customer-cell"),
+                ),
+                (
+                    "status",
+                    "center",
+                    _cell_wrapper(
+                        estimate_status_pill_html(status),
+                        extra_class="ips-dash-est-status-cell",
+                        align="center",
+                    ),
+                ),
+                (
+                    "total",
+                    "right",
+                    _cell_wrapper(
+                        html.escape(total),
+                        extra_class="ips-dash-est-total-cell",
+                        align="right",
+                    ),
+                ),
+                (
+                    "actions",
+                    "right",
+                    _cell_wrapper(
+                        _actions_html(
+                            eid,
+                            show_approve=approve_flags.get(eid, False),
+                            show_approved_label=approved_lookup.get(eid, False),
+                        ),
+                        extra_class="ips-dash-est-actions-cell",
+                        align="right",
+                    ),
+                ),
+            ]
+        else:
+            cells = [
+                (
+                    "num",
+                    "left",
+                    _cell_wrapper(
+                        _estimate_link_html(eid, num_label, extra_class="ips-dash-est-num-link"),
+                        extra_class="ips-dash-est-num-cell",
+                    ),
+                ),
+                (
+                    "desc",
+                    "left",
+                    _cell_wrapper(
+                        _estimate_link_html(eid, title_label, extra_class="ips-dash-est-desc-link"),
+                        extra_class="ips-dash-est-desc-cell",
+                    ),
+                ),
+                (
+                    "customer",
+                    "left",
+                    _cell_wrapper(html.escape(customer), extra_class="ips-dash-est-customer-cell"),
+                ),
+                (
+                    "date",
+                    "left",
+                    _cell_wrapper(html.escape(est_date), extra_class="ips-dash-est-date-cell"),
+                ),
+                (
+                    "total",
+                    "right",
+                    _cell_wrapper(
+                        html.escape(total),
+                        extra_class="ips-dash-est-total-cell",
+                        align="right",
+                    ),
+                ),
+                (
+                    "status",
+                    "center",
+                    _cell_wrapper(
+                        estimate_status_pill_html(status),
+                        extra_class="ips-dash-est-status-cell",
+                        align="center",
+                    ),
+                ),
+                (
+                    "actions",
+                    "right",
+                    _cell_wrapper(
+                        _actions_html(
+                            eid,
+                            show_approve=approve_flags.get(eid, False),
+                            show_approved_label=approved_lookup.get(eid, False),
+                        ),
+                        extra_class="ips-dash-est-actions-cell",
+                        align="right",
+                    ),
+                ),
+            ]
 
         tds = "".join(
             (
                 f'<td class="ips-dash-est-td ips-dash-est-td-{html.escape(key)}" '
-                f'style="width:{ESTIMATES_TABLE_COL_WIDTHS_PX[key]}px;max-width:{ESTIMATES_TABLE_COL_WIDTHS_PX[key]}px;">'
+                f'style="width:{widths[key]}px;max-width:{widths[key]}px;">'
                 f"{content}</td>"
             )
             for key, _align, content in cells
@@ -354,6 +471,30 @@ def handle_estimates_table_action(
         from navigation import navigate_to_estimate_detail  # type: ignore
     navigate_to_estimate_detail(eid)
     st.rerun()
+
+
+def render_estimates_table_open_buttons(
+    estimates: list[dict[str, Any]],
+    *,
+    open_estimate_fn: Callable[[str, dict[str, Any] | None], None],
+) -> None:
+    """Hidden Streamlit buttons — HTML link clicks trigger these via the bridge script."""
+    with st.container(key="estimates_open_button_harness"):
+        for est in estimates:
+            eid = str(est.get("id") or "").strip()
+            if not eid:
+                continue
+            bridge_key = estimates_bridge_button_key(est)
+
+            def _open(_eid: str = eid, _est: dict = est) -> None:
+                open_estimate_fn(_eid, _est)
+
+            st.button(
+                "Open estimate",
+                key=bridge_key,
+                type="tertiary",
+                on_click=_open,
+            )
 
 
 def render_estimates_table_bridge(
