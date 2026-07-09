@@ -31,10 +31,15 @@ def render_kpi_card(
     value: str,
     icon: str,
     icon_bg: str,
-    trend: str,
+    trend: str = "",
     trend_class: str = "up",
 ) -> None:
     ot = "d" + "iv"
+    trend_html = ""
+    if str(trend or "").strip():
+        trend_html = (
+            f'<p class="ips-kpi-trend {html.escape(trend_class)}">{html.escape(trend)}</p>'
+        )
     st.markdown(
         f"""
 <{ot} class="ips-kpi-card">
@@ -45,7 +50,7 @@ def render_kpi_card(
       <p class="ips-kpi-value">{html.escape(value)}</p>
     </{ot}>
   </{ot}>
-  <p class="ips-kpi-trend {html.escape(trend_class)}">{html.escape(trend)}</p>
+  {trend_html}
 </{ot}>
 """,
         unsafe_allow_html=True,
