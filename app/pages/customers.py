@@ -11,10 +11,8 @@ import streamlit as st
 try:
     from app.components.headers import render_page_brand_header
     from app.components.customers_list_table import (
-        build_customers_html_table,
+        customer_status_pill_html,
         normalize_customer_status,
-        render_customers_table_bridge_legacy,
-        render_customers_table_open_buttons,
     )
     from app.components.customers_page_layout import (
         close_customers_filter_bar_shell,
@@ -80,14 +78,12 @@ try:
         update_customer_location,
     )
     from app.styles import inject_customers_module_css
-    from app.ui.streamlit_perf import fragment, ips_app_rerun
+    from app.ui.streamlit_perf import fragment
 except ImportError:
     from components.headers import render_page_brand_header  # type: ignore
     from components.customers_list_table import (  # type: ignore
-        build_customers_html_table,
+        customer_status_pill_html,
         normalize_customer_status,
-        render_customers_table_bridge_legacy,
-        render_customers_table_open_buttons,
     )
     from components.customers_page_layout import (  # type: ignore
         close_customers_filter_bar_shell,
@@ -153,7 +149,7 @@ except ImportError:
         update_customer_location,
     )
     from styles import inject_customers_module_css  # type: ignore
-    from ui.streamlit_perf import fragment, ips_app_rerun  # type: ignore
+    from ui.streamlit_perf import fragment  # type: ignore
 
 _SEL = select_key("customers")
 _LOC_SEL = select_key("customer_locations")
@@ -206,8 +202,10 @@ _CONTACT_TABS = [
 ]
 
 SELECTED_CUSTOMER_KEY = "selected_customer_id"
-CUSTOMERS_VIEW_KEY = "customers_view"
+CUSTOMERS_MODE_KEY = "customers_mode"
+CUSTOMERS_SELECTED_ID_KEY = "customers_selected_id"
 SHOW_CUSTOMER_MODAL_KEY = "show_customer_detail_modal"
+_CUSTOMER_LIST_COLS = [4.2, 1.0, 1.1, 1.35, 1.15]
 _ALL_CUSTOMER_IDS_KEY = "_ips_customers_visible_ids"
 _CUSTOMER_FILTER_SPECS: list[tuple[str, str]] = [
     ("STATUS", "status"),
@@ -259,9 +257,17 @@ def _customer_select_key(customer_id: str) -> str:
     return f"customer_select_{customer_id}"
 
 
+def _customer_list_name(customer: dict) -> str:
+    return (
+        str(customer.get("customer_name") or customer.get("company_name") or "").strip()
+        or "Unnamed Customer"
+    )
+
+
 def _clear_customer_selection(customer_ids: list[str] | None = None) -> None:
     st.session_state[SELECTED_CUSTOMER_KEY] = None
-    st.session_state[CUSTOMERS_VIEW_KEY] = "list"
+    st.session_state[CUSTOMERS_MODE_KEY] = "list"
+    st.session_state[CUSTOMERS_SELECTED_ID_KEY] = None
     st.session_state[SHOW_CUSTOMER_MODAL_KEY] = False
     ids = list(customer_ids or [])
     for cid in ids:
@@ -271,28 +277,14 @@ def _clear_customer_selection(customer_ids: list[str] | None = None) -> None:
             st.session_state[key] = False
 
 
-def _open_customer_from_list(customer: dict) -> None:
-    cid = str(customer.get("id") or "").strip()
+def _open_customer_detail(customer_id: str) -> None:
+    cid = str(customer_id or "").strip()
     if not cid:
         return
+    st.session_state[CUSTOMERS_SELECTED_ID_KEY] = cid
+    st.session_state[CUSTOMERS_MODE_KEY] = "detail"
     st.session_state[SELECTED_CUSTOMER_KEY] = cid
-    st.session_state[CUSTOMERS_VIEW_KEY] = "detail"
-    st.session_state[SHOW_CUSTOMER_MODAL_KEY] = True
-    cache = st.session_state.get(_CUSTOMERS_CACHE_KEY) or {}
-    cached = cache.get(cid) if isinstance(cache, dict) else None
-    _open_customers_detail_modal(cid, cached or customer)
-    ips_app_rerun()
-
-
-def _open_customers_table_customer(customer_id: str, customer: dict | None = None) -> None:
-    """Set selected customer state; the page render opens the dialog once."""
-    cid = str(customer_id or (customer or {}).get("id") or "").strip()
-    if not cid:
-        return
-    row = customer if isinstance(customer, dict) else None
-    cache = st.session_state.get(_CUSTOMERS_CACHE_KEY) or {}
-    cached = cache.get(cid) if isinstance(cache, dict) else None
-    _open_customer_from_list(cached or row or {"id": cid})
+    st.session_state[SHOW_CUSTOMER_MODAL_KEY] = False
 
 
 def _render_customers_table_column_filters(
@@ -315,14 +307,26 @@ def _render_customers_table_column_filters(
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-@fragment
-def _render_customers_list_fragment(
+def _render_customers_list_table(
     filtered: list[dict],
     *,
     filter_options: dict[str, list[str]],
 ) -> list[str]:
-    """Customer list — filter and row actions rerun locally."""
+    """Customer list rows with Streamlit open buttons."""
     return _render_custom_customers_table(filtered, filter_options=filter_options)
+
+
+def _render_customers_table_header_row() -> None:
+    head_cols = st.columns(_CUSTOMER_LIST_COLS, gap="small")
+    labels = ["CUSTOMER", "CONTACTS", "OPEN JOBS", "OPEN ESTIMATES", "STATUS"]
+    aligns = ["left", "right", "right", "right", "center"]
+    for col, label, align in zip(head_cols, labels, aligns):
+        with col:
+            st.markdown(
+                f'<div class="ips-customers-native-head-cell ips-customers-native-head-{align}">'
+                f"{html.escape(label)}</div>",
+                unsafe_allow_html=True,
+            )
 
 
 def _render_custom_customers_table(
@@ -348,18 +352,51 @@ def _render_custom_customers_table(
 
     with st.container(key="customers_table_wrap"):
         _render_customers_table_column_filters(filter_options=filter_options)
-        st.markdown(
-            build_customers_html_table(filtered),
-            unsafe_allow_html=True,
-        )
-        render_customers_table_open_buttons(
-            filtered,
-            open_item_fn=_open_customers_table_customer,
-        )
-        render_customers_table_bridge_legacy(
-            customers_by_id,
-            open_item_fn=_open_customers_table_customer,
-        )
+        _render_customers_table_header_row()
+        for customer in filtered:
+            cid = str(customer.get("id") or "").strip()
+            if not cid:
+                continue
+            row = customers_by_id.get(cid, customer)
+            name = _customer_list_name(row)
+            contacts = str(row.get("contact_count") or 0)
+            open_jobs = str(row.get("open_jobs") or 0)
+            open_estimates = str(row.get("open_estimates") or 0)
+            status = normalize_customer_status(row.get("status"))
+            row_cols = st.columns(_CUSTOMER_LIST_COLS, gap="small")
+            with row_cols[0]:
+                if st.button(
+                    name,
+                    key=f"customer_open_{cid}",
+                    type="tertiary",
+                    use_container_width=True,
+                ):
+                    _open_customer_detail(cid)
+                    st.rerun()
+            with row_cols[1]:
+                st.markdown(
+                    f'<div class="ips-customers-native-cell ips-customers-native-cell-right">'
+                    f'<span class="ips-customers-count-cell">{html.escape(contacts)}</span></div>',
+                    unsafe_allow_html=True,
+                )
+            with row_cols[2]:
+                st.markdown(
+                    f'<div class="ips-customers-native-cell ips-customers-native-cell-right">'
+                    f'<span class="ips-customers-count-cell">{html.escape(open_jobs)}</span></div>',
+                    unsafe_allow_html=True,
+                )
+            with row_cols[3]:
+                st.markdown(
+                    f'<div class="ips-customers-native-cell ips-customers-native-cell-right">'
+                    f'<span class="ips-customers-count-cell">{html.escape(open_estimates)}</span></div>',
+                    unsafe_allow_html=True,
+                )
+            with row_cols[4]:
+                st.markdown(
+                    f'<div class="ips-customers-native-cell ips-customers-native-cell-center">'
+                    f"{customer_status_pill_html(status)}</div>",
+                    unsafe_allow_html=True,
+                )
 
     return all_customer_ids
 
@@ -1852,8 +1889,37 @@ def _render_customer_detail_tabs(customer: dict) -> None:
 
 @fragment
 def _render_customer_detail_tabs_fragment(customer: dict) -> None:
-    """Customer modal tabs — local reruns for contacts/locations edits."""
+    """Customer detail tabs — local reruns for contacts/locations edits."""
     _render_customer_detail_tabs(customer)
+
+
+def render_customer_detail(customer_id: str) -> None:
+    cid = str(customer_id or "").strip()
+    st.markdown(
+        '<span class="ips-customers-detail-page ips-page-shell-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    if st.button("← Back to Customers", key="customers_detail_back", type="secondary"):
+        st.session_state[CUSTOMERS_MODE_KEY] = "list"
+        st.session_state[CUSTOMERS_SELECTED_ID_KEY] = None
+        st.session_state[SELECTED_CUSTOMER_KEY] = None
+        st.session_state[SHOW_CUSTOMER_MODAL_KEY] = False
+        st.rerun()
+
+    cache = st.session_state.get(_CUSTOMERS_CACHE_KEY) or {}
+    customer = cache.get(cid) if isinstance(cache, dict) else None
+    if not customer:
+        customer = get_customer(cid)
+    if not customer:
+        st.warning("Customer not found.")
+        return
+
+    if isinstance(cache, dict):
+        cache[cid] = customer
+        st.session_state[_CUSTOMERS_CACHE_KEY] = cache
+    st.session_state[SELECTED_CUSTOMER_KEY] = cid
+
+    render_customer_detail_dialog(customer)
 
 
 def render_customer_detail_dialog(customer: dict) -> None:
@@ -2476,6 +2542,13 @@ def render() -> None:
         unsafe_allow_html=True,
     )
 
+    if (
+        st.session_state.get(CUSTOMERS_MODE_KEY) == "detail"
+        and st.session_state.get(CUSTOMERS_SELECTED_ID_KEY)
+    ):
+        render_customer_detail(str(st.session_state[CUSTOMERS_SELECTED_ID_KEY]))
+        st.stop()
+
     all_rows = _enrich_list_rows(get_customers())
     filter_options = build_filter_options(all_rows, _CUSTOMER_COLUMN_FILTER_SPECS)
 
@@ -2582,14 +2655,5 @@ def render() -> None:
     page_rows, _, _, _ = paginate_rows(filtered, _CUSTOMERS_TABLE_KEY)
 
     build_modal_cache(filtered, cache_key=_CUSTOMERS_CACHE_KEY)
-    _render_customers_list_fragment(page_rows, filter_options=filter_options)
+    _render_customers_list_table(page_rows, filter_options=filter_options)
     render_table_pagination_footer(len(filtered), _CUSTOMERS_TABLE_KEY)
-
-    selected_customer_id = st.session_state.get(SELECTED_CUSTOMER_KEY)
-    show_detail = (
-        st.session_state.get(CUSTOMERS_VIEW_KEY) == "detail"
-        or st.session_state.get(SHOW_CUSTOMER_MODAL_KEY)
-        or str(st.session_state.get(_CUSTOMERS_MODAL_KEY) or selected_customer_id or "").strip()
-    )
-    if show_detail:
-        show_modal_if_pending(_CUSTOMERS_MODAL_KEY, _show_customers_detail_modal)

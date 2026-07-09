@@ -259,6 +259,71 @@ section[data-testid="stMain"]:has(.ips-customers-page) .ips-customers-filter-bar
   text-transform: uppercase;
   color: #64748b;
 }
+.ips-customers-native-head-cell {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+  padding: 0.55rem 0.35rem;
+  background: #eef2f7;
+  border-bottom: 1px solid #e8edf4;
+  white-space: nowrap;
+}
+.ips-customers-native-head-right,
+.ips-customers-native-cell-right {
+  text-align: right !important;
+}
+.ips-customers-native-head-center,
+.ips-customers-native-cell-center {
+  text-align: center !important;
+}
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"] {
+  align-items: center !important;
+  border-bottom: 1px solid #e8edf4 !important;
+  margin: 0 !important;
+  min-height: 46px !important;
+}
+.st-key-customers_table_wrap [data-testid="stHorizontalBlock"]:hover {
+  background: #f8fbff !important;
+}
+.st-key-customers_table_wrap [class*="st-key-customer_open_"] {
+  display: flex !important;
+  align-items: center !important;
+  min-height: 46px !important;
+}
+.st-key-customers_table_wrap [class*="st-key-customer_open_"] .stButton {
+  width: 100% !important;
+  margin: 0 !important;
+}
+.st-key-customers_table_wrap [class*="st-key-customer_open_"] .stButton > button {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #2563eb !important;
+  font-weight: 800 !important;
+  font-size: 0.8125rem !important;
+  text-align: left !important;
+  justify-content: flex-start !important;
+  padding: 0 0.35rem !important;
+  min-height: 46px !important;
+  height: auto !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+.st-key-customers_table_wrap [class*="st-key-customer_open_"] .stButton > button:hover,
+.st-key-customers_table_wrap [class*="st-key-customer_open_"] .stButton > button:focus {
+  color: #1d4ed8 !important;
+  text-decoration: underline !important;
+  background: transparent !important;
+}
+.ips-customers-native-cell {
+  display: flex;
+  align-items: center;
+  min-height: 46px;
+  padding: 0 0.35rem;
+}
 @media (max-width: 768px) {
   .st-key-customers_table_wrap .ips-dash-est-html-table {
     table-layout: auto !important;
