@@ -607,6 +607,10 @@ EMPLOYEE_CERTIFICATIONS_COLUMNS = _cols(
     "attachment_path",
     "attachment_url",
     "attachment_file_name",
+    "attachment_mime_type",
+    "attachment_uploaded_at",
+    "attachment_uploaded_by",
+    "notes",
     "created_at",
     "updated_at",
 )

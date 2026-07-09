@@ -63,6 +63,7 @@ try:
         update_employee_certification,
         upload_certification_attachment,
     )
+    from app.services.phase2_modules_service import normalize_cert
     from app.styles import inject_certifications_module_css
     from app.utils.constants import CERTIFICATION_TYPES
     from app.utils.formatting import fmt_date
@@ -120,6 +121,7 @@ except ImportError:
         update_employee_certification,
         upload_certification_attachment,
     )
+    from services.phase2_modules_service import normalize_cert  # type: ignore
     from styles import inject_certifications_module_css  # type: ignore
     from utils.constants import CERTIFICATION_TYPES  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
@@ -225,17 +227,69 @@ def _clear_certification_selection(cert_ids: list[str] | None = None, *, prefix:
             st.session_state[_cert_select_key(cid, prefix=prefix)] = False
 
 
+def _cert_rows_cache_key(*, prefix: str = "") -> str:
+    return f"{prefix}cert_rows_by_id"
+
+
+def _cache_certification_rows(certifications: list[dict], *, session_prefix: str = "") -> None:
+    st.session_state[_cert_rows_cache_key(prefix=session_prefix)] = {
+        str(c.get("id") or "").strip(): c
+        for c in certifications
+        if str(c.get("id") or "").strip()
+    }
+
+
+def _cached_certification(cert_id: str, *, session_prefix: str = "") -> dict[str, Any]:
+    rows_by_id = st.session_state.get(_cert_rows_cache_key(prefix=session_prefix)) or {}
+    cert = rows_by_id.get(str(cert_id or "").strip())
+    return cert if isinstance(cert, dict) else {}
+
+
+def _reload_certification_for_detail(cert: dict) -> dict:
+    """Fetch the latest row so attachment metadata is current after uploads."""
+    cid = str(cert.get("id") or "").strip()
+    if not cid or is_demo_id(cid):
+        return cert
+    try:
+        from app.services.repository import fetch_by_id
+    except ImportError:
+        from services.repository import fetch_by_id  # type: ignore
+    employee_name = str(cert.get("employee_name") or "")
+    row = fetch_by_id(
+        "employee_certifications",
+        cid,
+        normalize=lambda raw: normalize_cert(raw, employee_name),
+    )
+    return row if isinstance(row, dict) else cert
+
+
+def _open_certification_detail(
+    cert_id: str,
+    cert: dict,
+    *,
+    all_cert_ids: list[str],
+    session_prefix: str = "",
+) -> None:
+    cid = str(cert_id or "").strip()
+    if not cid:
+        return
+    for other_id in all_cert_ids:
+        st.session_state[_cert_select_key(other_id, prefix=session_prefix)] = other_id == cid
+    st.session_state[_selected_id_key(prefix=session_prefix)] = cid
+    st.session_state[_show_detail_key(prefix=session_prefix)] = True
+    st.session_state.pop(_cert_pending_delete_key(prefix=session_prefix), None)
+    st.session_state[_show_doc_key(cid, prefix=session_prefix)] = cert_has_attachment(cert)
+
+
 def _on_certification_checkbox_change(cert_id: str, all_cert_ids: list[str], *, prefix: str = "") -> None:
     key = _cert_select_key(cert_id, prefix=prefix)
     if st.session_state.get(key):
-        for cid in all_cert_ids:
-            if cid != cert_id:
-                st.session_state[_cert_select_key(cid, prefix=prefix)] = False
-        st.session_state[_selected_id_key(prefix=prefix)] = cert_id
-        st.session_state[_show_detail_key(prefix=prefix)] = True
+        cert = _cached_certification(cert_id, session_prefix=prefix)
+        _open_certification_detail(cert_id, cert, all_cert_ids=all_cert_ids, session_prefix=prefix)
     elif st.session_state.get(_selected_id_key(prefix=prefix)) == cert_id:
         st.session_state[_selected_id_key(prefix=prefix)] = None
         st.session_state[_show_detail_key(prefix=prefix)] = False
+        st.session_state.pop(_show_doc_key(cert_id, prefix=prefix), None)
 
 
 def _filter_certs(rows: list[dict], *, q: str, hide_employee: bool) -> list[dict]:
@@ -488,14 +542,15 @@ def _render_attachment_section(
         else:
             url = get_certification_attachment_url(cert)
             toggle_key = _show_doc_key(cid, prefix=key_prefix)
+            show_preview = bool(st.session_state.get(toggle_key, False))
             preview_col, download_col = st.columns(2, gap="small")
             with preview_col:
                 if st.button(
-                    "Preview",
+                    "Preview" if not show_preview else "Hide Preview",
                     key=f"{key_prefix}cert_preview_{cid}",
                     use_container_width=True,
                 ):
-                    st.session_state[toggle_key] = not st.session_state.get(toggle_key, False)
+                    st.session_state[toggle_key] = not show_preview
                     st.rerun()
             with download_col:
                 if url:
@@ -509,10 +564,12 @@ def _render_attachment_section(
                     st.caption("Download unavailable")
             if not url:
                 st.warning("Attachment found but preview unavailable.")
-            elif st.session_state.get(toggle_key, False):
+            elif show_preview:
                 _render_attachment_preview(cert, key_prefix=key_prefix)
     else:
         st.caption("No certification document uploaded.")
+        if _can_manage_certifications():
+            st.caption("Click **Edit** to upload a certification image or PDF.")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -536,10 +593,26 @@ def _cert_document_button_label(cert: dict[str, Any]) -> str:
     return fname
 
 
-def _render_cert_document_cell(cert: dict[str, Any], *, session_prefix: str = "") -> None:
+def _render_cert_document_cell(
+    cert: dict[str, Any],
+    *,
+    session_prefix: str = "",
+    all_cert_ids: list[str] | None = None,
+) -> None:
     cid = str(cert.get("id") or "").strip()
     if not cert_has_attachment(cert):
-        st.markdown('<span class="ips-cert-doc-empty">—</span>', unsafe_allow_html=True)
+        if st.button(
+            "View",
+            key=f"{session_prefix}cert_view_{cid}",
+            use_container_width=True,
+        ):
+            _open_certification_detail(
+                cid,
+                cert,
+                all_cert_ids=all_cert_ids or [cid],
+                session_prefix=session_prefix,
+            )
+            st.rerun()
         return
 
     fname = _cert_attachment_file_name(cert)
@@ -560,6 +633,18 @@ def _render_cert_document_cell(cert: dict[str, Any], *, session_prefix: str = ""
             '<span class="ips-cert-doc-empty">Preview unavailable</span>',
             unsafe_allow_html=True,
         )
+        if st.button(
+            "View",
+            key=f"{session_prefix}cert_view_{cid}",
+            use_container_width=True,
+        ):
+            _open_certification_detail(
+                cid,
+                cert,
+                all_cert_ids=all_cert_ids or [cid],
+                session_prefix=session_prefix,
+            )
+            st.rerun()
         return
 
     action_col1, action_col2 = st.columns(2, gap="small")
@@ -570,8 +655,12 @@ def _render_cert_document_cell(cert: dict[str, Any], *, session_prefix: str = ""
             key=f"{session_prefix}cert_doc_preview_{cid}",
             use_container_width=True,
         ):
-            st.session_state[_selected_id_key(prefix=session_prefix)] = cid
-            st.session_state[_show_detail_key(prefix=session_prefix)] = True
+            _open_certification_detail(
+                cid,
+                cert,
+                all_cert_ids=all_cert_ids or [cid],
+                session_prefix=session_prefix,
+            )
             st.session_state[toggle_key] = True
             st.rerun()
     with action_col2:
@@ -601,6 +690,7 @@ def _render_certifications_table(
         str(c.get("id") or "").strip() for c in certifications if str(c.get("id") or "").strip()
     ]
     st.session_state[_ALL_CERT_IDS_KEY] = all_cert_ids
+    _cache_certification_rows(certifications, session_prefix=session_prefix)
 
     col_ratios = _CERT_COLS_EMP if hide_employee else _CERT_COLS_ALL
     header_specs = _CERT_HEADER_SPECS_EMP if hide_employee else _CERT_HEADER_SPECS_ALL
@@ -693,11 +783,15 @@ def _render_certifications_table(
                     unsafe_allow_html=True,
                 )
             with cols[col_idx + 6]:
-                _render_cert_document_cell(cert, session_prefix=session_prefix)
+                _render_cert_document_cell(
+                    cert,
+                    session_prefix=session_prefix,
+                    all_cert_ids=all_cert_ids,
+                )
 
         st.markdown("</div>", unsafe_allow_html=True)
 
-    st.caption("Select a certification to view details.")
+    st.caption("Select a certification or click View/Preview to open details and document preview.")
     return all_cert_ids
 
 
@@ -884,7 +978,7 @@ def render_certification_detail_dialog(
     session_prefix: str = "",
     lock_employee_id: str = "",
 ) -> None:
-    cert = selected_certification
+    cert = _reload_certification_for_detail(selected_certification)
     rk = record_session_key(cert, "id")
     st.session_state.setdefault(edit_mode_key(_MODULE, rk), False)
     edit_mode = is_edit_mode(_MODULE, rk)
@@ -969,8 +1063,9 @@ def render_certifications_table_block(
             )
             if selected_certification:
                 st.markdown("---")
+                fresh_cert = _reload_certification_for_detail(selected_certification)
                 render_certification_detail_dialog(
-                    selected_certification,
+                    fresh_cert,
                     all_cert_ids,
                     inline=True,
                     session_prefix=session_prefix,

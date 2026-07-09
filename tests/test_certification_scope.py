@@ -60,3 +60,19 @@ def test_cert_attachment_file_name_from_path():
         "attachment_file_name": "Forklift Card.pdf",
     }
     assert _cert_attachment_file_name(cert_named) == "Forklift Card.pdf"
+
+
+def test_open_certification_detail_enables_preview_when_attachment_exists():
+    from app.pages.employee_certifications import _open_certification_detail
+    import streamlit as st
+
+    cert = {
+        "id": "cert-1",
+        "attachment_path": "employee-certifications/cert-1/report.pdf",
+        "attachment_file_name": "report.pdf",
+    }
+    st.session_state.clear()
+    _open_certification_detail("cert-1", cert, all_cert_ids=["cert-1"], session_prefix="emp_cert_")
+    assert st.session_state.get("emp_cert_selected_certification_id") == "cert-1"
+    assert st.session_state.get("emp_cert_show_certification_detail") is True
+    assert st.session_state.get("emp_cert_show_cert_doc_cert-1") is True
