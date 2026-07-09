@@ -11969,7 +11969,7 @@ def inject_global_css() -> None:
     """Inject global IPS SaaS styles on every render."""
     st.markdown(
         f"""
-<style id="ips-global-styles-v7">
+<style id="ips-global-styles-v8">
 :root {{
   --ips-bg: {APP_BG};
   --ips-sidebar: {SIDEBAR_BG};
@@ -12008,6 +12008,7 @@ section[data-testid="stMain"]:has(.ips-login-page-marker) .block-container {{
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVerticalBlock"] > div {{
   padding-left: 28px;
   padding-right: 28px;
+  padding-top: 20px;
 }}
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVerticalBlock"] {{
   gap: 0.4rem !important;
@@ -12015,12 +12016,35 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVertic
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"] {{
   margin-bottom: 0.25rem !important;
 }}
-section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"]:has(.ips-page-shell-marker),
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"]:has(.ips-page-shell-marker):not(:has(.ips-page-header)):not(:has(.users-page-header-card)) {{
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  background: transparent !important;
+  border: none !important;
+}}
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"]:has(.ips-main-header) {{
-  padding-left: 0 !important;
-  padding-right: 0 !important;
-  background: {MAIN_HEADER_BG} !important;
-  margin-bottom: 0 !important;
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  background: transparent !important;
+  border: none !important;
+}}
+section[data-testid="stMain"] [data-testid="stElementContainer"]:has(.ips-ops-dashboard-marker):not(:has(.ips-page-title)) {{
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  background: transparent !important;
+  border: none !important;
 }}
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"]:has(.ips-page-actions-marker),
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVerticalBlockBorderWrapper"]:has(.ips-filter-bar-marker) {{
@@ -12197,7 +12221,7 @@ section[data-testid="stSidebar"] .block-container {{
   line-height: 1.2;
 }}
 
-/* Page header — light-gray brand bar + title row */
+/* Page header — title row at top of content (gray brand bar removed) */
 .ips-page-shell-marker {{
   display: none !important;
   height: 0 !important;
@@ -12207,17 +12231,15 @@ section[data-testid="stSidebar"] .block-container {{
   padding: 0 !important;
 }}
 .ips-main-header {{
-  background: {MAIN_HEADER_BG};
-  border-bottom: 1px solid #cfd8e3;
-  padding: 8px 28px;
-  min-height: 58px;
-  max-height: 68px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  width: 100%;
-  box-sizing: border-box;
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: none !important;
+  background: transparent !important;
 }}
 .ips-main-header-brand {{
   display: flex;
@@ -12261,7 +12283,7 @@ section[data-testid="stSidebar"] .block-container {{
   padding: 18px 28px 28px 28px;
 }}
 .ips-page-header {{
-  margin: 0 0 14px 0;
+  margin: 0 0 10px 0;
 }}
 .ips-page-header-bar {{
   display: none !important;
@@ -12321,6 +12343,7 @@ section[data-testid="stSidebar"] .block-container {{
   section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVerticalBlock"] > div {{
     padding-left: 14px;
     padding-right: 14px;
+    padding-top: 16px;
   }}
   .ips-page-title-row {{
     flex-direction: column;
@@ -14940,6 +14963,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stVer
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stVerticalBlock"] > div {
   padding-left: 20px !important;
   padding-right: 20px !important;
+  padding-top: 20px !important;
   box-sizing: border-box !important;
 }
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"] {

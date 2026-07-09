@@ -171,12 +171,6 @@ def render_module(slug: str | None = None) -> None:
             except ImportError:
                 from perf_debug import perf_span  # type: ignore
             try:
-                from app.components.headers import render_main_brand_bar
-            except ImportError:
-                from components.headers import render_main_brand_bar  # type: ignore
-            if active not in {"employees", "users"}:
-                render_main_brand_bar()
-            try:
                 from app.auth import current_role
                 from app.utils.permissions import normalize_role
                 from app.utils.view_as import is_view_as_active, render_view_as_banner

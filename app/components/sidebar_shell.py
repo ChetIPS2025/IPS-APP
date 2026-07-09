@@ -462,6 +462,25 @@ def inject_desktop_nav_rail(*, active_slug: str | None = None) -> None:
     inject_desktop_nav_rail_markup(active_slug=active_slug)
 
 
+def inject_mobile_nav_menu_button() -> None:
+    """Fixed mobile menu control (replaces the removed in-content gray brand bar)."""
+    st.markdown(
+        """
+<button type="button" class="ips-header-menu-btn ips-mobile-nav-fab" aria-label="Open navigation menu">
+  <span class="ips-header-menu-icon" aria-hidden="true">
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <line x1="4" y1="7" x2="20" y2="7"/>
+      <line x1="4" y1="12" x2="20" y2="12"/>
+      <line x1="4" y1="17" x2="20" y2="17"/>
+    </svg>
+  </span>
+</button>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def inject_sidebar_shell() -> None:
     """Inject sidebar layout CSS/JS on every authenticated render."""
     collapsed = True
@@ -472,6 +491,7 @@ def inject_sidebar_shell() -> None:
     components.html(_shell_script(nav_json), height=0)
 
     inject_sidebar_menu_wire()
+    inject_mobile_nav_menu_button()
     inject_sidebar_nav_align()
     inject_sidebar_layout_state(collapsed)
 
@@ -1054,6 +1074,26 @@ button.ips-header-menu-btn {{
     color: #2563eb !important;
     cursor: pointer !important;
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08) !important;
+  }}
+  button.ips-mobile-nav-fab {{
+    position: fixed !important;
+    top: 12px !important;
+    left: 12px !important;
+    z-index: 99998 !important;
+  }}
+  section[data-testid="stMain"] [data-testid="stElementContainer"]:has(.ips-mobile-nav-fab) {{
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: transparent !important;
+    border: none !important;
+    z-index: 99998 !important;
   }}
   button.ips-header-menu-btn:hover,
   button.ips-header-menu-btn:focus-visible {{

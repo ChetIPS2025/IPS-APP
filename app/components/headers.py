@@ -7,51 +7,12 @@ from collections.abc import Callable
 
 import streamlit as st
 
-try:
-    from app.branding import wording_logo_html
-    from app.components.sidebar_shell import inject_sidebar_menu_wire
-except ImportError:
-    from branding import wording_logo_html  # type: ignore
-    from components.sidebar_shell import inject_sidebar_menu_wire  # type: ignore
-
 _ActionFn = Callable[[], None]
 
 
 def render_main_brand_bar(*, brand_actions: list[_ActionFn] | None = None, show_menu: bool = True) -> None:
-    """Light-gray IPS wording logo bar — call once per page (via phase2 shell)."""
-    ot, ct = "d" + "iv", "/" + "d" + "iv"
-    logo = wording_logo_html(height=40)
-    menu_html = (
-        '<button type="button" class="ips-header-menu-btn" aria-label="Open navigation menu">'
-        '<span class="ips-header-menu-icon" aria-hidden="true">'
-        '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" '
-        'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">'
-        '<line x1="4" y1="7" x2="20" y2="7"/>'
-        '<line x1="4" y1="12" x2="20" y2="12"/>'
-        '<line x1="4" y1="17" x2="20" y2="17"/>'
-        "</svg></span></button>"
-        if show_menu
-        else ""
-    )
-    st.markdown(
-        f'<{ot} class="ips-main-header">'
-        f'<{ot} class="ips-main-header-menu">{menu_html}</{ct}>'
-        f'<{ot} class="ips-main-header-brand">{logo}</{ct}>'
-        f'<{ot} class="ips-main-header-actions-slot"></{ct}>'
-        f"</{ct}>",
-        unsafe_allow_html=True,
-    )
-    if show_menu:
-        inject_sidebar_menu_wire()
-    if brand_actions:
-        ba_cols = st.columns([5, 1], gap="small")
-        with ba_cols[1]:
-            st.markdown(
-                f'<span class="ips-main-header-actions-marker" aria-hidden="true"></span>',
-                unsafe_allow_html=True,
-            )
-            for fn in brand_actions:
-                fn()
+    """Deprecated: gray in-content brand bar removed; blue nav rail is the app chrome."""
+    _ = (brand_actions, show_menu)
 
 
 def render_page_brand_header(
@@ -64,15 +25,12 @@ def render_page_brand_header(
     include_brand_bar: bool = False,
 ) -> None:
     """
-    Compact page title row below the global brand bar.
+    Compact page title row at the top of the content area.
 
     Set ``include_brand_bar=True`` only for standalone pages outside ``render_module``.
     """
     ot, ct = "d" + "iv", "/" + "d" + "iv"
-    st.markdown(f'<{ot} class="ips-page-shell-marker"></{ct}>', unsafe_allow_html=True)
-
-    if include_brand_bar:
-        render_main_brand_bar(brand_actions=brand_actions)
+    _ = (brand_actions, include_brand_bar)
 
     sub_html = (
         f'<p class="ips-page-subtitle">{html.escape(subtitle)}</p>'
@@ -85,6 +43,11 @@ def render_page_brand_header(
         f"{sub_html}"
         f"</{ct}>"
     )
+    shell_marker = '<span class="ips-page-shell-marker" aria-hidden="true"></span>'
+    page_header_open = (
+        f'<{ot} class="ips-page-header">{shell_marker}<{ot} class="ips-page-title-row">'
+    )
+    page_header_close = f"</{ct}></{ct}>"
 
     if actions:
         n = len(actions)
@@ -97,7 +60,7 @@ def render_page_brand_header(
         main_col, act_col = st.columns([title_w, actions_w], gap="small", vertical_alignment="top")
         with main_col:
             st.markdown(
-                f'<{ot} class="ips-page-header"><{ot} class="ips-page-title-row">{title_block}</{ct}></{ct}>',
+                f"{page_header_open}{title_block}{page_header_close}",
                 unsafe_allow_html=True,
             )
         with act_col:
@@ -128,7 +91,7 @@ def render_page_brand_header(
                         widget()
     else:
         st.markdown(
-            f'<{ot} class="ips-page-header"><{ot} class="ips-page-title-row">{title_block}</{ct}></{ct}>',
+            f"{page_header_open}{title_block}{page_header_close}",
             unsafe_allow_html=True,
         )
 
@@ -141,7 +104,7 @@ def render_users_page_header(
 ) -> None:
     """Users page header card with icon, title, and subtitle."""
     _ = actions
-    st.markdown('<span class="ips-page-shell-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
+    shell_marker = '<span class="ips-page-shell-marker" aria-hidden="true"></span>'
     sub_html = (
         f'<p class="users-page-header-subtitle">{html.escape(subtitle)}</p>'
         if subtitle
@@ -149,6 +112,7 @@ def render_users_page_header(
     )
     st.markdown(
         f"""
+{shell_marker}
 <div class="users-page-header-card">
   <div class="users-page-header-inner">
     <div class="users-page-header-icon" aria-hidden="true">
