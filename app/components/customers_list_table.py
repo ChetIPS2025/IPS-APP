@@ -222,7 +222,11 @@ def handle_customers_table_action(
     if not row:
         return
     open_item_fn(row_id, row)
-    st.rerun()
+    try:
+        from app.ui.streamlit_perf import ips_app_rerun
+    except ImportError:
+        from ui.streamlit_perf import ips_app_rerun  # type: ignore
+    ips_app_rerun()
 
 
 def render_customers_table_open_buttons(

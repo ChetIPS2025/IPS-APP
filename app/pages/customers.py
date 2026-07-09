@@ -80,7 +80,7 @@ try:
         update_customer_location,
     )
     from app.styles import inject_customers_module_css
-    from app.ui.streamlit_perf import fragment
+    from app.ui.streamlit_perf import fragment, ips_app_rerun
 except ImportError:
     from components.headers import render_page_brand_header  # type: ignore
     from components.customers_list_table import (  # type: ignore
@@ -153,7 +153,7 @@ except ImportError:
         update_customer_location,
     )
     from styles import inject_customers_module_css  # type: ignore
-    from ui.streamlit_perf import fragment  # type: ignore
+    from ui.streamlit_perf import fragment, ips_app_rerun  # type: ignore
 
 _SEL = select_key("customers")
 _LOC_SEL = select_key("customer_locations")
@@ -206,6 +206,7 @@ _CONTACT_TABS = [
 ]
 
 SELECTED_CUSTOMER_KEY = "selected_customer_id"
+CUSTOMERS_VIEW_KEY = "customers_view"
 SHOW_CUSTOMER_MODAL_KEY = "show_customer_detail_modal"
 _ALL_CUSTOMER_IDS_KEY = "_ips_customers_visible_ids"
 _CUSTOMER_FILTER_SPECS: list[tuple[str, str]] = [
@@ -260,6 +261,7 @@ def _customer_select_key(customer_id: str) -> str:
 
 def _clear_customer_selection(customer_ids: list[str] | None = None) -> None:
     st.session_state[SELECTED_CUSTOMER_KEY] = None
+    st.session_state[CUSTOMERS_VIEW_KEY] = "list"
     st.session_state[SHOW_CUSTOMER_MODAL_KEY] = False
     ids = list(customer_ids or [])
     for cid in ids:
@@ -274,10 +276,12 @@ def _open_customer_from_list(customer: dict) -> None:
     if not cid:
         return
     st.session_state[SELECTED_CUSTOMER_KEY] = cid
+    st.session_state[CUSTOMERS_VIEW_KEY] = "detail"
     st.session_state[SHOW_CUSTOMER_MODAL_KEY] = True
     cache = st.session_state.get(_CUSTOMERS_CACHE_KEY) or {}
     cached = cache.get(cid) if isinstance(cache, dict) else None
     _open_customers_detail_modal(cid, cached or customer)
+    ips_app_rerun()
 
 
 def _open_customers_table_customer(customer_id: str, customer: dict | None = None) -> None:
@@ -2582,5 +2586,10 @@ def render() -> None:
     render_table_pagination_footer(len(filtered), _CUSTOMERS_TABLE_KEY)
 
     selected_customer_id = st.session_state.get(SELECTED_CUSTOMER_KEY)
-    if st.session_state.get(SHOW_CUSTOMER_MODAL_KEY):
+    show_detail = (
+        st.session_state.get(CUSTOMERS_VIEW_KEY) == "detail"
+        or st.session_state.get(SHOW_CUSTOMER_MODAL_KEY)
+        or str(st.session_state.get(_CUSTOMERS_MODAL_KEY) or selected_customer_id or "").strip()
+    )
+    if show_detail:
         show_modal_if_pending(_CUSTOMERS_MODAL_KEY, _show_customers_detail_modal)

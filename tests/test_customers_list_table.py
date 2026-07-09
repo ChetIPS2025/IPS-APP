@@ -56,8 +56,16 @@ def test_build_customers_html_table_includes_columns_and_link():
     assert customer_name(rows[0]) == "Acme Corp"
 
 
-def test_handle_customers_table_action_opens_customer():
+def test_handle_customers_table_action_opens_customer(monkeypatch):
     opened: list[tuple[str, dict]] = []
+    reran: list[str] = []
+
+    import sys
+    import types
+
+    perf_mod = types.ModuleType("app.ui.streamlit_perf")
+    perf_mod.ips_app_rerun = lambda: reran.append("app")
+    monkeypatch.setitem(sys.modules, "app.ui.streamlit_perf", perf_mod)
 
     handle_customers_table_action(
         "open:cust-1",
@@ -67,3 +75,4 @@ def test_handle_customers_table_action_opens_customer():
     )
 
     assert opened == [("cust-1", {"id": "cust-1", "customer_name": "Acme Corp"})]
+    assert reran == ["app"]
