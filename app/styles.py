@@ -3838,6 +3838,7 @@ div[data-testid="stDataFrame"].ips-table-fit-host {
       el.style.transformOrigin = '';
       el.style.width = '';
       el.style.maxWidth = '';
+      el.style.marginBottom = '';
     });
   }
 
@@ -3849,6 +3850,10 @@ div[data-testid="stDataFrame"].ips-table-fit-host {
       el.style.transform = 'scale(' + inv + ')';
       el.style.width = 100 * scale + '%';
       el.style.maxWidth = 100 * scale + '%';
+      var h = el.offsetHeight || el.scrollHeight;
+      if (h > 0 && inv > 1.001) {
+        el.style.marginBottom = Math.ceil(h * (inv - 1)) + 'px';
+      }
     });
   }
 
@@ -5391,9 +5396,13 @@ def inject_timekeeping_module_css() -> None:
     tk_alloc_type_widget = (
         f'{tk_expand}:has(.timekeeping-allocation-panel-marker) [class*="st-key-tk_alloc_type_"]'
     )
+    tk_alloc_week_footer = (
+        f'{tk_expand}:has(.timekeeping-allocation-panel-marker) '
+        f'[class*="st-key-tk_alloc_week_footer_"]'
+    )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v98">
+<style id="ips-timekeeping-module-v99">
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
@@ -8531,16 +8540,20 @@ def inject_timekeeping_module_css() -> None:
 }}
 {tk_alloc_day} [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-day-actions-bar-marker) {{
   display: flex !important;
-  flex-wrap: nowrap !important;
+  flex-wrap: wrap !important;
   align-items: center !important;
   justify-content: space-between !important;
   gap: 12px !important;
   width: 100% !important;
   max-width: 100% !important;
-  margin: 10px 0 0 !important;
-  padding: 10px 0 2px !important;
+  margin: 12px 0 0 !important;
+  padding: 12px 12px 14px !important;
   border-top: 1px solid #e2e8f0 !important;
   overflow: visible !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  z-index: 1 !important;
+  clear: both !important;
 }}
 {tk_alloc_day} [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-day-actions-bar-marker)
   > [data-testid="column"]:first-child {{
@@ -8596,24 +8609,26 @@ def inject_timekeeping_module_css() -> None:
 {tk_alloc_day} [data-testid="column"]:has(.timekeeping-allocation-actions-marker) {{
   display: flex !important;
   flex-direction: row !important;
-  flex-wrap: nowrap !important;
+  flex-wrap: wrap !important;
   align-items: center !important;
   justify-content: flex-end !important;
   gap: 8px !important;
   width: 100% !important;
   min-width: 0 !important;
+  max-width: 100% !important;
   overflow: visible !important;
 }}
 {tk_alloc_day} [data-testid="column"]:has(.timekeeping-allocation-actions-marker)
   > [data-testid="stVerticalBlock"] {{
   display: flex !important;
   flex-direction: row !important;
-  flex-wrap: nowrap !important;
+  flex-wrap: wrap !important;
   align-items: center !important;
   justify-content: flex-end !important;
   gap: 8px !important;
   width: 100% !important;
   min-width: 0 !important;
+  max-width: 100% !important;
   overflow: visible !important;
 }}
 {tk_alloc_day} [data-testid="column"]:has(.timekeeping-allocation-actions-marker)
@@ -8985,7 +9000,7 @@ def inject_timekeeping_module_css() -> None:
   flex-direction: column !important;
   align-items: stretch !important;
   width: 100% !important;
-  gap: 0.75rem !important;
+  gap: 1rem !important;
   height: auto !important;
   max-height: none !important;
   overflow: visible !important;
@@ -9020,13 +9035,15 @@ def inject_timekeeping_module_css() -> None:
 {tk_alloc_day} {{
   max-width: 100% !important;
   width: 100% !important;
-  margin: 0 0 8px 0 !important;
+  margin: 0 0 16px 0 !important;
   padding: 0 !important;
   background: transparent !important;
   border: none !important;
   border-radius: 0 !important;
   box-sizing: border-box !important;
   overflow: visible !important;
+  position: relative !important;
+  z-index: 0 !important;
 }}
 {tk_alloc_day} [data-testid="stVerticalBlockBorderWrapper"],
 {tk_alloc_day} > [data-testid="stVerticalBlock"] {{
@@ -9035,7 +9052,7 @@ def inject_timekeeping_module_css() -> None:
   border: 1px solid #e2e8f0 !important;
   border-radius: 8px !important;
   background: #ffffff !important;
-  padding: 0 !important;
+  padding: 0 0 12px 0 !important;
   box-sizing: border-box !important;
   overflow: visible !important;
 }}
@@ -9063,20 +9080,38 @@ def inject_timekeeping_module_css() -> None:
   border-color: #fca5a5 !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-actions-footer-marker) {{
-  display: flex !important;
-  flex-wrap: wrap !important;
+  [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-actions-footer-marker),
+{tk_alloc_week_footer} {{
+  display: block !important;
   width: 100% !important;
   max-width: 100% !important;
-  justify-content: flex-start !important;
-  align-items: center !important;
-  gap: 10px !important;
-  margin-top: 10px !important;
-  padding-top: 8px !important;
-  border-top: 1px solid #e2e8f0 !important;
+  margin-top: 1.25rem !important;
+  padding: 1rem 0 0.5rem !important;
+  border-top: 1px solid #dbe3ef !important;
   position: relative !important;
   z-index: 2 !important;
   clear: both !important;
+  overflow: visible !important;
+  box-sizing: border-box !important;
+}}
+{tk_alloc_week_footer} > [data-testid="stVerticalBlock"] {{
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 0.65rem !important;
+  width: 100% !important;
+  overflow: visible !important;
+}}
+{tk_alloc_week_footer} [data-testid="stButton"] {{
+  width: auto !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+}}
+{tk_alloc_week_footer} [data-testid="stCaptionContainer"] {{
+  margin-top: 0.35rem !important;
+  margin-bottom: 0 !important;
+  padding-top: 0.25rem !important;
+  line-height: 1.45 !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-actions-footer-marker)
@@ -9301,8 +9336,21 @@ def inject_timekeeping_module_css() -> None:
   flex: 1 1 240px !important;
   min-width: 200px !important;
   width: auto !important;
-  max-width: none !important;
+  max-width: min(100%, 520px) !important;
   overflow: visible !important;
+}}
+{tk_expand}:has(.timekeeping-allocation-list-compact-marker)
+  {tk_alloc_line_key} [data-testid="column"]:has(.timekeeping-allocation-assignment-marker) {{
+  flex: 1 1 280px !important;
+  min-width: 220px !important;
+  max-width: min(100%, 560px) !important;
+}}
+{tk_expand}:has(.timekeeping-allocation-list-compact-marker)
+  {tk_alloc_ctrl_row},
+{tk_expand}:has(.timekeeping-allocation-list-compact-marker)
+  {tk_alloc_ctrl_row_alt} {{
+  flex-wrap: wrap !important;
+  row-gap: 8px !important;
 }}
 {tk_alloc_ctrl_row}
   > [data-testid="column"]:nth-child(2),
@@ -9607,6 +9655,9 @@ body:has(.timekeeping-allocation-panel-marker) div[data-baseweb="popover"] li di
   display: flex !important;
   align-items: center !important;
 }}
+.timekeeping-alloc-row-autosave-compact {{
+  margin-top: 6px !important;
+}}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   {tk_alloc_line_key} [data-testid="stButton"] > button {{
   min-height: 28px !important;
@@ -9618,81 +9669,6 @@ body:has(.timekeeping-allocation-panel-marker) div[data-baseweb="popover"] li di
   overflow: visible !important;
   width: auto !important;
   min-width: max-content !important;
-}}
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [data-testid="column"]:has(.timekeeping-allocation-actions-marker) {{
-  min-width: {tk_alloc_actions_col_min_w} !important;
-  width: auto !important;
-  max-width: none !important;
-  overflow: visible !important;
-}}
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [data-testid="column"]:has(.timekeeping-allocation-actions-marker)
-  > [data-testid="stVerticalBlock"] {{
-  display: flex !important;
-  flex-direction: row !important;
-  flex-wrap: nowrap !important;
-  justify-content: flex-start !important;
-  align-items: center !important;
-  gap: 8px !important;
-  width: 100% !important;
-  min-width: 0 !important;
-  overflow: visible !important;
-}}
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [data-testid="column"]:has(.timekeeping-allocation-actions-marker)
-  [data-testid="stHorizontalBlock"] {{
-  flex-wrap: nowrap !important;
-  width: auto !important;
-  min-width: 0 !important;
-  gap: 8px !important;
-}}
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [data-testid="column"]:has(.timekeeping-allocation-actions-marker)
-  [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
-  width: auto !important;
-  min-width: max-content !important;
-  flex: 0 0 auto !important;
-  overflow: visible !important;
-}}
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [data-testid="column"]:has(.timekeeping-allocation-actions-marker)
-  > [data-testid="stVerticalBlock"] > div {{
-  width: auto !important;
-  flex: 0 0 auto !important;
-  min-width: max-content !important;
-}}
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [data-testid="column"]:has(.timekeeping-allocation-actions-marker)
-  [data-testid="stButton"] {{
-  width: auto !important;
-  min-width: max-content !important;
-  margin: 0 !important;
-  flex: 0 0 auto !important;
-}}
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [data-testid="column"]:has(.timekeeping-allocation-actions-marker)
-  [data-testid="stButton"] > button {{
-  width: auto !important;
-  min-width: max-content !important;
-  max-width: none !important;
-}}
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [data-testid="column"]:has(.timekeeping-allocation-actions-marker)
-  [data-testid="stButton"] > button p,
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [data-testid="column"]:has(.timekeeping-allocation-actions-marker)
-  [data-testid="stButton"] > button span,
-{tk_expand}:has(.timekeeping-allocation-panel-marker)
-  [data-testid="column"]:has(.timekeeping-allocation-actions-marker)
-  [data-testid="stButton"] > button div {{
-  white-space: nowrap !important;
-  writing-mode: horizontal-tb !important;
-  word-break: keep-all !important;
-  overflow: visible !important;
-  text-overflow: clip !important;
-  display: inline !important;
-  line-height: 1.2 !important;
 }}
 {tk_expand}:has(.timekeeping-allocation-panel-marker)
   {tk_alloc_line_key} [data-testid="stButton"] > button,

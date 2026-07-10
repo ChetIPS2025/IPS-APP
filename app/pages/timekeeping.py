@@ -24,6 +24,7 @@ try:
     from app.components.timekeeping_allocation import (
         AllocationRenderDeps,
         DayAllocationCardContext,
+        allocation_panel_scope_key,
         render_allocation_days_panel,
         render_allocation_panel_intro,
         render_day_allocation_card,
@@ -69,6 +70,7 @@ except ImportError:
     from components.timekeeping_allocation import (  # type: ignore
         AllocationRenderDeps,
         DayAllocationCardContext,
+        allocation_panel_scope_key,
         render_allocation_days_panel,
         render_allocation_panel_intro,
         render_day_allocation_card,
@@ -3014,7 +3016,7 @@ def _render_list_allocation_detail(
         return
 
     days_with_hours = 0
-    with render_allocation_days_panel(panel_scope=scope):
+    with render_allocation_days_panel(panel_scope=scope, compact=True):
         for day_ix, day_d in enumerate(week_dates(week_start_d)):
             iso = day_d.isoformat()
             grid_row = grid[day_ix] if day_ix < len(grid) else {}
@@ -3077,6 +3079,7 @@ def _render_list_allocation_detail(
                     record_key=record_session_key(emp, "id"),
                     week_status=week_status,
                     day_status=day_status,
+                    include_notes=False,
                 ),
                 normalize_timecard_status=_normalize_timecard_status,
             )
@@ -3094,49 +3097,51 @@ def _render_list_allocation_detail(
         return
 
     record_key = record_session_key(emp, "id")
-    st.markdown(
-        '<span class="timekeeping-allocation-actions-footer-marker" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
-    if can_submit and week_status in ("Draft", "Rejected") and st.button(
-        "Submit all for approval",
-        key=f"tk_submit_alloc_{record_key}",
-    ):
-        if _save_allocation_week(emp, week_start_d, show_message=False)[0] and _submit_timekeeping_week(
-            emp, week_start_d
-        ):
-            st.rerun()
-    if week_status == "Pending" and can_approve:
-        reject_notes = st.text_input(
-            "Rejection notes (optional)",
-            key=f"tk_list_reject_notes_{record_key}",
-            placeholder="Rejection notes (optional)",
-            label_visibility="collapsed",
+    footer_scope = allocation_panel_scope_key(scope)
+    with st.container(key=f"tk_alloc_week_footer_{footer_scope}"):
+        st.markdown(
+            '<span class="timekeeping-allocation-week-footer-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
         )
-        approve_col, reject_col = st.columns(2)
-        with approve_col:
-            if st.button(
-                "Approve time",
-                key=f"tk_approve_week_{record_key}",
-                type="primary",
-                use_container_width=True,
+        if can_submit and week_status in ("Draft", "Rejected") and st.button(
+            "Submit all for approval",
+            key=f"tk_submit_alloc_{record_key}",
+        ):
+            if _save_allocation_week(emp, week_start_d, show_message=False)[0] and _submit_timekeeping_week(
+                emp, week_start_d
             ):
-                if _approve_timekeeping_week(emp, week_start_d):
-                    st.rerun()
-        with reject_col:
-            if st.button(
-                "Reject",
-                key=f"tk_reject_week_{record_key}",
-                use_container_width=True,
-            ):
-                if _reject_timekeeping_week(emp, week_start_d, reject_notes):
-                    st.rerun()
-    elif week_status == "Pending":
-        st.caption("Pending approval — waiting for an administrator to approve or reject.")
-    st.caption(
-        "Totals in the row above are the source of truth. Use Submit day / Approve day on each day card, "
-        "or approve the full week below. Hours on — No assignment — do not count as allocated — pick a job, subjob, Shop, Administrative, or Vacation before submitting."
-    )
+                st.rerun()
+        if week_status == "Pending" and can_approve:
+            reject_notes = st.text_input(
+                "Rejection notes (optional)",
+                key=f"tk_list_reject_notes_{record_key}",
+                placeholder="Rejection notes (optional)",
+                label_visibility="collapsed",
+            )
+            approve_col, reject_col = st.columns(2)
+            with approve_col:
+                if st.button(
+                    "Approve time",
+                    key=f"tk_approve_week_{record_key}",
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    if _approve_timekeeping_week(emp, week_start_d):
+                        st.rerun()
+            with reject_col:
+                if st.button(
+                    "Reject",
+                    key=f"tk_reject_week_{record_key}",
+                    use_container_width=True,
+                ):
+                    if _reject_timekeeping_week(emp, week_start_d, reject_notes):
+                        st.rerun()
+        elif week_status == "Pending":
+            st.caption("Pending approval — waiting for an administrator to approve or reject.")
+        st.caption(
+            "Totals in the row above are the source of truth. Use Submit day / Approve day on each day card, "
+            "or approve the full week below. Hours on — No assignment — do not count as allocated — pick a job, subjob, Shop, Administrative, or Vacation before submitting."
+        )
 
 
 def _render_inline_daily_entries(row: dict, week_start_d: date) -> None:

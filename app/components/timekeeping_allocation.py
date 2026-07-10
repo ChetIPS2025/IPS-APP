@@ -18,6 +18,7 @@ ALLOC_HOUR_TYPE_OPTS = ("S/T", "O/T")
 # Streamlit column weights (layout widths come from CSS grid/flex in styles.py).
 # Reference layout: Assignment | Type | Hours (+ Remaining/Status below) | Notes
 ALLOC_LINE_COLS = [3.55, 0.58, 0.78, 1.55]
+ALLOC_LINE_COLS_COMPACT = [4.8, 0.72, 0.95]
 
 
 @dataclass(frozen=True)
@@ -75,6 +76,7 @@ class DayAllocationCardContext:
     week_status: str = ""
     day_status: str = "Draft"
     can_submit: bool = False
+    include_notes: bool = True
 
 
 def allocation_day_block_class(state: str) -> str:
@@ -433,8 +435,9 @@ def render_allocation_control_row(
     line_scope = allocation_panel_scope_key(f"{ctx.panel_scope}_{iso}_{lix}")
     autosave_cb = deps.mark_allocation_dirty if row_editable else None
     autosave_args = (iso,)
+    line_cols = ALLOC_LINE_COLS if ctx.include_notes else ALLOC_LINE_COLS_COMPACT
     with st.container(key=f"tk_alloc_line_{line_scope}"):
-        row_cols = st.columns(ALLOC_LINE_COLS, gap="small")
+        row_cols = st.columns(line_cols, gap="small")
         marker_classes = (
             "timekeeping-allocation-line-marker "
             "timekeeping-allocation-control-row-marker "
@@ -512,44 +515,63 @@ def render_allocation_control_row(
                 on_change=autosave_cb,
                 on_change_args=autosave_args,
             )
-        with row_cols[3]:
-            if row_editable:
-                line["notes"] = st.text_input(
-                    "Notes",
-                    value=str(line.get("notes") or ""),
-                    key=f"tk_alloc_notes_{eid}_{week_sig}_{iso}_{lix}",
-                    placeholder="Add notes (optional)",
-                    on_change=autosave_cb,
-                    args=autosave_args,
-                )
-                if is_primary_row:
-                    status_html = deps.alloc_autosave_status_html(iso)
-                    if status_html:
-                        st.markdown(
-                            f'<div class="timekeeping-alloc-row-autosave">{status_html}</div>',
-                            unsafe_allow_html=True,
-                        )
-            else:
+        if ctx.include_notes:
+            with row_cols[3]:
+                if row_editable:
+                    line["notes"] = st.text_input(
+                        "Notes",
+                        value=str(line.get("notes") or ""),
+                        key=f"tk_alloc_notes_{eid}_{week_sig}_{iso}_{lix}",
+                        placeholder="Add notes (optional)",
+                        on_change=autosave_cb,
+                        args=autosave_args,
+                    )
+                    if is_primary_row:
+                        status_html = deps.alloc_autosave_status_html(iso)
+                        if status_html:
+                            st.markdown(
+                                f'<div class="timekeeping-alloc-row-autosave">{status_html}</div>',
+                                unsafe_allow_html=True,
+                            )
+                else:
+                    st.markdown(
+                        '<div class="timekeeping-alloc-field-label timekeeping-alloc-field-label-static">'
+                        "Notes</div>",
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(
+                        f'<div class="timekeeping-alloc-cell">'
+                        f"{html.escape(str(line.get('notes') or '—'))}</div>",
+                        unsafe_allow_html=True,
+                    )
+                if not is_primary_row:
+                    _render_allocation_row_secondary_actions(
+                        deps=deps,
+                        ctx=ctx,
+                        line=line,
+                        lix=lix,
+                        lines=lines,
+                        day_status=day_status,
+                        row_editable=row_editable,
+                    )
+        elif is_primary_row:
+            status_html = deps.alloc_autosave_status_html(iso)
+            if status_html:
                 st.markdown(
-                    '<div class="timekeeping-alloc-field-label timekeeping-alloc-field-label-static">'
-                    "Notes</div>",
+                    f'<div class="timekeeping-alloc-row-autosave timekeeping-alloc-row-autosave-compact">'
+                    f"{status_html}</div>",
                     unsafe_allow_html=True,
                 )
-                st.markdown(
-                    f'<div class="timekeeping-alloc-cell">'
-                    f"{html.escape(str(line.get('notes') or '—'))}</div>",
-                    unsafe_allow_html=True,
-                )
-            if not is_primary_row:
-                _render_allocation_row_secondary_actions(
-                    deps=deps,
-                    ctx=ctx,
-                    line=line,
-                    lix=lix,
-                    lines=lines,
-                    day_status=day_status,
-                    row_editable=row_editable,
-                )
+        elif not is_primary_row and row_editable:
+            _render_allocation_row_secondary_actions(
+                deps=deps,
+                ctx=ctx,
+                line=line,
+                lix=lix,
+                lines=lines,
+                day_status=day_status,
+                row_editable=row_editable,
+            )
 
     line["hour_type"] = deps.normalize_alloc_hour_type(line.get("hour_type"))
 
@@ -621,11 +643,12 @@ def render_day_allocation_card(
         )
 
 
-def render_allocation_days_panel(*, panel_scope: str) -> Any:
+def render_allocation_days_panel(*, panel_scope: str, compact: bool = False) -> Any:
     """Wrapper container for all day cards in one expanded employee row."""
     scope = allocation_panel_scope_key(panel_scope)
+    compact_cls = " timekeeping-allocation-list-compact-marker" if compact else ""
     st.markdown(
-        '<span class="timekeeping-allocation-days-panel-marker" aria-hidden="true"></span>',
+        f'<span class="timekeeping-allocation-days-panel-marker{compact_cls}" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
     return st.container(key=f"tk_alloc_panel_{scope}")
