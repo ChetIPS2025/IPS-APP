@@ -141,7 +141,7 @@ _COLUMN_FILTER_SPECS_EMP: list[tuple[str, object]] = [
     ("status", None),
 ]
 
-_CERT_COLS_ALL = [0.35, 2.0, 1.4, 1.5, 1.6, 1.1, 1.1, 1.2, 0.9]
+_CERT_COLS_ALL = [0.35, 1.9, 1.3, 1.4, 1.5, 1.0, 1.0, 1.1, 1.4]
 _CERT_HEADER_SPECS_ALL: list[tuple[str, str | None]] = [
     ("", None),
     ("EMPLOYEE", "employee_name"),
@@ -153,7 +153,7 @@ _CERT_HEADER_SPECS_ALL: list[tuple[str, str | None]] = [
     ("STATUS", "status"),
     ("DOCUMENT", None),
 ]
-_CERT_COLS_EMP = [0.35, 1.8, 1.6, 1.8, 1.2, 1.2, 1.2, 0.9]
+_CERT_COLS_EMP = [0.35, 1.7, 1.5, 1.6, 1.1, 1.1, 1.1, 1.5]
 _CERT_HEADER_SPECS_EMP: list[tuple[str, str | None]] = [
     ("", None),
     ("TYPE", "cert_type"),
@@ -628,19 +628,24 @@ def _render_cert_document_cell(
         return
 
     fname = _cert_attachment_file_name(cert)
-    display_name = fname if len(fname) <= 22 else f"{fname[:19]}..."
-    st.markdown(
-        f'<div class="ips-cert-doc-name" title="{html.escape(fname, quote=True)}">'
-        f"{html.escape(display_name)}"
-        f"</div>",
-        unsafe_allow_html=True,
-    )
     if not _can_view_cert_attachment(cert):
+        st.markdown(
+            f'<div class="ips-cert-doc-name" title="{html.escape(fname, quote=True)}">'
+            f"{html.escape(fname if len(fname) <= 22 else f'{fname[:19]}...')}"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
         st.markdown('<span class="ips-cert-doc-empty">Restricted</span>', unsafe_allow_html=True)
         return
 
     url = get_certification_attachment_url(cert)
     if not url:
+        st.markdown(
+            f'<div class="ips-cert-doc-name" title="{html.escape(fname, quote=True)}">'
+            f"{html.escape(fname if len(fname) <= 22 else f'{fname[:19]}...')}"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
         st.markdown(
             '<span class="ips-cert-doc-empty">Preview unavailable</span>',
             unsafe_allow_html=True,
@@ -659,6 +664,10 @@ def _render_cert_document_cell(
             st.rerun()
         return
 
+    st.markdown(
+        '<span class="ips-cert-doc-actions-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
     action_col1, action_col2 = st.columns(2, gap="small")
     toggle_key = _show_doc_key(cid, prefix=session_prefix)
     with action_col1:
@@ -681,7 +690,7 @@ def _render_cert_document_cell(
             url,
             key=f"{session_prefix}cert_doc_open_{cid}",
             use_container_width=True,
-            help="Download certification document",
+            help=f"Download {fname}" if fname else "Download certification document",
         )
 
 
@@ -796,6 +805,10 @@ def _render_certifications_table(
                     unsafe_allow_html=True,
                 )
             with cols[col_idx + 6]:
+                st.markdown(
+                    '<span class="ips-cert-doc-cell" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
                 _render_cert_document_cell(
                     cert,
                     session_prefix=session_prefix,

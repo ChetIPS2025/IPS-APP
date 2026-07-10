@@ -2486,6 +2486,60 @@ def inject_certifications_module_css() -> None:
   color: #1e3a8a !important;
   border-color: #60a5fa !important;
 }}
+.st-key-certifications_table_wrap [data-testid="column"]:has(.ips-cert-doc-cell) [data-testid="stHorizontalBlock"]:has(.ips-cert-doc-actions-marker),
+.st-key-emp_certifications_table_wrap [data-testid="column"]:has(.ips-cert-doc-cell) [data-testid="stHorizontalBlock"]:has(.ips-cert-doc-actions-marker) {{
+  flex-wrap: nowrap !important;
+  gap: 0.35rem !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  align-items: center !important;
+}}
+.st-key-certifications_table_wrap [data-testid="column"]:has(.ips-cert-doc-cell) [data-testid="stHorizontalBlock"]:has(.ips-cert-doc-actions-marker) > [data-testid="column"],
+.st-key-emp_certifications_table_wrap [data-testid="column"]:has(.ips-cert-doc-cell) [data-testid="stHorizontalBlock"]:has(.ips-cert-doc-actions-marker) > [data-testid="column"] {{
+  flex: 1 1 0 !important;
+  min-width: 76px !important;
+  max-width: none !important;
+  overflow: visible !important;
+}}
+.st-key-certifications_table_wrap [data-testid="column"]:has(.ips-cert-doc-cell) [class*="cert_doc_preview_"] [data-testid="stButton"] > button,
+.st-key-certifications_table_wrap [data-testid="column"]:has(.ips-cert-doc-cell) [class*="cert_doc_open_"] [data-testid="stLinkButton"] > a,
+.st-key-emp_certifications_table_wrap [data-testid="column"]:has(.ips-cert-doc-cell) [class*="cert_doc_preview_"] [data-testid="stButton"] > button,
+.st-key-emp_certifications_table_wrap [data-testid="column"]:has(.ips-cert-doc-cell) [class*="cert_doc_open_"] [data-testid="stLinkButton"] > a {{
+  display: inline-flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  min-width: 76px !important;
+  max-width: none !important;
+  min-height: 28px !important;
+  height: 28px !important;
+  padding: 0 10px !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  writing-mode: horizontal-tb !important;
+  line-height: 1.1 !important;
+}}
+.st-key-certifications_table_wrap [data-testid="column"]:has(.ips-cert-doc-cell) [class*="cert_doc_preview_"] [data-testid="stButton"] > button > div,
+.st-key-certifications_table_wrap [data-testid="column"]:has(.ips-cert-doc-cell) [class*="cert_doc_open_"] [data-testid="stLinkButton"] > a > div,
+.st-key-emp_certifications_table_wrap [data-testid="column"]:has(.ips-cert-doc-cell) [class*="cert_doc_preview_"] [data-testid="stButton"] > button > div,
+.st-key-emp_certifications_table_wrap [data-testid="column"]:has(.ips-cert-doc-cell) [class*="cert_doc_open_"] [data-testid="stLinkButton"] > a > div,
+.st-key-certifications_table_wrap [data-testid="column"]:has(.ips-cert-doc-cell) [class*="cert_doc_preview_"] [data-testid="stButton"] > button p,
+.st-key-certifications_table_wrap [data-testid="column"]:has(.ips-cert-doc-cell) [class*="cert_doc_open_"] [data-testid="stLinkButton"] > a p,
+.st-key-emp_certifications_table_wrap [data-testid="column"]:has(.ips-cert-doc-cell) [class*="cert_doc_preview_"] [data-testid="stButton"] > button p,
+.st-key-emp_certifications_table_wrap [data-testid="column"]:has(.ips-cert-doc-cell) [class*="cert_doc_open_"] [data-testid="stLinkButton"] > a p {{
+  display: inline-flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: center !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  writing-mode: horizontal-tb !important;
+}}
 .ips-cert-doc-pill {{
   display: inline-flex;
   align-items: center;
