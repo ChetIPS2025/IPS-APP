@@ -24,7 +24,8 @@ IPS_SIDEBAR_COLLAPSED_WIDTH_PX = 48
 IPS_SIDEBAR_COLLAPSED_NAV_HEIGHT_PX = 44
 IPS_SIDEBAR_COLLAPSED_ICON_PX = 18
 IPS_SIDEBAR_COLLAPSED_HEADER_HEIGHT_PX = 56
-IPS_SIDEBAR_COLLAPSED_LOGO_PX = 28
+IPS_SIDEBAR_COLLAPSED_LOGO_PX = 40
+IPS_SIDEBAR_EXPANDED_LOGO_PX = 52
 
 
 def _collapsed_sidebar_selectors() -> str:
@@ -191,21 +192,13 @@ def _nav_fallback_rows() -> list[dict[str, str]]:
 
 def _desktop_rail_logo_html() -> str:
     try:
-        from app.config import ROOT_DIR
-        from app.branding import _logo_data_uri
+        from app.branding import sidebar_round_logo_html
     except ImportError:
-        from config import ROOT_DIR  # type: ignore
-        from branding import _logo_data_uri  # type: ignore
-    logo_px = IPS_SIDEBAR_COLLAPSED_LOGO_PX
-    for name in ("IPS Icon.png", "ips_logo_round.png", "ips_logo_header.png", "company_logo.png"):
-        path = Path(ROOT_DIR) / "assets" / name
-        if path.is_file():
-            src = html.escape(_logo_data_uri(str(path)), quote=True)
-            return (
-                f'<img class="ips-desktop-nav-rail__logo" src="{src}" alt="IPS" '
-                f'width="{logo_px}" height="{logo_px}" />'
-            )
-    return '<span class="ips-desktop-nav-rail__logo-fallback">IPS</span>'
+        from branding import sidebar_round_logo_html  # type: ignore
+    return sidebar_round_logo_html(
+        size_px=IPS_SIDEBAR_COLLAPSED_LOGO_PX,
+        css_class="ips-desktop-nav-rail__logo",
+    )
 
 
 def _desktop_nav_rail_css() -> str:
@@ -508,8 +501,10 @@ def inject_sidebar_nav_override_css() -> None:
 
 def _sidebar_nav_override_css() -> str:
     """Final cascade override for sidebar navigation rows (not button chrome)."""
-    return """
-<style id="ips-sidebar-nav-override-v9">
+    col_logo = IPS_SIDEBAR_COLLAPSED_LOGO_PX
+    exp_logo = IPS_SIDEBAR_EXPANDED_LOGO_PX
+    css = """
+<style id="ips-sidebar-nav-override-v10">
 section[data-testid="stSidebar"] > div,
 section[data-testid="stSidebar"] [data-testid="stSidebarContent"],
 section[data-testid="stSidebar"] .block-container {
@@ -647,8 +642,8 @@ section[data-testid="stSidebar"] .sidebar-logo-wrap img,
 section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"] img,
 section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed img,
 section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {
-  max-width: 90% !important;
-  max-height: 110px !important;
+  max-width: __EXP_LOGO__px !important;
+  max-height: __EXP_LOGO__px !important;
   width: auto !important;
   height: auto !important;
   object-fit: contain !important;
@@ -657,8 +652,8 @@ body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap i
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"] img,
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed img,
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {
-  max-width: 28px !important;
-  max-height: 28px !important;
+  max-width: __COL_LOGO__px !important;
+  max-height: __COL_LOGO__px !important;
 }
 section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"],
 section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] {
@@ -885,18 +880,33 @@ section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):n
   margin: 0 !important;
 }
 .sidebar-logo-icon {
-  width: 28px !important;
-  height: 28px !important;
-  min-width: 28px !important;
-  min-height: 28px !important;
-  max-width: 28px !important;
-  max-height: 28px !important;
+  width: __COL_LOGO__px !important;
+  height: __COL_LOGO__px !important;
+  min-width: __COL_LOGO__px !important;
+  min-height: __COL_LOGO__px !important;
+  max-width: __COL_LOGO__px !important;
+  max-height: __COL_LOGO__px !important;
   object-fit: contain !important;
   display: block !important;
   margin: 0 auto !important;
 }
+.sidebar-logo-img--expanded {
+  width: __EXP_LOGO__px !important;
+  height: __EXP_LOGO__px !important;
+  min-width: __EXP_LOGO__px !important;
+  min-height: __EXP_LOGO__px !important;
+  max-width: __EXP_LOGO__px !important;
+  max-height: __EXP_LOGO__px !important;
+  object-fit: contain !important;
+  display: block !important;
+  margin: 0 auto !important;
+  background: transparent !important;
+}
 </style>
 """
+    return (
+        css.replace("__COL_LOGO__", str(col_logo)).replace("__EXP_LOGO__", str(exp_logo))
+    )
 
 
 def inject_sidebar_layout_state(collapsed: bool) -> None:
@@ -1039,6 +1049,7 @@ def _shell_css() -> str:
     icon = IPS_SIDEBAR_COLLAPSED_ICON_PX
     header_h = IPS_SIDEBAR_COLLAPSED_HEADER_HEIGHT_PX
     logo_px = IPS_SIDEBAR_COLLAPSED_LOGO_PX
+    exp_logo_px = IPS_SIDEBAR_EXPANDED_LOGO_PX
     mobile_max = IPS_SIDEBAR_DESKTOP_MIN_PX - 1
     collapsed_sel = _collapsed_sidebar_selectors()
     return f"""
@@ -1231,8 +1242,8 @@ button.ips-header-menu-btn {{
   body.ips-sidebar-collapsed section[data-testid="stSidebar"]:hover .sidebar-logo-wrap [data-testid="stImage"] img,
   section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):hover .sidebar-logo-wrap img,
   section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):hover .sidebar-logo-wrap [data-testid="stImage"] img {{
-    max-width: 90% !important;
-    max-height: 110px !important;
+    max-width: {exp_logo_px}px !important;
+    max-height: {exp_logo_px}px !important;
   }}
   section[data-testid="stSidebar"] [class*="st-key-ips_sidebar_collapse_toggle"] {{
     display: none !important;
@@ -1497,13 +1508,15 @@ button.ips-header-menu-btn {{
   .sidebar-logo-wrap img,
   .sidebar-logo-wrap [data-testid="stImage"] img,
   .sidebar-logo-wrap--collapsed img,
-  .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {{
-    max-width: 90% !important;
-    max-height: 110px !important;
+  .sidebar-logo-wrap--collapsed [data-testid="stImage"] img,
+  .sidebar-logo-img--expanded {{
+    max-width: {exp_logo_px}px !important;
+    max-height: {exp_logo_px}px !important;
     width: auto !important;
     height: auto !important;
     margin: 0 auto !important;
     object-fit: contain !important;
+    background: transparent !important;
   }}
   .sidebar-header--collapsed-rail .sidebar-logo-wrap img,
   .sidebar-header--collapsed-rail .sidebar-logo-wrap [data-testid="stImage"] img,

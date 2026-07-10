@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import html
-from pathlib import Path
 
 import streamlit as st
 
@@ -11,13 +10,15 @@ try:
     from app.auth import current_role, current_user_display_name, effective_role, sign_out
     from app.components.sidebar_nav_icons import nav_icon_for_slug
     from app.components.sidebar_shell import (
+        IPS_SIDEBAR_COLLAPSED_LOGO_PX,
+        IPS_SIDEBAR_EXPANDED_LOGO_PX,
         apply_pending_sidebar_collapse,
         request_sidebar_collapse_after_nav,
         request_sidebar_toggle,
         set_sidebar_collapsed,
         store_sidebar_nav_fallback,
     )
-    from app.config import APP_VERSION, ROOT_DIR
+    from app.config import APP_VERSION
     from app.navigation import set_nav_slug
     from app.utils.constants import EMPLOYEE_NAV_PAGES, FIELD_NAV_PAGES, NAV_PAGES
     from app.utils.permissions import (
@@ -32,13 +33,15 @@ except ImportError:
     from auth import current_role, current_user_display_name, effective_role, sign_out  # type: ignore
     from components.sidebar_nav_icons import nav_icon_for_slug  # type: ignore
     from components.sidebar_shell import (  # type: ignore
+        IPS_SIDEBAR_COLLAPSED_LOGO_PX,
+        IPS_SIDEBAR_EXPANDED_LOGO_PX,
         apply_pending_sidebar_collapse,
         request_sidebar_collapse_after_nav,
         request_sidebar_toggle,
         set_sidebar_collapsed,
         store_sidebar_nav_fallback,
     )
-    from config import APP_VERSION, ROOT_DIR  # type: ignore
+    from config import APP_VERSION  # type: ignore
     from navigation import set_nav_slug  # type: ignore
     from utils.constants import EMPLOYEE_NAV_PAGES, FIELD_NAV_PAGES, NAV_PAGES  # type: ignore
     from utils.permissions import (  # type: ignore
@@ -53,17 +56,12 @@ except ImportError:
 _OT, _CT = "d" + "iv", "/" + "d" + "iv"
 
 
-def _logo_path(*, compact: bool = False) -> Path | None:
-    names = (
-        ("IPS Icon.png", "ips_logo_round.png", "ips_logo_header.png", "company_logo.png")
-        if compact
-        else ("ips_logo_header.png", "IPS Icon.png", "company_logo.png", "ips_logo_round.png")
-    )
-    for name in names:
-        p = ROOT_DIR / "assets" / name
-        if p.is_file():
-            return p
-    return None
+def _sidebar_round_logo_html(*, size_px: int, css_class: str) -> str:
+    try:
+        from app.branding import sidebar_round_logo_html
+    except ImportError:
+        from branding import sidebar_round_logo_html  # type: ignore
+    return sidebar_round_logo_html(size_px=size_px, css_class=css_class)
 
 
 def _nav_button_label(slug: str, label: str) -> str:
@@ -78,29 +76,17 @@ def _section_for_slug(slug: str, sections: list[tuple[frozenset[str], str]]) -> 
     return None
 
 
-def _sidebar_rail_icon_html(*, size: int = 28) -> str:
-    """Inline IPS icon for the collapsed sidebar rail header."""
-    try:
-        from app.branding import _logo_data_uri
-    except ImportError:
-        from branding import _logo_data_uri  # type: ignore
-    logo = _logo_path(compact=True)
-    if not logo:
-        return '<span class="sidebar-logo-icon sidebar-logo-icon-fallback">IPS</span>'
-    src = _logo_data_uri(str(logo))
-    return (
-        f'<img class="sidebar-logo-icon" src="{src}" alt="IPS" '
-        f'width="{size}" height="{size}" style="width:{size}px;height:{size}px;" />'
-    )
-
-
 def _render_sidebar_header() -> None:
+    collapsed_logo = _sidebar_round_logo_html(
+        size_px=IPS_SIDEBAR_COLLAPSED_LOGO_PX,
+        css_class="sidebar-logo-icon",
+    )
     st.markdown(
         f"""
 <div class="sidebar-header sidebar-header--collapsed-rail">
   <span class="sidebar-header-anchor sidebar-header-anchor--collapsed" aria-hidden="true"></span>
   <div class="sidebar-logo-wrap sidebar-logo-wrap--collapsed">
-    {_sidebar_rail_icon_html(size=28)}
+    {collapsed_logo}
   </div>
 </div>
         """,
@@ -115,10 +101,15 @@ def _render_sidebar_header() -> None:
         brand_col, toggle_col = st.columns([8, 1], gap="small", vertical_alignment="center")
         with brand_col:
             st.markdown('<span class="sidebar-header-brand-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
-            logo = _logo_path(compact=False)
-            st.markdown('<span class="sidebar-logo-wrap sidebar-logo-wrap--expanded" aria-hidden="true"></span>', unsafe_allow_html=True)
-            if logo:
-                st.image(str(logo), width=100)
+            expanded_logo = _sidebar_round_logo_html(
+                size_px=IPS_SIDEBAR_EXPANDED_LOGO_PX,
+                css_class="sidebar-logo-img sidebar-logo-img--expanded",
+            )
+            if expanded_logo:
+                st.markdown(
+                    f'<div class="sidebar-logo-wrap sidebar-logo-wrap--expanded ips-sidebar-logo-wrap">{expanded_logo}</div>',
+                    unsafe_allow_html=True,
+                )
             else:
                 st.markdown('<p class="ips-sidebar-brand">IPS Operations</p>', unsafe_allow_html=True)
             st.markdown(

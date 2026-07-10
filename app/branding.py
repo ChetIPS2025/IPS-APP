@@ -21,6 +21,19 @@ def _find_wide_logo() -> Path | None:
     return None
 
 
+def get_sidebar_round_logo_path() -> Path | None:
+    """Circular IPS logo for navigation sidebar branding."""
+    for name in (
+        "ips_logo_round.png",
+        "IPS LOGO ROUND.png",
+        "IPS Icon.png",
+    ):
+        path = _ASSETS_DIR / name
+        if path.is_file():
+            return path
+    return None
+
+
 def get_header_logo_path() -> Path | None:
     """Compact logo for page header bars (square / icon variants)."""
     branding_icon = _ASSETS_DIR / "branding" / "ips_app_icon.png"
@@ -95,6 +108,27 @@ def wording_logo_html(
     return (
         f'<img class="{html.escape(css_class, quote=True)}" src="{src}" alt="{html.escape(alt)}" '
         f'height="{int(height)}" style="height:{int(height)}px;" />'
+    )
+
+
+def sidebar_round_logo_html(
+    *,
+    size_px: int,
+    css_class: str = "sidebar-logo-icon",
+    alt: str = "IPS",
+) -> str:
+    """Inline round IPS logo for sidebar navigation."""
+    path = get_sidebar_round_logo_path()
+    if not path:
+        return (
+            f'<span class="{html.escape(css_class, quote=True)} '
+            f'{html.escape(css_class, quote=True)}-fallback">{html.escape(alt)}</span>'
+        )
+    src = _logo_data_uri(str(path))
+    px = int(size_px)
+    return (
+        f'<img class="{html.escape(css_class, quote=True)}" src="{src}" '
+        f'alt="{html.escape(alt)}" width="{px}" height="{px}" />'
     )
 
 

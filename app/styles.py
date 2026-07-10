@@ -13918,16 +13918,29 @@ section[data-testid="stSidebar"] > div {{
   justify-content: center;
 }}
 .sidebar-logo-icon {{
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  min-height: 28px;
-  max-width: 28px;
-  max-height: 28px;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  max-width: 40px;
+  max-height: 40px;
   object-fit: contain;
   display: block;
   margin: 0 auto;
   padding: 0;
+}}
+.sidebar-logo-img--expanded {{
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  min-height: 52px;
+  max-width: 52px;
+  max-height: 52px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+  padding: 0;
+  background: transparent !important;
 }}
 .sidebar-logo-icon-fallback {{
   font-size: 0.62rem;
@@ -14051,9 +14064,10 @@ section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):h
 .ips-sidebar-logo-wrap [data-testid="stImage"],
 .ips-sidebar-logo-wrap [data-testid="stImage"] img,
 .sidebar-logo-wrap--collapsed img,
-.sidebar-logo-wrap--collapsed [data-testid="stImage"] img {{
-  max-width: 90%;
-  max-height: 110px;
+.sidebar-logo-wrap--collapsed [data-testid="stImage"] img,
+.sidebar-logo-img--expanded {{
+  max-width: 52px;
+  max-height: 52px;
   width: auto;
   height: auto;
   display: block;
@@ -14064,9 +14078,10 @@ section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):h
 .sidebar-header--collapsed .sidebar-logo-wrap img,
 .sidebar-header--collapsed .sidebar-logo-wrap [data-testid="stImage"] img,
 .sidebar-header--collapsed .sidebar-logo-wrap--collapsed img,
-.sidebar-header--collapsed .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {{
-  max-width: 28px;
-  max-height: 28px;
+.sidebar-header--collapsed .sidebar-logo-wrap--collapsed [data-testid="stImage"] img,
+.sidebar-logo-icon {{
+  max-width: 40px;
+  max-height: 40px;
 }}
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stHorizontalBlock"]:has(.sidebar-header-brand-marker),
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):not(:hover) [data-testid="stElementContainer"]:has(.sidebar-header-brand-marker),
