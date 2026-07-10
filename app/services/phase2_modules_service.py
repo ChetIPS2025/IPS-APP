@@ -2201,10 +2201,19 @@ def save_employee_document(ui: dict[str, Any], *, row_id: str | None = None) -> 
 
 def save_certification(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
     try:
-        from app.services.certification_helpers import compute_certification_status, date_to_iso
+        from app.services.certification_helpers import (
+            compute_certification_status,
+            date_to_iso,
+            normalize_certification_ui_dates,
+        )
     except ImportError:
-        from services.certification_helpers import compute_certification_status, date_to_iso  # type: ignore
+        from services.certification_helpers import (  # type: ignore
+            compute_certification_status,
+            date_to_iso,
+            normalize_certification_ui_dates,
+        )
 
+    ui = normalize_certification_ui_dates(ui)
     payload = {
         "employee_id": ui.get("employee_id"),
         "cert_type": ui.get("cert_type") or ui.get("certification_type"),

@@ -12,6 +12,9 @@ CERT_TYPES_NO_EXPIRATION = (
     "Hot Work",
 )
 
+TWIC_CERT_TYPE = "TWIC"
+TWIC_VALIDITY_YEARS = 5
+
 CERT_STATUS_VALUES = (
     "Active",
     "Expiring Soon",
@@ -45,6 +48,38 @@ def date_to_iso(value: object) -> str | None:
     """Serialize UI/date values for Supabase JSON payloads."""
     parsed = coerce_date(value)
     return parsed.isoformat() if parsed else None
+
+
+def is_twic_certification_type(cert_type: object) -> bool:
+    return str(cert_type or "").strip().upper() == TWIC_CERT_TYPE
+
+
+def subtract_years(value: date, years: int) -> date:
+    """Subtract calendar years, falling back to Feb 28 for invalid leap-day targets."""
+    try:
+        return value.replace(year=value.year - years)
+    except ValueError:
+        return value.replace(year=value.year - years, month=2, day=28)
+
+
+def twic_issue_date_from_expiration(expiration: object) -> date | None:
+    """TWIC cards are valid for five years; derive issue date from expiration."""
+    exp = coerce_date(expiration)
+    if exp is None:
+        return None
+    return subtract_years(exp, TWIC_VALIDITY_YEARS)
+
+
+def normalize_certification_ui_dates(ui: dict[str, Any]) -> dict[str, Any]:
+    """Apply certification-type-specific date rules before persistence."""
+    cert_type = ui.get("cert_type") or ui.get("certification_type")
+    if not is_twic_certification_type(cert_type):
+        return ui
+    out = dict(ui)
+    issue = twic_issue_date_from_expiration(out.get("expiration_date"))
+    if issue is not None:
+        out["issue_date"] = issue
+    return out
 
 
 def compute_certification_status(row: dict[str, Any]) -> str:

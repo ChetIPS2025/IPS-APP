@@ -52,6 +52,7 @@ try:
         certification_visible_to_user,
         coerce_date,
         days_until_expiration,
+        is_twic_certification_type,
         resolve_logged_in_employee_id,
     )
     from app.services.certification_attachments_service import cert_has_attachment
@@ -110,6 +111,7 @@ except ImportError:
         certification_visible_to_user,
         coerce_date,
         days_until_expiration,
+        is_twic_certification_type,
         resolve_logged_in_employee_id,
     )
     from services.certification_attachments_service import cert_has_attachment  # type: ignore
@@ -473,6 +475,31 @@ def _sanitize_cert_date_state(key: str, raw: object) -> None:
         st.session_state[key] = coerced
     else:
         st.session_state.pop(key, None)
+
+
+def _render_cert_issue_expiration_inputs(
+    *,
+    type_key: str,
+    issue_key: str,
+    exp_key: str,
+    issue_default: date | None = None,
+    exp_default: date | None = None,
+) -> None:
+    """Render issue/expiration inputs; TWIC hides issue date and derives it on save."""
+    is_twic = is_twic_certification_type(st.session_state.get(type_key))
+    if not is_twic:
+        st.date_input(
+            "Issue Date",
+            value=issue_default if issue_default is not None else date.today(),
+            key=issue_key,
+        )
+    else:
+        st.caption("TWIC issue date is calculated automatically from the expiration date.")
+    st.date_input(
+        "Expiration Date",
+        value=exp_default if exp_default is not None else date.today(),
+        key=exp_key,
+    )
 
 
 def _cert_attachment_file_name(cert: dict[str, Any]) -> str:
@@ -885,15 +912,12 @@ def _render_cert_edit_form(
         st.text_input("Certification Number", key=f"cert_edit_num_{rk}")
         st.text_input("Issuing Organization", key=f"cert_edit_issuer_{rk}")
     with ec2:
-        st.date_input(
-            "Issue Date",
-            value=issue_date_value if issue_date_value is not None else date.today(),
-            key=issue_key,
-        )
-        st.date_input(
-            "Expiration Date",
-            value=expiration_date_value if expiration_date_value is not None else date.today(),
-            key=exp_key,
+        _render_cert_issue_expiration_inputs(
+            type_key=f"cert_edit_type_{rk}",
+            issue_key=issue_key,
+            exp_key=exp_key,
+            issue_default=issue_date_value,
+            exp_default=expiration_date_value,
         )
     st.text_area("Notes", key=f"cert_edit_notes_{rk}", height=80)
     _render_attachment_section(cert, rk=rk, key_prefix=key_prefix, edit_mode=True)
@@ -1129,8 +1153,11 @@ def _show_add_certification_dialog(default_employee_id: str) -> None:
         st.text_input("Certification Number", key="cert_new_number")
         st.text_input("Issuing Organization", key="cert_new_issuer")
     with c2:
-        st.date_input("Issue Date", key="cert_new_issue")
-        st.date_input("Expiration Date", key="cert_new_exp")
+        _render_cert_issue_expiration_inputs(
+            type_key="cert_new_type",
+            issue_key="cert_new_issue",
+            exp_key="cert_new_exp",
+        )
     st.file_uploader(
         "Upload certification image or document",
         type=["png", "jpg", "jpeg", "webp", "pdf"],
@@ -1209,8 +1236,11 @@ def _render_add_certification_form(
             st.text_input("Certification Number", key=f"{prefix}new_number")
             st.text_input("Issuing Organization", key=f"{prefix}new_issuer")
         with c2:
-            st.date_input("Issue Date", key=f"{prefix}new_issue")
-            st.date_input("Expiration Date", key=f"{prefix}new_exp")
+            _render_cert_issue_expiration_inputs(
+                type_key=f"{prefix}new_type",
+                issue_key=f"{prefix}new_issue",
+                exp_key=f"{prefix}new_exp",
+            )
         st.file_uploader(
             "Upload certification image or document",
             type=["png", "jpg", "jpeg", "webp", "pdf"],
