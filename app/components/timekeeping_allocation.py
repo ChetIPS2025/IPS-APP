@@ -46,6 +46,10 @@ class AllocationRenderDeps:
     mark_allocation_dirty: Callable[[str], None]
     save_allocation_day: Callable[[str], None]
     alloc_autosave_status_html: Callable[[str], str]
+    can_override_overtime: bool = False
+    handle_alloc_type_change: Callable[[str, int], None] | None = None
+    overtime_badge_html: Callable[[dict[str, Any]], str] | None = None
+    overtime_policy_note: str = ""
 
 
 def allocation_panel_scope_key(scope: str) -> str:
@@ -128,7 +132,7 @@ def allocation_card_state_class(state: str) -> str:
     return mapping.get(str(state or "").strip(), "allocation-incomplete")
 
 
-def render_allocation_panel_intro() -> None:
+def render_allocation_panel_intro(*, policy_note: str = "", week_totals_html: str = "") -> None:
     st.markdown(
         '<span class="timekeeping-allocation-panel-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
@@ -141,6 +145,10 @@ def render_allocation_panel_intro() -> None:
         "</div>",
         unsafe_allow_html=True,
     )
+    if policy_note:
+        st.caption(policy_note)
+    if week_totals_html:
+        st.markdown(week_totals_html, unsafe_allow_html=True)
 
 
 def render_day_summary_inline(
@@ -241,6 +249,12 @@ def _append_assignment_line(
             "hours": remaining_hrs,
             "notes": "",
             "status": "Draft",
+            "calculated_time_type": "ST",
+            "final_time_type": "ST",
+            "overtime_override": False,
+            "overtime_override_by": None,
+            "overtime_override_at": None,
+            "overtime_override_reason": None,
         }
     )
     by_date[iso] = day_lines
@@ -476,24 +490,65 @@ def render_allocation_control_row(
                 'aria-hidden="true"></span>',
                 unsafe_allow_html=True,
             )
-            if row_editable:
+            calculated = deps.normalize_alloc_hour_type(line.get("calculated_time_type") or hour_type)
+            badge_html = ""
+            if deps.overtime_badge_html:
+                badge_html = deps.overtime_badge_html(line)
+            if badge_html:
+                st.markdown(
+                    f'<div class="timekeeping-alloc-type-badge-wrap">{badge_html}</div>',
+                    unsafe_allow_html=True,
+                )
+            type_disabled = not row_editable or (
+                not deps.can_override_overtime and not line.get("overtime_override")
+            )
+            if row_editable and deps.can_override_overtime:
                 hour_type_options = list(ALLOC_HOUR_TYPE_OPTS)
-                type_label = deps.alloc_hour_type_label(hour_type)
+                type_label = deps.alloc_hour_type_label(
+                    line.get("final_time_type") or hour_type
+                )
                 deps.ensure_alloc_type_widget_label(type_key, hour_type)
                 type_index = (
                     hour_type_options.index(type_label)
                     if type_label in hour_type_options
                     else 0
                 )
-                picked = st.selectbox(
+                type_kwargs: dict[str, Any] = {
+                    "label": "Type",
+                    "options": hour_type_options,
+                    "index": type_index,
+                    "key": type_key,
+                }
+                if deps.handle_alloc_type_change is not None:
+                    type_kwargs["on_change"] = deps.handle_alloc_type_change
+                    type_kwargs["args"] = (iso, lix)
+                else:
+                    type_kwargs["on_change"] = autosave_cb
+                    type_kwargs["args"] = autosave_args
+                picked = st.selectbox(**type_kwargs)
+                line["hour_type"] = deps.normalize_alloc_hour_type(picked)
+            elif row_editable:
+                hour_type_options = list(ALLOC_HOUR_TYPE_OPTS)
+                type_label = deps.alloc_hour_type_label(
+                    line.get("final_time_type") or calculated
+                )
+                deps.ensure_alloc_type_widget_label(type_key, hour_type)
+                type_index = (
+                    hour_type_options.index(type_label)
+                    if type_label in hour_type_options
+                    else 0
+                )
+                st.selectbox(
                     "Type",
                     options=hour_type_options,
                     index=type_index,
                     key=type_key,
-                    on_change=autosave_cb,
-                    args=autosave_args,
+                    disabled=True,
+                    help=f"Calculated as {deps.alloc_hour_type_label(calculated)}",
                 )
-                line["hour_type"] = deps.normalize_alloc_hour_type(picked)
+                line["hour_type"] = deps.normalize_alloc_hour_type(
+                    line.get("final_time_type") or calculated
+                )
             else:
                 st.markdown(
                     '<div class="timekeeping-alloc-field-label timekeeping-alloc-field-label-static">'

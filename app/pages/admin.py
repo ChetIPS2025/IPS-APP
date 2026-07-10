@@ -330,6 +330,9 @@ def _hydrate_app_settings_widgets(key_prefix: str) -> None:
     st.session_state[f"{key_prefix}_date_fmt"] = str(row.get("date_format") or "MM/DD/YYYY")
     st.session_state[f"{key_prefix}_tz"] = str(row.get("timezone") or "America/Chicago")
     st.session_state[f"{key_prefix}_email"] = bool(row.get("email_notifications_enabled", True))
+    st.session_state[f"{key_prefix}_weekend_40"] = bool(
+        row.get("timekeeping_weekend_counts_toward_40", False)
+    )
     st.session_state[flag] = True
 
 
@@ -371,6 +374,16 @@ def _render_app_settings(*, key_prefix: str) -> None:
         key=f"{key_prefix}_theme",
         disabled=True,
     )
+    st.markdown("**Timekeeping**")
+    st.toggle(
+        "Weekend hours count toward 40-hour straight-time threshold",
+        key=f"{key_prefix}_weekend_40",
+        help=(
+            "When off (default), Saturday and Sunday hours are always overtime and do not "
+            "reduce weekday straight-time capacity. When on, weekend hours participate in "
+            "the 40-hour weekly straight-time calculation."
+        ),
+    )
     if st.button("Save settings", key=f"{key_prefix}_save", type="primary"):
         try:
             from app.services.company_settings_service import save_app_settings
@@ -381,6 +394,9 @@ def _render_app_settings(*, key_prefix: str) -> None:
             date_format=str(st.session_state.get(f"{key_prefix}_date_fmt") or "MM/DD/YYYY"),
             timezone_name=str(st.session_state.get(f"{key_prefix}_tz") or "America/Chicago"),
             email_notifications_enabled=bool(st.session_state.get(f"{key_prefix}_email", True)),
+            timekeeping_weekend_counts_toward_40=bool(
+                st.session_state.get(f"{key_prefix}_weekend_40", False)
+            ),
         )
         apply_persist_feedback(ok, msg)
     st.markdown("---")

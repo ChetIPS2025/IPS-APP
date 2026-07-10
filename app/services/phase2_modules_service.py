@@ -2467,6 +2467,12 @@ def save_timekeeping_day(ui: dict[str, Any], *, row_id: str | None = None) -> Se
         "dt_hours": ui.get("dt_hours") or 0,
         "notes": ui.get("notes") or "",
         "status": ui.get("status") or "Draft",
+        "calculated_time_type": ui.get("calculated_time_type"),
+        "final_time_type": ui.get("final_time_type"),
+        "overtime_override": bool(ui.get("overtime_override")),
+        "overtime_override_by": ui.get("overtime_override_by") or None,
+        "overtime_override_at": ui.get("overtime_override_at"),
+        "overtime_override_reason": ui.get("overtime_override_reason") or None,
     }
     rid = str(row_id or "").strip() or None
     if not rid:

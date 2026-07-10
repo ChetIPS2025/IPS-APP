@@ -499,6 +499,17 @@ EMPLOYEE_TIMEKEEPING_DAYS_COLUMNS = _cols(
     "approved_at",
     "created_at",
     "updated_at",
+    "st_hours",
+    "ot_hours",
+    "dt_hours",
+    "job_label",
+    "job_id",
+    "calculated_time_type",
+    "final_time_type",
+    "overtime_override",
+    "overtime_override_by",
+    "overtime_override_at",
+    "overtime_override_reason",
 )
 
 EMPLOYEE_TIMEKEEPING_WEEKS_COLUMNS = _cols(
@@ -788,6 +799,7 @@ COMPANY_SETTINGS_COLUMNS = _cols(
     "default_landing_page",
     "date_format",
     "email_notifications_enabled",
+    "timekeeping_weekend_counts_toward_40",
     "created_at",
     "updated_at",
 )

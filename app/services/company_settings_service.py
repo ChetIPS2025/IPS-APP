@@ -11,6 +11,7 @@ _DEFAULTS: dict[str, Any] = {
     "default_landing_page": "Dashboard",
     "date_format": "MM/DD/YYYY",
     "email_notifications_enabled": True,
+    "timekeeping_weekend_counts_toward_40": False,
 }
 
 _LANDING_PAGES = ("Dashboard", "Jobs", "Timekeeping")
@@ -45,6 +46,7 @@ def save_app_settings(
     date_format: str,
     timezone_name: str,
     email_notifications_enabled: bool,
+    timekeeping_weekend_counts_toward_40: bool = False,
 ) -> tuple[bool, str]:
     landing = str(default_landing_page or "Dashboard").strip()
     if landing not in _LANDING_PAGES:
@@ -61,6 +63,7 @@ def save_app_settings(
         "date_format": fmt,
         "timezone": tz,
         "email_notifications_enabled": bool(email_notifications_enabled),
+        "timekeeping_weekend_counts_toward_40": bool(timekeeping_weekend_counts_toward_40),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 

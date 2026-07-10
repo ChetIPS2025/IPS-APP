@@ -2637,6 +2637,12 @@ def persist_timekeeping_days(
             "dt_hours": row.get("dt") or 0,
             "notes": row.get("notes") or "",
             "status": str(row.get("status") or "Draft"),
+            "calculated_time_type": row.get("calculated_time_type"),
+            "final_time_type": row.get("final_time_type"),
+            "overtime_override": bool(row.get("overtime_override")),
+            "overtime_override_by": row.get("overtime_override_by"),
+            "overtime_override_at": row.get("overtime_override_at"),
+            "overtime_override_reason": row.get("overtime_override_reason"),
         }
         res = save_timekeeping_day(ui, row_id=day_id)
         err = _persist_result(res, success="")

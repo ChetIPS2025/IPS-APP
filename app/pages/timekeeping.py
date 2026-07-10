@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import html
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import streamlit as st
@@ -612,6 +612,17 @@ def _can_admin_edit_approved_timekeeping() -> bool:
     return can_admin_edit_approved_timekeeping(effective_role())
 
 
+def _can_override_overtime_allocation() -> bool:
+    """Only administrators may manually change calculated S/T vs O/T."""
+    try:
+        from app.auth import effective_role
+        from app.utils.permissions import normalize_role
+    except ImportError:
+        from auth import effective_role  # type: ignore
+        from utils.permissions import normalize_role  # type: ignore
+    return normalize_role(effective_role()) == "admin"
+
+
 def _day_hours_editable(day_status: str, week_status: str) -> bool:
     """Whether list-row / allocation hours may be edited for this day."""
     if not _can_submit_timekeeping():
@@ -851,50 +862,58 @@ def _load_saved_allocations_by_date(employee_id: str, week_start_d: date) -> dic
         status = _normalize_timecard_status(row.get("status"))
         st_h = float(row.get("st_hours") or 0)
         ot_h = float(row.get("ot_hours") or 0) + float(row.get("dt_hours") or 0)
-        # Only split ST/OT when both buckets have hours (explicit user split).
-        # Hours stored only as OT default to S/T in the allocation UI.
+        meta = _overtime_meta_from_db_row(row)
         if st_h > 0 and ot_h > 0:
             by_date.setdefault(iso, []).append(
-                {
-                    "line_id": line_id,
-                    "job": job,
-                    "hour_type": "ST",
-                    "hours": st_h,
-                    "notes": notes,
-                    "status": status,
-                }
+                _new_allocation_line(
+                    line_id=line_id,
+                    job=job,
+                    hour_type="ST",
+                    hours=st_h,
+                    notes=notes,
+                    status=status,
+                    **meta,
+                    final_time_type="ST",
+                )
             )
             by_date.setdefault(iso, []).append(
-                {
-                    "line_id": line_id,
-                    "job": job,
-                    "hour_type": "OT",
-                    "hours": ot_h,
-                    "notes": notes,
-                    "status": status,
-                }
+                _new_allocation_line(
+                    line_id=line_id,
+                    job=job,
+                    hour_type="OT",
+                    hours=ot_h,
+                    notes=notes,
+                    status=status,
+                    **meta,
+                    final_time_type="OT",
+                )
             )
         elif st_h > 0 or ot_h > 0:
+            hours = st_h + ot_h
+            final_type = meta.get("final_time_type") or ("OT" if ot_h > 0 and st_h <= 0 else "ST")
             by_date.setdefault(iso, []).append(
-                {
-                    "line_id": line_id,
-                    "job": job,
-                    "hour_type": "ST",
-                    "hours": st_h + ot_h,
-                    "notes": notes,
-                    "status": status,
-                }
+                _new_allocation_line(
+                    line_id=line_id,
+                    job=job,
+                    hour_type=final_type,
+                    hours=hours,
+                    notes=notes,
+                    status=status,
+                    **meta,
+                    final_time_type=final_type,
+                )
             )
         if st_h <= 0 and ot_h <= 0:
             by_date.setdefault(iso, []).append(
-                {
-                    "line_id": line_id,
-                    "job": job,
-                    "hour_type": "ST",
-                    "hours": 0.0,
-                    "notes": notes,
-                    "status": status,
-                }
+                _new_allocation_line(
+                    line_id=line_id,
+                    job=job,
+                    hour_type="ST",
+                    hours=0.0,
+                    notes=notes,
+                    status=status,
+                    **meta,
+                )
             )
     return by_date
 
@@ -933,6 +952,149 @@ def _normalize_alloc_hour_type(raw: object) -> str:
     if compact in {"OT", "OVERTIME"}:
         return "OT"
     return "ST"
+
+
+def _weekend_counts_toward_40() -> bool:
+    try:
+        from app.services.company_settings_service import load_app_settings
+    except ImportError:
+        from services.company_settings_service import load_app_settings  # type: ignore
+    settings = load_app_settings()
+    return bool(settings.get("timekeeping_weekend_counts_toward_40"))
+
+
+def _overtime_meta_from_db_row(row: dict[str, Any]) -> dict[str, Any]:
+    final_raw = row.get("final_time_type")
+    calc_raw = row.get("calculated_time_type")
+    final = _normalize_alloc_hour_type(final_raw) if final_raw else ""
+    calculated = _normalize_alloc_hour_type(calc_raw) if calc_raw else ""
+    return {
+        "calculated_time_type": calculated or final or "ST",
+        "final_time_type": final or calculated or "ST",
+        "overtime_override": bool(row.get("overtime_override")),
+        "overtime_override_by": row.get("overtime_override_by"),
+        "overtime_override_at": row.get("overtime_override_at"),
+        "overtime_override_reason": row.get("overtime_override_reason"),
+    }
+
+
+def _new_allocation_line(**extra: Any) -> dict[str, Any]:
+    try:
+        from app.services.timekeeping_overtime_service import new_allocation_line_defaults
+    except ImportError:
+        from services.timekeeping_overtime_service import new_allocation_line_defaults  # type: ignore
+    return new_allocation_line_defaults(**extra)
+
+
+def _recalculate_week_overtime(
+    by_date: dict[str, list[dict[str, Any]]],
+    week_start_d: date,
+) -> dict[str, list[dict[str, Any]]]:
+    try:
+        from app.services.timekeeping_overtime_service import recalculate_week_allocations
+    except ImportError:
+        from services.timekeeping_overtime_service import recalculate_week_allocations  # type: ignore
+    return recalculate_week_allocations(
+        by_date,
+        week_start_d,
+        week_dates_fn=week_dates,
+        weekend_counts_toward_40=_weekend_counts_toward_40(),
+        preserve_locked=True,
+    )
+
+
+def _overtime_policy_note() -> str:
+    try:
+        from app.services.timekeeping_overtime_service import overtime_policy_note
+    except ImportError:
+        from services.timekeeping_overtime_service import overtime_policy_note  # type: ignore
+    return overtime_policy_note(weekend_counts_toward_40=_weekend_counts_toward_40())
+
+
+def _summarize_week_allocation_hours(by_date: dict[str, list[dict[str, Any]]]) -> dict[str, float]:
+    try:
+        from app.services.timekeeping_overtime_service import summarize_week_hours
+    except ImportError:
+        from services.timekeeping_overtime_service import summarize_week_hours  # type: ignore
+    return summarize_week_hours(by_date)
+
+
+def _sync_alloc_type_widgets_from_lines(
+    by_date: dict[str, list[dict[str, Any]]],
+    *,
+    eid: str,
+    week_sig: str,
+) -> None:
+    for iso, lines in by_date.items():
+        for lix, line in enumerate(lines):
+            type_key = f"tk_alloc_type_{eid}_{week_sig}_{iso}_{lix}"
+            label = _alloc_hour_type_label(line.get("final_time_type") or line.get("hour_type"))
+            st.session_state[type_key] = label
+
+
+def _week_allocation_totals_html(by_date: dict[str, list[dict[str, Any]]]) -> str:
+    totals = _summarize_week_allocation_hours(by_date)
+    return (
+        '<div class="timekeeping-alloc-week-totals">'
+        f'<span><strong>S/T:</strong> {_fmt_day_hours(totals["st_total"])}</span>'
+        f'<span><strong>O/T:</strong> {_fmt_day_hours(totals["ot_total"])}</span>'
+        f'<span><strong>Total:</strong> {_fmt_day_hours(totals["total_hours"])}</span>'
+        "</div>"
+    )
+
+
+def _overtime_override_badge_html(line: dict[str, Any]) -> str:
+    if not line.get("overtime_override"):
+        return ""
+    return (
+        '<span class="timekeeping-alloc-override-badge" '
+        'title="Administrator manually changed the calculated overtime type">'
+        "Admin Override</span>"
+    )
+
+
+def _handle_alloc_type_change(
+    eid: str,
+    week_sig: str,
+    iso: str,
+    lix: int,
+    *,
+    can_override: bool,
+) -> None:
+    if not can_override:
+        return
+    ak = _alloc_state_key(eid)
+    by_date = st.session_state.get(ak)
+    if not isinstance(by_date, dict):
+        return
+    lines = list(by_date.get(iso) or [])
+    if lix >= len(lines):
+        return
+    type_key = f"tk_alloc_type_{eid}_{week_sig}_{iso}_{lix}"
+    picked = _normalize_alloc_hour_type(st.session_state.get(type_key))
+    line = dict(lines[lix])
+    calculated = _normalize_alloc_hour_type(line.get("calculated_time_type") or "ST")
+    if picked == calculated:
+        line["overtime_override"] = False
+        line["overtime_override_by"] = None
+        line["overtime_override_at"] = None
+        line["overtime_override_reason"] = None
+    else:
+        line["overtime_override"] = True
+        line["overtime_override_by"] = _current_user_id() or None
+        line["overtime_override_at"] = datetime.now(timezone.utc).isoformat()
+    line["final_time_type"] = picked
+    line["hour_type"] = picked
+    lines[lix] = line
+    by_date[iso] = lines
+    try:
+        week_start_d = date.fromisoformat(week_sig)
+        by_date = _recalculate_week_overtime(by_date, week_start_d)
+        _sync_alloc_type_widgets_from_lines(by_date, eid=eid, week_sig=week_sig)
+    except ValueError:
+        pass
+    st.session_state[ak] = by_date
+    _set_alloc_autosave_status(eid, iso, "unsaved")
 
 
 def _user_picked_allocation_overtime(
@@ -1046,7 +1208,11 @@ def _live_allocation_lines_for_day(
         hrs_key = f"tk_alloc_hrs_{eid}_{week_sig}_{iso}_{lix}"
         if job_key in st.session_state:
             live["job"] = st.session_state[job_key]
-        if type_key in st.session_state:
+        if line.get("overtime_override") and type_key in st.session_state:
+            live["hour_type"] = _normalize_alloc_hour_type(st.session_state[type_key])
+        elif line.get("final_time_type"):
+            live["hour_type"] = _normalize_alloc_hour_type(line.get("final_time_type"))
+        elif type_key in st.session_state:
             live["hour_type"] = _normalize_alloc_hour_type(st.session_state[type_key])
         if hrs_key in st.session_state:
             live["hours"] = float(st.session_state[hrs_key] or 0)
@@ -1198,23 +1364,17 @@ def _ensure_day_allocation_lines(
     lines = list(by_date.get(iso) or [])
     if daily_total > 0 and not lines:
         lines.append(
-            {
-                "line_id": "",
-                "job": _default_allocation_job(grid_row, job_opts),
-                "hour_type": "ST",
-                "hours": daily_total,
-                "notes": "",
-                "status": _normalize_timecard_status(grid_row.get("status")),
-            }
+            _new_allocation_line(
+                job=_default_allocation_job(grid_row, job_opts),
+                hour_type="ST",
+                hours=daily_total,
+                status=_normalize_timecard_status(grid_row.get("status")),
+            )
         )
     elif len(lines) == 1 and daily_total > 0:
         only = dict(lines[0])
         if float(only.get("hours") or 0) <= 0:
             only["hours"] = daily_total
-        if not _user_picked_allocation_overtime(
-            eid=eid, week_sig=week_sig, iso=iso, lix=0
-        ):
-            only["hour_type"] = "ST"
         lines = [only]
     by_date[iso] = lines
     return lines
@@ -1295,8 +1455,10 @@ def _sync_allocation_from_widgets(
             notes_key = f"tk_alloc_notes_{eid}_{week_sig}_{iso}_{lix}"
             if job_key in st.session_state:
                 line["job"] = st.session_state[job_key]
-            if type_key in st.session_state:
-                line["hour_type"] = _normalize_alloc_hour_type(st.session_state[type_key])
+            if type_key in st.session_state and line.get("overtime_override"):
+                picked = _normalize_alloc_hour_type(st.session_state[type_key])
+                line["hour_type"] = picked
+                line["final_time_type"] = picked
             if hrs_key in st.session_state:
                 line["hours"] = float(st.session_state[hrs_key] or 0)
             if notes_key in st.session_state:
@@ -1461,10 +1623,24 @@ def _allocation_lines_to_persist_grid(
                 merged[merge_key] = bucket
             elif not bucket["day_id"] and str(line.get("line_id") or "").strip():
                 bucket["day_id"] = str(line.get("line_id") or "")
-            if _normalize_alloc_hour_type(line.get("hour_type")) == "OT":
+            if _normalize_alloc_hour_type(line.get("final_time_type") or line.get("hour_type")) == "OT":
                 bucket["ot"] = float(bucket["ot"]) + hrs
             else:
                 bucket["st"] = float(bucket["st"]) + hrs
+            if line.get("overtime_override"):
+                bucket["overtime_override"] = True
+                bucket["overtime_override_by"] = line.get("overtime_override_by")
+                bucket["overtime_override_at"] = line.get("overtime_override_at")
+                bucket["overtime_override_reason"] = line.get("overtime_override_reason")
+            calc = str(line.get("calculated_time_type") or "").strip()
+            if calc:
+                bucket["calculated_time_type"] = calc
+            final = _normalize_alloc_hour_type(line.get("final_time_type") or line.get("hour_type"))
+            bucket["final_time_type"] = final
+        for bucket in merged.values():
+            if float(bucket.get("st") or 0) > 0 and float(bucket.get("ot") or 0) > 0:
+                bucket["final_time_type"] = "MIXED"
+                bucket["calculated_time_type"] = bucket.get("calculated_time_type") or "MIXED"
         persist_rows.extend(merged.values())
     return persist_rows, errors
 
@@ -1493,6 +1669,8 @@ def _save_allocation_week(
         eid=eid,
         week_sig=week_sig,
     )
+    by_date = _recalculate_week_overtime(by_date, week_start_d)
+    _sync_alloc_type_widgets_from_lines(by_date, eid=eid, week_sig=week_sig)
     st.session_state[_alloc_state_key(eid)] = by_date
     if focus and not allow_incomplete:
         day_ix = next(
@@ -2971,6 +3149,7 @@ def _render_list_allocation_detail(
     week_sig = week_start_d.isoformat()
     scope = str(panel_scope or eid or week_sig).strip()
     admin_edit = _can_admin_edit_approved_timekeeping()
+    can_override_ot = _can_override_overtime_allocation()
     job_opts = _assignment_options_for_timekeeping(week_start_d=week_start_d)
     can_approve = _can_approve_timekeeping()
     can_submit = _can_submit_timekeeping()
@@ -2979,8 +3158,23 @@ def _render_list_allocation_detail(
     week_status = _resolved_week_status(emp, week_start_d, grid=grid)
     week_locked = week_status == "Approved" and not admin_edit
     by_date = _ensure_allocation_state(emp, week_start_d)
+    _sync_allocation_from_widgets(by_date, eid=eid, week_sig=week_sig)
+    _bootstrap_week_allocation_lines(
+        by_date,
+        week_start_d=week_start_d,
+        source_grid=grid,
+        job_opts=job_opts,
+        eid=eid,
+        week_sig=week_sig,
+    )
+    by_date = _recalculate_week_overtime(by_date, week_start_d)
+    _sync_alloc_type_widgets_from_lines(by_date, eid=eid, week_sig=week_sig)
+    st.session_state[_alloc_state_key(eid)] = by_date
 
-    render_allocation_panel_intro()
+    render_allocation_panel_intro(
+        policy_note=_overtime_policy_note(),
+        week_totals_html=_week_allocation_totals_html(by_date),
+    )
 
     alloc_deps = AllocationRenderDeps(
         fmt_day_hours=_fmt_day_hours,
@@ -3004,6 +3198,20 @@ def _render_list_allocation_detail(
         mark_allocation_dirty=lambda iso: _mark_allocation_dirty(emp, week_start_d, iso),
         save_allocation_day=lambda iso: _save_allocation_day(emp, week_start_d, iso),
         alloc_autosave_status_html=lambda iso: _alloc_autosave_status_html(eid, iso),
+        can_override_overtime=can_override_ot,
+        handle_alloc_type_change=(
+            (lambda iso, lix: _handle_alloc_type_change(
+                eid,
+                week_sig,
+                iso,
+                lix,
+                can_override=can_override_ot,
+            ))
+            if can_override_ot
+            else None
+        ),
+        overtime_badge_html=_overtime_override_badge_html,
+        overtime_policy_note=_overtime_policy_note(),
     )
 
     if admin_edit and week_status == "Approved":

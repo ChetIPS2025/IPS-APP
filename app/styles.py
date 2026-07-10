@@ -5403,6 +5403,35 @@ def inject_timekeeping_module_css() -> None:
     st.markdown(
         f"""
 <style id="ips-timekeeping-module-v99">
+.timekeeping-alloc-week-totals {{
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 1rem !important;
+  margin: 0.35rem 0 0.5rem 0 !important;
+  font-size: 0.82rem !important;
+  color: #334155 !important;
+}}
+.timekeeping-alloc-week-totals span {{
+  white-space: nowrap !important;
+}}
+.timekeeping-alloc-override-badge {{
+  display: inline-flex !important;
+  align-items: center !important;
+  margin-left: 6px !important;
+  padding: 1px 7px !important;
+  border-radius: 999px !important;
+  background: #fef3c7 !important;
+  color: #92400e !important;
+  border: 1px solid #fcd34d !important;
+  font-size: 0.68rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.03em !important;
+  text-transform: uppercase !important;
+  white-space: nowrap !important;
+}}
+.timekeeping-alloc-type-badge-wrap {{
+  margin-bottom: 4px !important;
+}}
 .ips-timekeeping-table-wrap,
 .timekeeping-list-scroll {{
   background: #ffffff;
