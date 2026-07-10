@@ -7,11 +7,11 @@ from datetime import datetime, timezone
 from typing import Any
 
 try:
-    from app.db import create_signed_url, upload_bytes_admin
-    from app.services.repository import ServiceResult, update_row
+    from app.db import create_signed_url, update_rows_admin, upload_bytes_admin
+    from app.services.repository import ServiceResult, clear_data_cache_for_table, filter_payload_to_table
 except ImportError:
-    from db import create_signed_url, upload_bytes_admin  # type: ignore
-    from services.repository import ServiceResult, update_row  # type: ignore
+    from db import create_signed_url, update_rows_admin, upload_bytes_admin  # type: ignore
+    from services.repository import ServiceResult, clear_data_cache_for_table, filter_payload_to_table  # type: ignore
 
 CERTIFICATION_STORAGE_BUCKET = "certification-documents"
 _ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".pdf"}
@@ -68,6 +68,66 @@ def cert_has_attachment(cert: dict[str, Any]) -> bool:
     )
 
 
+def _update_certification_attachment_row(
+    cert_id: str,
+    payload: dict[str, Any],
+) -> ServiceResult:
+    """Persist attachment metadata with service role (matches storage upload permissions)."""
+    cid = str(cert_id or "").strip()
+    if not cid:
+        return ServiceResult(ok=False, error="Missing certification id.")
+    try:
+        from app.services.repository import table_column_names
+    except ImportError:
+        from services.repository import table_column_names  # type: ignore
+    cols = table_column_names("employee_certifications")
+    if cols and "attachment_path" not in cols:
+        return ServiceResult(
+            ok=False,
+            error="Certification attachment columns are missing. Run sql/070_employee_certification_attachments.sql in Supabase.",
+        )
+    filtered = filter_payload_to_table("employee_certifications", payload)
+    if not filtered:
+        return ServiceResult(
+            ok=False,
+            error="Certification attachment metadata could not be saved. Check Supabase schema migrations.",
+        )
+    try:
+        rows = update_rows_admin("employee_certifications", filtered, {"id": cid})
+    except Exception as exc:
+        configured = _storage_not_configured_message(exc)
+        if configured:
+            return ServiceResult(ok=False, error=configured)
+        try:
+            from app.auth import friendly_auth_error_message
+        except ImportError:
+            from auth import friendly_auth_error_message  # type: ignore
+        return ServiceResult(
+            ok=False,
+            error=friendly_auth_error_message(exc, operation="update employee_certifications"),
+        )
+    if not rows:
+        return ServiceResult(
+            ok=False,
+            error="Certification record not found or attachment metadata could not be saved.",
+        )
+    clear_data_cache_for_table("employee_certifications")
+    saved = rows[0] if isinstance(rows[0], dict) else {}
+    if cols:
+        saved = {k: v for k, v in payload.items() if k in cols}
+        if "attachment_path" not in saved:
+            return ServiceResult(
+                ok=False,
+                error="Certification attachment metadata could not be saved. Check Supabase schema migrations.",
+            )
+    out = dict(payload)
+    if isinstance(saved, dict) and saved:
+        out.update(saved)
+    elif isinstance(rows[0], dict):
+        out.update(rows[0])
+    return ServiceResult(ok=True, data=out)
+
+
 def upload_certification_attachment(
     cert_id: str,
     uploaded_file: Any,
@@ -116,28 +176,9 @@ def upload_certification_attachment(
         "attachment_mime_type": mime,
         "attachment_uploaded_at": datetime.now(timezone.utc).isoformat(),
         "attachment_uploaded_by": uploaded_by or None,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
     }
-    try:
-        from app.services.repository import table_column_names
-    except ImportError:
-        from services.repository import table_column_names  # type: ignore
-    cols = table_column_names("employee_certifications")
-    if cols and "attachment_path" not in cols:
-        return ServiceResult(
-            ok=False,
-            error="Certification attachment columns are missing. Run sql/070_employee_certification_attachments.sql in Supabase.",
-        )
-    result = update_row("employee_certifications", payload, {"id": cid})
-    if not result.ok:
-        return ServiceResult(ok=False, error=result.error or "Could not save attachment metadata.")
-    if cols:
-        saved = {k: v for k, v in payload.items() if k in cols}
-        if "attachment_path" not in saved:
-            return ServiceResult(
-                ok=False,
-                error="Certification attachment metadata could not be saved. Check Supabase schema migrations.",
-            )
-    return ServiceResult(ok=True, data={"attachment_path": storage_path, **payload})
+    return _update_certification_attachment_row(cid, payload)
 
 
 def get_certification_attachment_url(cert: dict[str, Any], *, expires_in: int = 3600) -> str | None:

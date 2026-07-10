@@ -183,6 +183,14 @@ def _resolve_saved_cert_id(cid: str, result: Any, row_id: str | None) -> str:
     return ""
 
 
+def _cert_persist_error_message(result: Any, fallback: str) -> str:
+    err = str(getattr(result, "error", None) or "").strip() or fallback
+    detail = str(getattr(result, "detail", None) or "").strip()
+    if detail and "please try again" in err.casefold():
+        return f"{err} ({detail})"
+    return err
+
+
 def _persist_certification_upload(
     *,
     cert_id: str,
@@ -920,7 +928,7 @@ def _render_cert_edit_form(
         else:
             result = create_employee_certification(ui)
         if not result.ok:
-            st.error(result.error or "Could not save certification.")
+            st.error(_cert_persist_error_message(result, "Could not save certification."))
             return
 
         saved_id = _resolve_saved_cert_id(cid, result, row_id)
@@ -1157,7 +1165,7 @@ def _show_add_certification_dialog(default_employee_id: str) -> None:
                 st.success("Certification saved.")
                 st.rerun()
             else:
-                st.error(result.error or "Could not save certification.")
+                st.error(_cert_persist_error_message(result, "Could not save certification."))
     with bc2:
         if st.button("Cancel", key="cert_cancel_new", use_container_width=True):
             st.session_state["ips_cert_form_open"] = False
@@ -1248,7 +1256,7 @@ def _render_add_certification_form(
                     st.success("Certification saved.")
                     st.rerun()
                 else:
-                    st.error(result.error or "Could not save certification.")
+                st.error(_cert_persist_error_message(result, "Could not save certification."))
         with bc2:
             if st.button("Cancel", key=f"{prefix}cancel_new", use_container_width=True):
                 st.session_state.pop(_cert_add_open_key(session_prefix=prefix), None)

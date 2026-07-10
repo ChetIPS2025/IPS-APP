@@ -2242,10 +2242,11 @@ def save_certification(ui: dict[str, Any], *, row_id: str | None = None) -> Serv
             }
         )
     table = "employee_certifications"
+    payload["updated_at"] = datetime.now(timezone.utc).isoformat()
     if row_id:
-        result = update_row(table, payload, {"id": row_id})
+        result = update_row_admin(table, payload, {"id": row_id})
     else:
-        result = insert_row(table, payload)
+        result = insert_row_admin(table, payload)
     return result
 
 

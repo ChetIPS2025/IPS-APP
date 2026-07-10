@@ -85,6 +85,25 @@ TABLE_COLUMN_ALLOWLIST: dict[str, frozenset[str]] = {
             "sort_order",
         }
     ),
+    "employee_certifications": frozenset(
+        {
+            "employee_id",
+            "cert_type",
+            "cert_number",
+            "issuer",
+            "issue_date",
+            "expiration_date",
+            "status",
+            "notes",
+            "attachment_path",
+            "attachment_url",
+            "attachment_file_name",
+            "attachment_mime_type",
+            "attachment_uploaded_at",
+            "attachment_uploaded_by",
+            "updated_at",
+        }
+    ),
 }
 
 # Oldest deployed shape (062) when the table has no sample rows yet.
