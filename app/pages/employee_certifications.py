@@ -1256,7 +1256,7 @@ def _render_add_certification_form(
                     st.success("Certification saved.")
                     st.rerun()
                 else:
-                st.error(_cert_persist_error_message(result, "Could not save certification."))
+                    st.error(_cert_persist_error_message(result, "Could not save certification."))
         with bc2:
             if st.button("Cancel", key=f"{prefix}cancel_new", use_container_width=True):
                 st.session_state.pop(_cert_add_open_key(session_prefix=prefix), None)
