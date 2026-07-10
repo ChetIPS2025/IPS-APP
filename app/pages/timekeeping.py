@@ -1025,11 +1025,21 @@ def _sync_alloc_type_widgets_from_lines(
     eid: str,
     week_sig: str,
 ) -> None:
+    """Prime type selectbox session keys before widgets render for this run."""
+    try:
+        from streamlit.errors import StreamlitAPIException
+    except ImportError:
+        StreamlitAPIException = Exception  # type: ignore[misc,assignment]
+
     for iso, lines in by_date.items():
         for lix, line in enumerate(lines):
             type_key = f"tk_alloc_type_{eid}_{week_sig}_{iso}_{lix}"
             label = _alloc_hour_type_label(line.get("final_time_type") or line.get("hour_type"))
-            st.session_state[type_key] = label
+            try:
+                st.session_state[type_key] = label
+            except StreamlitAPIException:
+                # Widget already instantiated this run (e.g. save clicked mid-render).
+                continue
 
 
 def _week_allocation_totals_html(by_date: dict[str, list[dict[str, Any]]]) -> str:
@@ -1670,7 +1680,6 @@ def _save_allocation_week(
         week_sig=week_sig,
     )
     by_date = _recalculate_week_overtime(by_date, week_start_d)
-    _sync_alloc_type_widgets_from_lines(by_date, eid=eid, week_sig=week_sig)
     st.session_state[_alloc_state_key(eid)] = by_date
     if focus and not allow_incomplete:
         day_ix = next(
