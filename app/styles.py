@@ -7386,6 +7386,32 @@ def inject_timekeeping_module_css() -> None:
   margin: 0 0 2px 0 !important;
   line-height: 1 !important;
 }}
+.timekeeping-hour-save-wrap {{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 14px;
+  margin: 0 0 2px 0;
+}}
+.timekeeping-hour-save-indicator {{
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}}
+.timekeeping-hour-save-pending {{
+  color: #64748b;
+}}
+.timekeeping-hour-save-saving {{
+  color: #2563eb;
+}}
+.timekeeping-hour-save-saved {{
+  color: #16a34a;
+}}
+.timekeeping-hour-save-error {{
+  color: #dc2626;
+}}
 .timekeeping-hour-input,
 .timekeeping-hour-input-ro,
 .timekeeping-list-hour-value {{

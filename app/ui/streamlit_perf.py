@@ -27,6 +27,14 @@ def ips_app_rerun() -> None:
         st.rerun()
 
 
+def fragment_rerun() -> None:
+    """Rerun only the active Streamlit fragment when supported."""
+    try:
+        st.rerun(scope="fragment")
+    except (TypeError, AttributeError):
+        st.rerun()
+
+
 def inject_scroll_preserve(marker: str) -> None:
     """Persist main-window scroll across Streamlit reruns (sessionStorage)."""
     sk = f"ips_scroll_preserve_injected_{marker}"
