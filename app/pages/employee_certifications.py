@@ -949,8 +949,12 @@ def _render_cert_detail_tabs(cert: dict, *, key_prefix: str = "") -> None:
             f"</div>"
         )
         st.markdown(dialog_card_html("Certification", overview_html), unsafe_allow_html=True)
-        st.markdown("**Attachment**")
-        _render_attachment_section(cert, rk=rk, key_prefix=key_prefix, edit_mode=False)
+        if cert_has_attachment(cert):
+            fname = _cert_attachment_file_name(cert)
+            label = html.escape(fname) if fname else "On file"
+            st.caption(f"Attachment: {label} — open the **Attachment** tab to preview or download.")
+        else:
+            st.caption("No certification document uploaded.")
 
     with tab_employee:
         if emp:
