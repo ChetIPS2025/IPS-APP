@@ -173,15 +173,19 @@ def render_module(slug: str | None = None) -> None:
             try:
                 from app.auth import current_role
                 from app.utils.permissions import normalize_role
-                from app.utils.view_as import is_view_as_active, render_view_as_banner
+                from app.utils.view_as import is_view_as_active, render_view_as_page_shell
             except ImportError:
                 from auth import current_role  # type: ignore
                 from utils.permissions import normalize_role  # type: ignore
-                from utils.view_as import is_view_as_active, render_view_as_banner  # type: ignore
+                from utils.view_as import is_view_as_active, render_view_as_page_shell  # type: ignore
+            def _render_module() -> None:
+                with perf_span(f"module.render:{active}"):
+                    fn()  # type: ignore[operator]
+
             if normalize_role(current_role()) == "admin" and is_view_as_active():
-                render_view_as_banner()
-            with perf_span(f"module.render:{active}"):
-                fn()  # type: ignore[operator]
+                render_view_as_page_shell(_render_module)
+            else:
+                _render_module()
         except Exception as exc:
             st.error(f"This page encountered an error: {exc}")
             logging.getLogger(__name__).exception("module %s failed", active)
