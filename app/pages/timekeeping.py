@@ -43,6 +43,7 @@ try:
         render_missing_record,
     )
     from app.pages._core._data import (
+        build_timekeeping_grid_from_day_rows,
         default_weekly_grid,
         load_jobs,
         load_timekeeping_grid,
@@ -101,6 +102,7 @@ except ImportError:
         render_missing_record,
     )
     from pages._core._data import (  # type: ignore
+        build_timekeeping_grid_from_day_rows,
         default_weekly_grid,
         load_jobs,
         load_timekeeping_grid,
@@ -134,6 +136,9 @@ except ImportError:
 _SEL = select_key("timekeeping")
 _MODULE = "timekeeping"
 _TABLE_KEY = "timekeeping_list"
+_TK_LIST_PAGE_SIZE = 25
+_TK_WEEK_DAYS_KEY = "ips_tk_week_days_by_employee"
+_TK_WEEK_DAYS_SIG_KEY = "ips_tk_week_days_sig"
 _MODAL_KEY = "ips_timekeeping_detail_modal_id"
 _CACHE_KEY = "_ips_timekeeping_modal_by_id"
 _WEEK_KEY = "ips_timekeeping_week_start"
@@ -346,6 +351,45 @@ def _assignment_options_cache_sig(*, week_start_d: date | None = None) -> str:
 def clear_timekeeping_assignment_options_cache() -> None:
     st.session_state.pop(_TK_ASSIGNMENT_OPTS_KEY, None)
     st.session_state.pop(_TK_ASSIGNMENT_OPTS_SIG_KEY, None)
+
+
+def clear_timekeeping_week_days_cache() -> None:
+    st.session_state.pop(_TK_WEEK_DAYS_KEY, None)
+    st.session_state.pop(_TK_WEEK_DAYS_SIG_KEY, None)
+
+
+def clear_timekeeping_list_caches() -> None:
+    clear_timekeeping_assignment_options_cache()
+    clear_timekeeping_week_days_cache()
+
+
+def _ensure_week_days_by_employee(week_start_d: date) -> dict[str, list[dict[str, Any]]]:
+    """Batch-load day rows for the active week once per session/week."""
+    sig = week_start_d.isoformat()
+    if st.session_state.get(_TK_WEEK_DAYS_SIG_KEY) == sig:
+        cached = st.session_state.get(_TK_WEEK_DAYS_KEY)
+        if isinstance(cached, dict):
+            return cached
+    try:
+        from app.services.timekeeping_service import list_timekeeping_days_for_week
+    except ImportError:
+        from services.timekeeping_service import list_timekeeping_days_for_week  # type: ignore
+    rows = list_timekeeping_days_for_week(week_start_d)
+    by_eid: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        eid = str(row.get("employee_id") or "").strip()
+        if eid:
+            by_eid.setdefault(eid, []).append(row)
+    st.session_state[_TK_WEEK_DAYS_KEY] = by_eid
+    st.session_state[_TK_WEEK_DAYS_SIG_KEY] = sig
+    return by_eid
+
+
+def _day_rows_for_employee(employee_id: str, week_start_d: date) -> list[dict[str, Any]]:
+    eid = str(employee_id or "").strip()
+    if not eid:
+        return []
+    return list(_ensure_week_days_by_employee(week_start_d).get(eid, []))
 
 
 def _assignment_options_for_timekeeping(*, week_start_d: date | None = None) -> list[str]:
@@ -848,13 +892,8 @@ def _alloc_state_key(emp_id: str) -> str:
 
 
 def _load_saved_allocations_by_date(employee_id: str, week_start_d: date) -> dict[str, list[dict[str, Any]]]:
-    try:
-        from app.services.timekeeping_service import list_timekeeping_days
-    except ImportError:
-        from services.timekeeping_service import list_timekeeping_days  # type: ignore
-
     by_date: dict[str, list[dict[str, Any]]] = {}
-    for row in list_timekeeping_days(employee_id, week_start_d):
+    for row in _day_rows_for_employee(employee_id, week_start_d):
         iso = str(row.get("work_date") or "")[:10]
         if not iso:
             continue
@@ -2980,6 +3019,10 @@ def _resolved_week_status(
     if not eid:
         return _normalize_timecard_status(emp.get("status"))
     try:
+        saved_rows = _day_rows_for_employee(eid, week_start_d)
+        if saved_rows:
+            loaded = build_timekeeping_grid_from_day_rows(eid, week_start_d, saved_rows)
+            return _week_status_from_grid(loaded)
         loaded = load_timekeeping_grid(eid, week_start_d)
         if loaded:
             return _week_status_from_grid(loaded)
@@ -2990,12 +3033,7 @@ def _resolved_week_status(
 
 def _build_timecard_row(row: dict, ws: date) -> dict:
     st_total, ot_total, dt_total, total = _emp_totals(row)
-    emp_stub = {
-        "id": str(row.get("id") or row.get("employee_id") or "").strip(),
-        "employee_id": str(row.get("id") or row.get("employee_id") or "").strip(),
-        "status": row.get("status"),
-    }
-    status = _resolved_week_status(emp_stub, ws)
+    status = _normalize_timecard_status(row.get("status"))
     return {
         **row,
         "timecard_id": _timecard_id_for_row(row, ws),
@@ -3105,7 +3143,11 @@ def _ensure_weekly_grid(emp: dict, week_start_d: date) -> list[dict]:
     week_sig = week_start_d.isoformat()
     if st.session_state.get(f"{gk}_week") != week_sig:
         try:
-            st.session_state[gk] = load_timekeeping_grid(eid, week_start_d)
+            saved_rows = _day_rows_for_employee(eid, week_start_d)
+            if saved_rows:
+                st.session_state[gk] = build_timekeeping_grid_from_day_rows(eid, week_start_d, saved_rows)
+            else:
+                st.session_state[gk] = default_weekly_grid(eid, week_start_d)
         except Exception:
             st.session_state[gk] = default_weekly_grid(eid, week_start_d)
         st.session_state[f"{gk}_week"] = week_sig
@@ -3835,11 +3877,9 @@ def _show_timecard_detail_modal() -> None:
 
 
 def _filter_timecards(
-    summaries: list[dict],
-    ws: date,
+    built_rows: list[dict],
 ) -> list[dict]:
-    rows = [_build_timecard_row(row, ws) for row in summaries]
-    return apply_column_filters(rows, _TABLE_KEY, _TK_COLUMN_FILTER_SPECS)
+    return apply_column_filters(built_rows, _TABLE_KEY, _TK_COLUMN_FILTER_SPECS)
 
 
 def _render_timekeeping_list_fragment(
@@ -4092,15 +4132,16 @@ def render() -> None:
     if pre_week_raw:
         try:
             st.session_state[_WEEK_KEY] = date.fromisoformat(pre_week_raw)
-            clear_timekeeping_assignment_options_cache()
+            clear_timekeeping_list_caches()
         except ValueError:
             pass
 
     ws = _current_week_start()
     we = week_end(ws)
     summaries = _filter_summaries_for_field_user(load_timekeeping_summaries(ws))
-    all_rows = [_build_timecard_row(row, ws) for row in summaries]
-    filter_options = build_filter_options(all_rows, _TK_COLUMN_FILTER_SPECS)
+    _ensure_week_days_by_employee(ws)
+    built_rows = [_build_timecard_row(row, ws) for row in summaries]
+    filter_options = build_filter_options(built_rows, _TK_COLUMN_FILTER_SPECS)
 
     def _tk_export() -> None:
         st.button("Export", key="tk_export", use_container_width=True)
@@ -4164,21 +4205,21 @@ def render() -> None:
                 st.session_state[_WEEK_KEY] = ws - timedelta(days=7)
                 reset_table_page(_TABLE_KEY)
                 _clear_expanded_timecard()
-                clear_timekeeping_assignment_options_cache()
+                clear_timekeeping_list_caches()
                 st.rerun()
         with nav2:
             if st.button("📅 Current Week", key="tk_current_week", use_container_width=True, type="secondary"):
                 st.session_state[_WEEK_KEY] = week_start()
                 reset_table_page(_TABLE_KEY)
                 _clear_expanded_timecard()
-                clear_timekeeping_assignment_options_cache()
+                clear_timekeeping_list_caches()
                 st.rerun()
         with nav3:
             if st.button("Next Week →", key="tk_next_week", use_container_width=True, type="secondary"):
                 st.session_state[_WEEK_KEY] = ws + timedelta(days=7)
                 reset_table_page(_TABLE_KEY)
                 _clear_expanded_timecard()
-                clear_timekeeping_assignment_options_cache()
+                clear_timekeeping_list_caches()
                 st.rerun()
         with week_col:
             st.markdown(
@@ -4189,7 +4230,7 @@ def render() -> None:
                 unsafe_allow_html=True,
             )
 
-    filtered = _filter_timecards(summaries, ws)
+    filtered = _filter_timecards(built_rows)
 
     build_modal_cache(filtered, row_id_key="timecard_id", cache_key=_CACHE_KEY)
 
@@ -4200,7 +4241,7 @@ def render() -> None:
         f"Day boxes stay visible on each row. Expand for job/ST/OT detail.</p>",
         unsafe_allow_html=True,
     )
-    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
+    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY, default_page_size=_TK_LIST_PAGE_SIZE)
     _render_timekeeping_list_fragment(page_rows, filter_options=filter_options, week_start_d=ws)
     _inject_timekeeping_daily_hour_focus_script()
     render_table_pagination_footer(len(filtered), _TABLE_KEY)
@@ -4249,6 +4290,7 @@ def render_field_time_panel(*, key_prefix: str = "ftp") -> None:
     ws = _current_week_start()
     we = week_end(ws)
     summaries = _filter_summaries_for_field_user(load_timekeeping_summaries(ws))
+    _ensure_week_days_by_employee(ws)
     rows = [_build_timecard_row(row, ws) for row in summaries]
     if not rows:
         st.info("No timecard loaded for this week yet.")

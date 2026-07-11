@@ -1374,15 +1374,13 @@ def default_weekly_grid(employee_id: str, week_start: date) -> list[dict[str, An
     return grid
 
 
-def load_timekeeping_grid(employee_id: str, week_start: date) -> list[dict[str, Any]]:
-    """Build the weekly grid from saved day rows, or schedule defaults for missing days."""
+def build_timekeeping_grid_from_day_rows(
+    employee_id: str,
+    week_start: date,
+    saved_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Build the weekly grid from preloaded day rows, or schedule defaults for missing days."""
     eid = str(employee_id or "").strip()
-    try:
-        from app.services.timekeeping_service import list_timekeeping_days
-    except ImportError:
-        from services.timekeeping_service import list_timekeeping_days  # type: ignore
-
-    saved_rows = list_timekeeping_days(eid, week_start) if eid else []
     if not saved_rows:
         return default_weekly_grid(eid, week_start)
 
@@ -1399,7 +1397,6 @@ def load_timekeeping_grid(employee_id: str, week_start: date) -> list[dict[str, 
     for i, day in enumerate(days):
         iso = day.isoformat()
         saved_list = by_date.get(iso) or []
-        # Any saved row for this date (including 0.0 hours) — do not apply schedule defaults.
         if saved_list:
             primary = saved_list[0]
             for candidate in saved_list:
@@ -1441,6 +1438,18 @@ def load_timekeeping_grid(employee_id: str, week_start: date) -> list[dict[str, 
                 "status": "Draft",
             })
     return grid
+
+
+def load_timekeeping_grid(employee_id: str, week_start: date) -> list[dict[str, Any]]:
+    """Build the weekly grid from saved day rows, or schedule defaults for missing days."""
+    eid = str(employee_id or "").strip()
+    try:
+        from app.services.timekeeping_service import list_timekeeping_days
+    except ImportError:
+        from services.timekeeping_service import list_timekeeping_days  # type: ignore
+
+    saved_rows = list_timekeeping_days(eid, week_start) if eid else []
+    return build_timekeeping_grid_from_day_rows(eid, week_start, saved_rows)
 
 
 _DEMO_DOCUMENTS_HUB: list[dict[str, Any]] = [

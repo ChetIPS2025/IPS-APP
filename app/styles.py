@@ -5204,6 +5204,9 @@ section[data-testid="stMain"]:has(.ips-assets-page)
 
 def _inject_timekeeping_daily_hour_focus_script() -> None:
     """Select-all on focus for List view top-row daily hour inputs only."""
+    if st.session_state.get("_ips_tk_hour_focus_script"):
+        return
+    st.session_state["_ips_tk_hour_focus_script"] = True
     html_doc = """
 <script>
 (function () {
@@ -5352,6 +5355,9 @@ def _inject_timekeeping_daily_hour_focus_script() -> None:
 
 def inject_timekeeping_module_css() -> None:
     """Timekeeping list custom table styling."""
+    if st.session_state.get("_ips_timekeeping_module_css"):
+        return
+    st.session_state["_ips_timekeeping_module_css"] = True
     tk_expand = ".st-key-timekeeping_table_wrap [class*='st-key-tk_expand_detail_']"
     tk_list_detail_excl = (
         ":not(:has(.timekeeping-detail-header-marker)):not(:has(.timekeeping-detail-row-marker))"

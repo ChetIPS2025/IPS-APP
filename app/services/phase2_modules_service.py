@@ -1218,6 +1218,25 @@ def list_timekeeping_days(employee_id: str, week_start: date) -> list[dict[str, 
     return [r for r in rows if _day_row_in_week(r, week_start)]
 
 
+def list_timekeeping_days_for_week(week_start: date, *, limit: int = 5000) -> list[dict[str, Any]]:
+    """Load all employee day rows for one week in a single query when possible."""
+    ws = week_start.isoformat()
+    try:
+        from app.db import fetch_by_match
+    except ImportError:
+        from db import fetch_by_match  # type: ignore
+    try:
+        rows = fetch_by_match("employee_timekeeping_days", {"week_start": ws}, limit=limit) or []
+        if rows:
+            return [r for r in rows if _day_row_in_week(r, week_start)]
+    except Exception as exc:
+        _LOG.debug("fetch_by_match employee_timekeeping_days week_start failed: %s", exc)
+    rows, err = fetch_rows("employee_timekeeping_days", limit=limit, order_by="work_date")
+    if err:
+        return []
+    return [r for r in rows or [] if _day_row_in_week(r, week_start)]
+
+
 def clear_timekeeping_day_rows(
     employee_id: str,
     work_date: str,
