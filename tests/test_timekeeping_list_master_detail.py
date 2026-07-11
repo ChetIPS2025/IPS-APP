@@ -24,9 +24,11 @@ class TestTimekeepingListMasterDetail(unittest.TestCase):
 
     def test_row_body_branches_on_expanded_state(self) -> None:
         source = inspect.getsource(tk._render_timekeeping_employee_row_body)
-        self.assertIn("if not expanded:", source)
-        self.assertIn("_render_list_row_day_cell_readonly", source)
+        self.assertIn("_render_timekeeping_employee_row_collapsed", source)
         self.assertIn("_render_list_row_day_cell(", source)
+        collapsed_source = inspect.getsource(tk._render_timekeeping_employee_row_collapsed)
+        self.assertIn("weekly-timecard-row-collapsed", collapsed_source)
+        self.assertIn("timesheet-day-cell", inspect.getsource(tk._list_row_day_cell_readonly_html))
 
     @patch("app.pages.timekeeping._ensure_weekly_grid")
     @patch("app.pages.timekeeping._ensure_week_days_by_employee")
