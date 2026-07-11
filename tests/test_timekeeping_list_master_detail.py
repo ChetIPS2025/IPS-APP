@@ -27,27 +27,12 @@ class TestTimekeepingListMasterDetail(unittest.TestCase):
         self.assertIn("_render_timekeeping_employee_row_collapsed", source)
         self.assertIn("_render_list_row_day_cell(", source)
         collapsed_source = inspect.getsource(tk._render_timekeeping_employee_row_collapsed)
-        self.assertIn("_build_collapsed_timecard_row_html", collapsed_source)
-        build_source = inspect.getsource(tk._build_collapsed_timecard_row_html)
-        self.assertIn("weekly-timecard-row-collapsed", build_source)
-        html = tk._build_collapsed_timecard_row_html(
-            employee_name="Amanda M. Robicheaux",
-            days=[date(2026, 7, 6 + i) for i in range(7)],
-            grid=None,
-            st_total=32.0,
-            ot_total=0.0,
-            total_hours=32.0,
-            status="Draft",
-        )
-        self.assertIn('class="day-cell"', html)
-        self.assertIn('class="day-date"', html)
-        self.assertIn('class="day-state"', html)
-        self.assertIn('class="day-value"', html)
-        self.assertIn('class="total-cell"', html)
-        self.assertIn('class="employee-cell"', html)
-        self.assertIn("<span class=\"day-date\">", html)
-        self.assertIn("<span class=\"day-state\">", html)
-        self.assertIn("<span class=\"day-value\">", html)
+        self.assertIn("_WEEKLY_TS_LIST_ROW_COLS", collapsed_source)
+        self.assertIn("_render_collapsed_list_day_cell", collapsed_source)
+        self.assertIn('gap="small"', collapsed_source)
+        day_source = inspect.getsource(tk._render_collapsed_list_day_cell)
+        self.assertIn("st.markdown", day_source)
+        self.assertIn("st.caption", day_source)
 
     @patch("app.pages.timekeeping._ensure_weekly_grid")
     @patch("app.pages.timekeeping._ensure_week_days_by_employee")

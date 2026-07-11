@@ -15062,77 +15062,32 @@ section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="st
 
 
 def _inject_timekeeping_list_row_gap_css() -> None:
-    """Final overrides for weekly timekeeping list row spacing (loads after global table CSS)."""
+    """Minimal list spacing — native Streamlit columns own the row layout."""
     st.markdown(
         """
-<style id="ips-timekeeping-list-gap-v3">
-.employee-timesheet-list,
-.weekly-timesheet-list,
-.weekly-timecard-list {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 5px !important;
-  width: 100% !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-.weekly-timecard-scroll,
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-scroll) {
+<style id="ips-timekeeping-list-gap-v4">
+.st-key-timekeeping_table_wrap:has(.timekeeping-list-scroll) {
   width: 100% !important;
   overflow-x: auto !important;
   overflow-y: visible !important;
   -webkit-overflow-scrolling: touch !important;
 }
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-list) {
-  overflow-x: auto !important;
-  overflow-y: visible !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  min-height: 0 !important;
-  height: auto !important;
-}
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-list) > [data-testid="stVerticalBlock"] {
+.st-key-timekeeping_table_wrap:has(.timekeeping-list-scroll) > [data-testid="stVerticalBlock"] {
   display: flex !important;
   flex-direction: column !important;
   gap: 5px !important;
+  min-width: 1100px !important;
   margin: 0 !important;
   padding: 0 !important;
-  height: auto !important;
-  min-height: 0 !important;
-  max-height: none !important;
 }
-.weekly-timecard-list [data-testid="stVerticalBlock"] {
-  gap: 0.3rem !important;
-}
-.weekly-timecard-list [data-testid="stVerticalBlockBorderWrapper"],
-.weekly-timecard-list [data-testid="stElementContainer"] {
+.st-key-timekeeping_table_wrap:has(.timekeeping-list-scroll) [class*="st-key-tk_row_"] {
   margin: 0 !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
+  padding: 6px 0 !important;
   height: auto !important;
   min-height: 0 !important;
   max-height: none !important;
 }
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-list) > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"],
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-list) > [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlockBorderWrapper"] {
-  margin: 0 !important;
-  padding: 0 !important;
-  height: auto !important;
-  min-height: 0 !important;
-  max-height: none !important;
-  flex: 0 0 auto !important;
-}
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-list) [class*="st-key-tk_row_"] {
-  margin: 0 !important;
-  padding: 0 !important;
-  height: auto !important;
-  min-height: 0 !important;
-  max-height: none !important;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-}
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-list) [class*="st-key-tk_row_"] > [data-testid="stVerticalBlock"] {
+.st-key-timekeeping_table_wrap:has(.timekeeping-list-scroll) [class*="st-key-tk_row_"] > [data-testid="stVerticalBlock"] {
   gap: 0 !important;
   margin: 0 !important;
   padding: 0 !important;
@@ -15140,321 +15095,28 @@ def _inject_timekeeping_list_row_gap_css() -> None:
   min-height: 0 !important;
   max-height: none !important;
 }
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-list) [class*="st-key-tk_card_"] {
-  margin: 0 !important;
-  padding: 0 !important;
-  height: auto !important;
-  min-height: 0 !important;
-  max-height: none !important;
-}
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-list) [class*="st-key-tk_row_"] > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] {
-  display: flex !important;
-  flex-wrap: nowrap !important;
-  align-items: center !important;
-  column-gap: 6px !important;
-  row-gap: 0 !important;
+.st-key-timekeeping_table_wrap:has(.timekeeping-list-scroll) [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"] {
   width: 100% !important;
-  min-width: 0 !important;
-  padding: 5px 8px !important;
-  margin: 0 !important;
-  min-height: 68px !important;
-  height: auto !important;
-  max-height: none !important;
-  flex: 0 0 auto !important;
-  box-sizing: border-box !important;
+  align-items: flex-start !important;
 }
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-list) [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) {
-  display: flex !important;
-  flex-wrap: nowrap !important;
-  align-items: flex-end !important;
-  column-gap: 6px !important;
-  width: 100% !important;
-  min-width: 0 !important;
-  padding: 5px 8px 2px 8px !important;
-  margin: 0 !important;
-  min-height: 0 !important;
-  box-sizing: border-box !important;
-}
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-list) [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:first-child {
-  flex: 0 0 54px !important;
-  width: 54px !important;
-  min-width: 54px !important;
-  max-width: 54px !important;
-}
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-list) [data-testid="stHorizontalBlock"]:has(.timekeeping-list-header-marker) > [data-testid="column"]:last-child {
-  flex: 1 1 auto !important;
-  min-width: 0 !important;
-  overflow-x: visible !important;
-}
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-list) [class*="st-key-tk_row_"] > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {
-  flex: 0 0 54px !important;
-  width: 54px !important;
-  min-width: 54px !important;
-  max-width: 54px !important;
-  padding: 0 !important;
-  margin: 0 !important;
-}
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-list) [class*="st-key-tk_row_"] > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child {
-  flex: 1 1 auto !important;
-  min-width: 0 !important;
-  overflow-x: visible !important;
-  padding: 0 !important;
-  margin: 0 !important;
-}
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-list) [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"] [data-testid="stHorizontalBlock"] {
-  gap: 0 !important;
-  min-height: 0 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-}
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-list) [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {
-  flex: 0 0 20px !important;
-  width: 20px !important;
-  min-width: 20px !important;
-  max-width: 20px !important;
-}
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-list) [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child {
-  flex: 0 0 34px !important;
-  width: 34px !important;
-  min-width: 34px !important;
-  max-width: 34px !important;
-}
-.drag-cell,
-.timekeeping-drag-cell {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: 20px !important;
-  min-width: 20px !important;
-  font-size: 12px !important;
-  color: #94a3b8 !important;
-  cursor: grab !important;
-  user-select: none !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-list) [data-testid="stHtml"],
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-list) [data-testid="stHtml"] > div,
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-list) iframe {
-  display: block !important;
-  width: 100% !important;
-  min-width: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: none !important;
-  overflow: visible !important;
-}
-.weekly-timecard-row,
-.weekly-timecard-row-grid {
-  display: grid !important;
-  grid-template-columns:
-    minmax(190px, 230px)
-    repeat(7, minmax(84px, 1fr))
-    54px
-    54px
-    60px
-    70px !important;
-  align-items: center !important;
-  column-gap: 6px !important;
-  row-gap: 0 !important;
-  width: 100% !important;
-  min-width: 1126px !important;
-  min-height: 68px !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  box-sizing: border-box !important;
-}
-.weekly-timecard-row-full {
-  grid-template-columns:
-    20px
-    34px
-    minmax(190px, 230px)
-    repeat(7, minmax(84px, 1fr))
-    54px
-    54px
-    60px
-    70px !important;
-  min-width: 1180px !important;
-}
-.weekly-timecard-header-row {
-  min-height: 0 !important;
-  padding: 0 !important;
-  margin: 0 0 2px 0 !important;
-}
-.employee-cell {
-  min-width: 0 !important;
-  font-weight: 600 !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  text-align: left !important;
-  font-size: 13px !important;
-  line-height: 1.2 !important;
-  padding: 0 2px !important;
-}
-.day-cell {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 2px !important;
-  min-width: 0 !important;
-  text-align: center !important;
-}
-.day-cell-weekend .day-value {
-  background: #f8fafc !important;
-}
-.day-date {
-  display: block !important;
-  font-size: 9px !important;
-  line-height: 1.05 !important;
-  font-weight: 700 !important;
-  white-space: nowrap !important;
-}
-.day-state {
-  display: block !important;
-  font-size: 8px !important;
-  line-height: 1 !important;
-  font-weight: 700 !important;
-  text-transform: uppercase !important;
-  white-space: nowrap !important;
-  color: #475569 !important;
-}
-.day-value {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: 50px !important;
-  min-height: 28px !important;
-  margin-top: 2px !important;
-  font-size: 12px !important;
-  line-height: 1 !important;
-  font-weight: 600 !important;
-  border: 1px solid #d7deea !important;
-  border-radius: 6px !important;
-  background: #ffffff !important;
-  box-sizing: border-box !important;
-}
-.total-cell {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 2px !important;
-  min-width: 0 !important;
-}
-.total-label {
-  font-size: 8px !important;
-  font-weight: 700 !important;
-  color: #64748b !important;
-  text-transform: uppercase !important;
-  line-height: 1 !important;
-}
-.total-value {
-  font-size: 13px !important;
-  font-weight: 700 !important;
-  line-height: 1.1 !important;
-}
-.status-cell {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  font-size: 11px !important;
-  font-weight: 600 !important;
-  text-align: center !important;
-  white-space: nowrap !important;
-  min-width: 0 !important;
-}
-.timesheet-day-cell {
-  display: grid !important;
-  grid-template-rows: auto auto auto !important;
-  justify-items: center !important;
-  align-items: center !important;
-  min-width: 92px !important;
-  width: 100% !important;
-  gap: 2px !important;
-  line-height: 1.1 !important;
-  margin: 0 auto !important;
-  box-sizing: border-box !important;
-}
-.timesheet-day-label {
-  display: block !important;
-  font-size: 10px !important;
-  font-weight: 700 !important;
-  white-space: nowrap !important;
-  text-align: center !important;
-  line-height: 1.1 !important;
-  margin: 0 !important;
-  width: 100% !important;
-}
-.timesheet-day-status {
-  display: block !important;
-  font-size: 9px !important;
-  font-weight: 700 !important;
-  text-transform: uppercase !important;
-  white-space: nowrap !important;
-  text-align: center !important;
-  line-height: 1.1 !important;
-  margin: 0 !important;
-  width: 100% !important;
-  color: #475569 !important;
-}
-.timesheet-day-hours {
+.timekeeping-collapsed-hour-value {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   width: 58px !important;
   min-height: 32px !important;
+  margin: 2px auto 0 auto !important;
   font-size: 13px !important;
   font-weight: 600 !important;
-  margin: 0 auto !important;
+  line-height: 1 !important;
+  border: 1px solid #d7deea !important;
+  border-radius: 6px !important;
+  background: #ffffff !important;
   box-sizing: border-box !important;
-}
-.weekly-timecard-summary-cell {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: 100% !important;
-  margin: 0 auto !important;
-  min-height: 0 !important;
-}
-.weekly-timecard-summary-value {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  min-height: 32px !important;
-  font-size: 13px !important;
-  font-weight: 600 !important;
   text-align: center !important;
 }
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-list) .weekly-timesheet-employee-name,
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-list) .ips-timekeeping-employee {
-  display: block !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  font-size: 13px !important;
-  font-weight: 700 !important;
-  line-height: 1.2 !important;
-  width: 100% !important;
-  max-width: 100% !important;
-}
-@media (min-width: 1280px) {
-  .st-key-timekeeping_table_wrap:has(.weekly-timecard-list) .weekly-timesheet-employee-name,
-  .st-key-timekeeping_table_wrap:has(.weekly-timecard-list) .ips-timekeeping-employee {
-    overflow: visible !important;
-    text-overflow: clip !important;
-  }
-}
-.employee-timesheet-row,
-.timesheet-employee-card,
-.weekly-employee-row,
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-list) [class*="st-key-tk_card_"],
-.st-key-timekeeping_table_wrap:has(.weekly-timecard-list) [class*="st-key-tk_row_"] {
-  height: auto !important;
-  min-height: 0 !important;
-  max-height: none !important;
+.timekeeping-collapsed-hour-weekend {
+  background: #f8fafc !important;
 }
 </style>
 """,
