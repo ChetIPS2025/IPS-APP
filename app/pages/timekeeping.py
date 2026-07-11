@@ -206,26 +206,23 @@ def _render_timekeeping_employee_filter_header(
     filter_options: dict[str, list[str]],
 ) -> None:
     """Employee filter and summary column titles at the top of the list."""
-    header_cols = st.columns(_WEEKLY_TS_LIST_ROW_COLS, gap="xxsmall")
-    with header_cols[0]:
+    lead_cols = st.columns([54, 1], gap="small")
+    with lead_cols[0]:
         st.markdown(
             '<span class="timekeeping-list-header-marker" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-    with header_cols[2]:
-        render_table_header_cell(
-            "EMPLOYEE",
-            table_key=_TABLE_KEY,
-            filter_field="employee_name",
-            filter_options=filter_options.get("employee_name", []),
-            base_class="ips-timekeeping-header-row ips-timekeeping-cell",
-        )
-    for col, label in zip(header_cols[10:14], _LIST_VIEW_SUMMARY_LABELS):
-        with col:
-            st.markdown(
-                _render_timekeeping_summary_column_header_html(label),
-                unsafe_allow_html=True,
+    with lead_cols[1]:
+        filter_col, _labels_col = st.columns([2.2, 9.8], gap="small")
+        with filter_col:
+            render_table_header_cell(
+                "EMPLOYEE",
+                table_key=_TABLE_KEY,
+                filter_field="employee_name",
+                filter_options=filter_options.get("employee_name", []),
+                base_class="ips-timekeeping-header-row ips-timekeeping-cell",
             )
+        _render_timekeeping_inline_html(_build_timecard_header_labels_html())
 
 
 _STATUS_FILTER_OPTS = ["Draft", "Pending Approval", "Approved", "Rejected"]
@@ -2490,6 +2487,85 @@ def _preload_weekly_grids_for_rows(rows: list[dict], week_start_d: date) -> None
             _ensure_weekly_grid(_emp_from_timecard_row(row), week_start_d)
 
 
+def _day_cell_readonly_html(
+    *,
+    day_d: date,
+    day_ix: int,
+    day_row: dict,
+) -> str:
+    """One weekday column for a collapsed timecard row."""
+    day_status = _normalize_timecard_status(day_row.get("status"))
+    total = _day_hours_total(day_row)
+    status_text = html.escape(_timecard_status_display(day_status).upper())
+    day_title = f'{day_d.strftime("%a").upper()} {day_d.strftime("%m/%d")}'
+    weekend_cls = " day-cell-weekend" if day_ix >= 5 else ""
+    return (
+        f'<div class="day-cell{weekend_cls}">'
+        f'<span class="day-date">{html.escape(day_title)}</span>'
+        f'<span class="day-state">{status_text}</span>'
+        f'<span class="day-value">{html.escape(_fmt_day_hours(total))}</span>'
+        f"</div>"
+    )
+
+
+def _total_cell_readonly_html(*, label: str, value: str) -> str:
+    return (
+        f'<div class="total-cell">'
+        f'<span class="total-label">{html.escape(label.upper())}</span>'
+        f'<span class="total-value">{html.escape(value)}</span>'
+        f"</div>"
+    )
+
+
+def _build_collapsed_timecard_row_html(
+    *,
+    employee_name: str,
+    days: list[date],
+    grid: list[dict] | None,
+    st_total: float,
+    ot_total: float,
+    total_hours: float,
+    status: str,
+) -> str:
+    """Single HTML grid row — employee, weekdays, totals, and status in separate cells."""
+    day_parts = []
+    for day_ix, day_d in enumerate(days):
+        day_row = grid[day_ix] if grid and day_ix < len(grid) else {}
+        day_parts.append(_day_cell_readonly_html(day_d=day_d, day_ix=day_ix, day_row=day_row))
+    return (
+        '<div class="weekly-timecard-row weekly-timecard-row-grid weekly-timecard-row-collapsed '
+        'timesheet-list-row-marker timekeeping-list-row-marker employee-timesheet-row weekly-employee-row">'
+        f'<div class="employee-cell" title="{html.escape(employee_name)}">'
+        f"{html.escape(employee_name)}</div>"
+        f"{''.join(day_parts)}"
+        f"{_total_cell_readonly_html(label='ST', value=_fmt_list_summary_hours(st_total))}"
+        f"{_total_cell_readonly_html(label='OT', value=_fmt_list_summary_hours(ot_total))}"
+        f"{_total_cell_readonly_html(label='TOTAL', value=_fmt_list_summary_hours(total_hours))}"
+        f'<div class="status-cell">{html.escape(_timecard_status_display(status))}</div>'
+        "</div>"
+    )
+
+
+def _build_timecard_header_labels_html() -> str:
+    """Column labels aligned with collapsed timecard grid columns."""
+    return (
+        '<div class="weekly-timecard-row weekly-timecard-row-grid weekly-timecard-header-row">'
+        '<div class="employee-cell employee-header-spacer" aria-hidden="true"></div>'
+        '<div class="day-cell day-header-cell"><span class="day-date">Mon</span></div>'
+        '<div class="day-cell day-header-cell"><span class="day-date">Tue</span></div>'
+        '<div class="day-cell day-header-cell"><span class="day-date">Wed</span></div>'
+        '<div class="day-cell day-header-cell"><span class="day-date">Thu</span></div>'
+        '<div class="day-cell day-header-cell"><span class="day-date">Fri</span></div>'
+        '<div class="day-cell day-header-cell day-cell-weekend"><span class="day-date">Sat</span></div>'
+        '<div class="day-cell day-header-cell day-cell-weekend"><span class="day-date">Sun</span></div>'
+        '<div class="total-cell"><span class="total-label">ST</span></div>'
+        '<div class="total-cell"><span class="total-label">OT</span></div>'
+        '<div class="total-cell"><span class="total-label">Total</span></div>'
+        '<div class="status-cell"><span class="total-label">Status</span></div>'
+        "</div>"
+    )
+
+
 def _list_row_day_cell_readonly_html(
     *,
     day_d: date,
@@ -3978,91 +4054,51 @@ def _render_timekeeping_employee_row_collapsed(
     employee_name: str,
     eid: str,
 ) -> None:
-    """Compact read-only weekly timecard row (no card wrapper, no hour widgets)."""
+    """Compact read-only weekly timecard row as one HTML grid plus expand control."""
+    st_total = float(row.get("st_total") or 0)
+    ot_total = float(row.get("ot_total") or 0)
+    total_hours = float(row.get("total_hours") or 0)
+    status = _normalize_timecard_status(row.get("status"))
+    grid: list[dict] | None = None
+    if eid:
+        grid = _ensure_weekly_grid(emp, week_start_d)
+        st_total, ot_total, total_hours = _row_totals_from_grid(grid)
+        status = _week_status_from_grid(grid)
+
     with st.container(key=f"tk_row_{timecard_id}"):
-        row_cols = st.columns(_WEEKLY_TS_LIST_ROW_COLS, gap="xxsmall")
-        with row_cols[0]:
-            st.markdown(
-                '<span class="weekly-timecard-row weekly-timecard-row-collapsed weekly-timesheet-row-marker '
-                'timesheet-list-row-marker timekeeping-list-row-marker employee-timesheet-row '
-                'weekly-employee-row" aria-hidden="true"></span>'
-                '<span class="timekeeping-drag-cell timesheet-list-drag-handle" '
-                'aria-hidden="true">⋮⋮</span>',
-                unsafe_allow_html=True,
-            )
-        with row_cols[1]:
-            st.markdown(
-                '<span class="weekly-timesheet-expand-marker weekly-timesheet-expand '
-                'timekeeping-expand-cell" aria-hidden="true"></span>',
-                unsafe_allow_html=True,
-            )
-            if st.button(
-                "▸",
-                key=f"tk_expand_{timecard_id}",
-                help="Expand ST/OT detail, notes, and daily submit",
-            ):
-                _toggle_expanded_timecard(timecard_id)
-                ips_app_rerun()
-        with row_cols[2]:
+        lead_cols = st.columns([54, 1], gap="small")
+        with lead_cols[0]:
+            drag_col, expand_col = st.columns([20, 34], gap="small")
+            with drag_col:
+                st.markdown(
+                    '<div class="drag-cell timekeeping-drag-cell timesheet-list-drag-handle" '
+                    'aria-hidden="true">⋮⋮</div>',
+                    unsafe_allow_html=True,
+                )
+            with expand_col:
+                st.markdown(
+                    '<span class="weekly-timesheet-expand-marker weekly-timesheet-expand '
+                    'timekeeping-expand-cell" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+                if st.button(
+                    "▸",
+                    key=f"tk_expand_{timecard_id}",
+                    help="Expand ST/OT detail, notes, and daily submit",
+                ):
+                    _toggle_expanded_timecard(timecard_id)
+                    ips_app_rerun()
+        with lead_cols[1]:
             _render_timekeeping_inline_html(
-                f'<div class="timekeeping-employee-cell weekly-timesheet-employee weekly-employee-cell '
-                f'timesheet-list-employee-cell">'
-                f'<div class="weekly-timesheet-employee-name employee-name ips-timekeeping-employee" '
-                f'title="{html.escape(employee_name)}">{html.escape(employee_name)}</div>'
-                f"</div>"
-            )
-
-        st_total = float(row.get("st_total") or 0)
-        ot_total = float(row.get("ot_total") or 0)
-        total_hours = float(row.get("total_hours") or 0)
-        status = _normalize_timecard_status(row.get("status"))
-        if eid:
-            grid = _ensure_weekly_grid(emp, week_start_d)
-            for day_ix, (col, day_d) in enumerate(zip(row_cols[3:10], days)):
-                day_row = grid[day_ix] if day_ix < len(grid) else {}
-                with col:
-                    _render_list_row_day_cell_readonly(
-                        day_d=day_d,
-                        day_ix=day_ix,
-                        day_row=day_row,
-                    )
-            st_total, ot_total, total_hours = _row_totals_from_grid(grid)
-            status = _week_status_from_grid(grid)
-        else:
-            for day_ix, (col, day_d) in enumerate(zip(row_cols[3:10], days)):
-                day_title = f'{day_d.strftime("%a").upper()} {day_d.strftime("%m/%d")}'
-                with col:
-                    _render_timekeeping_inline_html(
-                        f'<div class="timesheet-day-cell">'
-                        f'<div class="timesheet-day-label">{html.escape(day_title)}</div>'
-                        f'<div class="timesheet-day-status">DRAFT</div>'
-                        f'<div class="timesheet-day-hours timekeeping-hour-input-ro">—</div>'
-                        f"</div>"
-                    )
-
-        with row_cols[10]:
-            _render_list_row_summary_cell_readonly(
-                label=_LIST_VIEW_SUMMARY_LABELS[0],
-                value_html=html.escape(_fmt_list_summary_hours(st_total)),
-                value_class="timekeeping-total-cell ips-timekeeping-hours",
-            )
-        with row_cols[11]:
-            _render_list_row_summary_cell_readonly(
-                label=_LIST_VIEW_SUMMARY_LABELS[1],
-                value_html=html.escape(_fmt_list_summary_hours(ot_total)),
-                value_class="timekeeping-overtime-cell ips-timekeeping-hours",
-            )
-        with row_cols[12]:
-            _render_list_row_summary_cell_readonly(
-                label=_LIST_VIEW_SUMMARY_LABELS[2],
-                value_html=html.escape(_fmt_list_summary_hours(total_hours)),
-                value_class="timekeeping-billed-cell ips-timekeeping-hours",
-            )
-        with row_cols[13]:
-            _render_list_row_summary_cell_readonly(
-                label=_LIST_VIEW_SUMMARY_LABELS[3],
-                value_html=html.escape(status),
-                value_class="timekeeping-status-cell timesheet-list-status-cell timekeeping-status-text",
+                _build_collapsed_timecard_row_html(
+                    employee_name=employee_name,
+                    days=days,
+                    grid=grid,
+                    st_total=st_total,
+                    ot_total=ot_total,
+                    total_hours=total_hours,
+                    status=status,
+                )
             )
 
 
@@ -4279,7 +4315,8 @@ def _render_custom_timekeeping_table(
     with st.container(key="timekeeping_table_wrap"):
         st.markdown(
             '<span class="employee-timesheet-list weekly-timesheet-list weekly-timecard-list '
-            'ips-timekeeping-table-wrap timekeeping-list-scroll" aria-hidden="true"></span>',
+            'weekly-timecard-scroll ips-timekeeping-table-wrap timekeeping-list-scroll" '
+            'aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
 
