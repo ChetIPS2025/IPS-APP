@@ -13907,8 +13907,8 @@ section[data-testid="stSidebar"] > div {{
   max-height: 56px;
   padding: 0;
   margin: 0;
-  overflow: hidden;
-  background: transparent;
+  overflow: visible;
+  background: transparent !important;
   border: none;
   box-shadow: none;
 }}
@@ -13917,11 +13917,33 @@ section[data-testid="stSidebar"] > div {{
   height: 56px;
   min-height: 56px;
   max-height: 56px;
-  padding: 0;
+  padding: 4px 0;
   margin: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: transparent !important;
+  overflow: visible;
+}}
+.navigation-logo,
+.sidebar-logo,
+.app-logo,
+.sidebar-logo-icon,
+.sidebar-logo-img--expanded,
+.ips-desktop-nav-rail__logo {{
+  object-fit: contain !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  display: block;
+}}
+.sidebar-logo-wrap img,
+.navigation-logo,
+.sidebar-logo,
+.sidebar-logo-wrap [data-testid="stImage"] img,
+.sidebar-logo-wrap--collapsed img {{
+  background: transparent !important;
+  object-fit: contain !important;
 }}
 .sidebar-logo-icon {{
   width: 40px;
@@ -13934,6 +13956,9 @@ section[data-testid="stSidebar"] > div {{
   display: block;
   margin: 0 auto;
   padding: 0;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }}
 .sidebar-logo-img--expanded {{
   width: 52px;
@@ -13947,6 +13972,8 @@ section[data-testid="stSidebar"] > div {{
   margin: 0 auto;
   padding: 0;
   background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }}
 .sidebar-logo-icon-fallback {{
   font-size: 0.62rem;
@@ -14010,7 +14037,8 @@ section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):n
   min-height: 0 !important;
   height: 56px !important;
   max-height: 56px !important;
-  overflow: hidden !important;
+  overflow: visible !important;
+  background: transparent !important;
 }}
 body.ips-sidebar-collapsed section[data-testid="stSidebar"]:hover .sidebar-header--collapsed-rail,
 section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):hover .sidebar-header--collapsed-rail,
@@ -14071,7 +14099,10 @@ section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):h
 .ips-sidebar-logo-wrap [data-testid="stImage"] img,
 .sidebar-logo-wrap--collapsed img,
 .sidebar-logo-wrap--collapsed [data-testid="stImage"] img,
-.sidebar-logo-img--expanded {{
+.sidebar-logo-img--expanded,
+.navigation-logo,
+.sidebar-logo,
+.app-logo {{
   max-width: 52px;
   max-height: 52px;
   width: auto;
@@ -14080,6 +14111,8 @@ section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):h
   margin: 0 auto;
   object-fit: contain;
   background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }}
 .sidebar-header--collapsed .sidebar-logo-wrap img,
 .sidebar-header--collapsed .sidebar-logo-wrap [data-testid="stImage"] img,

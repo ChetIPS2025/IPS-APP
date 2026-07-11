@@ -80,8 +80,8 @@ def get_wording_logo_path() -> Path | None:
     return _find_wide_logo()
 
 
-@lru_cache(maxsize=4)
-def _logo_data_uri(path_str: str) -> str:
+@lru_cache(maxsize=8)
+def _logo_data_uri(path_str: str, mtime_ns: int) -> str:
     path = Path(path_str)
     mime = "image/png"
     if path.suffix.lower() in {".jpg", ".jpeg"}:
@@ -90,6 +90,10 @@ def _logo_data_uri(path_str: str) -> str:
         mime = "image/webp"
     encoded = base64.b64encode(path.read_bytes()).decode("ascii")
     return f"data:{mime};base64,{encoded}"
+
+
+def _logo_src(path: Path) -> str:
+    return _logo_data_uri(str(path), path.stat().st_mtime_ns)
 
 
 def wording_logo_html(
@@ -104,7 +108,7 @@ def wording_logo_html(
         return (
             f'<span class="ips-main-header-logo-fallback">{html.escape(alt)}</span>'
         )
-    src = _logo_data_uri(str(path))
+    src = _logo_src(path)
     return (
         f'<img class="{html.escape(css_class, quote=True)}" src="{src}" alt="{html.escape(alt)}" '
         f'height="{int(height)}" style="height:{int(height)}px;" />'
@@ -124,11 +128,13 @@ def sidebar_round_logo_html(
             f'<span class="{html.escape(css_class, quote=True)} '
             f'{html.escape(css_class, quote=True)}-fallback">{html.escape(alt)}</span>'
         )
-    src = _logo_data_uri(str(path))
+    src = _logo_src(path)
     px = int(size_px)
+    classes = f"sidebar-logo navigation-logo app-logo {css_class}".strip()
     return (
-        f'<img class="{html.escape(css_class, quote=True)}" src="{src}" '
-        f'alt="{html.escape(alt)}" width="{px}" height="{px}" />'
+        f'<img class="{html.escape(classes, quote=True)}" src="{src}" '
+        f'alt="{html.escape(alt)}" width="{px}" height="{px}" '
+        f'style="width:{px}px;height:{px}px;object-fit:contain;background:transparent;border:none;box-shadow:none;" />'
     )
 
 
@@ -137,7 +143,7 @@ def header_logo_html(*, height: int = 40, alt: str = "IPS") -> str:
     path = get_header_logo_path()
     if not path:
         return ""
-    src = _logo_data_uri(str(path))
+    src = _logo_src(path)
     return (
         f'<span class="ips-page-header-logo-wrap">'
         f'<img class="ips-page-header-logo" src="{src}" alt="{html.escape(alt)}" '

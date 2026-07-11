@@ -286,6 +286,15 @@ def _desktop_nav_rail_css() -> str:
   height: {IPS_SIDEBAR_COLLAPSED_LOGO_PX}px;
   object-fit: contain;
   display: block;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}}
+.ips-desktop-nav-rail__brand {{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
 }}
 .ips-desktop-nav-rail__logo-fallback {{
   font-size: 0.62rem;
@@ -641,19 +650,35 @@ section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar
 section[data-testid="stSidebar"] .sidebar-logo-wrap img,
 section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"] img,
 section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed img,
-section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {
+section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] img,
+section[data-testid="stSidebar"] .navigation-logo,
+section[data-testid="stSidebar"] .sidebar-logo,
+section[data-testid="stSidebar"] .app-logo {
   max-width: __EXP_LOGO__px !important;
   max-height: __EXP_LOGO__px !important;
   width: auto !important;
   height: auto !important;
   object-fit: contain !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap img,
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"] img,
 body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed img,
-body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] img {
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] img,
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] .navigation-logo,
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo,
+body.ips-sidebar-collapsed section[data-testid="stSidebar"] .app-logo {
   max-width: __COL_LOGO__px !important;
   max-height: __COL_LOGO__px !important;
+}
+section[data-testid="stSidebar"] .sidebar-logo-wrap,
+section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed,
+section[data-testid="stSidebar"] .ips-sidebar-logo-wrap,
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-logo-wrap),
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-header--collapsed-rail) {
+  background: transparent !important;
 }
 section[data-testid="stSidebar"] .sidebar-logo-wrap [data-testid="stImage"],
 section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stImage"] {
@@ -664,6 +689,7 @@ section[data-testid="stSidebar"] .sidebar-logo-wrap--collapsed [data-testid="stI
   max-width: 100% !important;
   margin: 0 auto !important;
   padding: 0 !important;
+  background: transparent !important;
 }
 section[data-testid="stSidebar"] .sidebar-header-brand {
   display: flex !important;
@@ -692,7 +718,8 @@ section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed) [
   min-height: 0 !important;
   height: 56px !important;
   max-height: 56px !important;
-  overflow: hidden !important;
+  overflow: visible !important;
+  background: transparent !important;
 }
 section[data-testid="stSidebar"] .sidebar-logo-tagline {
   font-size: 0.875rem !important;
@@ -863,7 +890,7 @@ section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):n
   max-height: 56px !important;
   padding: 0 !important;
   margin: 0 !important;
-  overflow: hidden !important;
+  overflow: visible !important;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
@@ -876,8 +903,10 @@ section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):n
   height: 56px !important;
   min-height: 56px !important;
   max-height: 56px !important;
-  padding: 0 !important;
+  padding: 4px 0 !important;
   margin: 0 !important;
+  background: transparent !important;
+  overflow: visible !important;
 }
 .sidebar-logo-icon {
   width: __COL_LOGO__px !important;
@@ -889,6 +918,9 @@ section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):n
   object-fit: contain !important;
   display: block !important;
   margin: 0 auto !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 .sidebar-logo-img--expanded {
   width: __EXP_LOGO__px !important;
@@ -901,6 +933,8 @@ section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):n
   display: block !important;
   margin: 0 auto !important;
   background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 </style>
 """
@@ -1302,7 +1336,7 @@ button.ips-header-menu-btn {{
     max-height: {header_h}px !important;
     padding: 0 !important;
     margin: 0 !important;
-    overflow: hidden !important;
+    overflow: visible !important;
     flex-shrink: 0 !important;
     background: transparent !important;
     border: none !important;
@@ -1316,8 +1350,10 @@ button.ips-header-menu-btn {{
     height: {header_h}px !important;
     min-height: {header_h}px !important;
     max-height: {header_h}px !important;
-    padding: 0 !important;
+    padding: 4px 0 !important;
     margin: 0 !important;
+    background: transparent !important;
+    overflow: visible !important;
   }}
   .sidebar-logo-icon {{
     width: {logo_px}px !important;
@@ -1330,6 +1366,9 @@ button.ips-header-menu-btn {{
     display: block !important;
     margin: 0 auto !important;
     padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
   }}
   .sidebar-logo-icon-fallback {{
     font-size: 0.62rem !important;
@@ -1344,7 +1383,8 @@ button.ips-header-menu-btn {{
     min-height: 0 !important;
     height: {header_h}px !important;
     max-height: {header_h}px !important;
-    overflow: hidden !important;
+    overflow: visible !important;
+    background: transparent !important;
   }}
   {collapsed_sel}:not(:hover) .st-key-sidebar_expanded_header_wrap,
   {collapsed_sel}:not(:hover) [data-testid="stVerticalBlock"].st-key-sidebar_expanded_header_wrap,
