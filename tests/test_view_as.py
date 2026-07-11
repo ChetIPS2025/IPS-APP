@@ -93,8 +93,11 @@ def test_mobile_preview_css_enables_internal_scroll():
 
     source = inspect.getsource(va.inject_view_as_styles)
     assert "overflow-y: auto !important" in source
-    assert "overscroll-behavior: contain !important" in source
     assert "calc(100vh - 24px)" in source
     assert "min-height: 0 !important" in source
     assert "mobile-preview-content" in source
+    assert "mobile-preview-label" in source
+    assert "justify-content: flex-start !important" in source
     assert "mobile_preview_content" in inspect.getsource(va.render_view_as_page_shell)
+    shell_source = inspect.getsource(va.render_view_as_page_shell)
+    assert "ips-mobile-preview-shell-marker" not in shell_source

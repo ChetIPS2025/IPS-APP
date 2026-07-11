@@ -276,19 +276,48 @@ def inject_view_as_styles() -> None:
   color: #2563eb;
 }
 .mobile-preview-shell {
-  width: 100%;
-  height: 100%;
+  width: min(430px, calc(100vw - 24px));
+  height: calc(100vh - 24px);
+  margin: 12px auto;
+  border: 1px solid #dbe4f0;
+  border-radius: 22px;
+  background: #f8fafc;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  justify-content: flex-start;
+  align-items: stretch;
 }
 .mobile-preview-header {
   flex: 0 0 auto;
   width: 100%;
-  padding: 12px 14px;
-  background: #f8fafc;
+  padding: 12px;
+  background: #ffffff;
   border-bottom: 1px solid #e2e8f0;
   box-sizing: border-box;
+}
+.mobile-preview-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+}
+.mobile-preview-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.35;
+  white-space: normal;
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #1e3a8a;
+}
+.mobile-preview-return-button {
+  flex: 0 0 auto;
+  max-width: 100%;
+  white-space: nowrap;
 }
 .mobile-preview-content {
   flex: 1 1 auto;
@@ -297,8 +326,7 @@ def inject_view_as_styles() -> None:
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  padding: 14px;
+  padding: 12px;
   box-sizing: border-box;
 }
 </style>
@@ -308,79 +336,117 @@ def inject_view_as_styles() -> None:
 
     marker_classes = "ips-view-as-marker"
     mobile_css = """
-<style id="ips-view-as-mobile-v4">
+<style id="ips-view-as-mobile-v5">
 html.ips-view-as-mobile-active [data-testid="stAppViewContainer"] {
   display: flex !important;
   justify-content: center !important;
   align-items: flex-start !important;
   overflow: hidden !important;
-  height: 100vh !important;
+  min-height: 100vh !important;
   max-height: 100vh !important;
 }
 html.ips-view-as-mobile-active section[data-testid="stSidebar"],
 html.ips-view-as-mobile-active [data-testid="stSidebar"] {
   display: none !important;
 }
-section[data-testid="stMain"]:has(.ips-mobile-preview-shell-marker) {
+html.ips-view-as-mobile-active .ips-desktop-nav-rail {
+  display: none !important;
+}
+section[data-testid="stMain"]:has(.st-key-mobile_preview_shell) {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  overflow: visible !important;
+  position: static !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  box-sizing: border-box !important;
+  transform: none !important;
+}
+section[data-testid="stMain"]:has(.st-key-mobile_preview_shell) > div,
+section[data-testid="stMain"]:has(.st-key-mobile_preview_shell) [data-testid="stMainBlockContainer"] {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+  box-sizing: border-box !important;
+  transform: none !important;
+}
+section[data-testid="stMain"]:has(.st-key-mobile_preview_shell) .block-container {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+  box-sizing: border-box !important;
+  transform: none !important;
+}
+section[data-testid="stMain"]:has(.st-key-mobile_preview_shell) .block-container > [data-testid="stVerticalBlock"] {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+.st-key-mobile_preview_shell {
   width: min(430px, calc(100vw - 24px)) !important;
-  max-width: min(430px, calc(100vw - 24px)) !important;
   height: calc(100vh - 24px) !important;
-  max-height: calc(100vh - 24px) !important;
   margin: 12px auto !important;
-  border: 1px solid #d9e2ef !important;
+  border: 1px solid #dbe4f0 !important;
   border-radius: 22px !important;
   background: #f8fafc !important;
-  box-shadow: 0 0 0 1px #dbeafe, 0 12px 40px rgba(37, 99, 235, 0.12) !important;
+  overflow: hidden !important;
   display: flex !important;
   flex-direction: column !important;
-  overflow: hidden !important;
-  padding: 0 !important;
-  position: relative !important;
+  box-sizing: border-box !important;
+  justify-content: flex-start !important;
+  align-items: stretch !important;
   flex: 0 0 auto !important;
   min-height: 0 !important;
-  box-sizing: border-box !important;
-}
-section[data-testid="stMain"]:has(.ips-mobile-preview-shell-marker) > div,
-section[data-testid="stMain"]:has(.ips-mobile-preview-shell-marker) [data-testid="stMainBlockContainer"] {
-  display: flex !important;
-  flex-direction: column !important;
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  height: 100% !important;
-  max-height: 100% !important;
-  overflow: hidden !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  box-sizing: border-box !important;
+  max-width: none !important;
+  position: static !important;
+  transform: none !important;
   padding: 0 !important;
-  margin: 0 !important;
 }
-section[data-testid="stMain"]:has(.ips-mobile-preview-shell-marker) .block-container {
-  display: flex !important;
-  flex-direction: column !important;
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  height: 100% !important;
-  max-height: 100% !important;
-  overflow: hidden !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  box-sizing: border-box !important;
-}
-section[data-testid="stMain"]:has(.ips-mobile-preview-shell-marker) .block-container > [data-testid="stVerticalBlock"] {
-  display: flex !important;
-  flex-direction: column !important;
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  height: 100% !important;
-  max-height: 100% !important;
-  overflow: hidden !important;
-  gap: 0 !important;
-  width: 100% !important;
-}
-.st-key-mobile_preview_shell,
 .st-key-mobile_preview_shell > [data-testid="stVerticalBlock"] {
   display: flex !important;
   flex-direction: column !important;
@@ -388,12 +454,15 @@ section[data-testid="stMain"]:has(.ips-mobile-preview-shell-marker) .block-conta
   min-height: 0 !important;
   height: 100% !important;
   max-height: 100% !important;
-  overflow: hidden !important;
   width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
   gap: 0 !important;
   margin: 0 !important;
   padding: 0 !important;
   box-sizing: border-box !important;
+  justify-content: flex-start !important;
+  align-items: stretch !important;
 }
 .st-key-mobile_preview_shell > [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlockBorderWrapper"].st-key-mobile_preview_header,
 .st-key-mobile_preview_header {
@@ -404,24 +473,13 @@ section[data-testid="stMain"]:has(.ips-mobile-preview-shell-marker) .block-conta
   max-height: none !important;
   overflow: visible !important;
   margin: 0 !important;
-  padding: 0 !important;
+  padding: 12px !important;
+  background: #ffffff !important;
+  border-bottom: 1px solid #e2e8f0 !important;
   box-sizing: border-box !important;
+  position: static !important;
+  transform: none !important;
 }
-.st-key-mobile_preview_shell > [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlockBorderWrapper"].st-key-mobile_preview_content,
-.st-key-mobile_preview_content {
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  width: 100% !important;
-  height: auto !important;
-  max-height: none !important;
-  overflow: hidden !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  box-sizing: border-box !important;
-  display: flex !important;
-  flex-direction: column !important;
-}
-.st-key-mobile_preview_header,
 .st-key-mobile_preview_header > [data-testid="stVerticalBlock"] {
   flex: 0 0 auto !important;
   width: 100% !important;
@@ -438,50 +496,79 @@ section[data-testid="stMain"]:has(.ips-mobile-preview-shell-marker) .block-conta
   display: flex !important;
   flex-wrap: nowrap !important;
   align-items: center !important;
-  gap: 0.5rem !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  width: 100% !important;
   margin: 0 !important;
-  padding: 12px 14px !important;
-  border-bottom: 1px solid #e2e8f0 !important;
-  background: #f8fafc !important;
+  padding: 0 !important;
   min-height: 0 !important;
   height: auto !important;
   max-height: none !important;
   box-sizing: border-box !important;
+  position: static !important;
+  transform: none !important;
 }
 .st-key-mobile_preview_header [data-testid="stHorizontalBlock"] > [data-testid="column"] {
   min-width: 0 !important;
   max-width: 100% !important;
   flex: 1 1 auto !important;
+  width: auto !important;
+  position: static !important;
+  transform: none !important;
 }
 .st-key-mobile_preview_header [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child {
-  flex: 0 1 auto !important;
-  max-width: 42% !important;
+  flex: 0 0 auto !important;
+  max-width: 100% !important;
+}
+.st-key-mobile_preview_header .mobile-preview-label {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  line-height: 1.35 !important;
+  white-space: normal !important;
 }
 .st-key-mobile_preview_header [data-testid="stButton"] > button {
-  font-size: 0.72rem !important;
-  padding: 0.35rem 0.5rem !important;
-  min-height: 2rem !important;
-  white-space: normal !important;
-  line-height: 1.15 !important;
-  width: 100% !important;
+  font-size: 0.78rem !important;
+  padding: 0.4rem 0.65rem !important;
+  min-height: 2.1rem !important;
+  white-space: nowrap !important;
+  line-height: 1.2 !important;
+  width: auto !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
 }
-.st-key-mobile_preview_content,
+.st-key-mobile_preview_shell > [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlockBorderWrapper"].st-key-mobile_preview_content,
+.st-key-mobile_preview_content {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column !important;
+  position: static !important;
+  transform: none !important;
+}
 .st-key-mobile_preview_content > [data-testid="stVerticalBlock"] {
   flex: 1 1 auto !important;
   min-height: 0 !important;
   width: 100% !important;
-  height: auto !important;
-  max-height: none !important;
+  max-width: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
   -webkit-overflow-scrolling: touch !important;
-  overscroll-behavior: contain !important;
-  padding: 14px !important;
+  padding: 12px !important;
   box-sizing: border-box !important;
   margin: 0 !important;
   gap: 0.35rem !important;
+  position: static !important;
+  transform: none !important;
 }
 .st-key-mobile_preview_content [data-testid="stVerticalBlockBorderWrapper"],
 .st-key-mobile_preview_content [data-testid="stElementContainer"] {
@@ -489,6 +576,8 @@ section[data-testid="stMain"]:has(.ips-mobile-preview-shell-marker) .block-conta
   height: auto !important;
   min-height: 0 !important;
   max-height: none !important;
+  max-width: 100% !important;
+  width: 100% !important;
   position: static !important;
   transform: none !important;
   margin-top: 0 !important;
@@ -498,47 +587,44 @@ section[data-testid="stMain"]:has(.ips-mobile-preview-shell-marker) .block-conta
   padding-left: 0 !important;
   padding-right: 0 !important;
   padding-top: 0 !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  position: static !important;
+  transform: none !important;
 }
-section[data-testid="stMain"]:has(.ips-mobile-preview-shell-marker) .st-key-mobile_preview_content [data-testid="stVerticalBlock"] {
+section[data-testid="stMain"]:has(.st-key-mobile_preview_shell) [data-testid="stVerticalBlock"] > div {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  padding-top: 0 !important;
+}
+section[data-testid="stMain"]:has(.st-key-mobile_preview_shell) .st-key-mobile_preview_content [data-testid="stVerticalBlock"] {
   padding-bottom: calc(4.5rem + env(safe-area-inset-bottom)) !important;
 }
-section[data-testid="stMain"]:has(.ips-mobile-preview-shell-marker) .ips-jobs-summary-cards {
+section[data-testid="stMain"]:has(.st-key-mobile_preview_shell) .ips-jobs-summary-cards {
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
 }
-.ips-mobile-preview-shell-marker,
-.ips-mobile-preview-header-marker,
-.ips-mobile-preview-content-marker {
-  display: none !important;
-  height: 0 !important;
-  min-height: 0 !important;
-  margin: 0 !important;
+section[data-testid="stMain"]:has(.st-key-mobile_preview_shell) .ips-view-as-banner-wrap,
+section[data-testid="stMain"]:has(.st-key-mobile_preview_shell) .ips-view-as-banner {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
   padding: 0 !important;
-  overflow: hidden !important;
-}
-.st-key-mobile_preview_shell > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has(.ips-mobile-preview-shell-marker) {
-  display: none !important;
-  height: 0 !important;
-  min-height: 0 !important;
   margin: 0 !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-  flex: 0 0 0 !important;
+  max-width: 100% !important;
+  width: 100% !important;
 }
-html.ips-view-as-mobile-active .ips-desktop-nav-rail {
-  display: none !important;
-}
-@media (max-width: 480px) {
-  .st-key-mobile_preview_header [data-testid="stHorizontalBlock"],
-  .mobile-preview-header-row {
+@media (max-width: 430px) {
+  .st-key-mobile_preview_header [data-testid="stHorizontalBlock"] {
     flex-direction: column !important;
     align-items: stretch !important;
     gap: 10px !important;
   }
-  .st-key-mobile_preview_header [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child {
-    max-width: 100% !important;
-  }
+  .st-key-mobile_preview_header [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child,
   .st-key-mobile_preview_header [data-testid="stButton"] > button {
     width: 100% !important;
+    max-width: 100% !important;
   }
 }
 </style>
@@ -575,24 +661,9 @@ def render_view_as_page_shell(render_fn: Callable[[], None]) -> None:
     if is_view_as_mobile_preview():
         inject_view_as_styles()
         with st.container(key="mobile_preview_shell"):
-            st.markdown(
-                '<span class="mobile-preview-shell ips-mobile-preview-shell-marker" '
-                'aria-hidden="true"></span>',
-                unsafe_allow_html=True,
-            )
             with st.container(key="mobile_preview_header"):
-                st.markdown(
-                    '<span class="mobile-preview-header ips-mobile-preview-header-marker" '
-                    'aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
                 render_view_as_active_toolbar(styles_already_injected=True)
             with st.container(key="mobile_preview_content"):
-                st.markdown(
-                    '<span class="mobile-preview-content ips-mobile-preview-content-marker" '
-                    'aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
                 render_fn()
         return
     if is_view_as_active():
@@ -608,13 +679,33 @@ def render_view_as_active_toolbar(*, styles_already_injected: bool = False) -> N
         inject_view_as_styles()
     label = html.escape(view_as_display_label())
     mobile_preview = is_view_as_mobile_preview()
-    toolbar_cols = [3, 2] if mobile_preview else [4, 1]
-    banner_col, return_col = st.columns(toolbar_cols, gap="small", vertical_alignment="center")
-    header_row_cls = " mobile-preview-header-row" if mobile_preview else ""
+    if mobile_preview:
+        label_col, return_col = st.columns(2, gap="small", vertical_alignment="center")
+        with label_col:
+            st.markdown(
+                f'<p class="mobile-preview-label">Viewing as {label} — Preview Mode</p>',
+                unsafe_allow_html=True,
+            )
+        with return_col:
+            if st.button(
+                "Return to Admin View",
+                key="ips_view_as_return_admin",
+                type="primary",
+                use_container_width=True,
+            ):
+                clear_view_as()
+                try:
+                    from app.navigation import set_nav_slug
+                except ImportError:
+                    from navigation import set_nav_slug  # type: ignore
+                set_nav_slug("dashboard")
+                st.rerun()
+        return
+    banner_col, return_col = st.columns([4, 1], gap="small", vertical_alignment="center")
     with banner_col:
         st.markdown(
             f"""
-<div class="ips-view-as-banner-wrap mobile-preview-header{header_row_cls}">
+<div class="ips-view-as-banner-wrap">
   <div class="ips-view-as-banner">
     <p class="ips-view-as-banner-text">Viewing as {label} — Preview Mode</p>
   </div>
