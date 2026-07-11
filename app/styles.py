@@ -5468,12 +5468,22 @@ def inject_timekeeping_module_css() -> None:
 .timekeeping-alloc-week-totals {{
   display: flex !important;
   flex-wrap: wrap !important;
-  gap: 1rem !important;
-  margin: 0.35rem 0 0.5rem 0 !important;
+  gap: 18px !important;
+  margin: 8px 0 12px 0 !important;
   font-size: 0.82rem !important;
+  font-weight: 600 !important;
   color: #334155 !important;
 }}
-.timekeeping-alloc-week-totals span {{
+.weekly-allocation-totals {{
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 18px !important;
+  align-items: center !important;
+  margin: 8px 0 12px !important;
+  font-weight: 600 !important;
+}}
+.timekeeping-alloc-week-totals span,
+.weekly-allocation-totals span {{
   white-space: nowrap !important;
 }}
 .timekeeping-alloc-override-badge {{
@@ -8563,10 +8573,10 @@ def inject_timekeeping_module_css() -> None:
   max-width: none !important;
 }}
 .timekeeping-alloc-intro {{
-  font-size: 0.84rem;
+  font-size: 0.82rem;
   color: #475569;
   line-height: 1.35;
-  margin: 0 0 0.5rem 0;
+  margin: 10px 0 6px 0;
   max-width: 100%;
 }}
 .timekeeping-allocation-card,
@@ -15065,7 +15075,7 @@ def _inject_timekeeping_list_row_gap_css() -> None:
     """Minimal list spacing — native Streamlit columns own the row layout."""
     st.markdown(
         """
-<style id="ips-timekeeping-list-gap-v4">
+<style id="ips-timekeeping-list-gap-v5">
 .st-key-timekeeping_table_wrap:has(.timekeeping-list-scroll) {
   width: 100% !important;
   overflow-x: auto !important;
@@ -15087,6 +15097,13 @@ def _inject_timekeeping_list_row_gap_css() -> None:
   min-height: 0 !important;
   max-height: none !important;
 }
+.st-key-timekeeping_table_wrap:has(.timekeeping-list-scroll) [class*="st-key-tk_card_"] {
+  margin: 0 !important;
+  padding: 0 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+}
 .st-key-timekeeping_table_wrap:has(.timekeeping-list-scroll) [class*="st-key-tk_row_"] > [data-testid="stVerticalBlock"] {
   gap: 0 !important;
   margin: 0 !important;
@@ -15095,9 +15112,68 @@ def _inject_timekeeping_list_row_gap_css() -> None:
   min-height: 0 !important;
   max-height: none !important;
 }
-.st-key-timekeeping_table_wrap:has(.timekeeping-list-scroll) [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"] {
+.st-key-timekeeping_table_wrap:has(.expanded-timecard-summary-marker) [class*="st-key-tk_row_"] {
+  padding: 8px 12px !important;
+  max-height: none !important;
+}
+.st-key-timekeeping_table_wrap:has(.expanded-timecard-summary-marker) [class*="st-key-tk_row_"] [data-testid="stHorizontalBlock"] {
   width: 100% !important;
-  align-items: flex-start !important;
+  align-items: center !important;
+  min-height: 0 !important;
+  max-height: none !important;
+}
+.st-key-timekeeping_table_wrap:has(.expanded-timecard-summary-marker) [class*="st-key-tk_row_"] [data-testid="stVerticalBlock"] {
+  gap: 3px !important;
+  align-items: center !important;
+}
+.day-summary-cell-marker + [data-testid="stMarkdownContainer"],
+.st-key-timekeeping_table_wrap [class*="st-key-tk_list_day_"] [data-testid="stMarkdownContainer"],
+.st-key-timekeeping_table_wrap [class*="st-key-tk_list_day_"] [data-testid="stCaptionContainer"] {
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: center !important;
+}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_list_day_"] [data-testid="stCaptionContainer"] p {
+  font-size: 9px !important;
+  color: #64748b !important;
+  line-height: 1.1 !important;
+}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_list_day_"] [data-testid="stMarkdownContainer"] p {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  line-height: 1.1 !important;
+  margin: 0 !important;
+}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_list_hrs_"] [data-testid="stNumberInput"] {
+  width: 58px !important;
+  min-width: 58px !important;
+  max-width: 58px !important;
+  margin: 2px auto 0 auto !important;
+}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_list_hrs_"] [data-testid="stNumberInput"] > div {
+  min-height: 34px !important;
+  height: 34px !important;
+  padding: 0 !important;
+}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_list_hrs_"] [data-testid="stNumberInput"] input {
+  width: 58px !important;
+  min-width: 58px !important;
+  max-width: 58px !important;
+  height: 34px !important;
+  min-height: 34px !important;
+  text-align: center !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  -moz-appearance: textfield !important;
+}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_list_hrs_"] [data-testid="stNumberInput"] input::-webkit-inner-spin-button,
+.st-key-timekeeping_table_wrap [class*="st-key-tk_list_hrs_"] [data-testid="stNumberInput"] input::-webkit-outer-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_list_hrs_"] [data-testid="stNumberInputStepUp"],
+.st-key-timekeeping_table_wrap [class*="st-key-tk_list_hrs_"] [data-testid="stNumberInputStepDown"] {
+  display: none !important;
 }
 .timekeeping-collapsed-hour-value {
   display: flex !important;
@@ -15117,6 +15193,61 @@ def _inject_timekeeping_list_row_gap_css() -> None:
 }
 .timekeeping-collapsed-hour-weekend {
   background: #f8fafc !important;
+}
+.weekly-allocation-totals {
+  display: flex !important;
+  gap: 18px !important;
+  align-items: center !important;
+  margin: 8px 0 12px !important;
+  font-weight: 600 !important;
+  flex-wrap: wrap !important;
+}
+.weekly-allocation-totals .weekly-allocation-total-item {
+  white-space: nowrap !important;
+}
+.timekeeping-alloc-intro {
+  margin: 10px 0 6px 0 !important;
+  font-size: 0.82rem !important;
+  line-height: 1.35 !important;
+}
+.st-key-timekeeping_table_wrap:has(.timekeeping-allocation-panel-marker) [data-testid="stCaptionContainer"] {
+  margin: 0 0 6px 0 !important;
+}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_alloc_day_"] {
+  padding: 0 !important;
+  margin: 0 0 10px 0 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_alloc_day_"] > [data-testid="stVerticalBlock"] {
+  gap: 8px !important;
+  padding: 14px 16px !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+}
+.daily-allocation-card-marker + [data-testid="stVerticalBlockBorderWrapper"],
+.st-key-timekeeping_table_wrap [class*="st-key-tk_alloc_day_"] [data-testid="stVerticalBlockBorderWrapper"] {
+  border: 1px solid #dce3ec !important;
+  border-radius: 10px !important;
+  padding: 0 !important;
+}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_alloc_line_"] {
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_alloc_line_"] [data-testid="stHorizontalBlock"] {
+  align-items: center !important;
+  min-height: 0 !important;
+}
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-allocation-day-actions-bar-marker) {
+  margin: 8px 0 0 0 !important;
+  padding: 8px 0 0 0 !important;
+  min-height: 0 !important;
+  border-top: 1px solid #e2e8f0 !important;
 }
 </style>
 """,

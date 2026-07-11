@@ -33,6 +33,9 @@ class TestTimekeepingListMasterDetail(unittest.TestCase):
         day_source = inspect.getsource(tk._render_collapsed_list_day_cell)
         self.assertIn("st.markdown", day_source)
         self.assertIn("st.caption", day_source)
+        expanded_source = inspect.getsource(tk._render_list_row_day_cell)
+        self.assertIn("_render_list_day_hour_input", expanded_source)
+        self.assertNotIn("_render_list_day_hour_stepper", expanded_source)
 
     @patch("app.pages.timekeeping._ensure_weekly_grid")
     @patch("app.pages.timekeeping._ensure_week_days_by_employee")

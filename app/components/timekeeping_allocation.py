@@ -18,7 +18,7 @@ ALLOC_HOUR_TYPE_OPTS = ("S/T", "O/T")
 # Streamlit column weights (layout widths come from CSS grid/flex in styles.py).
 # Reference layout: Assignment | Type | Hours (+ Remaining/Status below) | Notes
 ALLOC_LINE_COLS = [3.55, 0.58, 0.78, 1.55]
-ALLOC_LINE_COLS_COMPACT = [4.8, 0.72, 0.95]
+ALLOC_LINE_COLS_COMPACT = [5.5, 1.0, 1.0]
 
 
 @dataclass(frozen=True)
@@ -163,30 +163,45 @@ def render_day_summary_inline(
     card_cls: str,
     deps: AllocationRenderDeps,
 ) -> None:
-    """DayAllocationCard → DaySummaryInline."""
+    """Day card header with separate Streamlit elements (no concatenated labels)."""
     st.markdown(
         (
-            f'<div class="timekeeping-day-summary-inline timekeeping-day-summary-inline-marker '
-            f"timekeeping-allocation-day-card-marker timekeeping-day-allocation-card-marker "
-            f'timekeeping-alloc-day-summary {html.escape(card_cls)}{balance_cls}\">'
-            f'<div class="timekeeping-alloc-day-head-left">'
-            f"<strong>{html.escape(day_name)}</strong>"
-            f'<span class="timekeeping-alloc-day-date">{html.escape(fmt_date(iso))}</span>'
-            f'<span class="timekeeping-hours-badge timekeeping-alloc-day-total">'
-            f"{html.escape(deps.fmt_day_hours(daily_total))} hrs in row above"
-            f"</span>"
-            f"</div>"
-            f'<div class="timekeeping-alloc-day-head-right">'
-            f'<span class="timekeeping-allocation-status-text timekeeping-alloc-day-split">'
-            f"Allocated {deps.fmt_day_hours(allocated)} / {deps.fmt_day_hours(daily_total)}"
-            f"{html.escape(type_summary)} &bull; "
-            f'<span class="timekeeping-alloc-remaining-text">{html.escape(deps.fmt_day_hours(max(0.0, remaining)))} remaining</span>'
-            f"</span>"
-            f"</div>"
-            f"</div>"
+            f'<span class="timekeeping-day-summary-inline-marker timekeeping-day-allocation-card-marker '
+            f"timekeeping-allocation-day-card-marker {html.escape(card_cls)}{balance_cls}\" "
+            f'aria-hidden="true"></span>'
         ),
         unsafe_allow_html=True,
     )
+    head_cols = st.columns([1.45, 1.55], gap="small")
+    with head_cols[0]:
+        title_cols = st.columns([0.75, 1.0, 1.15], gap="small")
+        with title_cols[0]:
+            st.markdown(f"**{html.escape(day_name)}**")
+        with title_cols[1]:
+            st.caption(f"· {html.escape(fmt_date(iso))}")
+        with title_cols[2]:
+            st.markdown(
+                (
+                    f'<span class="timekeeping-hours-badge timekeeping-alloc-day-total">'
+                    f"{html.escape(deps.fmt_day_hours(daily_total))} hrs in row above"
+                    f"</span>"
+                ),
+                unsafe_allow_html=True,
+            )
+    with head_cols[1]:
+        alloc_text = (
+            f"Allocated {deps.fmt_day_hours(allocated)} / {deps.fmt_day_hours(daily_total)}"
+        )
+        if type_summary:
+            alloc_text += html.escape(type_summary)
+        alloc_text += (
+            f" · {html.escape(deps.fmt_day_hours(max(0.0, remaining)))} remaining"
+        )
+        st.markdown(
+            f'<div class="timekeeping-alloc-day-split timekeeping-allocation-status-text">'
+            f"{alloc_text}</div>",
+            unsafe_allow_html=True,
+        )
 
 
 def _render_allocation_hours_input(
@@ -221,6 +236,7 @@ def _render_allocation_hours_input(
         "max_value": 24.0,
         "step": 0.5,
         "format": "%.1f",
+        "label_visibility": "collapsed",
     }
     if on_change is not None:
         hours_kwargs["on_change"] = on_change
@@ -294,7 +310,7 @@ def _render_day_actions_bar(
     if ctx.can_approve and day_status == "Pending" and ctx.daily_total > 0:
         action_slots.extend(["approve", "reject"])
 
-    status_col, actions_col = st.columns([1.35, 4.65], gap="medium", vertical_alignment="center")
+    status_col, add_col, actions_col = st.columns([1.2, 1.4, 1.4], gap="small", vertical_alignment="center")
     with status_col:
         status_wrap_cls = ""
         try:
@@ -309,6 +325,15 @@ def _render_day_actions_bar(
             f"{deps.timecard_status_pill_html(day_status)}</div>",
             unsafe_allow_html=True,
         )
+    with add_col:
+        if "add" in action_slots:
+            if st.button(
+                "+ Add Assignment",
+                key=f"timecard_add_{ctx.eid}_{ctx.iso}",
+                type="secondary",
+                help="Add another assignment row for this day",
+            ):
+                _append_assignment_line(deps=deps, ctx=ctx)
     with actions_col:
         st.markdown(
             '<span class="timekeeping-allocation-actions-marker" aria-hidden="true"></span>',
@@ -323,21 +348,16 @@ def _render_day_actions_bar(
         if not action_slots:
             return
 
-        btn_cols = st.columns(len(action_slots), gap="small")
-        for col, slot in zip(btn_cols, action_slots):
+        trailing_slots = [slot for slot in action_slots if slot != "add"]
+        if not trailing_slots:
+            return
+        btn_cols = st.columns(len(trailing_slots), gap="small")
+        for col, slot in zip(btn_cols, trailing_slots):
             with col:
-                if slot == "add":
+                if slot == "save":
                     if st.button(
-                        "+ Add assignment",
-                        key=f"tk_alloc_add_{ctx.eid}_{ctx.week_sig}_{ctx.iso}",
-                        type="secondary",
-                        help="Add another assignment row for this day",
-                    ):
-                        _append_assignment_line(deps=deps, ctx=ctx)
-                elif slot == "save":
-                    if st.button(
-                        "Save day",
-                        key=f"tk_save_day_{ctx.eid}_{ctx.week_sig}_{ctx.iso}",
+                        "Save Day",
+                        key=f"timecard_save_{ctx.eid}_{ctx.iso}",
                         type="primary",
                     ):
                         deps.save_allocation_day(ctx.iso)
@@ -470,6 +490,7 @@ def render_allocation_control_row(
                     job_opts,
                     index=deps.assignment_option_index(job_opts, live_job),
                     key=job_key,
+                    label_visibility="collapsed",
                     on_change=autosave_cb,
                     args=autosave_args,
                 )
@@ -518,6 +539,7 @@ def render_allocation_control_row(
                     "options": hour_type_options,
                     "index": type_index,
                     "key": type_key,
+                    "label_visibility": "collapsed",
                 }
                 if deps.handle_alloc_type_change is not None:
                     type_kwargs["on_change"] = deps.handle_alloc_type_change
@@ -543,6 +565,7 @@ def render_allocation_control_row(
                     options=hour_type_options,
                     index=type_index,
                     key=type_key,
+                    label_visibility="collapsed",
                     disabled=True,
                     help=f"Calculated as {deps.alloc_hour_type_label(calculated)}",
                 )
@@ -652,7 +675,8 @@ def render_day_allocation_card(
             " timekeeping-alloc-day-unbalanced" if state == "overallocated" else ""
         )
         st.markdown(
-            f'<span class="timekeeping-day-allocation-card-marker timekeeping-alloc-day-state-marker '
+            f'<span class="daily-allocation-card daily-allocation-card-marker '
+            f"timekeeping-day-allocation-card-marker timekeeping-alloc-day-state-marker "
             f"timekeeping-alloc-day-state-{html.escape(state)}{unbalanced_cls} "
             f"{html.escape(approval_cls)} "
             f'timekeeping-allocation-day-card-marker timekeeping-allocation-day-group-marker" '
