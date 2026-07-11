@@ -149,7 +149,7 @@ _TS_DAY = 140
 _TS_WEEK = 70
 _TS_LIST_HANDLE = 18
 _TS_LIST_EXPAND = 26
-_TS_LIST_EMPLOYEE = 168
+_TS_LIST_EMPLOYEE = 200
 _TS_LIST_DAY = 84
 _TS_LIST_SPACER = 8
 _TS_LIST_TOTAL = 48
@@ -3887,7 +3887,8 @@ def _render_timekeeping_employee_row_body(
 
     with st.container(key=f"tk_card_{timecard_id}"):
         st.markdown(
-            '<span class="timesheet-employee-card-marker" aria-hidden="true"></span>',
+            '<span class="timesheet-employee-card timesheet-employee-card-marker '
+            'employee-timesheet-row-wrapper" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
         with st.container(key=f"tk_row_{timecard_id}"):
@@ -3896,7 +3897,8 @@ def _render_timekeeping_employee_row_body(
             with row_cols[0]:
                 st.markdown(
                     '<span class="weekly-timesheet-row-marker timesheet-list-row-marker '
-                    'timekeeping-list-row-marker" aria-hidden="true"></span>'
+                    'timekeeping-list-row-marker employee-timesheet-row weekly-employee-row" '
+                    'aria-hidden="true"></span>'
                     '<span class="timekeeping-drag-cell timesheet-list-drag-handle" '
                     'aria-hidden="true">⋮⋮</span>',
                     unsafe_allow_html=True,
@@ -4054,7 +4056,8 @@ def _render_custom_timekeeping_table(
 
     with st.container(key="timekeeping_table_wrap"):
         st.markdown(
-            '<div class="ips-timekeeping-table-wrap timekeeping-list-scroll">',
+            '<span class="employee-timesheet-list weekly-timesheet-list ips-timekeeping-table-wrap '
+            'timekeeping-list-scroll" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
 
@@ -4062,8 +4065,6 @@ def _render_custom_timekeeping_table(
 
         for row in filtered:
             _render_timekeeping_employee_row_fragment(row, week_start_d=week_start_d, days=days)
-
-        st.markdown("</div>", unsafe_allow_html=True)
 
     return all_timecard_ids
 
