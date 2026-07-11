@@ -147,15 +147,15 @@ _TS_EXPAND = 32
 _TS_EMPLOYEE = 180
 _TS_DAY = 140
 _TS_WEEK = 70
-_TS_LIST_HANDLE = 24
-_TS_LIST_EXPAND = 32
-_TS_LIST_EMPLOYEE = 220
-_TS_LIST_DAY = 110
-_TS_LIST_SPACER = 24
-_TS_LIST_TOTAL = 76
-_TS_LIST_OVERTIME = 68
-_TS_LIST_BILLED = 78
-_TS_LIST_STATUS = 104
+_TS_LIST_HANDLE = 18
+_TS_LIST_EXPAND = 26
+_TS_LIST_EMPLOYEE = 168
+_TS_LIST_DAY = 84
+_TS_LIST_SPACER = 8
+_TS_LIST_TOTAL = 48
+_TS_LIST_OVERTIME = 44
+_TS_LIST_BILLED = 52
+_TS_LIST_STATUS = 72
 _HGRID_COLS = [_TS_EMPLOYEE] + [_TS_DAY] * 7 + [_TS_WEEK]
 _WEEKLY_TS_LIST_ROW_COLS = [
     _TS_LIST_HANDLE,
@@ -239,7 +239,7 @@ _DAY_GRID_LABELS = [
 ]
 _LIST_VIEW_HOUR_STEP = 0.5
 _TK_HOUR_AUTOSAVE_DEBOUNCE_SEC = 1.0
-_LIST_VIEW_SUMMARY_LABELS = ("Total Hours", "Overtime", "Billed Hours", "Status")
+_LIST_VIEW_SUMMARY_LABELS = ("ST", "OT", "Total", "Status")
 _ALLOC_HOUR_TYPE_OPTS = ("S/T", "O/T")
 _ALLOC_TOLERANCE = 0.01
 _ASSIGNMENT_LEGACY_ALIASES = {
@@ -1935,6 +1935,18 @@ def _fmt_table_hours(val: object) -> str:
         return "0.00"
 
 
+def _fmt_list_summary_hours(val: object) -> str:
+    """Compact list-row totals (whole hours without trailing zeros)."""
+    try:
+        num = float(val)
+        if abs(num - round(num)) < 0.001:
+            return str(int(round(num)))
+        text = f"{num:.1f}".rstrip("0").rstrip(".")
+        return text or "0"
+    except (TypeError, ValueError):
+        return "0"
+
+
 def _fmt_day_hours(val: object) -> str:
     try:
         return f"{float(val):.1f}"
@@ -2338,7 +2350,7 @@ def _render_list_day_hour_stepper(
             f'aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        inp_col, btns_col = st.columns([76, 26], gap="xxsmall", vertical_alignment="center")
+        inp_col, btns_col = st.columns([72, 28], gap="xxsmall", vertical_alignment="center")
         bump_kwargs = {
             "widget_key": widget_key,
             "step": step,
@@ -3953,21 +3965,21 @@ def _render_timekeeping_employee_row_body(
             with row_cols[11]:
                 _render_list_row_summary_cell(
                     label=_LIST_VIEW_SUMMARY_LABELS[0],
-                    value_html=html.escape(_fmt_table_hours(st_total)),
+                    value_html=html.escape(_fmt_list_summary_hours(st_total)),
                     value_class="timekeeping-total-cell ips-timekeeping-hours",
                     show_label=False,
                 )
             with row_cols[12]:
                 _render_list_row_summary_cell(
                     label=_LIST_VIEW_SUMMARY_LABELS[1],
-                    value_html=html.escape(_fmt_table_hours(ot_total)),
+                    value_html=html.escape(_fmt_list_summary_hours(ot_total)),
                     value_class="timekeeping-overtime-cell ips-timekeeping-hours",
                     show_label=False,
                 )
             with row_cols[13]:
                 _render_list_row_summary_cell(
                     label=_LIST_VIEW_SUMMARY_LABELS[2],
-                    value_html=html.escape(_fmt_table_hours(total_hours)),
+                    value_html=html.escape(_fmt_list_summary_hours(total_hours)),
                     value_class="timekeeping-billed-cell ips-timekeeping-hours",
                     show_label=False,
                 )
