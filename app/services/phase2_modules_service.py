@@ -1146,6 +1146,16 @@ def list_tasks(*, demo: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], boo
 
 def list_timekeeping_summaries(week_start: date, *, demo: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], bool]:
     ws = week_start.isoformat()
+    try:
+        from app.db import fetch_by_match
+    except ImportError:
+        from db import fetch_by_match  # type: ignore
+    try:
+        rows = fetch_by_match("employee_timekeeping_weeks", {"week_start": ws}, limit=5000) or []
+        if rows:
+            return [normalize_timekeeping_summary(r, week_start) for r in rows], False
+    except Exception as exc:
+        _LOG.debug("fetch_by_match employee_timekeeping_weeks week_start failed: %s", exc)
     rows, used = fetch_list(
         "employee_timekeeping_weeks",
         order_by="week_start",

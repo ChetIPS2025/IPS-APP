@@ -2476,6 +2476,48 @@ def _render_list_day_hour_stepper(
     return max(0.0, float(hours))
 
 
+def _preload_weekly_grids_for_rows(rows: list[dict], week_start_d: date) -> None:
+    """Warm weekly grids for visible list rows using the batch week day cache."""
+    _ensure_week_days_by_employee(week_start_d)
+    for row in rows:
+        eid = str(row.get("employee_id") or row.get("id") or "").strip()
+        if eid:
+            _ensure_weekly_grid(_emp_from_timecard_row(row), week_start_d)
+
+
+def _render_list_row_day_cell_readonly(
+    *,
+    day_d: date,
+    day_ix: int,
+    day_row: dict,
+) -> None:
+    """Collapsed list row: markdown-only day cell (no hour widgets)."""
+    day_status = _normalize_timecard_status(day_row.get("status"))
+    total = _day_hours_total(day_row)
+    has_hours = total > _ALLOC_TOLERANCE
+    filled_marker = _list_day_box_marker_classes(
+        day_status=day_status,
+        alloc_state="",
+        has_hours=has_hours,
+    )
+    grid_marker = " timesheet-list-days-marker" if day_ix == 0 else ""
+    status_badge = _list_day_status_badge_html(day_status, "")
+    day_title = f'{day_d.strftime("%a").upper()} {day_d.strftime("%m/%d")}'
+    ro_cls = "timekeeping-hour-input timekeeping-hour-input-ro"
+    ro_cls += _day_approval_ro_hour_class(day_status)
+    st.markdown(
+        f'<span class="timesheet-list-day-marker day-block-marker timekeeping-day-cell-marker{grid_marker}{filled_marker}" '
+        f'aria-hidden="true"></span>'
+        f'<div class="timekeeping-day-cell">'
+        f'<div class="timekeeping-day-date-label">{html.escape(day_title)}</div>'
+        f'<div class="timekeeping-day-status-badge">{status_badge}</div>'
+        f'<div class="{ro_cls} timekeeping-list-hour-value">'
+        f"{html.escape(_fmt_day_hours(total))}</div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+
 def _render_list_row_day_cell(
     *,
     day_d: date,
@@ -3908,22 +3950,13 @@ def _render_timekeeping_employee_row_body(
         return
 
     emp = _emp_from_timecard_row(row)
-    _flush_debounced_hour_autosaves(emp, week_start_d)
-
     employee_name = str(row.get("employee_name") or "—")
     expanded = _expanded_timecard_id() == timecard_id
     eid = str(emp.get("id") or emp.get("employee_id") or "")
     week_sig = week_start_d.isoformat()
-    grid = _ensure_weekly_grid(emp, week_start_d) if eid else []
-    st_total = float(row.get("st_total") or 0)
-    ot_total = float(row.get("ot_total") or 0)
-    total_hours = float(row.get("total_hours") or 0)
-    status = _normalize_timecard_status(row.get("status"))
-    if eid:
-        grid = _sync_grid_from_widget_keys(grid, eid=eid, week_sig=week_sig)
-        _apply_row_hrs_to_grid(grid, eid=eid, week_sig=week_sig)
-        _apply_active_field_job_to_grid(grid)
-        status = _week_status_from_grid(grid)
+
+    if expanded:
+        _flush_debounced_hour_autosaves(emp, week_start_d)
 
     with st.container(key=f"tk_card_{timecard_id}"):
         st.markdown(
@@ -3968,39 +4001,78 @@ def _render_timekeeping_employee_row_body(
                     unsafe_allow_html=True,
                 )
 
-            if eid:
-                alloc_by_date = _ensure_allocation_state(emp, week_start_d)
-                for day_ix, (col, day_d) in enumerate(zip(row_cols[3:10], days)):
-                    day_row = grid[day_ix] if day_ix < len(grid) else {}
-                    day_row = _day_row_with_widget_values(
-                        day_row, eid=eid, week_sig=week_sig, index=day_ix
-                    )
-                    day_status = _normalize_timecard_status(day_row.get("status"))
-                    editable = _day_hours_editable(day_status, status)
-                    with col:
-                        _render_list_row_day_cell(
-                            day_d=day_d,
-                            day_ix=day_ix,
-                            day_row=day_row,
-                            emp_id=eid,
-                            week_sig=week_sig,
-                            editable=editable,
-                            alloc_by_date=alloc_by_date,
-                        )
-                st.session_state[_grid_key(eid)] = grid
-                st_total, ot_total, total_hours = _row_totals_from_grid(grid)
+            if not expanded:
+                st_total = float(row.get("st_total") or 0)
+                ot_total = float(row.get("ot_total") or 0)
+                total_hours = float(row.get("total_hours") or 0)
+                status = _normalize_timecard_status(row.get("status"))
+                if eid:
+                    grid = _ensure_weekly_grid(emp, week_start_d)
+                    for day_ix, (col, day_d) in enumerate(zip(row_cols[3:10], days)):
+                        day_row = grid[day_ix] if day_ix < len(grid) else {}
+                        with col:
+                            _render_list_row_day_cell_readonly(
+                                day_d=day_d,
+                                day_ix=day_ix,
+                                day_row=day_row,
+                            )
+                    st_total, ot_total, total_hours = _row_totals_from_grid(grid)
+                    status = _week_status_from_grid(grid)
+                else:
+                    for day_ix, (col, day_d) in enumerate(zip(row_cols[3:10], days)):
+                        day_title = f'{day_d.strftime("%a").upper()} {day_d.strftime("%m/%d")}'
+                        with col:
+                            st.markdown(
+                                f'<div class="timekeeping-day-cell">'
+                                f'<div class="timekeeping-day-date-label">{html.escape(day_title)}</div>'
+                                f'<div class="timekeeping-day-status-badge">DRAFT</div>'
+                                f'<div class="timekeeping-hour-input-ro timekeeping-list-hour-value">—</div>'
+                                f"</div>",
+                                unsafe_allow_html=True,
+                            )
             else:
-                for day_ix, (col, day_d) in enumerate(zip(row_cols[3:10], days)):
-                    day_title = f'{day_d.strftime("%a").upper()} {day_d.strftime("%m/%d")}'
-                    with col:
-                        st.markdown(
-                            f'<div class="timekeeping-day-cell">'
-                            f'<div class="timekeeping-day-date-label">{html.escape(day_title)}</div>'
-                            f'<div class="timekeeping-day-status-badge">DRAFT</div>'
-                            f'<div class="timekeeping-hour-input-ro timekeeping-list-hour-value">—</div>'
-                            f"</div>",
-                            unsafe_allow_html=True,
+                grid = _ensure_weekly_grid(emp, week_start_d) if eid else []
+                st_total = float(row.get("st_total") or 0)
+                ot_total = float(row.get("ot_total") or 0)
+                total_hours = float(row.get("total_hours") or 0)
+                status = _normalize_timecard_status(row.get("status"))
+                if eid:
+                    grid = _sync_grid_from_widget_keys(grid, eid=eid, week_sig=week_sig)
+                    _apply_row_hrs_to_grid(grid, eid=eid, week_sig=week_sig)
+                    _apply_active_field_job_to_grid(grid)
+                    status = _week_status_from_grid(grid)
+                    alloc_by_date = _ensure_allocation_state(emp, week_start_d)
+                    for day_ix, (col, day_d) in enumerate(zip(row_cols[3:10], days)):
+                        day_row = grid[day_ix] if day_ix < len(grid) else {}
+                        day_row = _day_row_with_widget_values(
+                            day_row, eid=eid, week_sig=week_sig, index=day_ix
                         )
+                        day_status = _normalize_timecard_status(day_row.get("status"))
+                        editable = _day_hours_editable(day_status, status)
+                        with col:
+                            _render_list_row_day_cell(
+                                day_d=day_d,
+                                day_ix=day_ix,
+                                day_row=day_row,
+                                emp_id=eid,
+                                week_sig=week_sig,
+                                editable=editable,
+                                alloc_by_date=alloc_by_date,
+                            )
+                    st.session_state[_grid_key(eid)] = grid
+                    st_total, ot_total, total_hours = _row_totals_from_grid(grid)
+                else:
+                    for day_ix, (col, day_d) in enumerate(zip(row_cols[3:10], days)):
+                        day_title = f'{day_d.strftime("%a").upper()} {day_d.strftime("%m/%d")}'
+                        with col:
+                            st.markdown(
+                                f'<div class="timekeeping-day-cell">'
+                                f'<div class="timekeeping-day-date-label">{html.escape(day_title)}</div>'
+                                f'<div class="timekeeping-day-status-badge">DRAFT</div>'
+                                f'<div class="timekeeping-hour-input-ro timekeeping-list-hour-value">—</div>'
+                                f"</div>",
+                                unsafe_allow_html=True,
+                            )
 
             with row_cols[10]:
                 _render_timekeeping_list_spacer_cell()
@@ -4043,11 +4115,18 @@ def _render_timekeeping_employee_row_fragment(
     week_start_d: date,
     days: list[date],
 ) -> None:
-    """One employee list row — hour edits rerun only this row, not the full page."""
+    """One employee list row — fragments only when expanded or autosave is pending."""
+    timecard_id = str(row.get("timecard_id") or "").strip()
+    expanded = _expanded_timecard_id() == timecard_id
     emp = _emp_from_timecard_row(row)
     eid = str(emp.get("id") or emp.get("employee_id") or "")
     week_sig = week_start_d.isoformat()
     pending = _employee_has_pending_hour_autosave(eid, week_sig)
+
+    if not expanded and not pending:
+        _render_timekeeping_employee_row_body(row, week_start_d=week_start_d, days=days)
+        return
+
     poll_interval = timedelta(seconds=max(0.5, float(_TK_HOUR_AUTOSAVE_DEBOUNCE_SEC)))
 
     def _mount_row_fragment(*, run_every: timedelta | float | None = None) -> None:
@@ -4102,6 +4181,8 @@ def _render_custom_timekeeping_table(
         )
 
         _render_timekeeping_employee_filter_header(filter_options)
+
+        _preload_weekly_grids_for_rows(filtered, week_start_d)
 
         for row in filtered:
             _render_timekeeping_employee_row_fragment(row, week_start_d=week_start_d, days=days)
