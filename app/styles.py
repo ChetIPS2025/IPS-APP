@@ -15053,7 +15053,7 @@ def inject_ops_dashboard_css() -> None:
     """Compact operations dashboard layout — KPI row, news, quick actions, activity grid."""
     st.markdown(
         """
-<style id="ips-ops-dashboard-v26">
+<style id="ips-ops-dashboard-v27">
 /* ── App shell: flex main beside sidebar (desktop only) ── */
 .stApp:has(.ips-ops-dashboard-marker) [data-testid="stAppViewContainer"] {
   width: 100% !important;
@@ -15118,7 +15118,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stVer
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stVerticalBlock"] > div {
   padding-left: 20px !important;
   padding-right: 20px !important;
-  padding-top: 20px !important;
+  padding-top: 14px !important;
   box-sizing: border-box !important;
 }
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"] {
@@ -15126,6 +15126,17 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stEle
   max-width: 100% !important;
   min-width: 0 !important;
   overflow: visible !important;
+}
+
+/* ── Compact section rhythm ── */
+.dashboard-section,
+.st-key-dashboard_ops_shell [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlockBorderWrapper"] {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+.dashboard-section {
+  margin-top: 16px !important;
+  margin-bottom: 16px !important;
 }
 
 /* ── Dashboard shell ── */
@@ -15137,7 +15148,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stEle
   overflow: visible !important;
 }
 .st-key-dashboard_ops_shell [data-testid="stVerticalBlock"] {
-  gap: 20px !important;
+  gap: 14px !important;
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
@@ -15146,8 +15157,12 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stEle
 .st-key-dashboard_ops_kpis,
 .st-key-dashboard_ops_row2,
 .st-key-dashboard_estimates_waiting_table,
-.st-key-dashboard_active_jobs_table {
-  margin-bottom: 20px !important;
+.st-key-dashboard_active_jobs_table,
+.st-key-dashboard_ops_quick_actions,
+.st-key-dashboard_preview_sections,
+.st-key-dashboard_ops_company_updates {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
@@ -15385,7 +15400,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stHor
   flex-wrap: wrap !important;
 }
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-page-header {
-  margin-bottom: 12px !important;
+  margin-bottom: 8px !important;
   padding-bottom: 0 !important;
   width: 100% !important;
 }
@@ -15436,7 +15451,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="colum
   min-height: 38px !important;
 }
 .ips-ops-welcome {
-  margin: 0 0 20px;
+  margin: 0;
   padding: 0;
 }
 .ips-ops-welcome-greet {
@@ -15463,7 +15478,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="colum
 .ips-ops-kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 16px;
+  gap: 12px;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -15744,7 +15759,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="colum
   color: #475569;
 }
 .st-key-dashboard_ops_company_updates {
-  margin-bottom: 0.35rem;
+  margin-bottom: 0 !important;
 }
 .ips-cu-banner {
   display: block;
@@ -15970,14 +15985,15 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="colum
 }
 
 /* ── Quick actions compact toolbar ── */
-.st-key-dashboard_ops_quick_actions {
+.st-key-dashboard_ops_quick_actions,
+.quick-actions-section {
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
   background: transparent !important;
   border: none !important;
-  padding: 0 !important;
-  margin: 18px 0 8px !important;
+  padding: 8px 0 !important;
+  margin: 0 !important;
   box-shadow: none !important;
   overflow: visible !important;
   box-sizing: border-box !important;
@@ -15995,10 +16011,21 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="colum
   position: static !important;
   transform: none !important;
 }
-.st-key-dashboard_ops_quick_actions [data-testid="stHorizontalBlock"] {
-  flex-wrap: nowrap !important;
-  gap: 10px !important;
+.st-key-dashboard_ops_quick_actions [data-testid="stVerticalBlock"] {
+  gap: 8px !important;
+}
+.st-key-dashboard_ops_quick_actions [data-testid="stHorizontalBlock"],
+.quick-actions-row {
+  flex-wrap: wrap !important;
+  gap: 10px 14px !important;
   align-items: stretch !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+@media (min-width: 1280px) {
+  .st-key-dashboard_ops_quick_actions [data-testid="stHorizontalBlock"] {
+    flex-wrap: nowrap !important;
+  }
 }
 .st-key-dashboard_ops_quick_actions [data-testid="stHorizontalBlock"] > [data-testid="column"] {
   min-width: 0 !important;
@@ -16007,18 +16034,20 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="colum
 }
 .st-key-dashboard_ops_quick_actions .stButton {
   width: 100% !important;
+  margin: 0 !important;
 }
-.st-key-dashboard_ops_quick_actions .stButton > button {
-  min-height: 32px !important;
-  height: 32px !important;
-  padding: 0 12px !important;
+.st-key-dashboard_ops_quick_actions .stButton > button,
+.quick-actions-row button {
+  min-height: 38px !important;
+  height: auto !important;
+  padding: 6px 14px !important;
   background: #ffffff !important;
   border: 1px solid #2563eb !important;
   border-radius: 6px !important;
   color: #0f172a !important;
   font-weight: 600 !important;
   font-size: 13px !important;
-  line-height: 1 !important;
+  line-height: 1.15 !important;
   box-shadow: none !important;
   white-space: nowrap !important;
   transition: background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
@@ -16032,16 +16061,17 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="colum
 .st-key-dashboard_ops_quick_actions .stButton > button p {
   font-size: 13px !important;
   font-weight: 600 !important;
-  line-height: 1 !important;
+  line-height: 1.15 !important;
   white-space: nowrap !important;
 }
 .ips-ops-quick-toolbar {
   width: 100%;
   box-sizing: border-box;
 }
-.ips-ops-quick-toolbar-title {
-  margin: 0 0 10px;
-  padding: 0;
+.ips-ops-quick-toolbar-title,
+.quick-actions-title {
+  margin: 0 0 8px 0 !important;
+  padding: 0 !important;
   font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -16111,15 +16141,18 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="colum
 }
 
 /* ── Dashboard preview cards (replaces expanders) ── */
-.st-key-dashboard_preview_sections {
+.st-key-dashboard_preview_sections,
+.dashboard-card-grid {
   width: 100% !important;
   max-width: 100% !important;
-  margin-top: 20px !important;
-  margin-bottom: 20px !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
 }
-.st-key-dashboard_preview_sections [data-testid="stHorizontalBlock"] {
+.st-key-dashboard_preview_sections [data-testid="stHorizontalBlock"],
+.dashboard-card-grid {
   align-items: stretch !important;
   gap: 16px !important;
+  margin-top: 0 !important;
 }
 .st-key-dashboard_preview_sections [data-testid="column"] {
   min-width: 0 !important;
@@ -16131,11 +16164,14 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="colum
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
   border-radius: 11px !important;
-  padding: 16px 18px 14px !important;
-  margin-bottom: 16px !important;
+  padding: 14px 16px 12px !important;
+  margin-bottom: 12px !important;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05) !important;
   overflow: visible !important;
   box-sizing: border-box !important;
+}
+.st-key-dashboard_preview_analytics {
+  margin-bottom: 0 !important;
 }
 .st-key-dashboard_preview_todos [data-testid="stMarkdownContainer"],
 .st-key-dashboard_preview_todos [data-testid="stMarkdownContainer"] p,
@@ -16154,7 +16190,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="colum
   display: flex !important;
   align-items: center !important;
   gap: 10px !important;
-  margin: 0 0 12px 0 !important;
+  margin: 0 0 8px 0 !important;
 }
 .ips-dash-preview-card-icon {
   display: inline-flex !important;

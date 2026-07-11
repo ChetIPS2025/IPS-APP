@@ -305,10 +305,10 @@ def render_dashboard_preview_sections() -> None:
 
     with st.container(key="dashboard_preview_sections"):
         st.markdown(
-            '<span class="ips-dash-preview-grid-marker" aria-hidden="true"></span>',
+            '<span class="ips-dash-preview-grid-marker dashboard-card-grid" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        left_col, right_col = st.columns(2, gap="medium")
+        left_col, right_col = st.columns(2, gap="small")
 
         with left_col:
             with st.container(key="dashboard_preview_todos"):

@@ -244,7 +244,8 @@ def render_ops_quick_action_tiles(
     """Compact Quick Actions toolbar for the operations dashboard."""
     with st.container(key="dashboard_ops_quick_actions"):
         st.markdown(
-            f'<p class="ips-ops-quick-toolbar-title">{html.escape(title)}</p>',
+            f'<p class="ips-ops-quick-toolbar-title quick-actions-title">'
+            f'{html.escape(title.upper())}</p>',
             unsafe_allow_html=True,
         )
         cols = st.columns(len(actions), gap="small")

@@ -168,3 +168,16 @@ def test_sync_lookup_deactivates_removed_values(monkeypatch):
     assert ok is True
     assert any(p.get("value") == "Alpha Renamed" for p, _ in updates)
     assert any(p.get("is_active") is False and m.get("id") == "b2" for p, m in updates)
+
+
+def test_ops_dashboard_css_uses_compact_vertical_spacing():
+    import inspect
+
+    from app.styles import inject_ops_dashboard_css
+
+    source = inspect.getsource(inject_ops_dashboard_css)
+    assert "ips-ops-dashboard-v27" in source
+    assert "gap: 14px !important" in source
+    assert "margin: 0 !important" in source
+    assert "quick-actions-title" in source
+    assert "dashboard-card-grid" in source
