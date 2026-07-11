@@ -84,3 +84,15 @@ def test_ensure_view_as_navigation_redirects_off_admin_pages(monkeypatch):
     with pytest.raises(RuntimeError, match="rerun"):
         ensure_view_as_navigation()
     assert nav_calls[-1] == "employee_portal"
+
+
+def test_mobile_preview_css_enables_internal_scroll():
+    import inspect
+
+    from app.utils import view_as as va
+
+    source = inspect.getsource(va.inject_view_as_styles)
+    assert "overflow-y: auto !important" in source
+    assert "overscroll-behavior: contain !important" in source
+    assert "calc(100vh - 80px)" in source
+    assert "min-height: 0 !important" in source

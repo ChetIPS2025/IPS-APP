@@ -274,6 +274,10 @@ def inject_view_as_styles() -> None:
 .ips-view-as-mobile-nav-btn.is-active {
   color: #2563eb;
 }
+.mobile-preview-header {
+  flex: 0 0 auto;
+  background: #f8fafc;
+}
 </style>
             """,
             unsafe_allow_html=True,
@@ -281,15 +285,98 @@ def inject_view_as_styles() -> None:
 
     marker_classes = "ips-view-as-marker"
     mobile_css = """
-<style id="ips-view-as-mobile-v2">
+<style id="ips-view-as-mobile-v3">
+html.ips-view-as-mobile-active [data-testid="stAppViewContainer"] {
+  overflow-x: visible !important;
+  overflow-y: auto !important;
+}
 html.ips-view-as-mobile-active section[data-testid="stMain"],
 section[data-testid="stMain"]:has(.ips-view-as-mobile-active) {
-  max-width: 430px !important;
-  margin: 0 auto !important;
+  width: min(430px, 100%) !important;
+  max-width: min(430px, 100%) !important;
+  height: calc(100vh - 80px) !important;
+  max-height: calc(100vh - 80px) !important;
+  margin: 0.5rem auto 1rem auto !important;
+  border: 1px solid #dbe2ea !important;
+  border-radius: 20px !important;
+  background: #f8fafc !important;
   box-shadow: 0 0 0 1px #dbeafe, 0 12px 40px rgba(37, 99, 235, 0.12) !important;
-  border-radius: 16px !important;
+  display: flex !important;
+  flex-direction: column !important;
   overflow: hidden !important;
-  padding-bottom: 4.25rem !important;
+  padding: 0 !important;
+  position: relative !important;
+  flex: 0 0 auto !important;
+  min-height: 0 !important;
+  box-sizing: border-box !important;
+}
+html.ips-view-as-mobile-active section[data-testid="stMain"] > div,
+html.ips-view-as-mobile-active section[data-testid="stMain"] [data-testid="stMainBlockContainer"],
+section[data-testid="stMain"]:has(.ips-view-as-mobile-active) > div,
+section[data-testid="stMain"]:has(.ips-view-as-mobile-active) [data-testid="stMainBlockContainer"] {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  height: 100% !important;
+  overflow: visible !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+html.ips-view-as-mobile-active section[data-testid="stMain"] .block-container,
+section[data-testid="stMain"]:has(.ips-view-as-mobile-active) .block-container {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+  padding: 0 16px 16px 16px !important;
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom)) !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+html.ips-view-as-mobile-active section[data-testid="stMain"] .block-container > [data-testid="stVerticalBlock"],
+section[data-testid="stMain"]:has(.ips-view-as-mobile-active) .block-container > [data-testid="stVerticalBlock"] {
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+html.ips-view-as-mobile-active section[data-testid="stMain"] .block-container [data-testid="stVerticalBlockBorderWrapper"],
+section[data-testid="stMain"]:has(.ips-view-as-mobile-active) .block-container [data-testid="stVerticalBlockBorderWrapper"] {
+  overflow: visible !important;
+}
+html.ips-view-as-mobile-active section[data-testid="stMain"] .block-container [data-testid="stHorizontalBlock"]:has(.ips-view-as-banner-wrap),
+section[data-testid="stMain"]:has(.ips-view-as-mobile-active) .block-container [data-testid="stHorizontalBlock"]:has(.ips-view-as-banner-wrap) {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 20 !important;
+  background: #f8fafc !important;
+  flex: 0 0 auto !important;
+  margin: 0 -16px !important;
+  padding: 10px 12px 8px 12px !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  gap: 0.5rem !important;
+  align-items: center !important;
+}
+html.ips-view-as-mobile-active section[data-testid="stMain"] .block-container [data-testid="stHorizontalBlock"]:has(.ips-view-as-banner-wrap) [data-testid="column"],
+section[data-testid="stMain"]:has(.ips-view-as-mobile-active) .block-container [data-testid="stHorizontalBlock"]:has(.ips-view-as-banner-wrap) [data-testid="column"] {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+html.ips-view-as-mobile-active section[data-testid="stMain"] .block-container [data-testid="stHorizontalBlock"]:has(.ips-view-as-banner-wrap) [data-testid="stButton"] > button,
+section[data-testid="stMain"]:has(.ips-view-as-mobile-active) .block-container [data-testid="stHorizontalBlock"]:has(.ips-view-as-banner-wrap) [data-testid="stButton"] > button {
+  font-size: 0.72rem !important;
+  padding: 0.35rem 0.5rem !important;
+  min-height: 2rem !important;
+  white-space: normal !important;
+  line-height: 1.15 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
 }
 html.ips-view-as-mobile-active section[data-testid="stMain"] .ips-jobs-summary-cards,
 section[data-testid="stMain"]:has(.ips-view-as-mobile-active) .ips-jobs-summary-cards {
@@ -333,15 +420,18 @@ def render_view_as_active_toolbar() -> None:
         return
     inject_view_as_styles()
     label = html.escape(view_as_display_label())
-    banner_col, return_col = st.columns([4, 1], gap="small", vertical_alignment="center")
+    mobile_preview = is_view_as_mobile_preview()
+    toolbar_cols = [3, 2] if mobile_preview else [4, 1]
+    banner_col, return_col = st.columns(toolbar_cols, gap="small", vertical_alignment="center")
     with banner_col:
         st.markdown(
             f"""
-<div class="ips-view-as-banner-wrap">
+<div class="ips-view-as-banner-wrap{" mobile-preview-header" if mobile_preview else ""}">
   <div class="ips-view-as-banner">
     <p class="ips-view-as-banner-text">Viewing as {label} — Preview Mode</p>
   </div>
 </div>
+<span class="ips-view-as-preview-toolbar-marker" aria-hidden="true"></span>
             """,
             unsafe_allow_html=True,
         )
