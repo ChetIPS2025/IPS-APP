@@ -5464,7 +5464,122 @@ def inject_timekeeping_module_css() -> None:
     )
     st.markdown(
         f"""
-<style id="ips-timekeeping-module-v102">
+<style id="ips-timekeeping-module-v103">
+.ips-timekeeping-week-toolbar-marker + [data-testid="stHorizontalBlock"] {
+  align-items: center !important;
+  margin: 0 0 14px 0 !important;
+}
+.ips-timekeeping-week-pill {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  min-height: 42px !important;
+  padding: 8px 16px !important;
+  border: 1px solid #dbe3ef !important;
+  border-radius: 10px !important;
+  background: #f8fafc !important;
+  color: #334155 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  text-align: center !important;
+}
+.ips-timekeeping-page-range {
+  margin: 8px 0 0 0 !important;
+  color: #64748b !important;
+  font-size: 12px !important;
+}
+.timekeeping-weekly-table-card {
+  border: 1px solid #dbe3ef !important;
+  border-radius: 12px !important;
+  background: #ffffff !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
+  padding: 8px 10px 12px 10px !important;
+}
+.timekeeping-day-header-label,
+.timekeeping-summary-header-label {
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+  color: #64748b !important;
+  text-align: center !important;
+  padding: 6px 2px !important;
+}
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-weekly-table-header-marker) {
+  border-bottom: 1px solid #e2e8f0 !important;
+  padding-bottom: 4px !important;
+  margin-bottom: 2px !important;
+}
+.timekeeping-employee-name {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  padding: 10px 4px !important;
+  line-height: 1.25 !important;
+}
+.timekeeping-day-cell-status {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+  color: #94a3b8 !important;
+  text-align: center !important;
+  margin-bottom: 4px !important;
+}
+.timekeeping-summary-value {
+  text-align: center !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  padding: 12px 2px !important;
+}
+.timekeeping-modal-stats-box {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  border: 1px solid #dbe3ef !important;
+  border-radius: 10px !important;
+  background: #f8fafc !important;
+  padding: 12px 10px !important;
+}
+.timekeeping-modal-stat {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  text-align: center !important;
+}
+.timekeeping-modal-stat-label {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+  color: #64748b !important;
+}
+.timekeeping-modal-stat-value {
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+}
+.timekeeping-modal-section-title {
+  margin: 14px 0 8px 0 !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+}
+.timekeeping-modal-status-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  margin: 12px 0 4px 0 !important;
+}
+.timekeeping-modal-status-label {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: #64748b !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+}
 .timekeeping-alloc-week-totals {{
   display: flex !important;
   flex-wrap: wrap !important;
@@ -15199,17 +15314,17 @@ def _inject_timekeeping_list_row_gap_css() -> None:
   cursor: pointer !important;
 }
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.timekeeping-day-cell-clickable-marker) [data-testid="stButton"] > button {
-  width: 58px !important;
-  min-height: 32px !important;
-  margin: 2px auto 0 auto !important;
-  padding: 4px 6px !important;
-  font-size: 13px !important;
-  font-weight: 600 !important;
+  width: 72px !important;
+  min-height: 34px !important;
+  margin: 0 auto !important;
+  padding: 6px 8px !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
   line-height: 1 !important;
-  border: 1px solid #d7deea !important;
-  border-radius: 6px !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 8px !important;
   background: #ffffff !important;
-  color: #1e293b !important;
+  color: #2563eb !important;
   box-shadow: none !important;
   display: block !important;
 }
@@ -15217,9 +15332,17 @@ def _inject_timekeeping_list_row_gap_css() -> None:
   border-color: #2563eb !important;
   background: #eff6ff !important;
   color: #1d4ed8 !important;
+  box-shadow: 0 0 0 1px #bfdbfe !important;
+}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"]:has(.timekeeping-weekly-row-marker) {
+  border-bottom: 1px solid #eef2f7 !important;
+}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"]:has(.timekeeping-weekly-row-marker):hover {
+  background: #f8fbff !important;
 }
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.timekeeping-day-cell-clickable-marker):nth-child(8) [data-testid="stButton"] > button,
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.timekeeping-day-cell-clickable-marker):nth-child(9) [data-testid="stButton"] > button {
+  color: #64748b !important;
   background: #f8fafc !important;
 }
 .timekeeping-alloc-type-hint {

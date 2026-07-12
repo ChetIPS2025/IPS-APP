@@ -702,18 +702,19 @@ def render_day_allocation_card(
             f'aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        render_day_summary_inline(
-            day_name=ctx.day_name,
-            iso=ctx.iso,
-            daily_total=ctx.daily_total,
-            allocated=ctx.allocated,
-            remaining=ctx.remaining,
-            type_summary=ctx.type_summary,
-            balance_cls=balance_cls,
-            card_cls=card_cls,
-            deps=deps,
-            hours_badge_text=ctx.daily_hours_label,
-        )
+        if not ctx.modal_host:
+            render_day_summary_inline(
+                day_name=ctx.day_name,
+                iso=ctx.iso,
+                daily_total=ctx.daily_total,
+                allocated=ctx.allocated,
+                remaining=ctx.remaining,
+                type_summary=ctx.type_summary,
+                balance_cls=balance_cls,
+                card_cls=card_cls,
+                deps=deps,
+                hours_badge_text=ctx.daily_hours_label,
+            )
         if ctx.daily_total <= 0:
             hint = (
                 "Enter daily total hours above to add assignments."
@@ -722,7 +723,6 @@ def render_day_allocation_card(
             )
             st.caption(hint)
             return
-
         st.markdown(
             '<span class="timekeeping-alloc-day-form-body-marker" aria-hidden="true"></span>',
             unsafe_allow_html=True,

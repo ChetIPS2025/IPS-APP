@@ -44,8 +44,14 @@ class TestTimekeepingListMasterDetail(unittest.TestCase):
         self.assertIn("_open_day_time_modal", source)
         self.assertIn("_timekeeping_app_rerun", source)
 
-    def test_weekly_row_has_thirteen_columns(self) -> None:
-        self.assertEqual(len(tk._WEEKLY_TS_LIST_ROW_COLS), 13)
+    def test_weekly_toolbar_and_mockup_labels(self) -> None:
+        self.assertIn("_render_weekly_timekeeping_toolbar", inspect.getsource(tk.render))
+        self.assertIn("Weekly Timekeeping", inspect.getsource(tk.render))
+        self.assertEqual(tk._LIST_VIEW_SUMMARY_LABELS[0], "ST (≤40)")
+        self.assertEqual(tk._LIST_VIEW_SUMMARY_LABELS[1], "OT (>40)")
+
+    def test_weekly_row_has_twelve_columns(self) -> None:
+        self.assertEqual(len(tk._WEEKLY_TS_LIST_ROW_COLS), 12)
 
     @patch("app.pages.timekeeping._ensure_weekly_grid")
     @patch("app.pages.timekeeping._ensure_week_days_by_employee")
