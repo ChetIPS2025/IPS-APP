@@ -113,16 +113,22 @@ def _render_login() -> None:
                 horizontal=True,
                 key="login_method",
             )
-            remember_device = st.checkbox(
-                "Remember this device",
-                value=True,
-                help="Keeps you signed in on this browser after refresh.",
-            )
 
             if str(st.session_state.get("login_method") or "").startswith("Email"):
-                email = st.text_input("Email", key="login_email")
-                password = st.text_input("Password", type="password", key="login_password")
-                if st.button("Login", type="primary", use_container_width=True, key="login_email_go"):
+                with st.form("login_email_form", clear_on_submit=False):
+                    email = st.text_input("Email", key="login_email")
+                    password = st.text_input("Password", type="password", key="login_password")
+                    remember_device = st.checkbox(
+                        "Remember this device",
+                        value=True,
+                        help="Keeps you signed in on this browser after refresh.",
+                    )
+                    submitted = st.form_submit_button(
+                        "Login",
+                        type="primary",
+                        use_container_width=True,
+                    )
+                if submitted:
                     try:
                         sign_in(email, password, remember_device=remember_device)
                         log_auth_state("email_login_success")
@@ -130,6 +136,11 @@ def _render_login() -> None:
                     except Exception as exc:
                         show_auth_error(exc)
             else:
+                remember_device = st.checkbox(
+                    "Remember this device",
+                    value=True,
+                    help="Keeps you signed in on this browser after refresh.",
+                )
                 phone = st.text_input("Phone number", placeholder="+1 555 123 4567", key="login_phone")
                 c1, c2 = st.columns(2)
                 with c1:

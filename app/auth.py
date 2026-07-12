@@ -548,7 +548,7 @@ def try_restore_supabase_session_from_cookies() -> None:
     try:
         sr = client.auth.set_session(at, rt)
     except Exception:
-        st.session_state["_ips_auth_clear_pending"] = True
+        _invalidate_stale_auth_cookies()
         return
     user = getattr(sr, "user", None) if sr is not None else None
     if user is None and sr is not None:
@@ -566,17 +566,17 @@ def try_restore_supabase_session_from_cookies() -> None:
         except Exception:
             user = None
     if not user:
-        st.session_state["_ips_auth_clear_pending"] = True
+        _invalidate_stale_auth_cookies()
         return
     try:
         _apply_user_and_profile_from_auth_user(user)
     except Exception:
-        st.session_state["_ips_auth_clear_pending"] = True
+        _invalidate_stale_auth_cookies()
         return
 
     toks = _auth_session_tokens(client)
     if not toks:
-        st.session_state["_ips_auth_clear_pending"] = True
+        _invalidate_stale_auth_cookies()
         return
     fresh_at, fresh_rt = toks
     remember = str(cookies.get(_COOKIE_PERSIST) or "").strip() == "1"
@@ -609,6 +609,26 @@ def _silent_write_auth_cookies(access_token: str, refresh_token: str, *, remembe
 }})();
 """
     components_html(f"<script>{script}</script>", height=0, width=0)
+
+
+def _silent_clear_auth_cookies() -> None:
+    """Drop invalid saved tokens without reloading the page (keeps login form state)."""
+    secure = _cookie_secure_flag()
+    sec_js = "true" if secure else "false"
+    script = f"""
+(function() {{
+  var base = "Path=/; SameSite=Lax" + ({sec_js} ? "; Secure" : "");
+  document.cookie = "{_COOKIE_ACCESS}=; " + base + "; Max-Age=0";
+  document.cookie = "{_COOKIE_REFRESH}=; " + base + "; Max-Age=0";
+  document.cookie = "{_COOKIE_PERSIST}=; " + base + "; Max-Age=0";
+}})();
+"""
+    components_html(f"<script>{script}</script>", height=0, width=0)
+
+
+def _invalidate_stale_auth_cookies() -> None:
+    """Clear expired browser tokens on the login screen without a full page reload."""
+    _silent_clear_auth_cookies()
 
 
 def _js_cookie_clear_reload(*, secure: bool) -> str:

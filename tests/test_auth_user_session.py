@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import streamlit as st
 
@@ -16,6 +16,7 @@ from app.auth import (
     current_user_display_name,
     ensure_authenticated_user_identity,
     sign_out,
+    try_restore_supabase_session_from_cookies,
 )
 
 
@@ -104,6 +105,29 @@ class TestAuthUserSession(unittest.TestCase):
         self.assertIsNone(st.session_state.get("auth_user"))
         self.assertIsNone(st.session_state.get(IPS_CURRENT_USER_FULL_NAME_KEY))
         self.assertIsNone(st.session_state.get(CURRENT_USER_ID_KEY))
+
+    @patch("app.auth._invalidate_stale_auth_cookies")
+    @patch("app.auth._try_get_client")
+    @patch("app.auth.is_authenticated", return_value=False)
+    def test_failed_cookie_restore_clears_silently_without_reload_pending(
+        self,
+        _auth_mock,
+        get_client_mock,
+        invalidate_mock,
+    ) -> None:
+        client = SimpleNamespace()
+        client.auth = SimpleNamespace(
+            set_session=Mock(side_effect=RuntimeError("expired")),
+        )
+        get_client_mock.return_value = client
+        cookies = {"ips_auth_at": "old-access", "ips_auth_rt": "old-refresh"}
+        mock_context = SimpleNamespace(cookies=cookies)
+
+        with patch("app.auth.st.context", mock_context):
+            try_restore_supabase_session_from_cookies()
+
+        invalidate_mock.assert_called_once()
+        self.assertFalse(st.session_state.get("_ips_auth_clear_pending"))
 
 
 if __name__ == "__main__":
