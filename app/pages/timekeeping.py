@@ -41,6 +41,7 @@ try:
         render_modal_meta_grid,
         render_modal_shell,
         render_missing_record,
+        show_modal_if_pending,
     )
     from app.pages._core._data import (
         build_timekeeping_grid_from_day_rows,
@@ -100,6 +101,7 @@ except ImportError:
         render_modal_meta_grid,
         render_modal_shell,
         render_missing_record,
+        show_modal_if_pending,
     )
     from pages._core._data import (  # type: ignore
         build_timekeeping_grid_from_day_rows,
@@ -147,6 +149,10 @@ _TK_ASSIGNMENT_OPTS_SIG_KEY = "ips_tk_assignment_options_sig"
 SELECTED_TIMECARD_KEY = "selected_timecard_id"
 SHOW_TIMECARD_MODAL_KEY = "show_timecard_detail_modal"
 _ALL_TIMECARD_IDS_KEY = "_ips_timekeeping_visible_ids"
+TIMEKEEPING_MODAL_EMPLOYEE_ID_KEY = "timekeeping_modal_employee_id"
+TIMEKEEPING_MODAL_DATE_KEY = "timekeeping_modal_date"
+TIMEKEEPING_MODAL_TIMECARD_KEY = "timekeeping_modal_timecard_id"
+SHOW_TIMEKEEPING_DAY_MODAL_KEY = "show_timekeeping_day_modal"
 _EXPANDED_TIMECARD_KEY = "ips_timekeeping_expanded_id"
 _TS_EXPAND = 32
 _TS_EMPLOYEE = 180
@@ -163,8 +169,7 @@ _TS_LIST_STATUS = 70
 _HGRID_COLS = [_TS_EMPLOYEE] + [_TS_DAY] * 7 + [_TS_WEEK]
 _WEEKLY_TS_LIST_ROW_COLS = [
     0.35,
-    0.55,
-    2.2,
+    2.75,
     1,
     1,
     1,
@@ -265,7 +270,7 @@ def _render_timekeeping_employee_filter_header(
             '<span class="timekeeping-list-header-marker" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-    with header_cols[2]:
+    with header_cols[1]:
         render_table_header_cell(
             "EMPLOYEE",
             table_key=_TABLE_KEY,
@@ -273,10 +278,10 @@ def _render_timekeeping_employee_filter_header(
             filter_options=filter_options.get("employee_name", []),
             base_class="ips-timekeeping-header-row ips-timekeeping-cell",
         )
-    for col, day_d in zip(header_cols[3:10], ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]):
+    for col, day_d in zip(header_cols[2:9], ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]):
         with col:
             st.markdown(f"**{day_d}**")
-    for col, label in zip(header_cols[10:14], _LIST_VIEW_SUMMARY_LABELS):
+    for col, label in zip(header_cols[9:13], _LIST_VIEW_SUMMARY_LABELS):
         with col:
             st.markdown(f"**{str(label).upper()}**")
 
@@ -4084,6 +4089,424 @@ def _render_timekeeping_list_fragment(
     )
 
 
+def _format_modal_day_title(day_d: date) -> str:
+    return f"{day_d.strftime('%A, %B')} {day_d.day}, {day_d.year}"
+
+
+def _clear_day_time_modal() -> None:
+    """Dismiss day editor — unsaved widget edits are discarded (no auto-save on close)."""
+    eid = str(st.session_state.get(TIMEKEEPING_MODAL_EMPLOYEE_ID_KEY) or "").strip()
+    iso = str(st.session_state.get(TIMEKEEPING_MODAL_DATE_KEY) or "").strip()[:10]
+    if eid and iso:
+        _set_alloc_autosave_status(eid, iso, "")
+    st.session_state.pop(TIMEKEEPING_MODAL_EMPLOYEE_ID_KEY, None)
+    st.session_state.pop(TIMEKEEPING_MODAL_DATE_KEY, None)
+    st.session_state.pop(TIMEKEEPING_MODAL_TIMECARD_KEY, None)
+    st.session_state[SHOW_TIMEKEEPING_DAY_MODAL_KEY] = False
+
+
+def _open_day_time_modal(
+    *,
+    eid: str,
+    work_date: date,
+    timecard_id: str,
+) -> None:
+    st.session_state[TIMEKEEPING_MODAL_EMPLOYEE_ID_KEY] = str(eid or "").strip()
+    st.session_state[TIMEKEEPING_MODAL_DATE_KEY] = work_date.isoformat()
+    st.session_state[TIMEKEEPING_MODAL_TIMECARD_KEY] = str(timecard_id or "").strip()
+    st.session_state[SHOW_TIMEKEEPING_DAY_MODAL_KEY] = True
+
+
+def _get_day_modal_context() -> tuple[dict, date, str, dict] | None:
+    """Return (emp, week_start, iso, timecard_row) for the open day modal."""
+    eid = str(st.session_state.get(TIMEKEEPING_MODAL_EMPLOYEE_ID_KEY) or "").strip()
+    iso = str(st.session_state.get(TIMEKEEPING_MODAL_DATE_KEY) or "").strip()[:10]
+    if not eid or not iso:
+        return None
+    week_start_d = _current_week_start()
+    cache = st.session_state.get(_CACHE_KEY) or {}
+    row: dict | None = None
+    if isinstance(cache, dict):
+        tid = str(st.session_state.get(TIMEKEEPING_MODAL_TIMECARD_KEY) or "").strip()
+        if tid and isinstance(cache.get(tid), dict):
+            row = cache[tid]
+        if row is None:
+            for rec in cache.values():
+                if not isinstance(rec, dict):
+                    continue
+                if str(rec.get("employee_id") or rec.get("id") or "").strip() == eid:
+                    row = rec
+                    break
+    if row is None:
+        row = {"employee_id": eid, "id": eid, "employee_name": "Employee"}
+    emp = _emp_from_timecard_row(row)
+    return emp, week_start_d, iso, row
+
+
+def _on_modal_day_hours_changed(eid: str, week_start_d: date, day_ix: int, iso: str) -> None:
+    week_sig = week_start_d.isoformat()
+    gk = _grid_key(eid)
+    grid = st.session_state.get(gk)
+    if not isinstance(grid, list) or day_ix < 0 or day_ix >= len(grid):
+        return
+    hours = max(
+        0.0,
+        float(st.session_state.get(_weekly_hours_widget_key(eid, iso), 0) or 0),
+    )
+    _set_day_job_hours(grid[day_ix], hours)
+    st.session_state[gk] = grid
+    by_date = st.session_state.get(_alloc_state_key(eid))
+    if isinstance(by_date, dict):
+        week_start_d = date.fromisoformat(week_sig)
+        _bootstrap_week_allocation_lines(
+            by_date,
+            week_start_d=week_start_d,
+            source_grid=grid,
+            job_opts=_assignment_options_for_timekeeping(week_start_d=week_start_d),
+            eid=eid,
+            week_sig=week_sig,
+        )
+        by_date = _recalculate_week_overtime(by_date, week_start_d)
+        st.session_state[_alloc_state_key(eid)] = by_date
+    _mark_allocation_dirty(_emp_from_timecard_row({"employee_id": eid, "id": eid}), week_start_d, iso)
+
+
+def _make_allocation_render_deps(emp: dict, week_start_d: date) -> AllocationRenderDeps:
+    eid = str(emp.get("id") or emp.get("employee_id") or "")
+    week_sig = week_start_d.isoformat()
+    can_override_ot = _can_override_overtime_allocation()
+    return AllocationRenderDeps(
+        fmt_day_hours=_fmt_day_hours,
+        coerce_assignment_label=_coerce_assignment_label,
+        assignment_option_index=_assignment_option_index,
+        sync_assignment_job_widget=_sync_assignment_job_widget,
+        normalize_alloc_hour_type=_normalize_alloc_hour_type,
+        ensure_alloc_type_widget_label=_ensure_alloc_type_widget_label,
+        alloc_hour_type_label=_alloc_hour_type_label,
+        timecard_status_pill_html=_timecard_status_pill_html,
+        allocated_hours_sum=_valid_allocated_hours_sum,
+        alloc_state_key=_alloc_state_key,
+        day_is_editable=_day_is_editable,
+        day_hours_editable=_day_hours_editable,
+        handle_alloc_line_submit=_handle_alloc_line_submit,
+        handle_alloc_line_approve=_handle_alloc_line_approve,
+        handle_alloc_line_reject=_handle_alloc_line_reject,
+        handle_day_submit_for_date=_handle_day_submit_for_date,
+        handle_day_approve_for_date=_handle_day_approve_for_date,
+        handle_day_reject_for_date=_handle_day_reject_for_date,
+        mark_allocation_dirty=lambda iso: _mark_allocation_dirty(emp, week_start_d, iso),
+        save_allocation_day=lambda iso: _save_allocation_day(emp, week_start_d, iso),
+        alloc_autosave_status_html=lambda iso: _alloc_autosave_status_html(eid, iso),
+        can_override_overtime=can_override_ot,
+        handle_alloc_type_change=(
+            (lambda iso, lix: _handle_alloc_type_change(
+                eid,
+                week_sig,
+                iso,
+                lix,
+                can_override=can_override_ot,
+            ))
+            if can_override_ot
+            else None
+        ),
+        overtime_badge_html=_overtime_override_badge_html,
+        overtime_policy_note=_overtime_policy_note(),
+    )
+
+
+def _render_single_day_allocation_modal(
+    emp: dict,
+    week_start_d: date,
+    *,
+    iso: str,
+    panel_scope: str,
+    alloc_deps: AllocationRenderDeps,
+) -> None:
+    """One-day allocation editor for the day modal."""
+    eid = str(emp.get("id") or emp.get("employee_id") or "")
+    week_sig = week_start_d.isoformat()
+    scope = str(panel_scope or eid or week_sig).strip()
+    admin_edit = _can_admin_edit_approved_timekeeping()
+    can_approve = _can_approve_timekeeping()
+    can_submit = _can_submit_timekeeping()
+    job_opts = _assignment_options_for_timekeeping(week_start_d=week_start_d)
+    grid = _ensure_weekly_grid(emp, week_start_d)
+    _apply_row_hrs_to_grid(grid, eid=eid, week_sig=week_sig)
+    week_status = _resolved_week_status(emp, week_start_d, grid=grid)
+    week_locked = week_status == "Approved" and not admin_edit
+    by_date = _ensure_allocation_state(emp, week_start_d)
+    _sync_allocation_from_widgets(by_date, eid=eid, week_sig=week_sig)
+    _bootstrap_week_allocation_lines(
+        by_date,
+        week_start_d=week_start_d,
+        source_grid=grid,
+        job_opts=job_opts,
+        eid=eid,
+        week_sig=week_sig,
+    )
+    by_date = _recalculate_week_overtime(by_date, week_start_d)
+    _sync_alloc_type_widgets_from_lines(by_date, eid=eid, week_sig=week_sig)
+    st.session_state[_alloc_state_key(eid)] = by_date
+
+    day_ix = next(
+        (i for i, day_d in enumerate(week_dates(week_start_d)) if day_d.isoformat() == iso),
+        -1,
+    )
+    if day_ix < 0:
+        st.error("That date is not in the current week.")
+        return
+    day_d = week_dates(week_start_d)[day_ix]
+    grid_row = grid[day_ix] if day_ix < len(grid) else {}
+    day_status = _normalize_timecard_status(grid_row.get("status"))
+    daily_total = _daily_total_from_list_row(
+        eid=eid,
+        week_sig=week_sig,
+        day_ix=day_ix,
+        grid_row=grid_row,
+    )
+    lines = _ensure_day_allocation_lines(
+        by_date,
+        iso=iso,
+        daily_total=daily_total,
+        grid_row=grid_row,
+        job_opts=job_opts,
+        eid=eid,
+        week_sig=week_sig,
+    )
+    live_lines = _live_allocation_lines_for_day(lines, eid=eid, week_sig=week_sig, iso=iso)
+    alloc_state = _get_day_allocation_state(daily_total, live_lines)
+    allocated = alloc_state["allocated_total"]
+    st_part = alloc_state["allocated_st"]
+    ot_part = alloc_state["allocated_ot"]
+    remaining = max(0.0, round(float(alloc_state["remaining"]), 2))
+    day_name = _detail_day_label({"day": day_d.strftime("%A"), "date": iso})
+    type_bits = []
+    if st_part > 0:
+        type_bits.append(f"S/T {_fmt_day_hours(st_part)}")
+    if ot_part > 0:
+        type_bits.append(f"O/T {_fmt_day_hours(ot_part)}")
+    type_summary = f" ({' · '.join(type_bits)})" if type_bits else ""
+
+    render_day_allocation_card(
+        deps=alloc_deps,
+        ctx=DayAllocationCardContext(
+            eid=eid,
+            week_sig=week_sig,
+            panel_scope=scope,
+            iso=iso,
+            day_name=day_name,
+            daily_total=daily_total,
+            allocated=allocated,
+            remaining=remaining,
+            type_summary=type_summary,
+            alloc_state=str(alloc_state["state"]),
+            lines=lines,
+            week_locked=week_locked,
+            job_opts=job_opts,
+            can_approve=can_approve,
+            can_submit=can_submit,
+            emp=emp,
+            week_start_d=week_start_d,
+            by_date=by_date,
+            record_key=record_session_key(emp, "id"),
+            week_status=week_status,
+            day_status=day_status,
+            include_notes=True,
+            modal_host=True,
+            daily_hours_label="hrs entered",
+        ),
+        normalize_timecard_status=_normalize_timecard_status,
+    )
+    if lines and day_ix < len(grid):
+        grid[day_ix]["job"] = str(lines[0].get("job") or grid[day_ix].get("job") or "")
+    st.session_state[_grid_key(eid)] = grid
+    st.session_state[_alloc_state_key(eid)] = by_date
+
+
+def _discard_day_modal_edits(emp: dict, week_start_d: date) -> None:
+    _invalidate_weekly_grid(emp, week_start_d)
+    _ensure_weekly_grid(emp, week_start_d)
+
+
+def _save_day_from_modal(emp: dict, week_start_d: date, iso: str) -> bool:
+    eid = str(emp.get("id") or emp.get("employee_id") or "")
+    week_sig = week_start_d.isoformat()
+    day_ix = next(
+        (i for i, day_d in enumerate(week_dates(week_start_d)) if day_d.isoformat() == iso),
+        -1,
+    )
+    grid = _ensure_weekly_grid(emp, week_start_d)
+    if day_ix >= 0 and day_ix < len(grid):
+        hours = max(
+            0.0,
+            float(st.session_state.get(_weekly_hours_widget_key(eid, iso), 0) or 0),
+        )
+        _set_day_job_hours(grid[day_ix], hours)
+        st.session_state[_grid_key(eid)] = grid
+    _set_alloc_autosave_status(eid, iso, "saving")
+    ok, _msg = _save_allocation_week(
+        emp,
+        week_start_d,
+        show_message=True,
+        focus_iso=iso,
+        allow_incomplete=True,
+    )
+    if ok:
+        grid = _ensure_weekly_grid(emp, week_start_d)
+        st_total, ot_total, total_hours = _row_totals_from_grid(grid)
+        status = _week_status_from_grid(grid)
+        _patch_timecard_cache(
+            emp,
+            week_start_d,
+            {
+                "st_total": st_total,
+                "ot_total": ot_total,
+                "total_hours": total_hours,
+                "status": status,
+            },
+        )
+        _set_alloc_autosave_status(eid, iso, "saved")
+        _clear_day_time_modal()
+        return True
+    _set_alloc_autosave_status(eid, iso, "unsaved")
+    return False
+
+
+def render_day_time_dialog_body(emp: dict, week_start_d: date, iso: str) -> None:
+    """Modal body: daily hours, allocations, cancel/save."""
+    eid = str(emp.get("id") or emp.get("employee_id") or "")
+    week_sig = week_start_d.isoformat()
+    day_ix = next(
+        (i for i, day_d in enumerate(week_dates(week_start_d)) if day_d.isoformat() == iso),
+        -1,
+    )
+    if day_ix < 0:
+        st.error("That date is not in the current week.")
+        return
+    day_d = week_dates(week_start_d)[day_ix]
+    grid = _ensure_weekly_grid(emp, week_start_d)
+    grid_row = grid[day_ix] if day_ix < len(grid) else {}
+    week_status = _resolved_week_status(emp, week_start_d, grid=grid)
+    day_status = _normalize_timecard_status(grid_row.get("status"))
+    hours_editable = _day_hours_editable(day_status, week_status)
+    daily_total = _daily_total_from_list_row(
+        eid=eid,
+        week_sig=week_sig,
+        day_ix=day_ix,
+        grid_row=grid_row,
+    )
+
+    render_modal_shell()
+    render_modal_header(
+        title=str(emp.get("name") or emp.get("employee_name") or "Employee"),
+        subtitle=_format_modal_day_title(day_d),
+        status=day_status,
+    )
+
+    unsaved_html = _alloc_autosave_status_html(eid, iso)
+    if unsaved_html:
+        st.markdown(unsaved_html, unsafe_allow_html=True)
+
+    st.markdown("**Daily total hours**")
+    if hours_editable:
+        daily_total = _render_list_day_hour_input(
+            value=daily_total,
+            emp_id=eid,
+            work_date=day_d,
+            day_label=day_d.strftime("%A"),
+            week_sig=week_sig,
+            day_ix=day_ix,
+            hour_autosave=False,
+        )
+        widget_key = _weekly_hours_widget_key(eid, day_d)
+        if widget_key in st.session_state and float(st.session_state[widget_key] or 0) != daily_total:
+            _mark_allocation_dirty(emp, week_start_d, iso)
+    else:
+        st.markdown(
+            f'<div class="timekeeping-hour-input timekeeping-hour-input-ro">'
+            f"{html.escape(_fmt_day_hours(daily_total))}</div>",
+            unsafe_allow_html=True,
+        )
+        if day_status == "Approved":
+            st.caption("This day is approved and locked.")
+
+    alloc_deps = _make_allocation_render_deps(emp, week_start_d)
+    timecard_id = str(st.session_state.get(TIMEKEEPING_MODAL_TIMECARD_KEY) or eid).strip()
+    _render_single_day_allocation_modal(
+        emp,
+        week_start_d,
+        iso=iso,
+        panel_scope=f"modal_{timecard_id}_{iso}",
+        alloc_deps=alloc_deps,
+    )
+
+    admin_edit = _can_admin_edit_approved_timekeeping()
+    if admin_edit and week_status == "Approved":
+        st.warning("Administrator edit mode — use **Save Day** to persist corrections.")
+    elif week_status == "Approved":
+        st.info("This week is approved and locked.")
+
+    cancel_col, save_col = st.columns(2, gap="small")
+    with cancel_col:
+        if st.button(
+            "Cancel",
+            key=f"time_cancel_{eid}_{iso}",
+            use_container_width=True,
+        ):
+            _discard_day_modal_edits(emp, week_start_d)
+            _clear_day_time_modal()
+            _timekeeping_app_rerun()
+    with save_col:
+        if hours_editable and st.button(
+            "Save Day",
+            key=f"time_save_{eid}_{iso}",
+            type="primary",
+            use_container_width=True,
+        ):
+            if _save_day_from_modal(emp, week_start_d, iso):
+                _timekeeping_app_rerun()
+
+
+@st.dialog("Day Time Entry", width="large", on_dismiss=_clear_day_time_modal)
+def _show_day_time_dialog() -> None:
+    ctx = _get_day_modal_context()
+    if not ctx:
+        render_missing_record(_clear_day_time_modal, close_key="tk_day_modal_missing_close")
+        return
+    emp, week_start_d, iso, _row = ctx
+    render_day_time_dialog_body(emp, week_start_d, iso)
+
+
+def _render_clickable_list_day_cell(
+    *,
+    day_d: date,
+    day_ix: int,
+    day_row: dict,
+    eid: str,
+    timecard_id: str,
+    week_start_d: date,
+) -> None:
+    """Compact day cell — click hours to open the day editor modal."""
+    day_status = _normalize_timecard_status(day_row.get("status"))
+    total = _day_hours_total(day_row)
+    day_title = f'{day_d.strftime("%a").upper()} {day_d.strftime("%m/%d")}'
+    hours_label = _fmt_day_hours(total)
+    st.markdown(
+        f'<span class="timekeeping-day-cell-clickable-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(f"**{day_title}**")
+    st.caption(_timecard_status_display(day_status).upper())
+    if st.button(
+        hours_label,
+        key=f"open_day_{eid}_{day_d.isoformat()}",
+        use_container_width=True,
+        help=f"Open {day_d.strftime('%A %m/%d')} time entry",
+    ):
+        _open_day_time_modal(eid=eid, work_date=day_d, timecard_id=timecard_id)
+        _timekeeping_app_rerun()
+
+
 def _render_timekeeping_employee_row_collapsed(
     row: dict,
     *,
@@ -4115,27 +4538,22 @@ def _render_timekeeping_employee_row_collapsed(
             )
             st.markdown("⋮⋮")
         with row_cols[1]:
-            if st.button(
-                "▸",
-                key=f"tk_expand_{timecard_id}",
-                help="Expand ST/OT detail, notes, and daily submit",
-            ):
-                _toggle_expanded_timecard(timecard_id)
-                ips_app_rerun()
-        with row_cols[2]:
             st.markdown(f"**{html.escape(employee_name)}**")
 
         if eid and grid is not None:
-            for day_ix, (col, day_d) in enumerate(zip(row_cols[3:10], days)):
+            for day_ix, (col, day_d) in enumerate(zip(row_cols[2:9], days)):
                 day_row = grid[day_ix] if day_ix < len(grid) else {}
                 with col:
-                    _render_collapsed_list_day_cell(
+                    _render_clickable_list_day_cell(
                         day_d=day_d,
                         day_ix=day_ix,
                         day_row=day_row,
+                        eid=eid,
+                        timecard_id=timecard_id,
+                        week_start_d=week_start_d,
                     )
         else:
-            for day_ix, (col, day_d) in enumerate(zip(row_cols[3:10], days)):
+            for day_ix, (col, day_d) in enumerate(zip(row_cols[2:9], days)):
                 with col:
                     st.markdown(f"**{day_d.strftime('%a').upper()} {day_d.strftime('%m/%d')}**")
                     st.caption("DRAFT")
@@ -4145,22 +4563,22 @@ def _render_timekeeping_employee_row_collapsed(
                         unsafe_allow_html=True,
                     )
 
-        with row_cols[10]:
+        with row_cols[9]:
             _render_collapsed_list_summary_cell(
                 label=_LIST_VIEW_SUMMARY_LABELS[0],
                 value=_fmt_list_summary_hours(st_total),
             )
-        with row_cols[11]:
+        with row_cols[10]:
             _render_collapsed_list_summary_cell(
                 label=_LIST_VIEW_SUMMARY_LABELS[1],
                 value=_fmt_list_summary_hours(ot_total),
             )
-        with row_cols[12]:
+        with row_cols[11]:
             _render_collapsed_list_summary_cell(
                 label=_LIST_VIEW_SUMMARY_LABELS[2],
                 value=_fmt_list_summary_hours(total_hours),
             )
-        with row_cols[13]:
+        with row_cols[12]:
             _render_collapsed_list_summary_cell(
                 label=_LIST_VIEW_SUMMARY_LABELS[3],
                 value=_timecard_status_display(status),
@@ -4173,126 +4591,23 @@ def _render_timekeeping_employee_row_body(
     week_start_d: date,
     days: list[date],
 ) -> None:
-    """Render one employee list row (shared by static and polled fragments)."""
+    """Render one compact employee weekly row (day cells open the editor modal)."""
     timecard_id = str(row.get("timecard_id") or "").strip()
     if not timecard_id:
         return
 
     emp = _emp_from_timecard_row(row)
     employee_name = str(row.get("employee_name") or "—")
-    expanded = _expanded_timecard_id() == timecard_id
     eid = str(emp.get("id") or emp.get("employee_id") or "")
-    week_sig = week_start_d.isoformat()
-
-    if not expanded:
-        _render_timekeeping_employee_row_collapsed(
-            row,
-            week_start_d=week_start_d,
-            days=days,
-            timecard_id=timecard_id,
-            emp=emp,
-            employee_name=employee_name,
-            eid=eid,
-        )
-        return
-
-    _flush_debounced_hour_autosaves(emp, week_start_d)
-
-    with st.container(key=f"tk_card_{timecard_id}"):
-        st.markdown(
-            '<span class="timesheet-employee-card timesheet-employee-card-marker '
-            'employee-timesheet-row-wrapper" aria-hidden="true"></span>',
-            unsafe_allow_html=True,
-        )
-        with st.container(key=f"tk_row_{timecard_id}"):
-            st.markdown(
-                '<span class="expanded-timecard-summary expanded-timecard-summary-marker '
-                'weekly-timecard-row-expanded" aria-hidden="true"></span>',
-                unsafe_allow_html=True,
-            )
-            row_cols = st.columns(_WEEKLY_TS_LIST_ROW_COLS, gap="small")
-
-            with row_cols[0]:
-                st.markdown(
-                    '<span class="timekeeping-list-row-marker employee-timesheet-row weekly-employee-row" '
-                    'aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-                st.markdown("⋮⋮")
-            with row_cols[1]:
-                if st.button(
-                    "▾",
-                    key=f"tk_expand_{timecard_id}",
-                    help="Collapse ST/OT detail, notes, and daily submit",
-                ):
-                    _toggle_expanded_timecard(timecard_id)
-                    ips_app_rerun()
-
-            with row_cols[2]:
-                st.markdown(f"**{html.escape(employee_name)}**")
-
-            grid = _ensure_weekly_grid(emp, week_start_d) if eid else []
-            st_total = float(row.get("st_total") or 0)
-            ot_total = float(row.get("ot_total") or 0)
-            total_hours = float(row.get("total_hours") or 0)
-            status = _normalize_timecard_status(row.get("status"))
-            if eid:
-                grid = _sync_grid_from_widget_keys(grid, eid=eid, week_sig=week_sig)
-                _apply_row_hrs_to_grid(grid, eid=eid, week_sig=week_sig)
-                _apply_active_field_job_to_grid(grid)
-                status = _week_status_from_grid(grid)
-                alloc_by_date = _ensure_allocation_state(emp, week_start_d)
-                for day_ix, (col, day_d) in enumerate(zip(row_cols[3:10], days)):
-                    day_row = grid[day_ix] if day_ix < len(grid) else {}
-                    day_row = _day_row_with_widget_values(
-                        day_row, eid=eid, week_sig=week_sig, index=day_ix
-                    )
-                    day_status = _normalize_timecard_status(day_row.get("status"))
-                    editable = _day_hours_editable(day_status, status)
-                    with col:
-                        _render_list_row_day_cell(
-                            day_d=day_d,
-                            day_ix=day_ix,
-                            day_row=day_row,
-                            emp_id=eid,
-                            week_sig=week_sig,
-                            editable=editable,
-                            alloc_by_date=alloc_by_date,
-                        )
-                st.session_state[_grid_key(eid)] = grid
-                st_total, ot_total, total_hours = _row_totals_from_grid(grid)
-            else:
-                for day_ix, (col, day_d) in enumerate(zip(row_cols[3:10], days)):
-                    with col:
-                        st.markdown(f"**{day_d.strftime('%a').upper()}**")
-                        st.caption(day_d.strftime("%m/%d"))
-                        st.markdown(
-                            '<div class="timekeeping-collapsed-hour-value timekeeping-hour-input-ro">—</div>',
-                            unsafe_allow_html=True,
-                        )
-
-            with row_cols[10]:
-                _render_collapsed_list_summary_cell(
-                    label=_LIST_VIEW_SUMMARY_LABELS[0],
-                    value=_fmt_list_summary_hours(st_total),
-                )
-            with row_cols[11]:
-                _render_collapsed_list_summary_cell(
-                    label=_LIST_VIEW_SUMMARY_LABELS[1],
-                    value=_fmt_list_summary_hours(ot_total),
-                )
-            with row_cols[12]:
-                _render_collapsed_list_summary_cell(
-                    label=_LIST_VIEW_SUMMARY_LABELS[2],
-                    value=_fmt_list_summary_hours(total_hours),
-                )
-            with row_cols[13]:
-                _render_collapsed_list_summary_cell(
-                    label=_LIST_VIEW_SUMMARY_LABELS[3],
-                    value=_timecard_status_display(status),
-                )
-
-        _render_timekeeping_expand_fragment(row, week_start_d)
+    _render_timekeeping_employee_row_collapsed(
+        row,
+        week_start_d=week_start_d,
+        days=days,
+        timecard_id=timecard_id,
+        emp=emp,
+        employee_name=employee_name,
+        eid=eid,
+    )
 
 
 def _render_timekeeping_employee_row_fragment(
@@ -4301,43 +4616,8 @@ def _render_timekeeping_employee_row_fragment(
     week_start_d: date,
     days: list[date],
 ) -> None:
-    """One employee list row — fragments only when expanded or autosave is pending."""
-    timecard_id = str(row.get("timecard_id") or "").strip()
-    expanded = _expanded_timecard_id() == timecard_id
-    emp = _emp_from_timecard_row(row)
-    eid = str(emp.get("id") or emp.get("employee_id") or "")
-    week_sig = week_start_d.isoformat()
-    pending = _employee_has_pending_hour_autosave(eid, week_sig)
-
-    if not expanded and not pending:
-        _render_timekeeping_employee_row_body(row, week_start_d=week_start_d, days=days)
-        return
-
-    poll_interval = timedelta(seconds=max(0.5, float(_TK_HOUR_AUTOSAVE_DEBOUNCE_SEC)))
-
-    def _mount_row_fragment(*, run_every: timedelta | float | None = None) -> None:
-        kwargs: dict[str, Any] = {}
-        if run_every is not None:
-            kwargs["run_every"] = run_every
-
-        @fragment(**kwargs)
-        def _row_fragment() -> None:
-            _render_timekeeping_employee_row_body(row, week_start_d=week_start_d, days=days)
-
-        _row_fragment()
-
-    if pending:
-        try:
-            _mount_row_fragment(run_every=poll_interval)
-            return
-        except (TypeError, Exception):
-            try:
-                _mount_row_fragment(run_every=float(poll_interval.total_seconds()))
-                return
-            except (TypeError, Exception):
-                pass
-
-    _mount_row_fragment()
+    """One employee list row — always compact; day edits open a modal dialog."""
+    _render_timekeeping_employee_row_body(row, week_start_d=week_start_d, days=days)
 
 
 def _render_custom_timekeeping_table(
@@ -4471,6 +4751,7 @@ def render() -> None:
                 st.session_state[_WEEK_KEY] = ws - timedelta(days=7)
                 reset_table_page(_TABLE_KEY)
                 _clear_expanded_timecard()
+                _clear_day_time_modal()
                 clear_timekeeping_list_caches()
                 st.rerun()
         with nav2:
@@ -4478,6 +4759,7 @@ def render() -> None:
                 st.session_state[_WEEK_KEY] = week_start()
                 reset_table_page(_TABLE_KEY)
                 _clear_expanded_timecard()
+                _clear_day_time_modal()
                 clear_timekeeping_list_caches()
                 st.rerun()
         with nav3:
@@ -4485,6 +4767,7 @@ def render() -> None:
                 st.session_state[_WEEK_KEY] = ws + timedelta(days=7)
                 reset_table_page(_TABLE_KEY)
                 _clear_expanded_timecard()
+                _clear_day_time_modal()
                 clear_timekeeping_list_caches()
                 st.rerun()
         with week_col:
@@ -4504,7 +4787,7 @@ def render() -> None:
 
     st.markdown(
         f'<p class="ips-timekeeping-list-caption">{len(filtered)} timecard(s) · '
-        f"Day boxes stay visible on each row. Expand for job/ST/OT detail.</p>",
+        f"Click any day cell to enter hours and job assignments.</p>",
         unsafe_allow_html=True,
     )
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY, default_page_size=_TK_LIST_PAGE_SIZE)
@@ -4514,6 +4797,8 @@ def render() -> None:
 
     if st.session_state.get(SELECTED_TIMECARD_KEY) and st.session_state.get(SHOW_TIMECARD_MODAL_KEY):
         _show_timecard_detail_modal()
+
+    show_modal_if_pending(SHOW_TIMEKEEPING_DAY_MODAL_KEY, _show_day_time_dialog)
 
     try:
         from app.auth import current_role, effective_role

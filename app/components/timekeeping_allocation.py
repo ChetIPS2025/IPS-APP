@@ -81,6 +81,8 @@ class DayAllocationCardContext:
     day_status: str = "Draft"
     can_submit: bool = False
     include_notes: bool = True
+    modal_host: bool = False
+    daily_hours_label: str = "hrs in row above"
 
 
 def allocation_day_block_class(state: str) -> str:
@@ -162,6 +164,7 @@ def render_day_summary_inline(
     balance_cls: str,
     card_cls: str,
     deps: AllocationRenderDeps,
+    hours_badge_text: str = "hrs in row above",
 ) -> None:
     """Day card header with separate Streamlit elements (no concatenated labels)."""
     st.markdown(
@@ -183,7 +186,7 @@ def render_day_summary_inline(
             st.markdown(
                 (
                     f'<span class="timekeeping-hours-badge timekeeping-alloc-day-total">'
-                    f"{html.escape(deps.fmt_day_hours(daily_total))} hrs in row above"
+                    f"{html.escape(deps.fmt_day_hours(daily_total))} {html.escape(hours_badge_text)}"
                     f"</span>"
                 ),
                 unsafe_allow_html=True,
@@ -297,7 +300,7 @@ def _render_day_actions_bar(
     action_slots: list[str] = []
     if hours_editable:
         action_slots.append("add")
-        if ctx.daily_total > 0:
+        if ctx.daily_total > 0 and not ctx.modal_host:
             action_slots.append("save")
     if (
         hours_editable
@@ -693,9 +696,15 @@ def render_day_allocation_card(
             balance_cls=balance_cls,
             card_cls=card_cls,
             deps=deps,
+            hours_badge_text=ctx.daily_hours_label,
         )
         if ctx.daily_total <= 0:
-            st.caption("Enter hours for this day in the row above before assigning.")
+            hint = (
+                "Enter daily total hours above to add assignments."
+                if ctx.modal_host
+                else "Enter hours for this day in the row above before assigning."
+            )
+            st.caption(hint)
             return
 
         st.markdown(

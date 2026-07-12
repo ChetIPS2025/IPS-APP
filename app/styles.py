@@ -15194,6 +15194,34 @@ def _inject_timekeeping_list_row_gap_css() -> None:
 .timekeeping-collapsed-hour-weekend {
   background: #f8fafc !important;
 }
+/* Clickable day cells — open day editor modal */
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.timekeeping-day-cell-clickable-marker) {
+  cursor: pointer !important;
+}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.timekeeping-day-cell-clickable-marker) [data-testid="stButton"] > button {
+  width: 58px !important;
+  min-height: 32px !important;
+  margin: 2px auto 0 auto !important;
+  padding: 4px 6px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  border: 1px solid #d7deea !important;
+  border-radius: 6px !important;
+  background: #ffffff !important;
+  color: #1e293b !important;
+  box-shadow: none !important;
+  display: block !important;
+}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.timekeeping-day-cell-clickable-marker) [data-testid="stButton"] > button:hover {
+  border-color: #2563eb !important;
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.timekeeping-day-cell-clickable-marker):nth-child(8) [data-testid="stButton"] > button,
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.timekeeping-day-cell-clickable-marker):nth-child(9) [data-testid="stButton"] > button {
+  background: #f8fafc !important;
+}
 .weekly-allocation-totals {
   display: flex !important;
   gap: 18px !important;
