@@ -9,6 +9,111 @@ import streamlit as st
 
 _ActionFn = Callable[[], None]
 
+_ICON_SVG_ATTRS = (
+    'class="ips-app-header-icon-svg" xmlns="http://www.w3.org/2000/svg" '
+    'width="22" height="22" viewBox="0 0 24 24" fill="none" '
+    'stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"'
+)
+
+_PAGE_HEADER_ICON_SVGS: dict[str, str] = {
+    "dashboard": (
+        f"<svg {_ICON_SVG_ATTRS}>"
+        '<rect x="3" y="3" width="7" height="7" rx="1"/>'
+        '<rect x="14" y="3" width="7" height="7" rx="1"/>'
+        '<rect x="3" y="14" width="7" height="7" rx="1"/>'
+        '<rect x="14" y="14" width="7" height="7" rx="1"/>'
+        "</svg>"
+    ),
+    "jobs": (
+        f"<svg {_ICON_SVG_ATTRS}>"
+        '<path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>'
+        '<rect x="4" y="6" width="16" height="14" rx="2"/>'
+        "</svg>"
+    ),
+    "pipeline": (
+        f"<svg {_ICON_SVG_ATTRS}>"
+        '<path d="M4 6h16"/><path d="M4 12h10"/><path d="M4 18h14"/>'
+        "</svg>"
+    ),
+    "customers": (
+        f"<svg {_ICON_SVG_ATTRS}>"
+        '<path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/>'
+        '<path d="M9 21v-6h6v6"/>'
+        "</svg>"
+    ),
+    "estimates": (
+        f"<svg {_ICON_SVG_ATTRS}>"
+        '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>'
+        '<path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/>'
+        "</svg>"
+    ),
+    "inventory": (
+        f"<svg {_ICON_SVG_ATTRS}>"
+        '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>'
+        "</svg>"
+    ),
+    "assets": (
+        f"<svg {_ICON_SVG_ATTRS}>"
+        '<rect x="2" y="7" width="20" height="14" rx="2"/>'
+        '<path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>'
+        "</svg>"
+    ),
+    "timekeeping": (
+        f"<svg {_ICON_SVG_ATTRS}>"
+        '<circle cx="12" cy="12" r="10"/>'
+        '<path d="M12 6v6l4 2"/>'
+        "</svg>"
+    ),
+    "employees": (
+        f"<svg {_ICON_SVG_ATTRS}>"
+        '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>'
+        '<circle cx="9" cy="7" r="4"/>'
+        '<path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'
+        "</svg>"
+    ),
+    "users": (
+        f"<svg {_ICON_SVG_ATTRS}>"
+        '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>'
+        '<circle cx="9" cy="7" r="4"/>'
+        '<path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'
+        "</svg>"
+    ),
+    "reports": (
+        f"<svg {_ICON_SVG_ATTRS}>"
+        '<path d="M3 3v18h18"/><path d="M7 16l4-5 4 3 5-7"/>'
+        "</svg>"
+    ),
+    "tasks": (
+        f"<svg {_ICON_SVG_ATTRS}>"
+        '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'
+        "</svg>"
+    ),
+    "documents": (
+        f"<svg {_ICON_SVG_ATTRS}>"
+        '<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>'
+        '<path d="M13 2v7h7"/>'
+        "</svg>"
+    ),
+    "settings": (
+        f"<svg {_ICON_SVG_ATTRS}>"
+        '<circle cx="12" cy="12" r="3"/>'
+        '<path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>'
+        "</svg>"
+    ),
+    "admin": (
+        f"<svg {_ICON_SVG_ATTRS}>"
+        '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'
+        "</svg>"
+    ),
+}
+
+_DEFAULT_PAGE_ICON_SVG = (
+    f"<svg {_ICON_SVG_ATTRS}>"
+    '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>'
+    '<path d="M14 2v6h6"/>'
+    "</svg>"
+)
+
 DEFAULT_PAGE_SUBTITLES: dict[str, str] = {
     "dashboard": "Overview of key operational metrics and performance.",
     "jobs": "Manage and track all company jobs.",
@@ -53,15 +158,16 @@ def _initials(name: str) -> str:
 
 
 def _resolve_icon(icon: str | None) -> str:
-    if icon:
+    if icon and str(icon).strip().startswith("<svg"):
         return str(icon).strip()
     try:
-        from app.components.sidebar_nav_icons import nav_icon_for_slug
         from app.navigation import current_nav_slug
     except ImportError:
-        from components.sidebar_nav_icons import nav_icon_for_slug  # type: ignore
         from navigation import current_nav_slug  # type: ignore
-    return nav_icon_for_slug(current_nav_slug())
+    slug = current_nav_slug()
+    if icon:
+        return str(icon).strip()
+    return _PAGE_HEADER_ICON_SVGS.get(slug, _DEFAULT_PAGE_ICON_SVG)
 
 
 def _resolve_subtitle(title: str, subtitle: str | None) -> str | None:
@@ -152,31 +258,46 @@ def _render_header_utilities(*, header_key: str) -> None:
 
     role = effective_role()
     unread = _unread_notification_count()
-    bell_label = "🔔" if unread <= 0 else f"🔔 {unread}"
+    display = current_user_display_name()
+    initials = _initials(display)
 
-    u1, u2, u3, u4 = st.columns(4, gap="small")
+    u1, u2, u3, u4 = st.columns([1, 1, 1, 1.35], gap="small")
     with u1:
+        st.markdown('<span class="ips-app-header-util-bell-slot" aria-hidden="true"></span>', unsafe_allow_html=True)
+        badge_html = (
+            f'<span class="ips-app-header-badge">{int(unread)}</span>'
+            if unread > 0
+            else ""
+        )
+        if badge_html:
+            st.markdown(badge_html, unsafe_allow_html=True)
         if role_can_access_page(role, "company_updates"):
-            if st.button(bell_label, key=f"{header_key}_bell", help="Company updates"):
+            if st.button("Notifications", key=f"{header_key}_bell", help="Company updates"):
                 set_nav_slug("company_updates")
                 st.rerun()
         else:
-            st.button(bell_label, key=f"{header_key}_bell", help="Notifications", disabled=True)
+            st.button("Notifications", key=f"{header_key}_bell", help="Notifications", disabled=True)
     with u2:
-        with st.popover("❓", use_container_width=True):
+        st.markdown('<span class="ips-app-header-util-help-slot" aria-hidden="true"></span>', unsafe_allow_html=True)
+        with st.popover("Help", use_container_width=True):
             st.markdown("**Help**")
             st.caption("Use the sidebar to switch modules. Contact your administrator for access changes.")
     with u3:
+        st.markdown('<span class="ips-app-header-util-settings-slot" aria-hidden="true"></span>', unsafe_allow_html=True)
         if role_can_access_page(role, "settings"):
-            if st.button("⚙", key=f"{header_key}_settings", help="Settings"):
+            if st.button("Settings", key=f"{header_key}_settings", help="Settings"):
                 set_nav_slug("settings")
                 st.rerun()
         else:
-            st.button("⚙", key=f"{header_key}_settings", help="Settings", disabled=True)
+            st.button("Settings", key=f"{header_key}_settings", help="Settings", disabled=True)
     with u4:
-        display = current_user_display_name()
-        with st.popover(_initials(display), use_container_width=True):
-            st.markdown(f"**{html.escape(display)}**")
+        st.markdown('<span class="ips-app-header-util-user-slot" aria-hidden="true"></span>', unsafe_allow_html=True)
+        with st.popover(f"{initials}  ▾", use_container_width=True):
+            st.markdown(
+                f'<span class="ips-app-header-avatar-lg">{html.escape(initials)}</span> '
+                f"**{html.escape(display)}**",
+                unsafe_allow_html=True,
+            )
             st.caption(role.replace("_", " ").title())
             if st.button("Log out", key=f"{header_key}_logout", use_container_width=True):
                 sign_out()
@@ -224,60 +345,63 @@ def render_page_header(
         else ""
     )
     icon_html = (
-        f'<span class="ips-app-header-icon" aria-hidden="true">{html.escape(resolved_icon)}</span>'
+        f'<span class="ips-app-header-icon-svg-wrap" aria-hidden="true">{resolved_icon}</span>'
         if resolved_icon
         else ""
     )
     title_html = (
+        f'<div class="ips-app-header-identity-wrap">'
+        f'<span class="ips-app-header-divider" aria-hidden="true"></span>'
         f'<div class="ips-app-header-title-block">'
         f"{icon_html}"
         f'<div class="ips-app-header-text">'
         f'<h1 class="ips-app-header-title">{html.escape(str(title or "").strip())}</h1>'
         f"{sub_html}"
-        f"</div></div>"
+        f"</div></div></div>"
     )
 
     st.markdown(f"{shell_marker}{header_marker}", unsafe_allow_html=True)
 
     with st.container(key="ips_app_page_header"):
         if merged_actions:
-            back_col, logo_col, title_col, act_col, util_col = st.columns(
-                [0.38, 0.82, 2.05, 1.55, 0.95],
+            nav_col, identity_col, act_col, util_col = st.columns(
+                [1.05, 2.35, 1.55, 1.0],
                 gap="small",
                 vertical_alignment="center",
             )
         else:
-            back_col, logo_col, title_col, util_col = st.columns(
-                [0.38, 0.82, 3.4, 0.95],
+            nav_col, identity_col, util_col = st.columns(
+                [1.05, 4.0, 1.0],
                 gap="small",
                 vertical_alignment="center",
             )
             act_col = None
 
-        with back_col:
-            st.markdown('<span class="ips-app-header-back-slot" aria-hidden="true"></span>', unsafe_allow_html=True)
-            if show_back and (on_back is not None or _can_navigate_back()):
-                if st.button("← Back", key=f"{header_key}_back", help="Go back"):
-                    if on_back is not None:
-                        on_back()
-                    else:
-                        _navigate_back()
-            elif show_back:
+        with nav_col:
+            back_slot, logo_slot = st.columns([0.38, 0.62], gap="small", vertical_alignment="center")
+            with back_slot:
+                st.markdown('<span class="ips-app-header-back-slot" aria-hidden="true"></span>', unsafe_allow_html=True)
+                if show_back and (on_back is not None or _can_navigate_back()):
+                    if st.button("←  Back", key=f"{header_key}_back", help="Go back"):
+                        if on_back is not None:
+                            on_back()
+                        else:
+                            _navigate_back()
+                elif show_back:
+                    st.markdown(
+                        '<span class="ips-app-header-back-spacer" aria-hidden="true"></span>',
+                        unsafe_allow_html=True,
+                    )
+                st.markdown('<span class="ips-app-header-menu-slot" aria-hidden="true"></span>', unsafe_allow_html=True)
+                if st.button("Menu", key=f"{header_key}_menu", help="Open menu"):
+                    _request_sidebar_toggle()
+            with logo_slot:
                 st.markdown(
-                    '<span class="ips-app-header-back-spacer" aria-hidden="true"></span>',
+                    wording_logo_html(height=36, css_class="ips-app-header-logo"),
                     unsafe_allow_html=True,
                 )
-            st.markdown('<span class="ips-app-header-menu-slot" aria-hidden="true"></span>', unsafe_allow_html=True)
-            if st.button("☰", key=f"{header_key}_menu", help="Open menu"):
-                _request_sidebar_toggle()
 
-        with logo_col:
-            st.markdown(
-                wording_logo_html(height=38, css_class="ips-app-header-logo"),
-                unsafe_allow_html=True,
-            )
-
-        with title_col:
+        with identity_col:
             st.markdown(title_html, unsafe_allow_html=True)
 
         if merged_actions and act_col is not None:
