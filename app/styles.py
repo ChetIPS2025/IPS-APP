@@ -5465,11 +5465,11 @@ def inject_timekeeping_module_css() -> None:
     st.markdown(
         f"""
 <style id="ips-timekeeping-module-v103">
-.ips-timekeeping-week-toolbar-marker + [data-testid="stHorizontalBlock"] {
+.ips-timekeeping-week-toolbar-marker + [data-testid="stHorizontalBlock"] {{
   align-items: center !important;
   margin: 0 0 14px 0 !important;
-}
-.ips-timekeeping-week-pill {
+}}
+.ips-timekeeping-week-pill {{
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -5483,21 +5483,21 @@ def inject_timekeeping_module_css() -> None:
   font-size: 14px !important;
   font-weight: 600 !important;
   text-align: center !important;
-}
-.ips-timekeeping-page-range {
+}}
+.ips-timekeeping-page-range {{
   margin: 8px 0 0 0 !important;
   color: #64748b !important;
   font-size: 12px !important;
-}
-.timekeeping-weekly-table-card {
+}}
+.timekeeping-weekly-table-card {{
   border: 1px solid #dbe3ef !important;
   border-radius: 12px !important;
   background: #ffffff !important;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
   padding: 8px 10px 12px 10px !important;
-}
+}}
 .timekeeping-day-header-label,
-.timekeeping-summary-header-label {
+.timekeeping-summary-header-label {{
   font-size: 11px !important;
   font-weight: 800 !important;
   letter-spacing: 0.04em !important;
@@ -5505,20 +5505,20 @@ def inject_timekeeping_module_css() -> None:
   color: #64748b !important;
   text-align: center !important;
   padding: 6px 2px !important;
-}
-.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-weekly-table-header-marker) {
+}}
+.st-key-timekeeping_table_wrap [data-testid="stHorizontalBlock"]:has(.timekeeping-weekly-table-header-marker) {{
   border-bottom: 1px solid #e2e8f0 !important;
   padding-bottom: 4px !important;
   margin-bottom: 2px !important;
-}
-.timekeeping-employee-name {
+}}
+.timekeeping-employee-name {{
   font-size: 14px !important;
   font-weight: 700 !important;
   color: #0f172a !important;
   padding: 10px 4px !important;
   line-height: 1.25 !important;
-}
-.timekeeping-day-cell-status {
+}}
+.timekeeping-day-cell-status {{
   font-size: 10px !important;
   font-weight: 700 !important;
   letter-spacing: 0.05em !important;
@@ -5526,15 +5526,15 @@ def inject_timekeeping_module_css() -> None:
   color: #94a3b8 !important;
   text-align: center !important;
   margin-bottom: 4px !important;
-}
-.timekeeping-summary-value {
+}}
+.timekeeping-summary-value {{
   text-align: center !important;
   font-size: 14px !important;
   font-weight: 700 !important;
   color: #0f172a !important;
   padding: 12px 2px !important;
-}
-.timekeeping-modal-stats-box {
+}}
+.timekeeping-modal-stats-box {{
   display: grid !important;
   grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
   gap: 8px !important;
@@ -5542,44 +5542,44 @@ def inject_timekeeping_module_css() -> None:
   border-radius: 10px !important;
   background: #f8fafc !important;
   padding: 12px 10px !important;
-}
-.timekeeping-modal-stat {
+}}
+.timekeeping-modal-stat {{
   display: flex !important;
   flex-direction: column !important;
   gap: 4px !important;
   text-align: center !important;
-}
-.timekeeping-modal-stat-label {
+}}
+.timekeeping-modal-stat-label {{
   font-size: 11px !important;
   font-weight: 700 !important;
   letter-spacing: 0.04em !important;
   text-transform: uppercase !important;
   color: #64748b !important;
-}
-.timekeeping-modal-stat-value {
+}}
+.timekeeping-modal-stat-value {{
   font-size: 16px !important;
   font-weight: 800 !important;
   color: #0f172a !important;
-}
-.timekeeping-modal-section-title {
+}}
+.timekeeping-modal-section-title {{
   margin: 14px 0 8px 0 !important;
   font-size: 15px !important;
   font-weight: 800 !important;
   color: #0f172a !important;
-}
-.timekeeping-modal-status-row {
+}}
+.timekeeping-modal-status-row {{
   display: flex !important;
   align-items: center !important;
   gap: 8px !important;
   margin: 12px 0 4px 0 !important;
-}
-.timekeeping-modal-status-label {
+}}
+.timekeeping-modal-status-label {{
   font-size: 12px !important;
   font-weight: 700 !important;
   color: #64748b !important;
   text-transform: uppercase !important;
   letter-spacing: 0.04em !important;
-}
+}}
 .timekeeping-alloc-week-totals {{
   display: flex !important;
   flex-wrap: wrap !important;
