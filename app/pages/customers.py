@@ -1944,24 +1944,35 @@ def _render_customer_detail_tabs_fragment(customer: dict) -> None:
 
 def render_customer_detail(customer_id: str) -> None:
     cid = str(customer_id or "").strip()
-    st.markdown(
-        '<span class="ips-customers-detail-page ips-page-shell-marker" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
-    if st.button("← Back to Customers", key="customers_detail_back", type="secondary"):
+
+    def _back_to_customers_list() -> None:
         st.session_state[CUSTOMERS_MODE_KEY] = "list"
         st.session_state[CUSTOMERS_SELECTED_ID_KEY] = None
         st.session_state[SELECTED_CUSTOMER_KEY] = None
         st.session_state[SHOW_CUSTOMER_MODAL_KEY] = False
         st.rerun()
 
+    st.markdown(
+        '<span class="ips-customers-detail-page" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+
     cache = st.session_state.get(_CUSTOMERS_CACHE_KEY) or {}
     customer = cache.get(cid) if isinstance(cache, dict) else None
     if not customer:
         customer = get_customer(cid)
     if not customer:
+        render_page_brand_header("Customer Detail", "Customer not found.", icon="🏢", on_back=_back_to_customers_list)
         st.warning("Customer not found.")
         return
+
+    cname = safe_value(customer.get("customer_name") or customer.get("company_name"))
+    render_page_brand_header(
+        str(cname or "Customer Detail"),
+        "Customer company details, locations, and contacts.",
+        icon="🏢",
+        on_back=_back_to_customers_list,
+    )
 
     if isinstance(cache, dict):
         cache[cid] = customer

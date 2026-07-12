@@ -1,4 +1,4 @@
-"""Page header components."""
+"""Shared IPS application page header."""
 
 from __future__ import annotations
 
@@ -9,10 +9,291 @@ import streamlit as st
 
 _ActionFn = Callable[[], None]
 
+DEFAULT_PAGE_SUBTITLES: dict[str, str] = {
+    "dashboard": "Overview of key operational metrics and performance.",
+    "jobs": "Manage and track all company jobs.",
+    "pipeline": "Quotes and jobs in one operational pipeline.",
+    "customers": "Customer companies and contacts.",
+    "estimates": "Manage and track all company estimates.",
+    "pricing_guide": "Master estimating catalog and default rates.",
+    "inventory": "Inventory management and stock levels.",
+    "assets": "Track and manage all company assets and equipment.",
+    "timekeeping": "Weekly employee timecards.",
+    "weekly_timesheets": "Weekly job timesheets and crew hours.",
+    "employees": "Employee management.",
+    "users": "Employee management.",
+    "employee_certifications": "Track credentials, expirations, and compliance.",
+    "employee_documents": "Store licenses, training records, and HR files.",
+    "company_updates": "Share announcements, safety alerts, events, and company news.",
+    "documents": "Central document hub for jobs, assets, and employees.",
+    "tasks": "Office and management to-dos.",
+    "reports": "Analytics and reporting.",
+    "admin": "System administration and lookups.",
+    "settings": "Application settings and preferences.",
+    "field_dashboard": "Today's jobs, reports, crew time, and quick field actions.",
+    "field_day": "Pick a job once, then move through report, crew time, hours, and tasks.",
+    "field_daily_reports": "Field daily reports with crew, photos, and safety.",
+    "field_crew_time": "Supervisors enter crew hours in Timekeeping.",
+    "coupling_inspection": "Coupling inspection forms and records.",
+}
+
 
 def render_main_brand_bar(*, brand_actions: list[_ActionFn] | None = None, show_menu: bool = True) -> None:
-    """Deprecated: gray in-content brand bar removed; blue nav rail is the app chrome."""
+    """Deprecated: replaced by :func:`render_page_header`."""
     _ = (brand_actions, show_menu)
+
+
+def _initials(name: str) -> str:
+    parts = [p for p in str(name or "").strip().split() if p]
+    if not parts:
+        return "?"
+    if len(parts) == 1:
+        return parts[0][:2].upper()
+    return (parts[0][0] + parts[-1][0]).upper()
+
+
+def _resolve_icon(icon: str | None) -> str:
+    if icon:
+        return str(icon).strip()
+    try:
+        from app.components.sidebar_nav_icons import nav_icon_for_slug
+        from app.navigation import current_nav_slug
+    except ImportError:
+        from components.sidebar_nav_icons import nav_icon_for_slug  # type: ignore
+        from navigation import current_nav_slug  # type: ignore
+    return nav_icon_for_slug(current_nav_slug())
+
+
+def _resolve_subtitle(title: str, subtitle: str | None) -> str | None:
+    if subtitle:
+        return str(subtitle).strip() or None
+    try:
+        from app.navigation import current_nav_slug
+    except ImportError:
+        from navigation import current_nav_slug  # type: ignore
+    return DEFAULT_PAGE_SUBTITLES.get(current_nav_slug())
+
+
+def _can_navigate_back() -> bool:
+    try:
+        from app.navigation import IPS_NAV_HISTORY_KEY
+    except ImportError:
+        from navigation import IPS_NAV_HISTORY_KEY  # type: ignore
+    history = st.session_state.get(IPS_NAV_HISTORY_KEY) or []
+    return bool(history)
+
+
+def _request_sidebar_toggle() -> None:
+    try:
+        from app.components.sidebar_shell import IPS_SIDEBAR_TOGGLE_REQUEST_KEY
+    except ImportError:
+        from components.sidebar_shell import IPS_SIDEBAR_TOGGLE_REQUEST_KEY  # type: ignore
+    st.session_state[IPS_SIDEBAR_TOGGLE_REQUEST_KEY] = True
+    st.rerun()
+
+
+def _navigate_back() -> None:
+    try:
+        from app.navigation import navigate_back
+    except ImportError:
+        from navigation import navigate_back  # type: ignore
+    navigate_back()
+
+
+def _unread_notification_count() -> int:
+    try:
+        from app.services.field_dashboard import load_field_dashboard_snapshot
+    except ImportError:
+        try:
+            from services.field_dashboard import load_field_dashboard_snapshot  # type: ignore
+        except Exception:
+            return 0
+    try:
+        snap = load_field_dashboard_snapshot()
+        return int(snap.get("unread_notifications", 0) or 0)
+    except Exception:
+        return 0
+
+
+def _render_page_actions(actions: list[_ActionFn]) -> None:
+    n = len(actions)
+    if n == 1:
+        actions[0]()
+    elif n == 2:
+        bc1, bc2 = st.columns([0.78, 1.22], gap="small")
+        with bc1:
+            actions[0]()
+        with bc2:
+            actions[1]()
+    elif n == 3:
+        bc1, bc2, bc3 = st.columns([0.95, 1.55, 1.1], gap="small")
+        with bc1:
+            actions[0]()
+        with bc2:
+            actions[1]()
+        with bc3:
+            actions[2]()
+    else:
+        cols = st.columns(min(n, 4), gap="small")
+        for i, widget in enumerate(actions):
+            with cols[i % len(cols)]:
+                widget()
+
+
+def _render_header_utilities(*, header_key: str) -> None:
+    try:
+        from app.auth import current_user_display_name, effective_role, sign_out
+        from app.navigation import set_nav_slug
+        from app.utils.permissions import role_can_access_page
+    except ImportError:
+        from auth import current_user_display_name, effective_role, sign_out  # type: ignore
+        from navigation import set_nav_slug  # type: ignore
+        from utils.permissions import role_can_access_page  # type: ignore
+
+    role = effective_role()
+    unread = _unread_notification_count()
+    bell_label = "🔔" if unread <= 0 else f"🔔 {unread}"
+
+    u1, u2, u3, u4 = st.columns(4, gap="small")
+    with u1:
+        if role_can_access_page(role, "company_updates"):
+            if st.button(bell_label, key=f"{header_key}_bell", help="Company updates"):
+                set_nav_slug("company_updates")
+                st.rerun()
+        else:
+            st.button(bell_label, key=f"{header_key}_bell", help="Notifications", disabled=True)
+    with u2:
+        with st.popover("❓", use_container_width=True):
+            st.markdown("**Help**")
+            st.caption("Use the sidebar to switch modules. Contact your administrator for access changes.")
+    with u3:
+        if role_can_access_page(role, "settings"):
+            if st.button("⚙", key=f"{header_key}_settings", help="Settings"):
+                set_nav_slug("settings")
+                st.rerun()
+        else:
+            st.button("⚙", key=f"{header_key}_settings", help="Settings", disabled=True)
+    with u4:
+        display = current_user_display_name()
+        with st.popover(_initials(display), use_container_width=True):
+            st.markdown(f"**{html.escape(display)}**")
+            st.caption(role.replace("_", " ").title())
+            if st.button("Log out", key=f"{header_key}_logout", use_container_width=True):
+                sign_out()
+
+
+def render_page_header(
+    title: str,
+    subtitle: str | None = None,
+    *,
+    icon: str | None = None,
+    actions: list[_ActionFn] | None = None,
+    show_back: bool = True,
+    on_back: Callable[[], None] | None = None,
+    actions_column_ratio: tuple[float, float] | None = None,
+    actions_cols: list[_ActionFn] | None = None,
+    brand_actions: list[_ActionFn] | None = None,
+    include_brand_bar: bool = False,
+    show_logo: bool = True,
+) -> None:
+    """
+    Standard IPS page header — back, logo, title, actions, and utility icons.
+
+    Every module page should call this once at the top of ``render()``.
+    """
+    _ = (actions_column_ratio, brand_actions, include_brand_bar, show_logo, actions_cols)
+    merged_actions = actions or actions_cols or brand_actions
+    resolved_subtitle = _resolve_subtitle(title, subtitle)
+    resolved_icon = _resolve_icon(icon)
+
+    try:
+        from app.branding import wording_logo_html
+        from app.navigation import current_nav_slug
+    except ImportError:
+        from branding import wording_logo_html  # type: ignore
+        from navigation import current_nav_slug  # type: ignore
+
+    slug = current_nav_slug()
+    header_key = f"ips_hdr_{slug}"
+    shell_marker = '<span class="ips-page-shell-marker" aria-hidden="true"></span>'
+    header_marker = '<span class="ips-app-page-header-marker" aria-hidden="true"></span>'
+
+    sub_html = (
+        f'<p class="ips-app-header-subtitle">{html.escape(resolved_subtitle)}</p>'
+        if resolved_subtitle
+        else ""
+    )
+    icon_html = (
+        f'<span class="ips-app-header-icon" aria-hidden="true">{html.escape(resolved_icon)}</span>'
+        if resolved_icon
+        else ""
+    )
+    title_html = (
+        f'<div class="ips-app-header-title-block">'
+        f"{icon_html}"
+        f'<div class="ips-app-header-text">'
+        f'<h1 class="ips-app-header-title">{html.escape(str(title or "").strip())}</h1>'
+        f"{sub_html}"
+        f"</div></div>"
+    )
+
+    st.markdown(f"{shell_marker}{header_marker}", unsafe_allow_html=True)
+
+    with st.container(key="ips_app_page_header"):
+        if merged_actions:
+            back_col, logo_col, title_col, act_col, util_col = st.columns(
+                [0.38, 0.82, 2.05, 1.55, 0.95],
+                gap="small",
+                vertical_alignment="center",
+            )
+        else:
+            back_col, logo_col, title_col, util_col = st.columns(
+                [0.38, 0.82, 3.4, 0.95],
+                gap="small",
+                vertical_alignment="center",
+            )
+            act_col = None
+
+        with back_col:
+            st.markdown('<span class="ips-app-header-back-slot" aria-hidden="true"></span>', unsafe_allow_html=True)
+            if show_back and (on_back is not None or _can_navigate_back()):
+                if st.button("← Back", key=f"{header_key}_back", help="Go back"):
+                    if on_back is not None:
+                        on_back()
+                    else:
+                        _navigate_back()
+            elif show_back:
+                st.markdown(
+                    '<span class="ips-app-header-back-spacer" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+            st.markdown('<span class="ips-app-header-menu-slot" aria-hidden="true"></span>', unsafe_allow_html=True)
+            if st.button("☰", key=f"{header_key}_menu", help="Open menu"):
+                _request_sidebar_toggle()
+
+        with logo_col:
+            st.markdown(
+                wording_logo_html(height=38, css_class="ips-app-header-logo"),
+                unsafe_allow_html=True,
+            )
+
+        with title_col:
+            st.markdown(title_html, unsafe_allow_html=True)
+
+        if merged_actions and act_col is not None:
+            with act_col:
+                st.markdown(
+                    '<span class="ips-page-actions-marker ips-app-header-actions-marker" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+                _render_page_actions(merged_actions)
+
+        with util_col:
+            st.markdown(
+                '<span class="ips-app-header-utils-marker" aria-hidden="true"></span>',
+                unsafe_allow_html=True,
+            )
+            _render_header_utilities(header_key=header_key)
 
 
 def render_page_brand_header(
@@ -23,77 +304,22 @@ def render_page_brand_header(
     actions_column_ratio: tuple[float, float] | None = None,
     brand_actions: list[_ActionFn] | None = None,
     include_brand_bar: bool = False,
+    icon: str | None = None,
+    show_back: bool = True,
+    on_back: Callable[[], None] | None = None,
 ) -> None:
-    """
-    Compact page title row at the top of the content area.
-
-    Set ``include_brand_bar=True`` only for standalone pages outside ``render_module``.
-    """
-    ot, ct = "d" + "iv", "/" + "d" + "iv"
-    _ = (brand_actions, include_brand_bar)
-
-    sub_html = (
-        f'<p class="ips-page-subtitle">{html.escape(subtitle)}</p>'
-        if subtitle
-        else ""
+    """Backward-compatible alias for :func:`render_page_header`."""
+    render_page_header(
+        title,
+        subtitle,
+        icon=icon,
+        actions=actions,
+        show_back=show_back,
+        on_back=on_back,
+        actions_column_ratio=actions_column_ratio,
+        brand_actions=brand_actions,
+        include_brand_bar=include_brand_bar,
     )
-    title_block = (
-        f'<{ot} class="ips-page-title-block">'
-        f'<h1 class="ips-page-title">{html.escape(title)}</h1>'
-        f"{sub_html}"
-        f"</{ct}>"
-    )
-    shell_marker = '<span class="ips-page-shell-marker" aria-hidden="true"></span>'
-    page_header_open = (
-        f'<{ot} class="ips-page-header">{shell_marker}<{ot} class="ips-page-title-row">'
-    )
-    page_header_close = f"</{ct}></{ct}>"
-
-    if actions:
-        n = len(actions)
-        if actions_column_ratio:
-            title_w, actions_w = actions_column_ratio
-        elif n >= 3:
-            title_w, actions_w = 1.65, 2.35
-        else:
-            title_w, actions_w = 2.55, 1.45
-        main_col, act_col = st.columns([title_w, actions_w], gap="small", vertical_alignment="top")
-        with main_col:
-            st.markdown(
-                f"{page_header_open}{title_block}{page_header_close}",
-                unsafe_allow_html=True,
-            )
-        with act_col:
-            st.markdown(
-                '<span class="ips-page-actions-marker" aria-hidden="true"></span>',
-                unsafe_allow_html=True,
-            )
-            if n == 1:
-                actions[0]()
-            elif n == 2:
-                bc1, bc2 = st.columns([0.78, 1.22], gap="small")
-                with bc1:
-                    actions[0]()
-                with bc2:
-                    actions[1]()
-            elif n == 3:
-                bc1, bc2, bc3 = st.columns([0.95, 1.55, 1.1], gap="small")
-                with bc1:
-                    actions[0]()
-                with bc2:
-                    actions[1]()
-                with bc3:
-                    actions[2]()
-            else:
-                cols = st.columns(min(n, 4), gap="small")
-                for i, widget in enumerate(actions):
-                    with cols[i % len(cols)]:
-                        widget()
-    else:
-        st.markdown(
-            f"{page_header_open}{title_block}{page_header_close}",
-            unsafe_allow_html=True,
-        )
 
 
 def render_users_page_header(
@@ -102,58 +328,8 @@ def render_users_page_header(
     *,
     actions: list[_ActionFn] | None = None,
 ) -> None:
-    """Users page header card with icon, title, and subtitle."""
-    _ = actions
-    shell_marker = '<span class="ips-page-shell-marker" aria-hidden="true"></span>'
-    sub_html = (
-        f'<p class="users-page-header-subtitle">{html.escape(subtitle)}</p>'
-        if subtitle
-        else ""
-    )
-    st.markdown(
-        f"""
-{shell_marker}
-<div class="users-page-header-card">
-  <div class="users-page-header-inner">
-    <div class="users-page-header-icon" aria-hidden="true">
-      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M20 21a8 8 0 0 0-16 0"/>
-        <circle cx="12" cy="7" r="4"/>
-      </svg>
-    </div>
-    <div class="users-page-header-text">
-      <h1 class="users-page-header-title">{html.escape(title)}</h1>
-      {sub_html}
-    </div>
-  </div>
-</div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def render_page_header(
-    title: str,
-    subtitle: str = "",
-    *,
-    actions_cols: list[_ActionFn] | None = None,
-    actions: list[_ActionFn] | None = None,
-    show_logo: bool = False,
-) -> None:
-    """Backward-compatible wrapper around ``render_page_brand_header``."""
-    _ = show_logo  # sidebar logo only; never render page title icon
-    merged = actions or actions_cols
-    render_page_brand_header(title, subtitle or None, actions=merged)
-
-
-def _initials(name: str) -> str:
-    parts = [p for p in str(name or "").strip().split() if p]
-    if not parts:
-        return "?"
-    if len(parts) == 1:
-        return parts[0][:2].upper()
-    return (parts[0][0] + parts[-1][0]).upper()
+    """Deprecated — use :func:`render_page_header`."""
+    render_page_header(title, subtitle, icon="👥", actions=actions)
 
 
 def render_person_profile_header(

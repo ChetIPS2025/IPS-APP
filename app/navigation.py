@@ -129,6 +129,7 @@ LEGACY_PAGE_LABEL_TO_SLUG: dict[str, str] = {
 
 # Deferred cross-page jumps (legacy labels + slugs). Consumed in ``apply_pending_navigation()``.
 IPS_NAV_PENDING_KEY = "ips_nav_pending"
+IPS_NAV_HISTORY_KEY = "ips_nav_history"
 ESTIMATE_DETAIL_TAB_KEY = "est_detail_active_tab"
 _INVENTORY_SCAN_SESSION_KEY = "_ips_inventory_scan_page"
 _ASSET_SCAN_SESSION_KEY = "_ips_asset_scan_page"
@@ -324,21 +325,66 @@ def current_nav_slug() -> str:
     return normalize_nav_slug(str(st.session_state.get(SESSION_NAV_KEY) or "dashboard"))
 
 
+def _record_nav_history(prev_slug: str, new_slug: str) -> None:
+    """Push the departing slug onto the back-navigation stack."""
+    if st.session_state.pop("_ips_nav_back_skip", False):
+        return
+    prev = normalize_nav_slug(str(prev_slug or "").strip())
+    new = normalize_nav_slug(str(new_slug or "").strip())
+    if not prev or prev == new:
+        return
+    try:
+        from app.navigation import IPS_NAV_HISTORY_KEY
+    except ImportError:
+        from navigation import IPS_NAV_HISTORY_KEY  # type: ignore
+    history: list[str] = list(st.session_state.get(IPS_NAV_HISTORY_KEY) or [])
+    if history and history[-1] == prev:
+        history[-1] = prev
+    else:
+        history.append(prev)
+    if len(history) > 30:
+        history = history[-30:]
+    st.session_state[IPS_NAV_HISTORY_KEY] = history
+
+
+def navigate_back() -> None:
+    """Return to the previous module slug, if any."""
+    try:
+        from app.navigation import IPS_NAV_HISTORY_KEY
+    except ImportError:
+        from navigation import IPS_NAV_HISTORY_KEY  # type: ignore
+    history: list[str] = list(st.session_state.get(IPS_NAV_HISTORY_KEY) or [])
+    if not history:
+        return
+    target = normalize_nav_slug(str(history.pop() or "").strip())
+    st.session_state[IPS_NAV_HISTORY_KEY] = history
+    if not target:
+        return
+    st.session_state["_ips_nav_back_skip"] = True
+    set_nav_slug(target)
+    st.rerun()
+
+
 def set_nav_slug(slug: str) -> None:
     raw = str(slug or "").strip()
+    prev = current_nav_slug()
     if raw == "scan_inventory":
+        _record_nav_history(prev, "inventory")
         st.session_state[SESSION_NAV_KEY] = "inventory"
         st.session_state[INVENTORY_SCAN_EMBED_KEY] = True
         st.session_state.pop(_INVENTORY_SCAN_SESSION_KEY, None)
         return
     if raw == "scan_asset":
+        _record_nav_history(prev, "assets")
         st.session_state[SESSION_NAV_KEY] = "assets"
         st.session_state[ASSET_SCAN_EMBED_KEY] = True
         st.session_state.pop(_ASSET_SCAN_SESSION_KEY, None)
         return
     st.session_state.pop(INVENTORY_SCAN_EMBED_KEY, None)
     st.session_state.pop(ASSET_SCAN_EMBED_KEY, None)
-    st.session_state[SESSION_NAV_KEY] = normalize_nav_slug(raw)
+    new_slug = normalize_nav_slug(raw)
+    _record_nav_history(prev, new_slug)
+    st.session_state[SESSION_NAV_KEY] = new_slug
 
 
 def ensure_nav_defaults() -> None:
@@ -382,6 +428,7 @@ __all__ = [
     "INVENTORY_SCAN_EMBED_KEY",
     "ESTIMATE_DETAIL_TAB_KEY",
     "IPS_NAV_PENDING_KEY",
+    "IPS_NAV_HISTORY_KEY",
     "JC_FOCUS_JOB_KEY",
     "JOBS_DETAIL_FOCUS_TAB_KEY",
     "LEGACY_PAGE_LABEL_TO_SLUG",
@@ -398,6 +445,7 @@ __all__ = [
     "navigate_to_estimate_materials",
     "navigate_to_timekeeping",
     "navigate_to_weekly_timesheet",
+    "navigate_back",
     "normalize_nav_slug",
     "on_nav_change",
     "open_jobs_job_costing",

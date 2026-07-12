@@ -12209,7 +12209,7 @@ def inject_global_css() -> None:
     """Inject global IPS SaaS styles on every render."""
     st.markdown(
         f"""
-<style id="ips-global-styles-v8">
+<style id="ips-global-styles-v9">
 :root {{
   --ips-bg: {APP_BG};
   --ips-sidebar: {SIDEBAR_BG};
@@ -12246,9 +12246,12 @@ section[data-testid="stMain"]:has(.ips-login-page-marker) .block-container {{
   padding-bottom: 2rem !important;
 }}
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVerticalBlock"] > div {{
-  padding-left: 28px;
-  padding-right: 28px;
-  padding-top: 20px;
+  padding-left: 22px;
+  padding-right: 22px;
+  padding-top: 0;
+}}
+section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="stVerticalBlock"] > div {{
+  padding-top: 0 !important;
 }}
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVerticalBlock"] {{
   gap: 0.4rem !important;
@@ -12256,7 +12259,7 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVertic
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"] {{
   margin-bottom: 0.25rem !important;
 }}
-section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"]:has(.ips-page-shell-marker):not(:has(.ips-page-header)):not(:has(.users-page-header-card)) {{
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"]:has(.ips-page-shell-marker):not(:has(.ips-app-page-header-marker)):not(:has(.users-page-header-card)) {{
   display: none !important;
   height: 0 !important;
   min-height: 0 !important;
@@ -12265,6 +12268,13 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElemen
   overflow: hidden !important;
   background: transparent !important;
   border: none !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"]:has(.ips-app-page-header-marker) {{
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}}
+section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="stElementContainer"]:has(.ips-app-page-header-marker) + [data-testid="stElementContainer"] {{
+  margin-top: 16px !important;
 }}
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"]:has(.ips-main-header) {{
   display: none !important;
@@ -12327,6 +12337,54 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-page-actions-marker) .stButton > button p,
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-page-actions-marker) [data-testid="stButton"] > button p {{
   white-space: nowrap !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-app-header-utils-marker) {{
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 4px !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-app-header-utils-marker) [data-testid="stHorizontalBlock"] {{
+  justify-content: flex-end !important;
+  gap: 4px !important;
+  flex-wrap: nowrap !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-app-header-utils-marker) .stButton > button {{
+  min-width: 36px !important;
+  width: 36px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+  font-size: 1rem !important;
+}}
+section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="column"]:has(.ips-app-header-back-slot) .stButton > button {{
+  min-height: 36px !important;
+  height: 36px !important;
+  min-width: 90px !important;
+  font-size: 0.82rem !important;
+  font-weight: 600 !important;
+  border: 1px solid #d1d5db !important;
+  background: #ffffff !important;
+  color: #374151 !important;
+  border-radius: 8px !important;
+  padding: 0 0.65rem !important;
+  white-space: nowrap !important;
+}}
+section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="column"]:has(.ips-app-header-menu-slot) .stButton > button {{
+  min-width: 36px !important;
+  width: 36px !important;
+  min-height: 36px !important;
+  height: 36px !important;
+  padding: 0 !important;
+  display: none !important;
+}}
+@media (max-width: 899px) {{
+  section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="column"]:has(.ips-app-header-back-slot) .stButton > button {{
+    display: none !important;
+  }}
+  section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="column"]:has(.ips-app-header-menu-slot) .stButton > button {{
+    display: inline-flex !important;
+  }}
 }}
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-main-header-actions-marker) {{
   display: flex !important;
@@ -12470,70 +12528,88 @@ section[data-testid="stSidebar"] .block-container {{
   margin: 0 !important;
   padding: 0 !important;
 }}
-.ips-main-header {{
-  display: none !important;
-  height: 0 !important;
-  min-height: 0 !important;
-  max-height: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-  border: none !important;
-  background: transparent !important;
+.st-key-ips_app_page_header,
+.st-key-ips_app_page_header [data-testid="stVerticalBlockBorderWrapper"] {{
+  margin-left: -22px !important;
+  margin-right: -22px !important;
+  margin-bottom: 0 !important;
+  padding: 8px 22px !important;
+  background: #ffffff !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  border-radius: 0 !important;
+  min-height: 68px !important;
+  box-sizing: border-box !important;
+  margin-bottom: 16px !important;
 }}
-.ips-main-header-brand {{
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  flex: 1 1 auto;
+.st-key-ips_app_page_header [data-testid="stHorizontalBlock"] {{
+  align-items: center !important;
+  min-height: 52px !important;
 }}
-.ips-main-header-menu {{
+.ips-app-page-header-shell {{
   display: none;
-  align-items: center;
-  flex: 0 0 auto;
-  margin-right: 0.65rem;
 }}
-@media (max-width: 899px) {{
-  .ips-main-header-menu {{
-    display: flex;
-  }}
-}}
-.ips-main-header-logo {{
-  height: 40px;
+.ips-app-header-logo {{
+  height: 38px;
   width: auto;
-  max-width: 420px;
+  max-width: 220px;
   object-fit: contain;
   display: block;
   background: transparent;
 }}
-.ips-main-header-logo-fallback {{
-  font-size: 1.05rem;
+.ips-app-header-title-block {{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}}
+.ips-app-header-icon {{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-size: 1.15rem;
+  flex: 0 0 auto;
+}}
+.ips-app-header-text {{
+  min-width: 0;
+}}
+.ips-app-header-title {{
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.1;
   font-weight: 800;
   color: #0f172a;
   letter-spacing: -0.02em;
 }}
-.ips-main-header-actions,
-.ips-main-header-actions-slot {{
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 0 0 auto;
+.ips-app-header-subtitle {{
+  margin: 2px 0 0 0;
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.35;
+}}
+.ips-app-header-back-spacer {{
+  display: inline-block;
+  width: 90px;
+  height: 36px;
+}}
+.ips-app-header-actions-marker {{
+  display: block;
+}}
+.ips-app-header-utils-marker {{
+  display: block;
 }}
 .ips-page-content {{
-  padding: 18px 28px 28px 28px;
+  padding: 16px 22px 28px 22px;
 }}
 .ips-page-header {{
-  margin: 0 0 10px 0;
+  display: none !important;
 }}
 .ips-page-header-bar {{
   display: none !important;
 }}
 .ips-page-title-row {{
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 4px;
+  display: none !important;
 }}
 .ips-page-title-block {{
   min-width: 0;
@@ -12547,16 +12623,16 @@ section[data-testid="stSidebar"] .block-container {{
 }}
 .ips-page-title {{
   margin: 0;
-  font-size: 34px;
-  line-height: 1.08;
-  font-weight: 850;
+  font-size: 28px;
+  line-height: 1.1;
+  font-weight: 800;
   color: #0f172a;
   letter-spacing: -0.02em;
 }}
 .ips-page-subtitle {{
-  margin-top: 6px;
+  margin-top: 2px;
   margin-bottom: 0;
-  font-size: 15px;
+  font-size: 13px;
   color: #64748b;
   line-height: 1.35;
 }}
@@ -12569,13 +12645,22 @@ section[data-testid="stSidebar"] .block-container {{
   padding-top: 2px;
 }}
 @media (max-width: 900px) {{
-  .ips-main-header {{
-    min-height: 54px;
-    padding: 8px 14px;
+  .st-key-ips_app_page_header,
+  .st-key-ips_app_page_header [data-testid="stVerticalBlockBorderWrapper"] {{
+    margin-left: -14px !important;
+    margin-right: -14px !important;
+    padding: 6px 14px !important;
+    min-height: 64px !important;
   }}
-  .ips-main-header-logo {{
+  .ips-app-header-logo {{
     height: 34px;
-    max-width: 90%;
+    max-width: 160px;
+  }}
+  .ips-app-header-title {{
+    font-size: 22px;
+  }}
+  .ips-app-header-subtitle {{
+    font-size: 12px;
   }}
   .ips-page-content {{
     padding: 14px 14px 24px 14px;
@@ -12583,14 +12668,14 @@ section[data-testid="stSidebar"] .block-container {{
   section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVerticalBlock"] > div {{
     padding-left: 14px;
     padding-right: 14px;
-    padding-top: 16px;
+    padding-top: 0;
   }}
   .ips-page-title-row {{
     flex-direction: column;
     gap: 10px;
   }}
   .ips-page-title {{
-    font-size: 28px;
+    font-size: 22px;
   }}
   .ips-page-actions {{
     width: 100%;

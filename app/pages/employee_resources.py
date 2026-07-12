@@ -9,6 +9,7 @@ import streamlit as st
 
 try:
     from app.auth import current_role, effective_role
+    from app.components.headers import render_page_header
     from app.pages._core._access import begin_module
     from app.services.employee_resources_service import (
         RESOURCE_TYPES,
@@ -25,6 +26,7 @@ try:
     from app.utils.permissions import normalize_role
 except ImportError:
     from auth import current_role, effective_role  # type: ignore
+    from components.headers import render_page_header  # type: ignore
     from pages._core._access import begin_module  # type: ignore
     from services.employee_resources_service import (  # type: ignore
         RESOURCE_TYPES,
@@ -184,10 +186,14 @@ def render() -> None:
     inject_global_css()
     inject_employee_portal_css()
     st.markdown(
-        '<span class="ips-employee-resources-page ips-page-shell-marker" aria-hidden="true"></span>',
+        '<span class="ips-employee-resources-page" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
-    st.markdown('<h2 class="ips-ep-page-title">Employee Resources</h2>', unsafe_allow_html=True)
+    render_page_header(
+        "Employee Resources",
+        "Forms, documents, and workforce reference materials.",
+        icon="📁",
+    )
 
     role = effective_role()
     rows, _used_demo = list_employee_resources(role=role)

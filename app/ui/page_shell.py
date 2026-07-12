@@ -295,15 +295,24 @@ def render_page_header(
     *,
     help_text: str | None = None,
     logo_width: int = 180,
+    icon: str | None = None,
+    actions: list | None = None,
+    show_back: bool = True,
 ) -> None:
-    """Small logo + title + one-line subtitle."""
+    """Delegate to the shared IPS page header component."""
+    _ = (help_text, logo_width)
     inject_ips_dashboard_layout()
-    st.markdown('<span class="ips-page-shell-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
     try:
-        from app.branding import render_header
+        from app.components.headers import render_page_header as _render_ips_header
     except ImportError:
-        from branding import render_header  # type: ignore
-    render_header(title, subtitle=subtitle, help_text=help_text, logo_width=logo_width)
+        from components.headers import render_page_header as _render_ips_header  # type: ignore
+    _render_ips_header(
+        title,
+        subtitle or None,
+        icon=icon,
+        actions=actions,
+        show_back=show_back,
+    )
 
 
 def render_section_header(title: str, description: str | None = None) -> None:

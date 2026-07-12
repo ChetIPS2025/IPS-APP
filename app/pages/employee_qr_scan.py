@@ -5,10 +5,12 @@ from __future__ import annotations
 import streamlit as st
 
 try:
+    from app.components.headers import render_page_header
     from app.navigation import set_nav_slug
     from app.pages._core._access import begin_module
     from app.styles import inject_employee_portal_css, inject_global_css
 except ImportError:
+    from components.headers import render_page_header  # type: ignore
     from navigation import set_nav_slug  # type: ignore
     from pages._core._access import begin_module  # type: ignore
     from styles import inject_employee_portal_css, inject_global_css  # type: ignore
@@ -20,13 +22,13 @@ def render() -> None:
     inject_global_css()
     inject_employee_portal_css()
     st.markdown(
-        '<span class="ips-employee-qr-page ips-page-shell-marker" aria-hidden="true"></span>',
+        '<span class="ips-employee-qr-page" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
-    st.markdown('<h2 class="ips-ep-page-title">QR Scan</h2>', unsafe_allow_html=True)
-    st.markdown(
-        '<p class="ips-ep-muted">Choose what you are scanning. IPS supports inventory, assets, and equipment QR codes.</p>',
-        unsafe_allow_html=True,
+    render_page_header(
+        "QR Scan",
+        "Choose what you are scanning — inventory, assets, or equipment.",
+        icon="📷",
     )
 
     if st.button("📦  Scan Inventory / Stock", type="primary", use_container_width=True, key="eqs_inv"):

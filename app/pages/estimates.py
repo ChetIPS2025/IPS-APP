@@ -1727,20 +1727,32 @@ def _render_estimate_actions_panel(est: dict) -> None:
 def render_estimate_detail(estimate_id: str) -> None:
     """Full-page estimate detail (opened from list navigation)."""
     eid = str(estimate_id or "").strip()
-    if st.button("← Back to Estimates", key="est_detail_back"):
+
+    def _back_to_estimates_list() -> None:
         st.session_state[ESTIMATES_MODE_KEY] = "list"
         st.session_state[SELECTED_ESTIMATE_KEY] = None
         _clear_estimate_selection(st.session_state.get(_ALL_ESTIMATE_IDS_KEY))
         st.rerun()
 
     if not eid:
+        render_page_brand_header("Estimate Detail", "Estimate not found.", icon="📄", on_back=_back_to_estimates_list)
         st.error("Estimate not found.")
         return
 
     est = get_estimate(eid)
     if not est:
+        render_page_brand_header("Estimate Detail", "Estimate not found.", icon="📄", on_back=_back_to_estimates_list)
         st.error("Estimate not found.")
         return
+
+    en = safe_value(est.get("estimate_number"))
+    project = _estimate_project(est)
+    render_page_brand_header(
+        f"Estimate {en}",
+        str(project or est.get("customer") or "Estimate detail").strip(),
+        icon="📄",
+        on_back=_back_to_estimates_list,
+    )
 
     st.session_state[ACTIVE_ESTIMATE_KEY] = eid
     render_estimate_detail_dialog(est)
