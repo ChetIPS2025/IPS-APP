@@ -8,13 +8,37 @@ from typing import Any
 WEEKLY_ST_THRESHOLD = 40.0
 _TIME_TYPE_ST = "ST"
 _TIME_TYPE_OT = "OT"
+_TIME_TYPE_AUTO = "AUTO"
 
 
 def normalize_time_type(raw: object) -> str:
     s = str(raw or _TIME_TYPE_ST).strip().upper().replace(".", "").replace(" ", "").replace("/", "")
+    if s in {_TIME_TYPE_AUTO, "AUTOMATIC"}:
+        return _TIME_TYPE_AUTO
     if s in {_TIME_TYPE_OT, "OVERTIME"}:
         return _TIME_TYPE_OT
     return _TIME_TYPE_ST
+
+
+def normalize_selected_time_type(raw: object) -> str:
+    """UI/storage token: AUTO, ST, or OT."""
+    return normalize_time_type(raw)
+
+
+def selected_time_type_is_auto(line: dict[str, Any]) -> bool:
+    explicit = str(line.get("selected_time_type") or "").strip()
+    if explicit:
+        return normalize_selected_time_type(explicit) == _TIME_TYPE_AUTO
+    return not bool(line.get("overtime_override"))
+
+
+def time_type_calculation_reason(*, work_date: date, calculated: str) -> str:
+    """Human-readable suffix for Auto → calculated display."""
+    if normalize_time_type(calculated) != _TIME_TYPE_OT:
+        return ""
+    if is_weekend_date(work_date):
+        return "Weekend rule"
+    return "Over 40"
 
 
 def is_weekend_date(work_date: date) -> bool:
@@ -133,6 +157,8 @@ def recalculate_week_allocations(
         out["calculated_time_type"] = calculated
         out["final_time_type"] = final
         out["hour_type"] = final
+        if selected_time_type_is_auto(out) and not out.get("overtime_override"):
+            out["selected_time_type"] = _TIME_TYPE_AUTO
         lines[lix] = out
         updated[iso] = lines
 
@@ -173,7 +199,8 @@ def new_allocation_line_defaults(**extra: Any) -> dict[str, Any]:
     base = {
         "line_id": "",
         "job": "",
-        "hour_type": _TIME_TYPE_ST,
+        "hour_type": _TIME_TYPE_AUTO,
+        "selected_time_type": _TIME_TYPE_AUTO,
         "hours": 0.0,
         "notes": "",
         "status": "Draft",

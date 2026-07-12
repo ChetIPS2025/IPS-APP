@@ -15222,6 +15222,12 @@ def _inject_timekeeping_list_row_gap_css() -> None:
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.timekeeping-day-cell-clickable-marker):nth-child(9) [data-testid="stButton"] > button {
   background: #f8fafc !important;
 }
+.timekeeping-alloc-type-hint {
+  margin-top: 2px !important;
+  font-size: 11px !important;
+  line-height: 1.3 !important;
+  color: #64748b !important;
+}
 .weekly-allocation-totals {
   display: flex !important;
   gap: 18px !important;

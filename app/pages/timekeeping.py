@@ -308,7 +308,7 @@ _DAY_GRID_LABELS = [
 _LIST_VIEW_HOUR_STEP = 0.5
 _TK_HOUR_AUTOSAVE_DEBOUNCE_SEC = 1.0
 _LIST_VIEW_SUMMARY_LABELS = ("ST", "OT", "Total", "Status")
-_ALLOC_HOUR_TYPE_OPTS = ("S/T", "O/T")
+_ALLOC_HOUR_TYPE_OPTS = ("Auto", "S/T", "O/T")
 _ALLOC_TOLERANCE = 0.01
 _ASSIGNMENT_LEGACY_ALIASES = {
     "ips shop": "Shop",
@@ -967,16 +967,17 @@ def _load_saved_allocations_by_date(employee_id: str, week_start_d: date) -> dic
         st_h = float(row.get("st_hours") or 0)
         ot_h = float(row.get("ot_hours") or 0) + float(row.get("dt_hours") or 0)
         meta = _overtime_meta_from_db_row(row)
+        selected = _selected_time_type_from_line({**meta, "status": status})
         if st_h > 0 and ot_h > 0:
             by_date.setdefault(iso, []).append(
                 _new_allocation_line(
                     line_id=line_id,
                     job=job,
-                    hour_type="ST",
                     hours=st_h,
                     notes=notes,
                     status=status,
                     **meta,
+                    selected_time_type=selected,
                     final_time_type="ST",
                 )
             )
@@ -984,11 +985,11 @@ def _load_saved_allocations_by_date(employee_id: str, week_start_d: date) -> dic
                 _new_allocation_line(
                     line_id=line_id,
                     job=job,
-                    hour_type="OT",
                     hours=ot_h,
                     notes=notes,
                     status=status,
                     **meta,
+                    selected_time_type=selected,
                     final_time_type="OT",
                 )
             )
@@ -1004,6 +1005,7 @@ def _load_saved_allocations_by_date(employee_id: str, week_start_d: date) -> dic
                     notes=notes,
                     status=status,
                     **meta,
+                    selected_time_type=selected,
                     final_time_type=final_type,
                 )
             )
@@ -1012,11 +1014,11 @@ def _load_saved_allocations_by_date(employee_id: str, week_start_d: date) -> dic
                 _new_allocation_line(
                     line_id=line_id,
                     job=job,
-                    hour_type="ST",
                     hours=0.0,
                     notes=notes,
                     status=status,
                     **meta,
+                    selected_time_type=selected,
                 )
             )
     return by_date
@@ -1063,9 +1065,72 @@ def _normalize_alloc_hour_type(raw: object) -> str:
     if not s:
         return "ST"
     compact = s.upper().replace(".", "").replace(" ", "").replace("/", "")
+    if compact in {"AUTO", "AUTOMATIC"}:
+        return "AUTO"
     if compact in {"OT", "OVERTIME"}:
         return "OT"
     return "ST"
+
+
+def _selected_time_type_from_line(line: dict[str, Any]) -> str:
+    """Return AUTO, ST, or OT for the Time Type dropdown."""
+    explicit = str(line.get("selected_time_type") or "").strip()
+    if explicit:
+        return _normalize_alloc_hour_type(explicit)
+    if line.get("overtime_override"):
+        return _normalize_alloc_hour_type(line.get("final_time_type") or line.get("hour_type"))
+    status = _normalize_timecard_status(line.get("status"))
+    if status in ("Approved", "Pending"):
+        return _normalize_alloc_hour_type(line.get("final_time_type") or line.get("hour_type"))
+    return "AUTO"
+
+
+def _selected_time_type_widget_label(selected: str) -> str:
+    token = _normalize_alloc_hour_type(selected)
+    if token == "AUTO":
+        return "Auto"
+    return _alloc_hour_type_label(token)
+
+
+def _alloc_hour_type_label(hour_type: str) -> str:
+    token = _normalize_alloc_hour_type(hour_type)
+    if token == "AUTO":
+        return "Auto"
+    return "O/T" if token == "OT" else "S/T"
+
+
+def _alloc_hour_type_select_index(hour_type: str) -> int:
+    label = _selected_time_type_widget_label(hour_type)
+    if label in _ALLOC_HOUR_TYPE_OPTS:
+        return _ALLOC_HOUR_TYPE_OPTS.index(label)
+    return 0
+
+
+def _alloc_time_type_hint_html(line: dict[str, Any], iso: str) -> str:
+    """Show calculated S/T or O/T under the Auto Time Type dropdown."""
+    selected = _selected_time_type_from_line(line)
+    if selected != "AUTO":
+        return ""
+    calculated = _normalize_alloc_hour_type(line.get("calculated_time_type") or "ST")
+    try:
+        from app.services.timekeeping_overtime_service import time_type_calculation_reason
+    except ImportError:
+        from services.timekeeping_overtime_service import time_type_calculation_reason  # type: ignore
+    try:
+        work_date = date.fromisoformat(str(iso)[:10])
+    except ValueError:
+        work_date = date.today()
+    reason = time_type_calculation_reason(work_date=work_date, calculated=calculated)
+    calc_label = _alloc_hour_type_label(calculated)
+    text = f"Calculated: {calc_label}"
+    if reason:
+        text += f" — {reason}"
+    return (
+        f'<div class="timekeeping-alloc-type-hint">'
+        f"Auto → {html.escape(calc_label)}"
+        f"{f' ({html.escape(reason)})' if reason else ''}"
+        f"</div>"
+    )
 
 
 def _weekend_counts_toward_40() -> bool:
@@ -1148,7 +1213,7 @@ def _sync_alloc_type_widgets_from_lines(
     for iso, lines in by_date.items():
         for lix, line in enumerate(lines):
             type_key = f"tk_alloc_type_{eid}_{week_sig}_{iso}_{lix}"
-            label = _alloc_hour_type_label(line.get("final_time_type") or line.get("hour_type"))
+            label = _selected_time_type_widget_label(_selected_time_type_from_line(line))
             try:
                 st.session_state[type_key] = label
             except StreamlitAPIException:
@@ -1198,20 +1263,23 @@ def _handle_alloc_type_change(
     if lix >= len(lines):
         return
     type_key = f"tk_alloc_type_{eid}_{week_sig}_{iso}_{lix}"
-    picked = _normalize_alloc_hour_type(st.session_state.get(type_key))
+    raw_pick = str(st.session_state.get(type_key) or "").strip()
     line = dict(lines[lix])
     calculated = _normalize_alloc_hour_type(line.get("calculated_time_type") or "ST")
-    if picked == calculated:
+    if raw_pick == "Auto":
+        line["selected_time_type"] = "AUTO"
         line["overtime_override"] = False
         line["overtime_override_by"] = None
         line["overtime_override_at"] = None
         line["overtime_override_reason"] = None
     else:
+        picked = _normalize_alloc_hour_type(raw_pick)
+        line["selected_time_type"] = picked
         line["overtime_override"] = True
         line["overtime_override_by"] = _current_user_id() or None
         line["overtime_override_at"] = datetime.now(timezone.utc).isoformat()
-    line["final_time_type"] = picked
-    line["hour_type"] = picked
+        line["final_time_type"] = picked
+        line["hour_type"] = picked
     lines[lix] = line
     by_date[iso] = lines
     try:
@@ -1238,23 +1306,15 @@ def _user_picked_allocation_overtime(
     return _normalize_alloc_hour_type(st.session_state[type_key]) == "OT"
 
 
-def _alloc_hour_type_label(hour_type: str) -> str:
-    return "O/T" if _normalize_alloc_hour_type(hour_type) == "OT" else "S/T"
-
-
-def _alloc_hour_type_select_index(hour_type: str) -> int:
-    return 1 if _normalize_alloc_hour_type(hour_type) == "OT" else 0
-
-
 def _ensure_alloc_type_widget_label(type_key: str, hour_type: str) -> None:
-    """Keep Streamlit select state on S/T and O/T (not legacy ST/OT tokens)."""
+    """Keep Streamlit select state on Auto / S/T / O/T (not legacy ST/OT tokens)."""
     if type_key not in st.session_state:
         return
     raw = str(st.session_state[type_key] or "").strip()
-    if raw in {"ST", "OT"}:
-        st.session_state[type_key] = _alloc_hour_type_label(raw)
+    if raw in {"ST", "OT", "AUTO"}:
+        st.session_state[type_key] = _selected_time_type_widget_label(raw)
     elif raw and raw not in _ALLOC_HOUR_TYPE_OPTS:
-        st.session_state[type_key] = _alloc_hour_type_label(raw)
+        st.session_state[type_key] = _selected_time_type_widget_label(raw)
 
 
 def _line_allocated_hours(line: dict[str, Any]) -> float:
@@ -1316,7 +1376,8 @@ def _allocation_line_has_valid_assignment(line: dict[str, Any]) -> bool:
 def _allocation_line_hour_type_valid(line: dict[str, Any], hours: float) -> bool:
     if hours <= _ALLOC_TOLERANCE:
         return True
-    return _normalize_alloc_hour_type(line.get("hour_type")) in {"ST", "OT"}
+    final = _normalize_alloc_hour_type(line.get("final_time_type") or line.get("hour_type"))
+    return final in {"ST", "OT"}
 
 
 def _live_allocation_lines_for_day(
@@ -1337,10 +1398,13 @@ def _live_allocation_lines_for_day(
             live["job"] = st.session_state[job_key]
         if line.get("overtime_override") and type_key in st.session_state:
             live["hour_type"] = _normalize_alloc_hour_type(st.session_state[type_key])
+            live["selected_time_type"] = _normalize_alloc_hour_type(st.session_state[type_key])
+        elif _selected_time_type_from_line(line) == "AUTO":
+            live["hour_type"] = _normalize_alloc_hour_type(line.get("final_time_type") or "ST")
+            live["selected_time_type"] = "AUTO"
         elif line.get("final_time_type"):
             live["hour_type"] = _normalize_alloc_hour_type(line.get("final_time_type"))
-        elif type_key in st.session_state:
-            live["hour_type"] = _normalize_alloc_hour_type(st.session_state[type_key])
+            live["selected_time_type"] = _normalize_alloc_hour_type(line.get("final_time_type"))
         if hrs_key in st.session_state:
             live["hours"] = float(st.session_state[hrs_key] or 0)
         out.append(live)
@@ -1366,7 +1430,7 @@ def _get_day_allocation_state(day_total: float, allocations: list[dict[str, Any]
             placeholder_hours += hours
             continue
         allocated_total += hours
-        if _normalize_alloc_hour_type(row.get("hour_type")) == "OT":
+        if _normalize_alloc_hour_type(row.get("final_time_type") or row.get("hour_type")) == "OT":
             allocated_ot += hours
         else:
             allocated_st += hours
@@ -1493,7 +1557,6 @@ def _ensure_day_allocation_lines(
         lines.append(
             _new_allocation_line(
                 job=_default_allocation_job(grid_row, job_opts),
-                hour_type="ST",
                 hours=daily_total,
                 status=_normalize_timecard_status(grid_row.get("status")),
             )
@@ -1582,10 +1645,17 @@ def _sync_allocation_from_widgets(
             notes_key = f"tk_alloc_notes_{eid}_{week_sig}_{iso}_{lix}"
             if job_key in st.session_state:
                 line["job"] = st.session_state[job_key]
-            if type_key in st.session_state and line.get("overtime_override"):
-                picked = _normalize_alloc_hour_type(st.session_state[type_key])
-                line["hour_type"] = picked
-                line["final_time_type"] = picked
+            if type_key in st.session_state:
+                raw_pick = str(st.session_state[type_key] or "").strip()
+                if raw_pick == "Auto":
+                    line["selected_time_type"] = "AUTO"
+                    line["overtime_override"] = False
+                elif line.get("overtime_override") or raw_pick in {"S/T", "O/T"}:
+                    picked = _normalize_alloc_hour_type(raw_pick)
+                    line["selected_time_type"] = picked
+                    line["hour_type"] = picked
+                    line["final_time_type"] = picked
+                    line["overtime_override"] = True
             if hrs_key in st.session_state:
                 line["hours"] = float(st.session_state[hrs_key] or 0)
             if notes_key in st.session_state:
@@ -3744,6 +3814,9 @@ def _render_list_allocation_detail(
         ),
         overtime_badge_html=_overtime_override_badge_html,
         overtime_policy_note=_overtime_policy_note(),
+        selected_time_type_from_line=_selected_time_type_from_line,
+        selected_time_type_widget_label=_selected_time_type_widget_label,
+        alloc_time_type_hint_html=_alloc_time_type_hint_html,
     )
 
     if admin_edit and week_status == "Approved":
@@ -4211,6 +4284,9 @@ def _make_allocation_render_deps(emp: dict, week_start_d: date) -> AllocationRen
         ),
         overtime_badge_html=_overtime_override_badge_html,
         overtime_policy_note=_overtime_policy_note(),
+        selected_time_type_from_line=_selected_time_type_from_line,
+        selected_time_type_widget_label=_selected_time_type_widget_label,
+        alloc_time_type_hint_html=_alloc_time_type_hint_html,
     )
 
 

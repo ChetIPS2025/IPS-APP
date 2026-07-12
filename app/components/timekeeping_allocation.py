@@ -14,7 +14,7 @@ try:
 except ImportError:
     from utils.formatting import fmt_date  # type: ignore
 
-ALLOC_HOUR_TYPE_OPTS = ("S/T", "O/T")
+ALLOC_HOUR_TYPE_OPTS = ("Auto", "S/T", "O/T")
 # Streamlit column weights (layout widths come from CSS grid/flex in styles.py).
 # Reference layout: Assignment | Type | Hours (+ Remaining/Status below) | Notes
 ALLOC_LINE_COLS = [3.55, 0.58, 0.78, 1.55]
@@ -50,6 +50,9 @@ class AllocationRenderDeps:
     handle_alloc_type_change: Callable[[str, int], None] | None = None
     overtime_badge_html: Callable[[dict[str, Any]], str] | None = None
     overtime_policy_note: str = ""
+    selected_time_type_from_line: Callable[[dict[str, Any]], str] | None = None
+    selected_time_type_widget_label: Callable[[str], str] | None = None
+    alloc_time_type_hint_html: Callable[[dict[str, Any], str], str] | None = None
 
 
 def allocation_panel_scope_key(scope: str) -> str:
@@ -264,7 +267,8 @@ def _append_assignment_line(
         {
             "line_id": "",
             "job": ctx.job_opts[0] if ctx.job_opts else "— No assignment —",
-            "hour_type": "ST",
+            "hour_type": "AUTO",
+            "selected_time_type": "AUTO",
             "hours": remaining_hrs,
             "notes": "",
             "status": "Draft",
@@ -465,9 +469,19 @@ def render_allocation_control_row(
         live_job = deps.coerce_assignment_label(str(st.session_state[job_key]), job_opts)
     hour_type = deps.normalize_alloc_hour_type(line.get("hour_type"))
     type_key = f"tk_alloc_type_{eid}_{week_sig}_{iso}_{lix}"
-    deps.ensure_alloc_type_widget_label(type_key, hour_type)
+    selected_token = (
+        deps.selected_time_type_from_line(line)
+        if deps.selected_time_type_from_line is not None
+        else hour_type
+    )
+    widget_label_fn = deps.selected_time_type_widget_label or deps.alloc_hour_type_label
+    deps.ensure_alloc_type_widget_label(type_key, selected_token)
     if type_key in st.session_state:
-        hour_type = deps.normalize_alloc_hour_type(st.session_state[type_key])
+        raw_pick = str(st.session_state[type_key] or "").strip()
+        if raw_pick == "Auto":
+            selected_token = "AUTO"
+        elif raw_pick:
+            selected_token = deps.normalize_alloc_hour_type(raw_pick)
     is_primary_row = lix == 0
     line_scope = allocation_panel_scope_key(f"{ctx.panel_scope}_{iso}_{lix}")
     autosave_cb = deps.mark_allocation_dirty if row_editable else None
@@ -514,7 +528,7 @@ def render_allocation_control_row(
                 'aria-hidden="true"></span>',
                 unsafe_allow_html=True,
             )
-            calculated = deps.normalize_alloc_hour_type(line.get("calculated_time_type") or hour_type)
+            calculated = deps.normalize_alloc_hour_type(line.get("calculated_time_type") or "ST")
             badge_html = ""
             if deps.overtime_badge_html:
                 badge_html = deps.overtime_badge_html(line)
@@ -523,70 +537,70 @@ def render_allocation_control_row(
                     f'<div class="timekeeping-alloc-type-badge-wrap">{badge_html}</div>',
                     unsafe_allow_html=True,
                 )
-            type_disabled = not row_editable or (
-                not deps.can_override_overtime and not line.get("overtime_override")
-            )
-            if row_editable and deps.can_override_overtime:
-                hour_type_options = list(ALLOC_HOUR_TYPE_OPTS)
-                type_label = deps.alloc_hour_type_label(
-                    line.get("final_time_type") or hour_type
-                )
-                deps.ensure_alloc_type_widget_label(type_key, hour_type)
-                type_index = (
-                    hour_type_options.index(type_label)
-                    if type_label in hour_type_options
-                    else 0
-                )
-                type_kwargs: dict[str, Any] = {
-                    "label": "Type",
-                    "options": hour_type_options,
-                    "index": type_index,
-                    "key": type_key,
-                    "label_visibility": "collapsed",
-                }
-                if deps.handle_alloc_type_change is not None:
-                    type_kwargs["on_change"] = deps.handle_alloc_type_change
-                    type_kwargs["args"] = (iso, lix)
-                else:
-                    type_kwargs["on_change"] = autosave_cb
-                    type_kwargs["args"] = autosave_args
-                picked = st.selectbox(**type_kwargs)
-                line["hour_type"] = deps.normalize_alloc_hour_type(picked)
-            elif row_editable:
-                hour_type_options = list(ALLOC_HOUR_TYPE_OPTS)
-                type_label = deps.alloc_hour_type_label(
-                    line.get("final_time_type") or calculated
-                )
-                deps.ensure_alloc_type_widget_label(type_key, hour_type)
-                type_index = (
-                    hour_type_options.index(type_label)
-                    if type_label in hour_type_options
-                    else 0
-                )
-                st.selectbox(
-                    "Type",
-                    options=hour_type_options,
-                    index=type_index,
-                    key=type_key,
-                    label_visibility="collapsed",
-                    disabled=True,
-                    help=f"Calculated as {deps.alloc_hour_type_label(calculated)}",
-                )
-                line["hour_type"] = deps.normalize_alloc_hour_type(
-                    line.get("final_time_type") or calculated
-                )
-            else:
+            if not row_editable:
                 st.markdown(
                     '<div class="timekeeping-alloc-field-label timekeeping-alloc-field-label-static">'
-                    "Type</div>",
+                    "Time Type</div>",
                     unsafe_allow_html=True,
+                )
+                display_type = deps.alloc_hour_type_label(
+                    line.get("final_time_type") or calculated
                 )
                 st.markdown(
                     f'<div class="timekeeping-alloc-cell timekeeping-alloc-type-cell '
                     f'timekeeping-hour-type-cell">'
-                    f"{html.escape(deps.alloc_hour_type_label(hour_type))}</div>",
+                    f"{html.escape(display_type)}</div>",
                     unsafe_allow_html=True,
                 )
+            else:
+                hour_type_options = list(ALLOC_HOUR_TYPE_OPTS)
+                type_label = widget_label_fn(selected_token)
+                type_index = (
+                    hour_type_options.index(type_label)
+                    if type_label in hour_type_options
+                    else 0
+                )
+                type_disabled = not deps.can_override_overtime
+                type_kwargs: dict[str, Any] = {
+                    "label": "Time Type",
+                    "options": hour_type_options,
+                    "index": type_index,
+                    "key": type_key,
+                    "label_visibility": "collapsed",
+                    "disabled": type_disabled,
+                }
+                if deps.can_override_overtime:
+                    if deps.handle_alloc_type_change is not None:
+                        type_kwargs["on_change"] = deps.handle_alloc_type_change
+                        type_kwargs["args"] = (iso, lix)
+                    else:
+                        type_kwargs["on_change"] = autosave_cb
+                        type_kwargs["args"] = autosave_args
+                else:
+                    type_kwargs["help"] = (
+                        f"Calculated as {deps.alloc_hour_type_label(calculated)} — "
+                        "administrators may override S/T or O/T"
+                    )
+                st.selectbox(**type_kwargs)
+                if deps.alloc_time_type_hint_html:
+                    hint_html = deps.alloc_time_type_hint_html(line, iso)
+                    if hint_html:
+                        st.markdown(hint_html, unsafe_allow_html=True)
+                if selected_token == "AUTO":
+                    line["selected_time_type"] = "AUTO"
+                    line["hour_type"] = deps.normalize_alloc_hour_type(
+                        line.get("final_time_type") or calculated
+                    )
+                elif line.get("overtime_override") or deps.can_override_overtime:
+                    line["selected_time_type"] = selected_token
+                    line["hour_type"] = deps.normalize_alloc_hour_type(
+                        line.get("final_time_type") or selected_token
+                    )
+                else:
+                    line["selected_time_type"] = "AUTO"
+                    line["hour_type"] = deps.normalize_alloc_hour_type(
+                        line.get("final_time_type") or calculated
+                    )
         with row_cols[2]:
             line["hours"] = _render_allocation_hours_input(
                 value=float(line.get("hours") or 0),
@@ -654,7 +668,9 @@ def render_allocation_control_row(
                 row_editable=row_editable,
             )
 
-    line["hour_type"] = deps.normalize_alloc_hour_type(line.get("hour_type"))
+    line["hour_type"] = deps.normalize_alloc_hour_type(
+        line.get("final_time_type") or line.get("hour_type") or "ST"
+    )
 
 
 def render_day_allocation_card(

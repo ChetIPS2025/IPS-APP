@@ -6,9 +6,11 @@ import unittest
 from datetime import date
 
 from app.services.timekeeping_overtime_service import (
+    new_allocation_line_defaults,
     peek_line_time_type,
     recalculate_week_allocations,
     summarize_week_hours,
+    time_type_calculation_reason,
 )
 from app.utils.dates import week_dates
 
@@ -86,6 +88,27 @@ class TestTimekeepingOvertimeService(unittest.TestCase):
         self.assertEqual(
             peek_line_time_type(work_date=monday, hours=6, weekday_st_used=40.0),
             "OT",
+        )
+
+    def test_new_allocation_line_defaults_to_auto(self) -> None:
+        line = new_allocation_line_defaults()
+        self.assertEqual(line["selected_time_type"], "AUTO")
+        self.assertEqual(line["hour_type"], "AUTO")
+
+    def test_time_type_calculation_reason_weekend_and_over_forty(self) -> None:
+        saturday = date(2026, 6, 13)
+        monday = date(2026, 6, 8)
+        self.assertEqual(
+            time_type_calculation_reason(work_date=saturday, calculated="OT"),
+            "Weekend rule",
+        )
+        self.assertEqual(
+            time_type_calculation_reason(work_date=monday, calculated="OT"),
+            "Over 40",
+        )
+        self.assertEqual(
+            time_type_calculation_reason(work_date=monday, calculated="ST"),
+            "",
         )
 
 
