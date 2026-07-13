@@ -10,11 +10,7 @@ _EXCLUDED_FIELD_JOB_STATUSES = frozenset(
     {"Deleted", "Archived", "Completed", "Closed", "Cancelled"}
 )
 
-try:
-    from app.services.shared_sequence import next_job_number_string
-except ImportError:
-    from services.shared_sequence import next_job_number_string  # type: ignore
-
+from app.services.shared_sequence import next_job_number_string
 _JOB_LEGACY = re.compile(r"^JOB-(\d+)$", re.IGNORECASE)
 
 
@@ -35,10 +31,7 @@ def job_number_display(value: str | None) -> str:
         return ""
     m = _JOB_LEGACY.match(s)
     if m:
-        try:
-            from app.services.shared_sequence import format_job_number
-        except ImportError:
-            from services.shared_sequence import format_job_number  # type: ignore
+        from app.services.shared_sequence import format_job_number
         try:
             return format_job_number(int(m.group(1)))
         except ValueError:
@@ -140,10 +133,7 @@ def sort_jobs_by_name(jobs: list[dict]) -> list[dict]:
 
 def normalize_job_status_for_filter(raw: object) -> str:
     """Canonical job status labels (aligned with Jobs page filters)."""
-    try:
-        from app.services.jobs_service import normalize_job_status
-    except ImportError:
-        from services.jobs_service import normalize_job_status  # type: ignore
+    from app.services.jobs_service import normalize_job_status
     return normalize_job_status(raw)
 
 
@@ -234,26 +224,17 @@ def is_job_eligible_for_weekly_timesheet(job: dict[str, Any]) -> bool:
 def load_jobs_for_select(*, limit: int = 5000, use_admin: bool | None = None) -> list[dict[str, Any]]:
     """Load jobs from Supabase with admin fallback (matches Jobs / time tracking reads)."""
     if use_admin is None:
-        try:
-            from app.auth import current_role
-        except ImportError:
-            from auth import current_role  # type: ignore
+        from app.auth import current_role
         role = str(current_role() or "").strip().lower()
         use_admin = role in {"admin", "manager", "supervisor", "project manager", "pm"}
-    try:
-        from app.db import fetch_jobs_with_order_fallback
-    except ImportError:
-        from db import fetch_jobs_with_order_fallback  # type: ignore
+    from app.db import fetch_jobs_with_order_fallback
     try:
         rows = list(fetch_jobs_with_order_fallback(limit=limit, use_admin=bool(use_admin)) or [])
         if rows:
             return sort_jobs_by_number_then_name(rows)
     except Exception:
         pass
-    try:
-        from app.pages._core._data import load_jobs
-    except ImportError:
-        from pages._core._data import load_jobs  # type: ignore
+    from app.pages._core._data import load_jobs
     return sort_jobs_by_number_then_name(load_jobs())
 
 

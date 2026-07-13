@@ -7,33 +7,16 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.config import settings
-    from app.db import create_signed_url
-except ImportError:
-    from config import settings  # type: ignore
-    from db import create_signed_url  # type: ignore
-
-
+from app.config import settings
+from app.db import create_signed_url
 def _photo_bucket() -> str:
     return str(getattr(settings, "task_photos_bucket", "task-photos") or "task-photos")
 
-try:
-    from app.ui.components.badges import render_badge
-    from app.ui.components.empty_states import render_empty_state
-    from app.ui.page_shell import render_card
-except ImportError:
-    from ui.components.badges import render_badge  # type: ignore
-    from ui.components.empty_states import render_empty_state  # type: ignore
-    from ui.page_shell import render_card  # type: ignore
-
-try:
-    from app.services.job_photos import PHOTO_CATEGORIES, fetch_job_photos, upload_job_photos
-    from app.services.job_timeline import fetch_timeline_for_job, timeline_badge_tone
-except ImportError:
-    from services.job_photos import PHOTO_CATEGORIES, fetch_job_photos, upload_job_photos  # type: ignore
-    from services.job_timeline import fetch_timeline_for_job, timeline_badge_tone  # type: ignore
-
+from app.ui.components.badges import render_badge
+from app.ui.components.empty_states import render_empty_state
+from app.ui.page_shell import render_card
+from app.services.job_photos import PHOTO_CATEGORIES, fetch_job_photos, upload_job_photos
+from app.services.job_timeline import fetch_timeline_for_job, timeline_badge_tone
 _IMG_EXT = re.compile(r"\.(jpe?g|png|gif|webp)$", re.IGNORECASE)
 
 

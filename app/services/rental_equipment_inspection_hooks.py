@@ -5,13 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-try:
-    from app.services.rental_equipment_inspection_service import create_auto_inspection, is_rental_equipment
-    from app.services.repository import fetch_by_id
-except ImportError:
-    from services.rental_equipment_inspection_service import create_auto_inspection, is_rental_equipment  # type: ignore
-    from services.repository import fetch_by_id  # type: ignore
-
+from app.services.rental_equipment_inspection_service import create_auto_inspection, is_rental_equipment
+from app.services.repository import fetch_by_id
 _LOG = logging.getLogger(__name__)
 
 

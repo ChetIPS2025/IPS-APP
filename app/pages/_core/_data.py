@@ -33,11 +33,7 @@ def clear_catalog_session_key(name: str) -> None:
         del store[key]
 
 
-try:
-    from app.utils.dates import week_dates
-except ImportError:
-    from utils.dates import week_dates  # type: ignore
-
+from app.utils.dates import week_dates
 _DEMO_JOBS: list[dict[str, Any]] = [
     {
         "id": "demo-j26047",
@@ -134,16 +130,10 @@ _DEMO_JOBS: list[dict[str, Any]] = [
 
 
 def _fetch_table(name: str, *, order_by: str | None = None, limit: int = 500) -> list[dict[str, Any]]:
-    try:
-        from app.services.repository import fetch_rows
-    except ImportError:
-        from services.repository import fetch_rows  # type: ignore
+    from app.services.repository import fetch_rows
     rows, err = fetch_rows(name, limit=limit, order_by=order_by)
     if err:
-        try:
-            from app.pages._core._access import mark_demo_data, show_db_error
-        except ImportError:
-            from pages._core._access import mark_demo_data, show_db_error  # type: ignore
+        from app.pages._core._access import mark_demo_data, show_db_error
         mark_demo_data()
         show_db_error(name, err)
     return rows
@@ -151,19 +141,12 @@ def _fetch_table(name: str, *, order_by: str | None = None, limit: int = 500) ->
 
 def _mark_if_demo(used: bool) -> None:
     if used:
-        try:
-            from app.pages._core._access import mark_demo_data
-        except ImportError:
-            from pages._core._access import mark_demo_data  # type: ignore
+        from app.pages._core._access import mark_demo_data
         mark_demo_data()
 
 
 def load_jobs() -> list[dict[str, Any]]:
-    try:
-        from app.perf_debug import perf_span
-    except ImportError:
-        from perf_debug import perf_span  # type: ignore
-
+    from app.perf_debug import perf_span
     def _load() -> list[dict[str, Any]]:
         rows, used = _cached_jobs_rows()
         _mark_if_demo(used)
@@ -175,10 +158,7 @@ def load_jobs() -> list[dict[str, Any]]:
 
 @st.cache_data(ttl=CATALOG_CACHE_TTL, show_spinner=False)
 def _cached_jobs_rows() -> tuple[tuple[dict[str, Any], ...], bool]:
-    try:
-        from app.services.jobs_service import list_jobs
-    except ImportError:
-        from services.jobs_service import list_jobs  # type: ignore
+    from app.services.jobs_service import list_jobs
     rows, used = list_jobs(demo=list(_DEMO_JOBS))
     return tuple(rows), used
 
@@ -188,11 +168,7 @@ def load_dashboard_kpis(
     period_start: date | None = None,
     period_end: date | None = None,
 ) -> dict[str, Any]:
-    try:
-        from app.services.dashboard_metrics_service import compute_dashboard_kpis
-    except ImportError:
-        from services.dashboard_metrics_service import compute_dashboard_kpis  # type: ignore
-
+    from app.services.dashboard_metrics_service import compute_dashboard_kpis
     estimates = load_estimates()
     jobs = load_jobs()
     inventory = load_inventory()
@@ -237,11 +213,7 @@ def dashboard_sales_series(
     period_start: date,
     period_end: date,
 ) -> tuple[list[str], dict[str, list[float]], bool]:
-    try:
-        from app.services.dashboard_metrics_service import sales_overview_series
-    except ImportError:
-        from services.dashboard_metrics_service import sales_overview_series  # type: ignore
-
+    from app.services.dashboard_metrics_service import sales_overview_series
     labels, series = sales_overview_series(
         load_estimates(),
         load_jobs(),
@@ -259,11 +231,7 @@ def dashboard_sales_categories(
     period_start: date,
     period_end: date,
 ) -> tuple[dict[str, float], bool]:
-    try:
-        from app.services.dashboard_metrics_service import sales_by_category
-    except ImportError:
-        from services.dashboard_metrics_service import sales_by_category  # type: ignore
-
+    from app.services.dashboard_metrics_service import sales_by_category
     cats = sales_by_category(
         load_estimates(),
         period_start=period_start,
@@ -275,11 +243,7 @@ def dashboard_sales_categories(
 
 
 def dashboard_quote_aging_bars() -> tuple[list[tuple[str, float, str]], bool]:
-    try:
-        from app.services.dashboard_metrics_service import open_quotes_aging_bars
-    except ImportError:
-        from services.dashboard_metrics_service import open_quotes_aging_bars  # type: ignore
-
+    from app.services.dashboard_metrics_service import open_quotes_aging_bars
     bars = open_quotes_aging_bars(load_estimates())
     if bars:
         return bars, True
@@ -292,11 +256,7 @@ def dashboard_quote_aging_bars() -> tuple[list[tuple[str, float, str]], bool]:
 
 
 def dashboard_upcoming_deadlines() -> tuple[list[dict[str, str]], bool]:
-    try:
-        from app.services.dashboard_metrics_service import upcoming_deadlines
-    except ImportError:
-        from services.dashboard_metrics_service import upcoming_deadlines  # type: ignore
-
+    from app.services.dashboard_metrics_service import upcoming_deadlines
     items = upcoming_deadlines(load_estimates(), load_jobs())
     if items:
         return items, True
@@ -304,11 +264,7 @@ def dashboard_upcoming_deadlines() -> tuple[list[dict[str, str]], bool]:
 
 
 def dashboard_job_status_overview() -> tuple[dict[str, int], bool]:
-    try:
-        from app.services.dashboard_metrics_service import job_status_overview
-    except ImportError:
-        from services.dashboard_metrics_service import job_status_overview  # type: ignore
-
+    from app.services.dashboard_metrics_service import job_status_overview
     counts = job_status_overview(load_jobs())
     if counts:
         return counts, True
@@ -363,10 +319,7 @@ def demo_item_activities() -> list[dict[str, str]]:
 
 
 def load_recent_item_activity(*, limit: int = 10) -> tuple[list[dict[str, str]], bool]:
-    try:
-        from app.services.dashboard_item_activity_service import recent_item_activity_feed
-    except ImportError:
-        from services.dashboard_item_activity_service import recent_item_activity_feed  # type: ignore
+    from app.services.dashboard_item_activity_service import recent_item_activity_feed
     items = recent_item_activity_feed(limit=limit)
     if items:
         return items, True
@@ -489,10 +442,7 @@ def demo_qr_scans() -> list[dict[str, str]]:
 
 
 def load_recent_qr_scans(*, limit: int = 25, inventory_item_id: str | None = None) -> tuple[list[dict[str, str]], bool]:
-    try:
-        from app.services.qr_scan_log_service import recent_qr_scans
-    except ImportError:
-        from services.qr_scan_log_service import recent_qr_scans  # type: ignore
+    from app.services.qr_scan_log_service import recent_qr_scans
     rows = recent_qr_scans(limit=limit, inventory_item_id=inventory_item_id)
     if rows:
         return rows, True
@@ -522,11 +472,7 @@ def _job_awarded_date(job: dict[str, Any]) -> str:
 
 def load_awarded_jobs() -> list[dict[str, Any]]:
     """Live active jobs for dashboard lists (legacy name retained for callers)."""
-    try:
-        from app.services.job_service import normalize_job_status_for_filter, sort_jobs_by_number_then_name
-    except ImportError:
-        from services.job_service import normalize_job_status_for_filter, sort_jobs_by_number_then_name  # type: ignore
-
+    from app.services.job_service import normalize_job_status_for_filter, sort_jobs_by_number_then_name
     active = [
         job
         for job in load_jobs()
@@ -694,11 +640,7 @@ _DEMO_ASSETS: list[dict[str, Any]] = [
 
 
 def load_estimates() -> list[dict[str, Any]]:
-    try:
-        from app.perf_debug import perf_span
-    except ImportError:
-        from perf_debug import perf_span  # type: ignore
-
+    from app.perf_debug import perf_span
     def _load() -> list[dict[str, Any]]:
         rows, used = _cached_estimates_rows()
         _mark_if_demo(used)
@@ -710,10 +652,7 @@ def load_estimates() -> list[dict[str, Any]]:
 
 @st.cache_data(ttl=CATALOG_CACHE_TTL, show_spinner=False)
 def _cached_estimates_rows() -> tuple[tuple[dict[str, Any], ...], bool]:
-    try:
-        from app.services.estimates_service import list_estimates
-    except ImportError:
-        from services.estimates_service import list_estimates  # type: ignore
+    from app.services.estimates_service import list_estimates
     rows, used = list_estimates(demo=list(_DEMO_ESTIMATES))
     return tuple(rows), used
 
@@ -728,10 +667,7 @@ def get_estimate(estimate_id: str) -> dict[str, Any] | None:
 
 def load_estimate_materials(estimate_id: str) -> list[dict[str, Any]]:
     eid = str(estimate_id or "").strip()
-    try:
-        from app.services.estimates_service import list_estimate_materials
-    except ImportError:
-        from services.estimates_service import list_estimate_materials  # type: ignore
+    from app.services.estimates_service import list_estimate_materials
     rows, used = list_estimate_materials(eid, demo=list(_DEMO_MATERIALS))
     _mark_if_demo(used)
     return rows
@@ -804,20 +740,14 @@ def clear_estimates_catalog_cache() -> None:
 def clear_inventory_catalog_cache() -> None:
     clear_inventory_list_cache()
     clear_catalog_session_key("inventory")
-    try:
-        from app.services.pricing_guide_service import clear_pricing_guide_cache
-    except ImportError:
-        from services.pricing_guide_service import clear_pricing_guide_cache  # type: ignore
+    from app.services.pricing_guide_service import clear_pricing_guide_cache
     clear_pricing_guide_cache()
 
 
 def clear_assets_catalog_cache() -> None:
     clear_assets_list_cache()
     clear_catalog_session_key("assets")
-    try:
-        from app.services.pricing_guide_service import clear_pricing_guide_cache
-    except ImportError:
-        from services.pricing_guide_service import clear_pricing_guide_cache  # type: ignore
+    from app.services.pricing_guide_service import clear_pricing_guide_cache
     clear_pricing_guide_cache()
 
 
@@ -847,10 +777,7 @@ def clear_timekeeping_catalog_cache() -> None:
 
 
 def clear_pricing_guide_catalog_cache() -> None:
-    try:
-        from app.services.pricing_guide_service import clear_pricing_guide_cache
-    except ImportError:
-        from services.pricing_guide_service import clear_pricing_guide_cache  # type: ignore
+    from app.services.pricing_guide_service import clear_pricing_guide_cache
     clear_pricing_guide_cache()
 
 
@@ -866,39 +793,26 @@ def clear_all_catalog_list_caches() -> None:
     clear_user_profiles_cache()
     clear_labor_rates_cache()
     clear_tasks_list_cache()
-    try:
-        from app.services.pricing_guide_service import clear_pricing_guide_cache
-    except ImportError:
-        from services.pricing_guide_service import clear_pricing_guide_cache  # type: ignore
+    from app.services.pricing_guide_service import clear_pricing_guide_cache
     clear_pricing_guide_cache()
 
 
 @st.cache_data(ttl=CATALOG_CACHE_TTL, show_spinner=False)
 def _cached_inventory_rows() -> tuple[tuple[dict[str, Any], ...], bool]:
-    try:
-        from app.services.inventory_service import list_inventory
-    except ImportError:
-        from services.inventory_service import list_inventory  # type: ignore
+    from app.services.inventory_service import list_inventory
     rows, used = list_inventory(demo=list(_DEMO_INVENTORY))
     return tuple(rows), used
 
 
 @st.cache_data(ttl=CATALOG_CACHE_TTL, show_spinner=False)
 def _cached_assets_rows() -> tuple[tuple[dict[str, Any], ...], bool]:
-    try:
-        from app.services.assets_service import list_assets
-    except ImportError:
-        from services.assets_service import list_assets  # type: ignore
+    from app.services.assets_service import list_assets
     rows, used = list_assets(demo=list(_DEMO_ASSETS))
     return tuple(rows), used
 
 
 def load_inventory() -> list[dict[str, Any]]:
-    try:
-        from app.perf_debug import perf_span
-    except ImportError:
-        from perf_debug import perf_span  # type: ignore
-
+    from app.perf_debug import perf_span
     def _load() -> list[dict[str, Any]]:
         rows, used = _cached_inventory_rows()
         _mark_if_demo(used)
@@ -909,11 +823,7 @@ def load_inventory() -> list[dict[str, Any]]:
 
 
 def load_assets() -> list[dict[str, Any]]:
-    try:
-        from app.perf_debug import perf_span
-    except ImportError:
-        from perf_debug import perf_span  # type: ignore
-
+    from app.perf_debug import perf_span
     def _load() -> list[dict[str, Any]]:
         rows, used = _cached_assets_rows()
         _mark_if_demo(used)
@@ -1025,11 +935,7 @@ _DEMO_EVENTS: list[dict[str, Any]] = [
 
 
 def load_employees() -> list[dict[str, Any]]:
-    try:
-        from app.perf_debug import perf_span
-    except ImportError:
-        from perf_debug import perf_span  # type: ignore
-
+    from app.perf_debug import perf_span
     def _load() -> list[dict[str, Any]]:
         rows, used = _cached_employees_rows()
         _mark_if_demo(used)
@@ -1041,10 +947,7 @@ def load_employees() -> list[dict[str, Any]]:
 
 @st.cache_data(ttl=CATALOG_CACHE_TTL, show_spinner=False)
 def _cached_employees_rows() -> tuple[tuple[dict[str, Any], ...], bool]:
-    try:
-        from app.services.employees_service import list_employees
-    except ImportError:
-        from services.employees_service import list_employees  # type: ignore
+    from app.services.employees_service import list_employees
     rows, used = list_employees(demo=list(_DEMO_EMPLOYEES))
     return tuple(rows), used
 
@@ -1067,10 +970,7 @@ def get_employee(employee_id: str) -> dict[str, Any] | None:
 
 def load_certifications(employee_id: str) -> list[dict[str, Any]]:
     eid = str(employee_id or "").strip()
-    try:
-        from app.services.employees_service import list_certifications
-    except ImportError:
-        from services.employees_service import list_certifications  # type: ignore
+    from app.services.employees_service import list_certifications
     demo = [c for c in _DEMO_CERTIFICATIONS if c.get("employee_id") == eid]
     if not demo and eid:
         demo = [c for c in _DEMO_CERTIFICATIONS if eid == "emp-chance"][:2]
@@ -1095,46 +995,28 @@ def load_employee_documents(employee_id: str, *, role: str = "admin") -> list[di
 
 
 def load_documents_hub(*, role: str = "admin") -> list[dict[str, Any]]:
-    try:
-        from app.services.documents_service import list_documents_hub
-    except ImportError:
-        from services.documents_service import list_documents_hub  # type: ignore
+    from app.services.documents_service import list_documents_hub
     rows, used = list_documents_hub(role=role, demo=list(_DEMO_DOCUMENTS_HUB))
     _mark_if_demo(used)
     return rows
 
 
 def load_company_updates(*, category: str = "All Updates") -> list[dict[str, Any]]:
-    try:
-        from app.services.updates_service import list_company_updates
-    except ImportError:
-        from services.updates_service import list_company_updates  # type: ignore
+    from app.services.updates_service import list_company_updates
     rows, used = list_company_updates(category=category, demo=list(_DEMO_COMPANY_UPDATES))
     _mark_if_demo(used)
-    try:
-        from app.services.updates_service import enrich_company_update_banner
-    except ImportError:
-        from services.updates_service import enrich_company_update_banner  # type: ignore
+    from app.services.updates_service import enrich_company_update_banner
     rows = [enrich_company_update_banner(row) for row in rows]
-    try:
-        from app.components.install_share import with_welcome_install_update
-    except ImportError:
-        from components.install_share import with_welcome_install_update  # type: ignore
+    from app.components.install_share import with_welcome_install_update
     return with_welcome_install_update(rows)
 
 
 def load_recent_company_updates(*, limit: int = 5) -> list[dict[str, Any]]:
     """Human company announcements for the Dashboard (not system activity events)."""
-    try:
-        from app.components.company_updates_feed import (
-            dashboard_update_visible,
-            sort_dashboard_updates,
-        )
-    except ImportError:
-        from components.company_updates_feed import (  # type: ignore
-            dashboard_update_visible,
-            sort_dashboard_updates,
-        )
+    from app.components.company_updates_feed import (
+        dashboard_update_visible,
+        sort_dashboard_updates,
+    )
     visible = [row for row in load_company_updates() if dashboard_update_visible(row)]
     return sort_dashboard_updates(visible)[: max(1, int(limit))]
 
@@ -1157,10 +1039,7 @@ def load_upcoming_events() -> list[dict[str, Any]]:
 
 
 def load_all_certifications() -> list[dict[str, Any]]:
-    try:
-        from app.services.employees_service import list_all_certifications
-    except ImportError:
-        from services.employees_service import list_all_certifications  # type: ignore
+    from app.services.employees_service import list_all_certifications
     employees = load_employees()
     demo = []
     for c in _DEMO_CERTIFICATIONS:
@@ -1172,31 +1051,16 @@ def load_all_certifications() -> list[dict[str, Any]]:
 
 
 def certification_alerts(certs: list[dict[str, Any]]) -> tuple[int, int]:
-    try:
-        from app.services.certification_helpers import certification_alerts_counts
-    except ImportError:
-        from services.certification_helpers import certification_alerts_counts  # type: ignore
+    from app.services.certification_helpers import certification_alerts_counts
     return certification_alerts_counts(certs)
 
 
 def job_options_for_timekeeping() -> list[str]:
     """Same assignable job list as Timekeeping allocation dropdowns."""
-    try:
-        from app.pages.timekeeping import _assignment_options_for_timekeeping
-
-        return _assignment_options_for_timekeeping()
-    except ImportError:
-        from pages.timekeeping import _assignment_options_for_timekeeping  # type: ignore
-
-        return _assignment_options_for_timekeeping()
-
-
+    from app.pages.timekeeping import _assignment_options_for_timekeeping
+    return _assignment_options_for_timekeeping()
 def load_tasks() -> list[dict[str, Any]]:
-    try:
-        from app.perf_debug import perf_span
-    except ImportError:
-        from perf_debug import perf_span  # type: ignore
-
+    from app.perf_debug import perf_span
     def _load() -> list[dict[str, Any]]:
         rows, used = _cached_tasks_rows()
         _mark_if_demo(used)
@@ -1208,10 +1072,7 @@ def load_tasks() -> list[dict[str, Any]]:
 
 @st.cache_data(ttl=CATALOG_CACHE_TTL, show_spinner=False)
 def _cached_tasks_rows() -> tuple[tuple[dict[str, Any], ...], bool]:
-    try:
-        from app.services.phase2_modules_service import list_tasks
-    except ImportError:
-        from services.phase2_modules_service import list_tasks  # type: ignore
+    from app.services.phase2_modules_service import list_tasks
     rows, used = list_tasks(demo=list(_DEMO_TASKS))
     return tuple(rows), used
 
@@ -1278,11 +1139,7 @@ def _demo_timekeeping_summaries(week_start: date) -> list[dict[str, Any]]:
 
 
 def load_timekeeping_summaries(week_start: date) -> list[dict[str, Any]]:
-    try:
-        from app.services.timekeeping_service import list_timekeeping_summaries
-    except ImportError:
-        from services.timekeeping_service import list_timekeeping_summaries  # type: ignore
-
+    from app.services.timekeeping_service import list_timekeeping_summaries
     employees = _active_employees()
     employee_ids = {str(e.get("id") or "").strip() for e in employees}
     rows, used = list_timekeeping_summaries(week_start, demo=_demo_timekeeping_summaries(week_start))
@@ -1443,11 +1300,7 @@ def build_timekeeping_grid_from_day_rows(
 def load_timekeeping_grid(employee_id: str, week_start: date) -> list[dict[str, Any]]:
     """Build the weekly grid from saved day rows, or schedule defaults for missing days."""
     eid = str(employee_id or "").strip()
-    try:
-        from app.services.timekeeping_service import list_timekeeping_days
-    except ImportError:
-        from services.timekeeping_service import list_timekeeping_days  # type: ignore
-
+    from app.services.timekeeping_service import list_timekeeping_days
     saved_rows = list_timekeeping_days(eid, week_start) if eid else []
     return build_timekeeping_grid_from_day_rows(eid, week_start, saved_rows)
 
@@ -1836,29 +1689,20 @@ def demo_report_timekeeping_summary() -> list[dict[str, Any]]:
 
 def persist_lookup_table(table_label: str, values: list[str]) -> tuple[bool, str]:
     """Save admin lookup table values (Supabase with session fallback)."""
-    try:
-        from app.services.lookup_service import save_lookup_for_label
-    except ImportError:
-        from services.lookup_service import save_lookup_for_label  # type: ignore
+    from app.services.lookup_service import save_lookup_for_label
     return save_lookup_for_label(table_label, values)
 
 
 def lookup_options(slug: str) -> list[str]:
     """Dropdown values from Supabase lookup tables with constants fallback."""
-    try:
-        from app.services.lookup_service import load_lookup_values
-    except ImportError:
-        from services.lookup_service import load_lookup_values  # type: ignore
+    from app.services.lookup_service import load_lookup_values
     values, _ = load_lookup_values(slug)
     return values
 
 
 def _persist_result(result: Any, *, success: str) -> tuple[bool, str]:
     """Return (ok, message) for UI feedback."""
-    try:
-        from app.services.repository import user_facing_error
-    except ImportError:
-        from services.repository import user_facing_error  # type: ignore
+    from app.services.repository import user_facing_error
     err = user_facing_error(result)
     if err:
         return False, err
@@ -1869,10 +1713,7 @@ _DEMO_SAVE_MSG = "Cannot save demo data to Supabase. Create a new record instead
 
 
 def _demo_blocked(row_id: str | None) -> bool:
-    try:
-        from app.pages._core._crud import is_demo_id
-    except ImportError:
-        from pages._core._crud import is_demo_id  # type: ignore
+    from app.pages._core._crud import is_demo_id
     return is_demo_id(row_id)
 
 
@@ -2089,11 +1930,7 @@ _DEMO_CUSTOMER_CONTACTS: list[dict[str, Any]] = [
 
 
 def load_customers() -> list[dict[str, Any]]:
-    try:
-        from app.perf_debug import perf_span
-    except ImportError:
-        from perf_debug import perf_span  # type: ignore
-
+    from app.perf_debug import perf_span
     def _load() -> list[dict[str, Any]]:
         rows, used = _cached_customers_rows()
         _mark_if_demo(used)
@@ -2105,20 +1942,13 @@ def load_customers() -> list[dict[str, Any]]:
 
 @st.cache_data(ttl=CATALOG_CACHE_TTL, show_spinner=False)
 def _cached_customers_rows() -> tuple[tuple[dict[str, Any], ...], bool]:
-    try:
-        from app.services.customers_service import list_customers
-    except ImportError:
-        from services.customers_service import list_customers  # type: ignore
+    from app.services.customers_service import list_customers
     rows, used = list_customers(demo=list(_DEMO_CUSTOMERS))
     return tuple(rows), used
 
 
 def load_user_profiles(*, limit: int = 200) -> list[dict[str, Any]]:
-    try:
-        from app.perf_debug import perf_span
-    except ImportError:
-        from perf_debug import perf_span  # type: ignore
-
+    from app.perf_debug import perf_span
     def _load() -> list[dict[str, Any]]:
         return list(_cached_user_profiles(limit))
 
@@ -2128,19 +1958,12 @@ def load_user_profiles(*, limit: int = 200) -> list[dict[str, Any]]:
 
 @st.cache_data(ttl=CATALOG_CACHE_TTL, show_spinner=False)
 def _cached_user_profiles(limit: int) -> tuple[dict[str, Any], ...]:
-    try:
-        from app.services.users_service import list_profiles
-    except ImportError:
-        from services.users_service import list_profiles  # type: ignore
+    from app.services.users_service import list_profiles
     return tuple(list_profiles(limit=limit))
 
 
 def load_labor_rates(*, active_only: bool = False) -> list[dict[str, Any]]:
-    try:
-        from app.perf_debug import perf_span
-    except ImportError:
-        from perf_debug import perf_span  # type: ignore
-
+    from app.perf_debug import perf_span
     def _load() -> list[dict[str, Any]]:
         return list(_cached_labor_rates_rows(active_only))
 
@@ -2150,10 +1973,7 @@ def load_labor_rates(*, active_only: bool = False) -> list[dict[str, Any]]:
 
 @st.cache_data(ttl=CATALOG_CACHE_TTL, show_spinner=False)
 def _cached_labor_rates_rows(active_only: bool) -> tuple[dict[str, Any], ...]:
-    try:
-        from app.services.labor_rates_service import list_labor_rates
-    except ImportError:
-        from services.labor_rates_service import list_labor_rates  # type: ignore
+    from app.services.labor_rates_service import list_labor_rates
     return tuple(list_labor_rates(active_only=active_only))
 
 
@@ -2163,10 +1983,7 @@ def get_customer(customer_id: str) -> dict[str, Any] | None:
 
 
 def load_customer_locations(customer_id: str) -> list[dict[str, Any]]:
-    try:
-        from app.services.customers_service import list_customer_locations
-    except ImportError:
-        from services.customers_service import list_customer_locations  # type: ignore
+    from app.services.customers_service import list_customer_locations
     rows, used = list_customer_locations(customer_id, demo=list(_DEMO_CUSTOMER_LOCATIONS))
     if used:
         _mark_if_demo(True)
@@ -2179,10 +1996,7 @@ def load_locations_for_customer(customer_id: str) -> list[dict[str, Any]]:
 
 
 def load_customer_contacts(customer_id: str, location_id: str | None = None) -> list[dict[str, Any]]:
-    try:
-        from app.services.customers_service import get_customer_contacts
-    except ImportError:
-        from services.customers_service import get_customer_contacts  # type: ignore
+    from app.services.customers_service import get_customer_contacts
     return get_customer_contacts(customer_id, location_id=location_id)
 
 
@@ -2231,10 +2045,7 @@ def customer_location_select_options(customer_id: str) -> list[tuple[str, str]]:
     cid = str(customer_id or "").strip()
     if not cid:
         return []
-    try:
-        from app.services.customers_service import get_customer_location_options
-    except ImportError:
-        from services.customers_service import get_customer_location_options  # type: ignore
+    from app.services.customers_service import get_customer_location_options
     return get_customer_location_options(cid, active_only=False)
 
 
@@ -2246,30 +2057,21 @@ def customer_contact_select_options(
     cid = str(customer_id or "").strip()
     if not cid:
         return []
-    try:
-        from app.services.customers_service import get_customer_contact_options
-    except ImportError:
-        from services.customers_service import get_customer_contact_options  # type: ignore
+    from app.services.customers_service import get_customer_contact_options
     return get_customer_contact_options(cid, location_id, active_only=False)
 
 
 def persist_customer(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
     if _demo_blocked(row_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.customers_service import save_customer
-    except ImportError:
-        from services.customers_service import save_customer  # type: ignore
+    from app.services.customers_service import save_customer
     return _persist_result(save_customer(ui, row_id=row_id), success="Customer saved.")
 
 
 def delete_customer_row(row_id: str) -> tuple[bool, str]:
     if _demo_blocked(row_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.customers_service import delete_customer
-    except ImportError:
-        from services.customers_service import delete_customer  # type: ignore
+    from app.services.customers_service import delete_customer
     return _persist_result(delete_customer(row_id), success="Customer removed.")
 
 
@@ -2277,10 +2079,7 @@ def persist_customer_contact(ui: dict[str, Any], *, row_id: str | None = None) -
     cust_id = str(ui.get("customer_id") or "").strip()
     if _demo_blocked(row_id) or _demo_blocked(cust_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.customers_service import save_customer_contact
-    except ImportError:
-        from services.customers_service import save_customer_contact  # type: ignore
+    from app.services.customers_service import save_customer_contact
     msg = "Contact updated." if row_id else "Contact added."
     return _persist_result(save_customer_contact(ui, row_id=row_id), success=msg)
 
@@ -2288,10 +2087,7 @@ def persist_customer_contact(ui: dict[str, Any], *, row_id: str | None = None) -
 def delete_customer_contact_row(row_id: str) -> tuple[bool, str]:
     if _demo_blocked(row_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.customers_service import delete_customer_contact
-    except ImportError:
-        from services.customers_service import delete_customer_contact  # type: ignore
+    from app.services.customers_service import delete_customer_contact
     return _persist_result(delete_customer_contact(row_id), success="Contact removed.")
 
 
@@ -2299,10 +2095,7 @@ def persist_customer_location(ui: dict[str, Any], *, row_id: str | None = None) 
     cust_id = str(ui.get("customer_id") or "").strip()
     if _demo_blocked(row_id) or _demo_blocked(cust_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.customers_service import save_customer_location
-    except ImportError:
-        from services.customers_service import save_customer_location  # type: ignore
+    from app.services.customers_service import save_customer_location
     msg = "Location updated." if row_id else "Location added."
     return _persist_result(save_customer_location(ui, row_id=row_id), success=msg)
 
@@ -2310,26 +2103,17 @@ def persist_customer_location(ui: dict[str, Any], *, row_id: str | None = None) 
 def delete_customer_location_row(row_id: str) -> tuple[bool, str]:
     if _demo_blocked(row_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.customers_service import delete_customer_location
-    except ImportError:
-        from services.customers_service import delete_customer_location  # type: ignore
+    from app.services.customers_service import delete_customer_location
     return _persist_result(delete_customer_location(row_id), success="Location removed.")
 
 
 def persist_job(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str, str | None]:
     if _demo_blocked(row_id):
         return False, _DEMO_SAVE_MSG, None
-    try:
-        from app.services.jobs_service import save_job
-    except ImportError:
-        from services.jobs_service import save_job  # type: ignore
+    from app.services.jobs_service import save_job
     result = save_job(ui, row_id=row_id)
     err = None
-    try:
-        from app.services.repository import user_facing_error
-    except ImportError:
-        from services.repository import user_facing_error  # type: ignore
+    from app.services.repository import user_facing_error
     err = user_facing_error(result)
     if err:
         detail = str(getattr(result, "detail", None) or "").strip()
@@ -2342,80 +2126,56 @@ def persist_job(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool,
 def persist_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
     if _demo_blocked(row_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.estimates_service import save_estimate
-    except ImportError:
-        from services.estimates_service import save_estimate  # type: ignore
+    from app.services.estimates_service import save_estimate
     return _persist_result(save_estimate(ui, row_id=row_id), success="Estimate saved.")
 
 
 def persist_estimate_material(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
     if _demo_blocked(row_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.estimates_service import save_estimate_line_item
-    except ImportError:
-        from services.estimates_service import save_estimate_line_item  # type: ignore
+    from app.services.estimates_service import save_estimate_line_item
     return _persist_result(save_estimate_line_item(ui, row_id=row_id), success="Material line saved.")
 
 
 def delete_estimate_material(row_id: str) -> tuple[bool, str]:
     if _demo_blocked(row_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.estimates_service import delete_estimate_line_item
-    except ImportError:
-        from services.estimates_service import delete_estimate_line_item  # type: ignore
+    from app.services.estimates_service import delete_estimate_line_item
     return _persist_result(delete_estimate_line_item(row_id), success="Material line removed.")
 
 
 def persist_inventory(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
     if _demo_blocked(row_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.inventory_service import save_inventory_item
-    except ImportError:
-        from services.inventory_service import save_inventory_item  # type: ignore
+    from app.services.inventory_service import save_inventory_item
     return _persist_result(save_inventory_item(ui, row_id=row_id), success="Inventory item saved.")
 
 
 def persist_asset(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
     if _demo_blocked(row_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.assets_service import save_asset
-    except ImportError:
-        from services.assets_service import save_asset  # type: ignore
+    from app.services.assets_service import save_asset
     return _persist_result(save_asset(ui, row_id=row_id), success="Asset saved.")
 
 
 def persist_employee(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
     if _demo_blocked(row_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.employees_service import save_employee
-    except ImportError:
-        from services.employees_service import save_employee  # type: ignore
+    from app.services.employees_service import save_employee
     return _persist_result(save_employee(ui, row_id=row_id), success="Employee saved.")
 
 
 def persist_certification(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
     if _demo_blocked(row_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.employees_service import save_certification
-    except ImportError:
-        from services.employees_service import save_certification  # type: ignore
+    from app.services.employees_service import save_certification
     return _persist_result(save_certification(ui, row_id=row_id), success="Certification saved.")
 
 
 def persist_document(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
     if _demo_blocked(row_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.documents_service import save_document_hub
-    except ImportError:
-        from services.documents_service import save_document_hub  # type: ignore
+    from app.services.documents_service import save_document_hub
     return _persist_result(save_document_hub(ui, row_id=row_id), success="Document saved.")
 
 
@@ -2430,16 +2190,10 @@ def persist_employee_document(
     eid = str(ui.get("employee_id") or "").strip()
     if _demo_blocked(eid):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.employee_documents_service import save_employee_document
-    except ImportError:
-        from services.employee_documents_service import save_employee_document  # type: ignore
+    from app.services.employee_documents_service import save_employee_document
     result = save_employee_document(ui, row_id=row_id, uploaded_file=uploaded_file)
     err = None
-    try:
-        from app.services.repository import user_facing_error
-    except ImportError:
-        from services.repository import user_facing_error  # type: ignore
+    from app.services.repository import user_facing_error
     err = user_facing_error(result)
     if err:
         return False, err
@@ -2450,10 +2204,7 @@ def persist_employee_document(
 def persist_company_update(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
     if _demo_blocked(row_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.updates_service import save_company_update
-    except ImportError:
-        from services.updates_service import save_company_update  # type: ignore
+    from app.services.updates_service import save_company_update
     return _persist_result(save_company_update(ui, row_id=row_id), success="Update published.")
 
 
@@ -2465,12 +2216,8 @@ def persist_company_update_record(
     """Like persist_company_update but returns saved row data (includes id for new rows)."""
     if _demo_blocked(row_id):
         return False, _DEMO_SAVE_MSG, {}
-    try:
-        from app.services.repository import user_facing_error
-        from app.services.updates_service import save_company_update
-    except ImportError:
-        from services.repository import user_facing_error  # type: ignore
-        from services.updates_service import save_company_update  # type: ignore
+    from app.services.repository import user_facing_error
+    from app.services.updates_service import save_company_update
     result = save_company_update(ui, row_id=row_id)
     err = user_facing_error(result)
     if err:
@@ -2488,10 +2235,7 @@ def persist_company_update_banner(
 ) -> tuple[bool, str]:
     if _demo_blocked(update_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.updates_service import upload_company_update_banner
-    except ImportError:
-        from services.updates_service import upload_company_update_banner  # type: ignore
+    from app.services.updates_service import upload_company_update_banner
     return _persist_result(
         upload_company_update_banner(
             update_id,
@@ -2510,10 +2254,7 @@ def remove_company_update_banner_row(
 ) -> tuple[bool, str]:
     if _demo_blocked(update_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.updates_service import remove_company_update_banner
-    except ImportError:
-        from services.updates_service import remove_company_update_banner  # type: ignore
+    from app.services.updates_service import remove_company_update_banner
     return _persist_result(
         remove_company_update_banner(update_id, existing_row=existing_row),
         success="Banner removed.",
@@ -2523,70 +2264,49 @@ def remove_company_update_banner_row(
 def persist_task(ui: dict[str, Any], *, row_id: str | None = None) -> tuple[bool, str]:
     if _demo_blocked(row_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.tasks_service import save_task
-    except ImportError:
-        from services.tasks_service import save_task  # type: ignore
+    from app.services.tasks_service import save_task
     return _persist_result(save_task(ui, row_id=row_id), success="Task saved.")
 
 
 def delete_job(row_id: str) -> tuple[bool, str]:
     if _demo_blocked(row_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.jobs_service import delete_job as _del
-    except ImportError:
-        from services.jobs_service import delete_job as _del  # type: ignore
+    from app.services.jobs_service import delete_job as _del
     return _persist_result(_del(row_id), success="Job deleted.")
 
 
 def delete_estimate(row_id: str) -> tuple[bool, str]:
     if _demo_blocked(row_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.estimates_service import delete_estimate as _del
-    except ImportError:
-        from services.estimates_service import delete_estimate as _del  # type: ignore
+    from app.services.estimates_service import delete_estimate as _del
     return _persist_result(_del(row_id), success="Estimate deleted.")
 
 
 def delete_inventory(row_id: str) -> tuple[bool, str]:
     if _demo_blocked(row_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.inventory_service import delete_inventory_item as _del
-    except ImportError:
-        from services.inventory_service import delete_inventory_item as _del  # type: ignore
+    from app.services.inventory_service import delete_inventory_item as _del
     return _persist_result(_del(row_id), success="Item deleted.")
 
 
 def delete_asset(row_id: str) -> tuple[bool, str]:
     if _demo_blocked(row_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.assets_service import delete_asset as _del
-    except ImportError:
-        from services.assets_service import delete_asset as _del  # type: ignore
+    from app.services.assets_service import delete_asset as _del
     return _persist_result(_del(row_id), success="Asset deleted.")
 
 
 def delete_company_update(row_id: str) -> tuple[bool, str]:
     if _demo_blocked(row_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.updates_service import delete_company_update as _del
-    except ImportError:
-        from services.updates_service import delete_company_update as _del  # type: ignore
+    from app.services.updates_service import delete_company_update as _del
     return _persist_result(_del(row_id), success="Update removed.")
 
 
 def persist_timekeeping_week(employee_id: str, week_start: date, summary: dict[str, Any]) -> tuple[bool, str]:
     if _demo_blocked(employee_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.timekeeping_service import save_timekeeping_week
-    except ImportError:
-        from services.timekeeping_service import save_timekeeping_week  # type: ignore
+    from app.services.timekeeping_service import save_timekeeping_week
     return _persist_result(
         save_timekeeping_week(employee_id, week_start, summary),
         success="Timekeeping saved.",
@@ -2603,22 +2323,13 @@ def persist_timekeeping_days(
     """Upsert daily rows after week summary save."""
     if _demo_blocked(employee_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.timekeeping_service import save_timekeeping_day
-    except ImportError:
-        from services.timekeeping_service import save_timekeeping_day  # type: ignore
+    from app.services.timekeeping_service import save_timekeeping_day
     ws = week_start.isoformat()
     errors: list[str] = []
     target_date = str(only_work_date or "")[:10] or None
     saved_ids_by_date: dict[str, set[str]] = {}
-    try:
-        from app.services.jobs_service import resolve_job_id_from_label
-    except ImportError:
-        from services.jobs_service import resolve_job_id_from_label  # type: ignore
-    try:
-        from app.services.timekeeping_service import clear_timekeeping_day_rows
-    except ImportError:
-        from services.timekeeping_service import clear_timekeeping_day_rows  # type: ignore
+    from app.services.jobs_service import resolve_job_id_from_label
+    from app.services.timekeeping_service import clear_timekeeping_day_rows
     for row in grid:
         work_date = str(row.get("date") or "")[:10]
         if not work_date:
@@ -2662,10 +2373,7 @@ def persist_timekeeping_days(
         if res.ok and isinstance(res.data, dict):
             saved_id = str(res.data.get("id") or day_id or "").strip() or None
         if not saved_id and res.ok:
-            try:
-                from app.services.timekeeping_service import _find_timekeeping_day_row
-            except ImportError:
-                from services.timekeeping_service import _find_timekeeping_day_row  # type: ignore
+            from app.services.timekeeping_service import _find_timekeeping_day_row
             found = _find_timekeeping_day_row(
                 employee_id,
                 work_date,
@@ -2680,10 +2388,7 @@ def persist_timekeeping_days(
         return False, errors[0]
     for wd, keep_ids in saved_ids_by_date.items():
         clear_timekeeping_day_rows(employee_id, wd, keep_day_ids=keep_ids)
-    try:
-        from app.services.timekeeping_service import sync_timekeeping_week_from_days
-    except ImportError:
-        from services.timekeeping_service import sync_timekeeping_week_from_days  # type: ignore
+    from app.services.timekeeping_service import sync_timekeeping_week_from_days
     sync_timekeeping_week_from_days(employee_id, week_start)
     return True, "Daily entries saved."
 
@@ -2691,10 +2396,7 @@ def persist_timekeeping_days(
 def persist_timekeeping_day_submit(day_id: str, employee_id: str, week_start: date) -> tuple[bool, str]:
     if _demo_blocked(employee_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.timekeeping_service import submit_timekeeping_day, sync_timekeeping_week_from_days
-    except ImportError:
-        from services.timekeeping_service import submit_timekeeping_day, sync_timekeeping_week_from_days  # type: ignore
+    from app.services.timekeeping_service import submit_timekeeping_day, sync_timekeeping_week_from_days
     ok, msg = _persist_result(submit_timekeeping_day(day_id), success="Day submitted for approval.")
     if ok:
         sync_timekeeping_week_from_days(employee_id, week_start)
@@ -2710,10 +2412,7 @@ def persist_timekeeping_day_approve(
 ) -> tuple[bool, str]:
     if _demo_blocked(employee_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.timekeeping_service import approve_timekeeping_day, sync_timekeeping_week_from_days
-    except ImportError:
-        from services.timekeeping_service import approve_timekeeping_day, sync_timekeeping_week_from_days  # type: ignore
+    from app.services.timekeeping_service import approve_timekeeping_day, sync_timekeeping_week_from_days
     ok, msg = _persist_result(
         approve_timekeeping_day(day_id, approved_by=approved_by),
         success="Day approved.",
@@ -2730,10 +2429,7 @@ def persist_timekeeping_day_submit_for_date(
 ) -> tuple[bool, str]:
     if _demo_blocked(employee_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.timekeeping_service import submit_timekeeping_days_for_work_date
-    except ImportError:
-        from services.timekeeping_service import submit_timekeeping_days_for_work_date  # type: ignore
+    from app.services.timekeeping_service import submit_timekeeping_days_for_work_date
     return _persist_result(
         submit_timekeeping_days_for_work_date(employee_id, week_start, work_date),
         success="Day submitted for approval.",
@@ -2749,10 +2445,7 @@ def persist_timekeeping_day_approve_for_date(
 ) -> tuple[bool, str]:
     if _demo_blocked(employee_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.timekeeping_service import approve_timekeeping_days_for_work_date
-    except ImportError:
-        from services.timekeeping_service import approve_timekeeping_days_for_work_date  # type: ignore
+    from app.services.timekeeping_service import approve_timekeeping_days_for_work_date
     return _persist_result(
         approve_timekeeping_days_for_work_date(
             employee_id,
@@ -2773,10 +2466,7 @@ def persist_timekeeping_day_reject_for_date(
 ) -> tuple[bool, str]:
     if _demo_blocked(employee_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.timekeeping_service import reject_timekeeping_days_for_work_date
-    except ImportError:
-        from services.timekeeping_service import reject_timekeeping_days_for_work_date  # type: ignore
+    from app.services.timekeeping_service import reject_timekeeping_days_for_work_date
     return _persist_result(
         reject_timekeeping_days_for_work_date(
             employee_id,
@@ -2797,10 +2487,7 @@ def persist_timekeeping_day_reject(
 ) -> tuple[bool, str]:
     if _demo_blocked(employee_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.timekeeping_service import reject_timekeeping_day, sync_timekeeping_week_from_days
-    except ImportError:
-        from services.timekeeping_service import reject_timekeeping_day, sync_timekeeping_week_from_days  # type: ignore
+    from app.services.timekeeping_service import reject_timekeeping_day, sync_timekeeping_week_from_days
     ok, msg = _persist_result(
         reject_timekeeping_day(day_id, approved_by=approved_by),
         success="Day rejected.",
@@ -2813,10 +2500,7 @@ def persist_timekeeping_day_reject(
 def persist_timekeeping_submit(employee_id: str, week_start: date) -> tuple[bool, str]:
     if _demo_blocked(employee_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.timekeeping_service import submit_timekeeping_week
-    except ImportError:
-        from services.timekeeping_service import submit_timekeeping_week  # type: ignore
+    from app.services.timekeeping_service import submit_timekeeping_week
     return _persist_result(submit_timekeeping_week(employee_id, week_start), success="Submitted for approval.")
 
 
@@ -2828,10 +2512,7 @@ def persist_timekeeping_approve(
 ) -> tuple[bool, str]:
     if _demo_blocked(employee_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.timekeeping_service import approve_timekeeping_week
-    except ImportError:
-        from services.timekeeping_service import approve_timekeeping_week  # type: ignore
+    from app.services.timekeeping_service import approve_timekeeping_week
     return _persist_result(
         approve_timekeeping_week(employee_id, week_start, approved_by=approved_by),
         success="Timecard approved.",
@@ -2847,10 +2528,7 @@ def persist_timekeeping_reject(
 ) -> tuple[bool, str]:
     if _demo_blocked(employee_id):
         return False, _DEMO_SAVE_MSG
-    try:
-        from app.services.timekeeping_service import reject_timekeeping_week
-    except ImportError:
-        from services.timekeeping_service import reject_timekeeping_week  # type: ignore
+    from app.services.timekeeping_service import reject_timekeeping_week
     return _persist_result(
         reject_timekeeping_week(employee_id, week_start, approved_by=approved_by, notes=notes),
         success="Timecard rejected.",

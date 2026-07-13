@@ -7,14 +7,8 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.auth import current_role
-    from app.services.jobs_service import can_manage_job_actions
-except ImportError:
-    from auth import current_role  # type: ignore
-    from services.jobs_service import can_manage_job_actions  # type: ignore
-
-
+from app.auth import current_role
+from app.services.jobs_service import can_manage_job_actions
 def _confirm_state_key(job_id: str, action: str) -> str:
     return f"confirm_{action}_job_{job_id}"
 

@@ -8,15 +8,9 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.services.pricing_guide_images import get_pricing_guide_image_url
-    from app.services.pricing_guide_service import class_pill_html
-    from app.utils.formatting import fmt_currency
-except ImportError:
-    from services.pricing_guide_images import get_pricing_guide_image_url  # type: ignore
-    from services.pricing_guide_service import class_pill_html  # type: ignore
-    from utils.formatting import fmt_currency  # type: ignore
-
+from app.services.pricing_guide_images import get_pricing_guide_image_url
+from app.services.pricing_guide_service import class_pill_html
+from app.utils.formatting import fmt_currency
 PG_TABLE_LAST_ACTION_KEY = "pg_list_last_action"
 
 
@@ -348,11 +342,7 @@ def render_pricing_guide_table_bridge(
     component_key: str = "ips_pricing_guide_list_bridge",
     hook_key: str = "ipsPgList::action",
 ) -> str | None:
-    try:
-        from app.ui.clean_table import _components_html
-    except ImportError:
-        from ui.clean_table import _components_html  # type: ignore
-
+    from app.ui.clean_table import _components_html
     return _components_html(
         f"""
 <script>

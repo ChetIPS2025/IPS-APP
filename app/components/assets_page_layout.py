@@ -6,21 +6,12 @@ import html
 
 import streamlit as st
 
-try:
-    from app.components.table_pagination import (
-        page_key,
-        page_size_key,
-        pagination_meta,
-        reset_table_page,
-    )
-except ImportError:
-    from components.table_pagination import (  # type: ignore
-        page_key,
-        page_size_key,
-        pagination_meta,
-        reset_table_page,
-    )
-
+from app.components.table_pagination import (
+    page_key,
+    page_size_key,
+    pagination_meta,
+    reset_table_page,
+)
 _EQUIPMENT_BANNER = (
     "Large assets and rentable equipment — tool trailers, generators, pressure washers, "
     "dump trailers, and similar fleet items."
@@ -458,11 +449,7 @@ def render_assets_summary_cards(
 
 def render_assets_equipment_row_click_bridge() -> str | None:
     """Zero-height bridge: row click opens asset detail via marker data-row-id."""
-    try:
-        from app.ui.clean_table import _components_html
-    except ImportError:
-        from ui.clean_table import _components_html  # type: ignore
-
+    from app.ui.clean_table import _components_html
     st.markdown(
         '<span class="ips-assets-row-click-bridge-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
@@ -569,11 +556,7 @@ def render_assets_equipment_row_click_bridge() -> str | None:
 
 def render_assets_table_pagination_header(total: int, table_key: str) -> tuple[int, int, int]:
     """Show: [page size] selector aligned above the table."""
-    try:
-        from app.components.table_pagination import DEFAULT_CATALOG_PAGE_SIZE
-    except ImportError:
-        from components.table_pagination import DEFAULT_CATALOG_PAGE_SIZE  # type: ignore
-
+    from app.components.table_pagination import DEFAULT_CATALOG_PAGE_SIZE
     page, page_size, total_pages = pagination_meta(total, table_key)
     _, size_col = st.columns([4.5, 1])
     with size_col:

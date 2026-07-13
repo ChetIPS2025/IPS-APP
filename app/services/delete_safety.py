@@ -9,21 +9,12 @@ from __future__ import annotations
 
 from typing import Any
 
-try:
-    from db import (
-        delete_rows_admin,
-        fetch_by_match,
-        fetch_by_match_admin,
-        update_rows_admin,
-    )
-except ImportError:
-    from app.db import (
-        delete_rows_admin,
-        fetch_by_match,
-        fetch_by_match_admin,
-        update_rows_admin,
-    )
-
+from app.db import (
+    delete_rows_admin,
+    fetch_by_match,
+    fetch_by_match_admin,
+    update_rows_admin,
+)
 _COSTING_TABLES: tuple[str, ...] = (
     "time_entries",
     "job_materials",

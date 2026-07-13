@@ -165,10 +165,7 @@ def list_all_kit_items_enriched(
     """All active kit items with parent asset context for cross-kit lists."""
     rows, _ = fetch_rows(_KIT_ITEMS, limit=10000, order_by="item_name")
     if assets_by_id is None:
-        try:
-            from app.services.phase2_modules_service import list_assets, normalize_asset
-        except ImportError:
-            from services.phase2_modules_service import list_assets, normalize_asset  # type: ignore
+        from app.services.phase2_modules_service import list_assets, normalize_asset
         assets_by_id = {
             str(a.get("id") or "").strip(): normalize_asset(a)
             for a in list_assets()
@@ -570,11 +567,7 @@ def create_asset_kit_audit(
     items = get_asset_kit_items(pid)
     by_id = {str(i.get("id")): i for i in items}
 
-    try:
-        from app.services.trailer_dashboard_service import normalize_audit_item_status, validate_audit_item_lines
-    except ImportError:
-        from services.trailer_dashboard_service import normalize_audit_item_status, validate_audit_item_lines  # type: ignore
-
+    from app.services.trailer_dashboard_service import normalize_audit_item_status, validate_audit_item_lines
     labels = {str(i.get("id") or ""): str(i.get("item_name") or "Item") for i in items}
     for line in audit_items:
         kid = str(line.get("kit_item_id") or "").strip()

@@ -17,13 +17,8 @@ from typing import Any
 import openai
 from openai import OpenAI
 
-try:
-    from app.services.asset_autofill_media import pdf_extracted_text_hints, prepare_asset_autofill_inputs
-    from app.services.asset_constants import ASSET_CONDITIONS, ASSET_TYPES
-except ImportError:
-    from services.asset_autofill_media import pdf_extracted_text_hints, prepare_asset_autofill_inputs  # type: ignore
-    from services.asset_constants import ASSET_CONDITIONS, ASSET_TYPES  # type: ignore
-
+from app.services.asset_autofill_media import pdf_extracted_text_hints, prepare_asset_autofill_inputs
+from app.services.asset_constants import ASSET_CONDITIONS, ASSET_TYPES
 # Single, module-level client (required pattern)
 try:
     client = OpenAI()

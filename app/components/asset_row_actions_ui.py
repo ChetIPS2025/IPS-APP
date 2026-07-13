@@ -6,25 +6,14 @@ from typing import Any, Callable
 
 import streamlit as st
 
-try:
-    from app.components.asset_actions import open_asset_action_confirm
-    from app.components.rental_equipment_inspection_launcher import open_rental_inspection
-    from app.pages._core._crud import is_demo_id
-    from app.services.asset_classification_service import tracking_type_label
-    from app.services.asset_kits_service import get_tool_trailers
-    from app.services.assets_service import can_manage_asset_actions
-    from app.services.rental_equipment_inspection_service import create_auto_inspection, is_rental_equipment
-    from app.services.serialized_tool_service import assign_tool_to_trailer, is_serialized_tool_asset
-except ImportError:
-    from components.asset_actions import open_asset_action_confirm  # type: ignore
-    from components.rental_equipment_inspection_launcher import open_rental_inspection  # type: ignore
-    from pages._core._crud import is_demo_id  # type: ignore
-    from services.asset_classification_service import tracking_type_label  # type: ignore
-    from services.asset_kits_service import get_tool_trailers  # type: ignore
-    from services.assets_service import can_manage_asset_actions  # type: ignore
-    from services.rental_equipment_inspection_service import create_auto_inspection, is_rental_equipment  # type: ignore
-    from services.serialized_tool_service import assign_tool_to_trailer, is_serialized_tool_asset  # type: ignore
-
+from app.components.asset_actions import open_asset_action_confirm
+from app.components.rental_equipment_inspection_launcher import open_rental_inspection
+from app.pages._core._crud import is_demo_id
+from app.services.asset_classification_service import tracking_type_label
+from app.services.asset_kits_service import get_tool_trailers
+from app.services.assets_service import can_manage_asset_actions
+from app.services.rental_equipment_inspection_service import create_auto_inspection, is_rental_equipment
+from app.services.serialized_tool_service import assign_tool_to_trailer, is_serialized_tool_asset
 ASSET_OPEN_ACTIVITY_KEY = "ast_open_activity_id"
 
 

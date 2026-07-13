@@ -65,16 +65,9 @@ _INVALID_IMAGE_TOKENS = frozenset({"", "—", "-", "none", "null", "undefined"})
 
 _HIGH_CONFIDENCE_FIELDS = frozenset({"model_number", "item_number", "sku"})
 
-try:
-    from app.config import ROOT_DIR
-    from app.db import create_signed_url, update_rows_admin, upload_bytes_admin
-    from app.services.repository import ServiceResult, clear_data_cache_for_table, filter_payload_to_table
-except ImportError:
-    from config import ROOT_DIR  # type: ignore
-    from db import create_signed_url, update_rows_admin, upload_bytes_admin  # type: ignore
-    from services.repository import ServiceResult, clear_data_cache_for_table, filter_payload_to_table  # type: ignore
-
-
+from app.config import ROOT_DIR
+from app.db import create_signed_url, update_rows_admin, upload_bytes_admin
+from app.services.repository import ServiceResult, clear_data_cache_for_table, filter_payload_to_table
 @dataclass
 class ImageMatchResult:
     filename: str
@@ -363,10 +356,7 @@ def _update_item_image_row(table: str, payload: dict[str, Any], record_id: str) 
     try:
         rows = update_rows_admin(table, filtered, {"id": rid})
     except Exception as exc:
-        try:
-            from app.auth import friendly_auth_error_message
-        except ImportError:
-            from auth import friendly_auth_error_message  # type: ignore
+        from app.auth import friendly_auth_error_message
         return ServiceResult(
             ok=False,
             error=friendly_auth_error_message(exc, operation=f"save image for {table}"),
@@ -599,10 +589,7 @@ def persist_item_image(
     try:
         upload_bytes_admin(storage_path, data, mime, bucket=None)
     except Exception as exc:
-        try:
-            from app.auth import friendly_auth_error_message
-        except ImportError:
-            from auth import friendly_auth_error_message  # type: ignore
+        from app.auth import friendly_auth_error_message
         return ServiceResult(
             ok=False,
             error=friendly_auth_error_message(exc, operation="upload image"),

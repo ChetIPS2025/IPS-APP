@@ -7,51 +7,27 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.auth import current_profile
-    from app.components.rental_equipment_inspection_launcher import (
-        clear_rental_inspection_context,
-        set_rental_inspection_context,
-    )
-    from app.pages.rental_equipment_inspection import render_inspection_form
-    from app.services.assets_service import get_asset_image_url
-    from app.services.rental_equipment_inspection_service import (
-        create_auto_inspection,
-        create_damage_report,
-        get_rental_equipment_dashboard_summary,
-        get_rental_inspection,
-        inspection_type_label,
-        list_rental_inspections_for_asset,
-        save_rental_inspection,
-        upload_inspection_photo,
-        validate_for_complete,
-    )
-    from app.services.rental_equipment_inspection_specs import DAMAGE_ITEM_OPTIONS
-    from app.styles import inject_trailer_dashboard_css
-    from app.utils.formatting import fmt_date
-except ImportError:
-    from auth import current_profile  # type: ignore
-    from components.rental_equipment_inspection_launcher import (  # type: ignore
-        clear_rental_inspection_context,
-        set_rental_inspection_context,
-    )
-    from pages.rental_equipment_inspection import render_inspection_form  # type: ignore
-    from services.assets_service import get_asset_image_url  # type: ignore
-    from services.rental_equipment_inspection_service import (  # type: ignore
-        create_auto_inspection,
-        create_damage_report,
-        get_rental_equipment_dashboard_summary,
-        get_rental_inspection,
-        inspection_type_label,
-        list_rental_inspections_for_asset,
-        save_rental_inspection,
-        upload_inspection_photo,
-        validate_for_complete,
-    )
-    from services.rental_equipment_inspection_specs import DAMAGE_ITEM_OPTIONS  # type: ignore
-    from styles import inject_trailer_dashboard_css  # type: ignore
-    from utils.formatting import fmt_date  # type: ignore
-
+from app.auth import current_profile
+from app.components.rental_equipment_inspection_launcher import (
+    clear_rental_inspection_context,
+    set_rental_inspection_context,
+)
+from app.pages.rental_equipment_inspection import render_inspection_form
+from app.services.assets_service import get_asset_image_url
+from app.services.rental_equipment_inspection_service import (
+    create_auto_inspection,
+    create_damage_report,
+    get_rental_equipment_dashboard_summary,
+    get_rental_inspection,
+    inspection_type_label,
+    list_rental_inspections_for_asset,
+    save_rental_inspection,
+    upload_inspection_photo,
+    validate_for_complete,
+)
+from app.services.rental_equipment_inspection_specs import DAMAGE_ITEM_OPTIONS
+from app.styles import inject_trailer_dashboard_css
+from app.utils.formatting import fmt_date
 _VIEW_KEY = "_rental_dash_view"
 
 

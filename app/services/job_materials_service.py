@@ -104,11 +104,7 @@ def resolve_inventory_by_scan_code(code: str) -> ServiceResult:
             return result
         return ServiceResult(ok=False, error=str(result.error or "Invalid inventory QR code."))
 
-    try:
-        from app.db import fetch_by_match_admin
-    except ImportError:
-        from db import fetch_by_match_admin  # type: ignore
-
+    from app.db import fetch_by_match_admin
     for field in ("qr_code_value", "sku"):
         rows = fetch_by_match_admin("inventory_items", {field: raw}, limit=5) or []
         if len(rows) == 1:
@@ -134,10 +130,7 @@ def _inventory_display_name(item: dict[str, Any]) -> str:
 
 
 def _pricing_guide_unit_cost(row: dict[str, Any]) -> float:
-    try:
-        from app.services.pricing_guide_service import resolve_live_unit_cost
-    except ImportError:
-        from services.pricing_guide_service import resolve_live_unit_cost  # type: ignore
+    from app.services.pricing_guide_service import resolve_live_unit_cost
     cost = resolve_live_unit_cost(row)
     if cost > 0:
         return cost
@@ -163,16 +156,10 @@ def get_pricing_guide_item(item_id: str) -> dict[str, Any] | None:
 
 def list_pricing_guide_job_options(*, include_inactive: bool = False) -> list[dict[str, Any]]:
     """Active Pricing Guide rows suitable for job material costing (no inventory movement)."""
-    try:
-        from app.services.pricing_guide_service import (
-            _MATERIAL_LIKE_TYPES,
-            cached_pricing_guide_rows,
-        )
-    except ImportError:
-        from services.pricing_guide_service import (  # type: ignore
-            _MATERIAL_LIKE_TYPES,
-            cached_pricing_guide_rows,
-        )
+    from app.services.pricing_guide_service import (
+        _MATERIAL_LIKE_TYPES,
+        cached_pricing_guide_rows,
+    )
     rows = cached_pricing_guide_rows(include_inactive=include_inactive)
     out: list[dict[str, Any]] = []
     for row in rows:
@@ -237,10 +224,7 @@ def add_pricing_guide_job_material(
 def _insert_job_material(payload: dict[str, Any]) -> ServiceResult:
     result = insert_row(_JOB_MATERIALS_TABLE, payload)
     if result.ok and isinstance(result.data, dict):
-        try:
-            from app.services.job_cost_transaction_service import _safe_sync, sync_job_material
-        except ImportError:
-            from services.job_cost_transaction_service import _safe_sync, sync_job_material  # type: ignore
+        from app.services.job_cost_transaction_service import _safe_sync, sync_job_material
         _safe_sync(sync_job_material, result.data)
     return result
 
@@ -271,10 +255,7 @@ def issue_inventory_to_job(
     jid = str(job_id or "").strip()
     iid = str(inventory_item_id or "").strip()
     txn_type = str(transaction_type or "consume_on_job").strip().lower()
-    try:
-        from app.utils.inventory_quantity import try_parse_inventory_quantity
-    except ImportError:
-        from utils.inventory_quantity import try_parse_inventory_quantity  # type: ignore
+    from app.utils.inventory_quantity import try_parse_inventory_quantity
     qty, qty_err = try_parse_inventory_quantity(quantity, allow_zero=False, field_name="Quantity")
     if qty_err or qty is None:
         return ServiceResult(ok=False, error=qty_err or "Quantity must be greater than zero.")

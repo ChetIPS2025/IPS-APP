@@ -9,16 +9,8 @@ from typing import Any
 import streamlit as st
 from streamlit.components.v1 import html as components_html
 
-try:
-    from app.db import fetch_one, get_client
-except ImportError:
-    from db import fetch_one, get_client  # type: ignore
-
-try:
-    from app.config import settings
-except ImportError:
-    from config import settings  # type: ignore
-
+from app.db import fetch_one, get_client
+from app.config import settings
 # Browser cookie names (Supabase access / refresh JWTs; HttpOnly not available from Streamlit JS bridge).
 _COOKIE_ACCESS = "ips_auth_at"
 _COOKIE_REFRESH = "ips_auth_rt"
@@ -230,10 +222,7 @@ def _clear_cached_identity_keys(*, preserve_auth_checked: bool = False) -> None:
     auth_checked = bool(st.session_state.get("auth_checked")) if preserve_auth_checked else False
     for key in _CACHED_IDENTITY_KEYS:
         st.session_state.pop(key, None)
-    try:
-        from app.utils.view_as import clear_view_as
-    except ImportError:
-        from utils.view_as import clear_view_as  # type: ignore
+    from app.utils.view_as import clear_view_as
     clear_view_as()
     st.session_state["authenticated"] = False
     st.session_state["is_authenticated"] = False
@@ -286,10 +275,7 @@ def _sync_current_user_snapshot(profile: dict[str, Any], *, auth_user_id: str) -
 def _clear_stale_user_identity() -> None:
     """Drop cached profile/employee identity before binding a new authenticated user."""
     _clear_cached_identity_keys(preserve_auth_checked=True)
-    try:
-        from app.db import clear_streamlit_db_read_cache
-    except ImportError:
-        from db import clear_streamlit_db_read_cache  # type: ignore
+    from app.db import clear_streamlit_db_read_cache
     clear_streamlit_db_read_cache()
 
 
@@ -312,20 +298,14 @@ def _fetch_profile_for_auth_user_id(uid: str) -> dict[str, Any] | None:
     auth_uid = str(uid or "").strip()
     if not auth_uid:
         return None
-    try:
-        from app.db import clear_streamlit_db_read_cache
-    except ImportError:
-        from db import clear_streamlit_db_read_cache  # type: ignore
+    from app.db import clear_streamlit_db_read_cache
     clear_streamlit_db_read_cache()
 
     profile = fetch_one("profiles", {"id": auth_uid})
     if profile and _profile_matches_auth_user(profile, auth_uid):
         return profile
 
-    try:
-        from app.services.repository import table_column_names
-    except ImportError:
-        from services.repository import table_column_names  # type: ignore
+    from app.services.repository import table_column_names
     cols = table_column_names("profiles")
     if cols and "user_id" in cols:
         profile = fetch_one("profiles", {"user_id": auth_uid})
@@ -371,10 +351,7 @@ def ensure_authenticated_user_identity(*, force_profile_reload: bool = False) ->
     if identity_changed or force_profile_reload:
         if identity_changed:
             _clear_cached_identity_keys(preserve_auth_checked=True)
-            try:
-                from app.db import clear_streamlit_db_read_cache
-            except ImportError:
-                from db import clear_streamlit_db_read_cache  # type: ignore
+            from app.db import clear_streamlit_db_read_cache
             clear_streamlit_db_read_cache()
 
         profile = _fetch_profile_for_auth_user_id(live_uid)
@@ -423,10 +400,7 @@ def _apply_user_and_profile_from_auth_user(user: Any, *, email_hint: str = "", p
     if not uid:
         raise RuntimeError("Login failed: Supabase returned a user without an id.")
 
-    try:
-        from app.db import clear_streamlit_db_read_cache
-    except ImportError:
-        from db import clear_streamlit_db_read_cache  # type: ignore
+    from app.db import clear_streamlit_db_read_cache
     clear_streamlit_db_read_cache()
 
     profile = _fetch_profile_for_auth_user_id(uid)
@@ -711,11 +685,7 @@ def run_auth_browser_cookie_effects() -> None:
 
 
 def sign_in(email: str, password: str, *, remember_device: bool = False) -> None:
-    try:
-        from app.config import validate_supabase_public_config
-    except ImportError:
-        from config import validate_supabase_public_config  # type: ignore
-
+    from app.config import validate_supabase_public_config
     cfg_err = validate_supabase_public_config()
     if cfg_err:
         raise RuntimeError(cfg_err)
@@ -766,11 +736,7 @@ def sign_in(email: str, password: str, *, remember_device: bool = False) -> None
     _clear_stale_user_identity()
     _apply_user_and_profile_from_auth_user(user, email_hint=email)
 
-    try:
-        from app.db import clear_streamlit_db_read_cache
-    except ImportError:
-        from db import clear_streamlit_db_read_cache  # type: ignore
-
+    from app.db import clear_streamlit_db_read_cache
     clear_streamlit_db_read_cache()
 
     toks = _auth_session_tokens(client)
@@ -842,11 +808,7 @@ def verify_phone_otp(*, phone_number: str, code: str, remember_device: bool = Fa
     _clear_stale_user_identity()
     _apply_user_and_profile_from_auth_user(user, phone_hint=ph)
 
-    try:
-        from app.db import clear_streamlit_db_read_cache
-    except ImportError:
-        from db import clear_streamlit_db_read_cache  # type: ignore
-
+    from app.db import clear_streamlit_db_read_cache
     clear_streamlit_db_read_cache()
 
     toks = _auth_session_tokens(client)
@@ -869,11 +831,7 @@ def sign_out() -> None:
     # Keep auth_checked True so bootstrap does not re-show login during sign-out reload.
     st.session_state["auth_checked"] = True
     st.session_state["_ips_auth_clear_pending"] = True
-    try:
-        from app.db import clear_streamlit_db_read_cache
-    except ImportError:
-        from db import clear_streamlit_db_read_cache  # type: ignore
-
+    from app.db import clear_streamlit_db_read_cache
     clear_streamlit_db_read_cache()
 
 
@@ -957,10 +915,7 @@ def get_current_user_role() -> str:
 
 def effective_role() -> str:
     """UI/navigation role (admin View As preview overrides visibility only)."""
-    try:
-        from app.utils.view_as import ui_role
-    except ImportError:
-        from utils.view_as import ui_role  # type: ignore
+    from app.utils.view_as import ui_role
     return ui_role()
 
 
@@ -988,10 +943,7 @@ def update_password(new_password: str) -> None:
     prof = current_profile()
     pid = str(prof.get("id") or "").strip()
     if pid:
-        try:
-            from app.services.repository import update_row_admin
-        except ImportError:
-            from services.repository import update_row_admin  # type: ignore
+        from app.services.repository import update_row_admin
         try:
             update_row_admin("profiles", {"must_reset_password": False}, {"id": pid})
             st.session_state["auth_profile"] = {**prof, "must_reset_password": False}

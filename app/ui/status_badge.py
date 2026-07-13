@@ -6,11 +6,7 @@ import html
 
 import streamlit as st
 
-try:
-    from app.components.status import status_pill_html as _legacy_pill_html
-except ImportError:
-    from components.status import status_pill_html as _legacy_pill_html  # type: ignore
-
+from app.components.status import status_pill_html as _legacy_pill_html
 _DISPLAY_LABELS: dict[str, str] = {
     "active": "Active",
     "inactive": "Inactive",

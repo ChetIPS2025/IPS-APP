@@ -17,10 +17,7 @@ EXPENSE_STATUSES: tuple[str, ...] = ("Open", "Approved", "Rejected")
 
 
 def _db():
-    try:
-        import app.db as db
-    except ImportError:
-        import db  # type: ignore
+    import app.db as db
     return db
 
 
@@ -102,15 +99,9 @@ def save_job_expense(
         return False, str(exc) or "Could not save expense."
     if not saved_id:
         return False, "Could not save expense."
-    try:
-        from app.services.job_cost_transaction_service import _safe_sync, sync_job_expense
-    except ImportError:
-        from services.job_cost_transaction_service import _safe_sync, sync_job_expense  # type: ignore
+    from app.services.job_cost_transaction_service import _safe_sync, sync_job_expense
     _safe_sync(sync_job_expense, saved_id)
-    try:
-        from app.services.repository import clear_data_cache_for_table
-    except ImportError:
-        from services.repository import clear_data_cache_for_table  # type: ignore
+    from app.services.repository import clear_data_cache_for_table
     clear_data_cache_for_table("job_expenses")
     return True, "Expense saved."
 
@@ -128,21 +119,12 @@ def delete_job_expense(row_id: str) -> tuple[bool, str]:
         db.delete_rows("job_expenses", {"id": xid})
     except Exception as exc:
         return False, str(exc) or "Could not delete expense."
-    try:
-        from app.services.job_cost_transaction_service import delete_job_cost_transaction, refresh_job_actual_cost
-    except ImportError:
-        from services.job_cost_transaction_service import (  # type: ignore
-            delete_job_cost_transaction,
-            refresh_job_actual_cost,
-        )
+    from app.services.job_cost_transaction_service import delete_job_cost_transaction, refresh_job_actual_cost
     delete_job_cost_transaction("job_expense", xid)
     if rows:
         jid = str(rows[0].get("job_id") or "").strip()
         if jid:
             refresh_job_actual_cost(jid)
-    try:
-        from app.services.repository import clear_data_cache_for_table
-    except ImportError:
-        from services.repository import clear_data_cache_for_table  # type: ignore
+    from app.services.repository import clear_data_cache_for_table
     clear_data_cache_for_table("job_expenses")
     return True, "Expense removed."

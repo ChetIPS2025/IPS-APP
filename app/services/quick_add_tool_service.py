@@ -7,17 +7,10 @@ import io
 import re
 from typing import Any
 
-try:
-    from app.services.asset_classification_service import _map_category_to_hand_tool
-    from app.services.repository import ServiceResult, update_row_admin
-    from app.services.serialized_tool_service import create_serialized_tool
-    from app.services.small_hand_tool_service import HAND_TOOL_CATEGORIES, save_hand_tool
-except ImportError:
-    from services.asset_classification_service import _map_category_to_hand_tool  # type: ignore
-    from services.repository import ServiceResult, update_row_admin  # type: ignore
-    from services.serialized_tool_service import create_serialized_tool  # type: ignore
-    from services.small_hand_tool_service import HAND_TOOL_CATEGORIES, save_hand_tool  # type: ignore
-
+from app.services.asset_classification_service import _map_category_to_hand_tool
+from app.services.repository import ServiceResult, update_row_admin
+from app.services.serialized_tool_service import create_serialized_tool
+from app.services.small_hand_tool_service import HAND_TOOL_CATEGORIES, save_hand_tool
 TOOL_KINDS: tuple[str, ...] = ("serialized", "small", "inventory")
 
 TOOL_KIND_LABELS: dict[str, str] = {
@@ -27,10 +20,7 @@ TOOL_KIND_LABELS: dict[str, str] = {
 }
 
 def _friendly_tool_save_error(err: str) -> str:
-    try:
-        from app.auth import SESSION_EXPIRED_USER_MESSAGE, is_jwt_expired_error
-    except ImportError:
-        from auth import SESSION_EXPIRED_USER_MESSAGE, is_jwt_expired_error  # type: ignore
+    from app.auth import SESSION_EXPIRED_USER_MESSAGE, is_jwt_expired_error
     if is_jwt_expired_error(RuntimeError(str(err or ""))):
         return SESSION_EXPIRED_USER_MESSAGE
     return str(err or "Save failed.")
@@ -132,10 +122,7 @@ def _resolve_trailer_id(asset_number: str) -> str:
     num = _clean(asset_number)
     if not num:
         return ""
-    try:
-        from app.services.repository import fetch_rows
-    except ImportError:
-        from services.repository import fetch_rows  # type: ignore
+    from app.services.repository import fetch_rows
     assets, _ = fetch_rows("assets", limit=5000)
     for row in assets or []:
         if not isinstance(row, dict):
@@ -150,11 +137,7 @@ EXISTING_ASSET_FOUND_CODE = "existing_asset_found"
 
 def lookup_existing_serialized_by_serial(serial: str) -> dict[str, Any] | None:
     """Return existing serialized asset metadata when serial is already in use."""
-    try:
-        from app.services.serialized_tool_service import find_serialized_tool_by_serial
-    except ImportError:
-        from services.serialized_tool_service import find_serialized_tool_by_serial  # type: ignore
-
+    from app.services.serialized_tool_service import find_serialized_tool_by_serial
     cleaned = _clean(serial)
     if not cleaned:
         return None
@@ -197,10 +180,7 @@ def check_serialized_serial_duplicate(serial: str) -> ServiceResult:
 
 
 def merge_serialized_tool_from_intake(asset_id: str, data: dict[str, Any]) -> ServiceResult:
-    try:
-        from app.services.serialized_tool_service import merge_serialized_tool_fields
-    except ImportError:
-        from services.serialized_tool_service import merge_serialized_tool_fields  # type: ignore
+    from app.services.serialized_tool_service import merge_serialized_tool_fields
     result = merge_serialized_tool_fields(asset_id, data)
     return result
 
@@ -256,11 +236,7 @@ def quick_add_tool(
         )
 
     # inventory consumables
-    try:
-        from app.services.phase2_modules_service import save_inventory_item
-    except ImportError:
-        from services.phase2_modules_service import save_inventory_item  # type: ignore
-
+    from app.services.phase2_modules_service import save_inventory_item
     item_name = _clean(data.get("tool_name") or data.get("item_name") or data.get("asset_name"))
     if not item_name:
         return ServiceResult(ok=False, error="Item name is required.")
@@ -304,10 +280,7 @@ def bulk_import_tools(
             errors.append(f"Row {idx}: {_friendly_tool_save_error(result.error or 'failed')}")
 
     if created == 0 and errors:
-        try:
-            from app.auth import SESSION_EXPIRED_USER_MESSAGE
-        except ImportError:
-            from auth import SESSION_EXPIRED_USER_MESSAGE  # type: ignore
+        from app.auth import SESSION_EXPIRED_USER_MESSAGE
         unique_msgs = list(dict.fromkeys(errors))
         if len(unique_msgs) == 1 and SESSION_EXPIRED_USER_MESSAGE in unique_msgs[0]:
             summary = SESSION_EXPIRED_USER_MESSAGE
@@ -323,10 +296,7 @@ def bulk_import_tools(
 
 def attach_tool_photo(asset_id: str, uploaded: Any, *, uploaded_by: str | None = None) -> ServiceResult:
     """Save original upload for evidence and a converted preview for thumbnails/OCR."""
-    try:
-        from app.services.upload_media_strategy import attach_asset_photo_with_preview
-    except ImportError:
-        from services.upload_media_strategy import attach_asset_photo_with_preview  # type: ignore
+    from app.services.upload_media_strategy import attach_asset_photo_with_preview
     return attach_asset_photo_with_preview(asset_id, uploaded, uploaded_by=uploaded_by)
 
 
@@ -338,21 +308,12 @@ def analyze_tool_photos(
     """Extract tool fields, default upload primary, and optional catalog product suggestions."""
     if not uploads:
         return ServiceResult(ok=False, error="Upload at least one photo or document.")
-    try:
-        from app.services.tool_intake_ai_service import extract_tool_from_photos
-        from app.services.tool_preview_image_service import (
-            find_product_image_suggestions,
-            pick_best_upload_preview,
-            preview_image_to_dict,
-        )
-    except ImportError:
-        from services.tool_intake_ai_service import extract_tool_from_photos  # type: ignore
-        from services.tool_preview_image_service import (  # type: ignore
-            find_product_image_suggestions,
-            pick_best_upload_preview,
-            preview_image_to_dict,
-        )
-
+    from app.services.tool_intake_ai_service import extract_tool_from_photos
+    from app.services.tool_preview_image_service import (
+        find_product_image_suggestions,
+        pick_best_upload_preview,
+        preview_image_to_dict,
+    )
     try:
         extracted = extract_tool_from_photos(uploads, kind_hint=kind_hint)
         upload_preview = pick_best_upload_preview(uploads)
@@ -383,10 +344,7 @@ def attach_tool_photos_bundle(
     uploaded_by: str | None = None,
 ) -> ServiceResult:
     """Save all source uploads and set the chosen primary preview on the asset."""
-    try:
-        from app.services.upload_media_strategy import attach_asset_photos_bundle
-    except ImportError:
-        from services.upload_media_strategy import attach_asset_photos_bundle  # type: ignore
+    from app.services.upload_media_strategy import attach_asset_photos_bundle
     return attach_asset_photos_bundle(
         asset_id,
         uploads,
@@ -399,10 +357,7 @@ def attach_tool_photos_bundle(
 def attach_tool_receipt(asset: dict[str, Any], uploaded: Any, *, uploaded_by: str | None = None) -> ServiceResult:
     if not asset or uploaded is None:
         return ServiceResult(ok=False, error="Asset and receipt are required.")
-    try:
-        from app.services.asset_document_util import persist_asset_document_upload
-    except ImportError:
-        from services.asset_document_util import persist_asset_document_upload  # type: ignore
+    from app.services.asset_document_util import persist_asset_document_upload
     try:
         persist_asset_document_upload(
             asset_row=asset,

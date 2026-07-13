@@ -5,13 +5,8 @@ import streamlit as st
 
 from app.auth import current_profile, current_role, sign_out
 
-try:
-    from app.mobile_ui import inject_ips_global_mobile_css, inject_sidebar_mobile_auto_collapse_once
-    from app.pwa import render_install_app_sidebar_block
-except ImportError:
-    from mobile_ui import inject_ips_global_mobile_css, inject_sidebar_mobile_auto_collapse_once  # type: ignore
-    from pwa import render_install_app_sidebar_block  # type: ignore
-
+from app.mobile_ui import inject_ips_global_mobile_css, inject_sidebar_mobile_auto_collapse_once
+from app.pwa import render_install_app_sidebar_block
 def _repo_root() -> Path:
     """Resolve repository root whether this module is ``app/ui/__init__.py`` or legacy ``app/ui.py``."""
     p = Path(__file__).resolve()
@@ -860,13 +855,7 @@ def render_sidebar() -> str:
     _sidebar_brand()
     nav_early = str(st.session_state.get(IPS_NAV_PAGE_KEY) or "Dashboard")
     if nav_early == "Dashboard":
-        try:
-            from app.pages.dashboard.coastal_sidebar import inject_coastal_sidebar_header
-        except ImportError:
-            try:
-                from pages.dashboard.coastal_sidebar import inject_coastal_sidebar_header  # type: ignore
-            except ImportError:
-                inject_coastal_sidebar_header = None  # type: ignore
+        from app.pages.dashboard.coastal_sidebar import inject_coastal_sidebar_header
         if inject_coastal_sidebar_header:
             inject_coastal_sidebar_header()
 
@@ -874,10 +863,7 @@ def render_sidebar() -> str:
 
     _ensure_valid_nav_page()
     _inject_sidebar_nav_css()
-    try:
-        from app.ui.components.sidebar import inject_sidebar_theme
-    except ImportError:
-        from ui.components.sidebar import inject_sidebar_theme  # type: ignore
+    from app.ui.components.sidebar import inject_sidebar_theme
     inject_sidebar_theme()
     inject_ips_global_mobile_css()
     inject_sidebar_mobile_auto_collapse_once()

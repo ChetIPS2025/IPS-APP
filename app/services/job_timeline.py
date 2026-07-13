@@ -7,7 +7,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from services.field_ops_util import fetch_fn, table_exists, write_fn
+from app.services.field_ops_util import fetch_fn, table_exists, write_fn
 
 _LOG = logging.getLogger(__name__)
 

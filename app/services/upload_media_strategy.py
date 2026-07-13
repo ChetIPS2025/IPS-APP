@@ -14,11 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-try:
-    from app.services.repository import ServiceResult
-except ImportError:
-    from services.repository import ServiceResult  # type: ignore
-
+from app.services.repository import ServiceResult
 WEB_PREVIEW_EXTENSIONS: frozenset[str] = frozenset({".jpg", ".jpeg", ".png", ".webp"})
 SOURCE_DOCUMENT_TYPE = "Source photo"
 SOURCE_DOCUMENT_NOTES = "Original upload — preserved for evidence; app preview is a converted copy."
@@ -62,14 +58,8 @@ def _guess_content_type(filename: str, content_type: str = "") -> str:
 
 
 def _sync_asset_primary_image(asset_id: str, existing: dict[str, Any] | None = None) -> None:
-    try:
-        from app.services.catalog_image_sync import sync_catalog_images_for_asset
-    except ImportError:
-        from services.catalog_image_sync import sync_catalog_images_for_asset  # type: ignore
-    try:
-        from app.pages._core._data import load_assets
-    except ImportError:
-        from pages._core._data import load_assets  # type: ignore
+    from app.services.catalog_image_sync import sync_catalog_images_for_asset
+    from app.pages._core._data import load_assets
     aid = str(asset_id or "").strip()
     source = next((r for r in load_assets() if str(r.get("id") or "") == aid), None) or existing or {"id": aid}
     sync_catalog_images_for_asset(source)
@@ -121,11 +111,7 @@ def upload_asset_media(
         except ValueError as exc:
             return ServiceResult(ok=False, error=str(exc))
 
-    try:
-        from app.services.item_images import persist_item_image
-    except ImportError:
-        from services.item_images import persist_item_image  # type: ignore
-
+    from app.services.item_images import persist_item_image
     result = persist_item_image(
         table="assets",
         record_id=aid,
@@ -160,18 +146,12 @@ def build_display_preview(file_bytes: bytes, file_name: str) -> tuple[bytes, str
     name = str(file_name or "upload").strip() or "upload"
 
     if needs_display_conversion(name):
-        try:
-            from app.services.asset_autofill_media import prepare_asset_autofill_inputs
-        except ImportError:
-            from services.asset_autofill_media import prepare_asset_autofill_inputs  # type: ignore
+        from app.services.asset_autofill_media import prepare_asset_autofill_inputs
         prepared = prepare_asset_autofill_inputs([(file_bytes, name)])
         preview_bytes, preview_name = prepared[0]
         return preview_bytes, preview_name
 
-    try:
-        from app.services.item_images import resize_item_image_bytes
-    except ImportError:
-        from services.item_images import resize_item_image_bytes  # type: ignore
+    from app.services.item_images import resize_item_image_bytes
     preview_bytes, _mime = resize_item_image_bytes(file_bytes)
     stem = Path(name).stem or "preview"
     return preview_bytes, f"{stem}.jpg"
@@ -179,10 +159,7 @@ def build_display_preview(file_bytes: bytes, file_name: str) -> tuple[bytes, str
 
 def vision_inputs_from_upload(file_bytes: bytes, file_name: str) -> list[tuple[bytes, str]]:
     """All raster pages/images for vision/OCR (never sends raw HEIC/PDF to the model)."""
-    try:
-        from app.services.asset_autofill_media import prepare_asset_autofill_inputs
-    except ImportError:
-        from services.asset_autofill_media import prepare_asset_autofill_inputs  # type: ignore
+    from app.services.asset_autofill_media import prepare_asset_autofill_inputs
     return prepare_asset_autofill_inputs([(file_bytes, file_name)])
 
 
@@ -201,10 +178,7 @@ def persist_original_asset_upload(
     raw = uploaded.getvalue()
     if not raw:
         return ServiceResult(ok=False, error="Uploaded file is empty.")
-    try:
-        from app.services.asset_document_util import persist_asset_document_upload
-    except ImportError:
-        from services.asset_document_util import persist_asset_document_upload  # type: ignore
+    from app.services.asset_document_util import persist_asset_document_upload
     try:
         row = persist_asset_document_upload(
             asset_row={"id": aid},
@@ -326,10 +300,7 @@ def attach_asset_photos_bundle(
                 source_errors.append(result.error or f"Source upload {idx} failed.")
                 continue
             # Preserve per-file evidence note on the document row when possible.
-            try:
-                from app.services.repository import update_row
-            except ImportError:
-                from services.repository import update_row  # type: ignore
+            from app.services.repository import update_row
             doc = (result.data or {}).get("document") if isinstance(result.data, dict) else None
             if isinstance(doc, dict) and doc.get("id"):
                 update_row("asset_documents", {"notes": note}, {"id": doc["id"]})

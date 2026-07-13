@@ -8,16 +8,9 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.components.action_styles import success_solid_button
-    from app.pages._core._crud import is_demo_id
-    from app.services.catalog_presence_service import apply_catalog_presence, resolve_catalog_presence
-except ImportError:
-    from components.action_styles import success_solid_button  # type: ignore
-    from pages._core._crud import is_demo_id  # type: ignore
-    from services.catalog_presence_service import apply_catalog_presence, resolve_catalog_presence  # type: ignore
-
-
+from app.components.action_styles import success_solid_button
+from app.pages._core._crud import is_demo_id
+from app.services.catalog_presence_service import apply_catalog_presence, resolve_catalog_presence
 def _confirm_state_key(item_id: str) -> str:
     return f"confirm_catalog_presence_{item_id}"
 
@@ -39,10 +32,7 @@ def _fresh_pricing_row(row: dict[str, Any]) -> dict[str, Any]:
     pid = str(row.get("id") or "").strip()
     if not pid:
         return row
-    try:
-        from app.services.pricing_guide_service import cached_pricing_guide_rows
-    except ImportError:
-        from services.pricing_guide_service import cached_pricing_guide_rows  # type: ignore
+    from app.services.pricing_guide_service import cached_pricing_guide_rows
     return next(
         (r for r in cached_pricing_guide_rows(include_inactive=True) if str(r.get("id") or "") == pid),
         row,

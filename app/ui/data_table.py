@@ -7,27 +7,15 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.components.status import status_pill_html
-    from app.components.table_filters import apply_column_filters, build_filter_options
-    from app.components.table_pagination import (
-        paginate_rows,
-        render_table_pagination_footer,
-        render_table_pagination_header,
-    )
-    from app.components.tables import render_data_table as _render_core_table
-    from app.ui.status_badge import status_badge_html
-except ImportError:
-    from components.status import status_pill_html  # type: ignore
-    from components.table_filters import apply_column_filters, build_filter_options  # type: ignore
-    from components.table_pagination import (  # type: ignore
-        paginate_rows,
-        render_table_pagination_footer,
-        render_table_pagination_header,
-    )
-    from components.tables import render_data_table as _render_core_table  # type: ignore
-    from ui.status_badge import status_badge_html  # type: ignore
-
+from app.components.status import status_pill_html
+from app.components.table_filters import apply_column_filters, build_filter_options
+from app.components.table_pagination import (
+    paginate_rows,
+    render_table_pagination_footer,
+    render_table_pagination_header,
+)
+from app.components.tables import render_data_table as _render_core_table
+from app.ui.status_badge import status_badge_html
 HtmlCellFn = Callable[[str, dict[str, Any]], str]
 
 

@@ -6,11 +6,7 @@ from collections import Counter, defaultdict
 from datetime import date, timedelta
 from typing import Any
 
-try:
-    from app.services import task_photos as _task_photos
-except ImportError:
-    import services.task_photos as _task_photos  # type: ignore
-
+from app.services import task_photos as _task_photos
 _GOAL_OPEN = frozenset({"open", "in_progress"})
 
 _DELAY_LABELS: dict[str, str] = {

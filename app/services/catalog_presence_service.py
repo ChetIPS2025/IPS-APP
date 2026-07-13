@@ -5,39 +5,21 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-try:
-    from app.services.assets_service import (
-        clear_assets_cache,
-        delete_asset_record,
-        set_asset_include_in_pricing_guide,
-    )
-    from app.services.inventory_service import clear_inventory_cache, get_inventory_item
-    from app.services.phase2_modules_service import delete_inventory_item
-    from app.services.pricing_guide_service import (
-        cached_pricing_guide_rows,
-        clear_pricing_guide_cache,
-        link_asset_to_pricing_item,
-        link_inventory_to_pricing_item,
-        slug_item_code,
-    )
-    from app.services.repository import ServiceResult
-except ImportError:
-    from services.assets_service import (  # type: ignore
-        clear_assets_cache,
-        delete_asset_record,
-        set_asset_include_in_pricing_guide,
-    )
-    from services.inventory_service import clear_inventory_cache, get_inventory_item  # type: ignore
-    from services.phase2_modules_service import delete_inventory_item  # type: ignore
-    from services.pricing_guide_service import (  # type: ignore
-        cached_pricing_guide_rows,
-        clear_pricing_guide_cache,
-        link_asset_to_pricing_item,
-        link_inventory_to_pricing_item,
-        slug_item_code,
-    )
-    from services.repository import ServiceResult  # type: ignore
-
+from app.services.assets_service import (
+    clear_assets_cache,
+    delete_asset_record,
+    set_asset_include_in_pricing_guide,
+)
+from app.services.inventory_service import clear_inventory_cache, get_inventory_item
+from app.services.phase2_modules_service import delete_inventory_item
+from app.services.pricing_guide_service import (
+    cached_pricing_guide_rows,
+    clear_pricing_guide_cache,
+    link_asset_to_pricing_item,
+    link_inventory_to_pricing_item,
+    slug_item_code,
+)
+from app.services.repository import ServiceResult
 __all__ = [
     "apply_catalog_presence",
     "resolve_catalog_presence",
@@ -49,18 +31,12 @@ def _now_iso() -> str:
 
 
 def _filter_table_payload(table: str, payload: dict[str, Any]) -> dict[str, Any]:
-    try:
-        from app.services.repository import filter_payload_to_table
-    except ImportError:
-        from services.repository import filter_payload_to_table  # type: ignore
+    from app.services.repository import filter_payload_to_table
     return filter_payload_to_table(table, payload)
 
 
 def _admin_insert_row(table: str, payload: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
-    try:
-        from app.services.repository import insert_row_admin
-    except ImportError:
-        from services.repository import insert_row_admin  # type: ignore
+    from app.services.repository import insert_row_admin
     res = insert_row_admin(table, _filter_table_payload(table, payload))
     if res.ok and isinstance(res.data, dict):
         return res.data, None
@@ -79,10 +55,7 @@ def _load_asset_row(asset_id: str) -> dict[str, Any] | None:
     aid = str(asset_id or "").strip()
     if not aid:
         return None
-    try:
-        from app.pages._core._data import load_assets
-    except ImportError:
-        from pages._core._data import load_assets  # type: ignore
+    from app.pages._core._data import load_assets
     return next((r for r in load_assets() if str(r.get("id") or "") == aid), None)
 
 
@@ -136,10 +109,7 @@ def _recompute_item_class(
         item_class = "Asset"
     else:
         item_class = "Non-Inventory"
-    try:
-        from app.services.repository import update_row_admin
-    except ImportError:
-        from services.repository import update_row_admin  # type: ignore
+    from app.services.repository import update_row_admin
     res = update_row_admin(
         "pricing_guide_items",
         {
@@ -160,11 +130,7 @@ def _set_pricing_guide_visibility(row: dict[str, Any], *, visible: bool) -> Serv
     pid = str(row.get("id") or "").strip()
     if not pid:
         return ServiceResult(ok=False, error="Missing pricing item id.")
-    try:
-        from app.services.repository import update_row_admin
-    except ImportError:
-        from services.repository import update_row_admin  # type: ignore
-
+    from app.services.repository import update_row_admin
     res = update_row_admin(
         "pricing_guide_items",
         {"is_active": bool(visible), "updated_at": _now_iso()},

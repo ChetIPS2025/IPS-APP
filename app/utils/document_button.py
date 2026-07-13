@@ -12,11 +12,7 @@ from typing import Any, Union
 
 import streamlit as st
 
-try:
-    from app.config import ROOT_DIR
-except ImportError:
-    from config import ROOT_DIR  # type: ignore
-
+from app.config import ROOT_DIR
 PathLike = Union[str, Path]
 
 

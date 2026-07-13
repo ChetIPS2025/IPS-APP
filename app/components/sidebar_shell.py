@@ -59,10 +59,7 @@ def apply_pending_sidebar_collapse() -> None:
 
 def store_sidebar_nav_fallback(items: list[tuple[str, ...]]) -> None:
     """Persist current nav labels for client-side fallback menu."""
-    try:
-        from app.components.sidebar_nav_icons import nav_icon_for_slug
-    except ImportError:
-        from components.sidebar_nav_icons import nav_icon_for_slug  # type: ignore
+    from app.components.sidebar_nav_icons import nav_icon_for_slug
     rows: list[dict[str, str]] = []
     for item in items:
         if len(item) >= 2:
@@ -116,10 +113,7 @@ def capture_logout_from_query() -> None:
         raw = raw[0] if raw else ""
     if str(raw or "").strip().lower() not in {"1", "true", "yes"}:
         return
-    try:
-        from app.auth import is_authenticated
-    except ImportError:
-        from auth import is_authenticated  # type: ignore
+    from app.auth import is_authenticated
     if not is_authenticated():
         try:
             del st.query_params["ips_logout"]
@@ -130,10 +124,7 @@ def capture_logout_from_query() -> None:
         del st.query_params["ips_logout"]
     except Exception:
         pass
-    try:
-        from app.auth import sign_out
-    except ImportError:
-        from auth import sign_out  # type: ignore
+    from app.auth import sign_out
     sign_out()
     st.rerun()
 
@@ -151,10 +142,7 @@ def capture_nav_slug_from_query() -> None:
     slug = str(raw or "").strip()
     if not slug:
         return
-    try:
-        from app.navigation import set_nav_slug
-    except ImportError:
-        from navigation import set_nav_slug  # type: ignore
+    from app.navigation import set_nav_slug
     set_nav_slug(slug)
     try:
         del st.query_params["ips_nav"]
@@ -191,10 +179,7 @@ def _nav_fallback_rows() -> list[dict[str, str]]:
 
 
 def _desktop_rail_logo_html() -> str:
-    try:
-        from app.branding import sidebar_round_logo_html
-    except ImportError:
-        from branding import sidebar_round_logo_html  # type: ignore
+    from app.branding import sidebar_round_logo_html
     return sidebar_round_logo_html(
         size_px=IPS_SIDEBAR_COLLAPSED_LOGO_PX,
         css_class="ips-desktop-nav-rail__logo",
@@ -392,10 +377,7 @@ def _desktop_nav_rail_css() -> str:
 
 
 def _desktop_nav_rail_html(rows: list[dict[str, str]], active_slug: str) -> str:
-    try:
-        from app.components.sidebar_nav_icons import nav_icon_for_slug
-    except ImportError:
-        from components.sidebar_nav_icons import nav_icon_for_slug  # type: ignore
+    from app.components.sidebar_nav_icons import nav_icon_for_slug
     item_bits: list[str] = []
     for row in rows:
         slug = row["slug"]
@@ -450,10 +432,7 @@ def inject_desktop_nav_rail_markup(*, active_slug: str | None = None) -> None:
     if not rows:
         return
     if active_slug is None:
-        try:
-            from app.navigation import current_nav_slug
-        except ImportError:
-            from navigation import current_nav_slug  # type: ignore
+        from app.navigation import current_nav_slug
         active_slug = current_nav_slug()
     st.markdown(_desktop_nav_rail_html(rows, active_slug), unsafe_allow_html=True)
 

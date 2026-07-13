@@ -4,27 +4,15 @@ from __future__ import annotations
 
 from typing import Any
 
-try:
-    from app.services.inventory_display_helpers import resolve_inventory_qr_value
-    from app.services.inventory_service import normalize_inventory
-    from app.services.job_service import job_row_select_label
-    from app.services.qr_scan_event_service import qr_scan_summary_line
-    from app.services.repository import fetch_rows
-    from app.services.tracking_terminology import (
-        inventory_action_label,
-        serialized_tool_action_label,
-    )
-except ImportError:
-    from services.inventory_display_helpers import resolve_inventory_qr_value  # type: ignore
-    from services.inventory_service import normalize_inventory  # type: ignore
-    from services.job_service import job_row_select_label  # type: ignore
-    from services.qr_scan_event_service import qr_scan_summary_line  # type: ignore
-    from services.repository import fetch_rows  # type: ignore
-    from services.tracking_terminology import (  # type: ignore
-        inventory_action_label,
-        serialized_tool_action_label,
-    )
-
+from app.services.inventory_display_helpers import resolve_inventory_qr_value
+from app.services.inventory_service import normalize_inventory
+from app.services.job_service import job_row_select_label
+from app.services.qr_scan_event_service import qr_scan_summary_line
+from app.services.repository import fetch_rows
+from app.services.tracking_terminology import (
+    inventory_action_label,
+    serialized_tool_action_label,
+)
 _INV_TXN = "inventory_transactions"
 _TOOL_TXN = "tool_transactions"
 _INV_ITEMS = "inventory_items"
@@ -173,10 +161,7 @@ def recent_qr_scans(
     inventory_item_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """Last N QR scan events; falls back to transaction adapter when events table is empty."""
-    try:
-        from app.services.qr_scan_event_service import list_qr_scan_events
-    except ImportError:
-        from services.qr_scan_event_service import list_qr_scan_events  # type: ignore
+    from app.services.qr_scan_event_service import list_qr_scan_events
     events = list_qr_scan_events(limit=limit, inventory_item_id=inventory_item_id)
     if events:
         return events

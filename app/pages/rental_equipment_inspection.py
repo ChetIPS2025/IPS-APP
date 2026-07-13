@@ -7,63 +7,33 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.auth import current_profile
-    from app.components.rental_equipment_inspection_launcher import (
-        clear_rental_inspection_context,
-        rental_inspection_context,
-    )
-    from app.components.signature_pad import render_signature_field
-    from app.pages._core._access import begin_module
-    from app.pages._core._data import load_assets, load_jobs
-    from app.services.rental_equipment_inspection_service import (
-        get_rental_inspection,
-        inspection_type_label,
-        new_inspection_payload,
-        pdf_export_filename,
-        photo_view_url,
-        save_rental_inspection,
-        upload_inspection_photo,
-        validate_for_complete,
-    )
-    from app.services.rental_equipment_inspection_specs import (
-        CHECKLIST_ITEMS,
-        GENERAL_CONDITIONS,
-        PHOTO_SLOT_LABELS,
-        SIGNATURE_ROLE_LABELS,
-        SIGNATURE_ROLES,
-        normalize_checklist,
-        required_photo_slots_for_checklist,
-    )
-except ImportError:
-    from auth import current_profile  # type: ignore
-    from components.rental_equipment_inspection_launcher import (  # type: ignore
-        clear_rental_inspection_context,
-        rental_inspection_context,
-    )
-    from components.signature_pad import render_signature_field  # type: ignore
-    from pages._core._access import begin_module  # type: ignore
-    from pages._core._data import load_assets, load_jobs  # type: ignore
-    from services.rental_equipment_inspection_service import (  # type: ignore
-        get_rental_inspection,
-        inspection_type_label,
-        new_inspection_payload,
-        pdf_export_filename,
-        photo_view_url,
-        save_rental_inspection,
-        upload_inspection_photo,
-        validate_for_complete,
-    )
-    from services.rental_equipment_inspection_specs import (  # type: ignore
-        CHECKLIST_ITEMS,
-        GENERAL_CONDITIONS,
-        PHOTO_SLOT_LABELS,
-        SIGNATURE_ROLE_LABELS,
-        SIGNATURE_ROLES,
-        normalize_checklist,
-        required_photo_slots_for_checklist,
-    )
-
+from app.auth import current_profile
+from app.components.rental_equipment_inspection_launcher import (
+    clear_rental_inspection_context,
+    rental_inspection_context,
+)
+from app.components.signature_pad import render_signature_field
+from app.pages._core._access import begin_module
+from app.pages._core._data import load_assets, load_jobs
+from app.services.rental_equipment_inspection_service import (
+    get_rental_inspection,
+    inspection_type_label,
+    new_inspection_payload,
+    pdf_export_filename,
+    photo_view_url,
+    save_rental_inspection,
+    upload_inspection_photo,
+    validate_for_complete,
+)
+from app.services.rental_equipment_inspection_specs import (
+    CHECKLIST_ITEMS,
+    GENERAL_CONDITIONS,
+    PHOTO_SLOT_LABELS,
+    SIGNATURE_ROLE_LABELS,
+    SIGNATURE_ROLES,
+    normalize_checklist,
+    required_photo_slots_for_checklist,
+)
 _DRAFT_KEY = "rental_insp_draft"
 
 
@@ -164,10 +134,7 @@ def _exit_inspection(*, embedded: bool) -> None:
     if embedded:
         st.session_state[_RENTAL_DASH_VIEW_KEY] = "home"
     else:
-        try:
-            from app.navigation import set_nav_slug
-        except ImportError:
-            from navigation import set_nav_slug  # type: ignore
+        from app.navigation import set_nav_slug
         set_nav_slug("assets")
     st.rerun()
 

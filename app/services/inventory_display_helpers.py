@@ -32,23 +32,15 @@ def resolve_inventory_qr_value(row: dict[str, Any]) -> str:
     iid = str(row.get("id") or "").strip()
     if not iid:
         return ""
-    try:
-        from app.services.qr_codes import inventory_qr_from_item_id
-    except ImportError:
-        from services.qr_codes import inventory_qr_from_item_id  # type: ignore
+    from app.services.qr_codes import inventory_qr_from_item_id
     return inventory_qr_from_item_id(iid)
 
 
 def inventory_qr_embed_subject(row: dict[str, Any]) -> str:
     """Payload encoded in inventory QR images (tokenized URL when possible)."""
-    try:
-        from app.config import settings
-        from app.services.qr_codes import inventory_scan_link_url
-        from app.services.inventory_display_helpers import resolve_inventory_qr_value, resolve_inventory_sku
-    except ImportError:
-        from config import settings  # type: ignore
-        from services.qr_codes import inventory_scan_link_url  # type: ignore
-        from services.inventory_display_helpers import resolve_inventory_qr_value, resolve_inventory_sku  # type: ignore
+    from app.config import settings
+    from app.services.qr_codes import inventory_scan_link_url
+    from app.services.inventory_display_helpers import resolve_inventory_qr_value, resolve_inventory_sku
     base = str(getattr(settings, "app_base_url", "") or "").strip().rstrip("/")
     sku = resolve_inventory_sku(row)
     token = str(row.get("qr_token") or "").strip()
@@ -74,10 +66,7 @@ def inventory_qr_png_bytes(row: dict[str, Any]) -> bytes | None:
     qrv = resolve_inventory_qr_value(row)
     if not qrv and not row.get("qr_token"):
         return None
-    try:
-        from app.services.qr_codes import generate_qr_png_bytes
-    except ImportError:
-        from services.qr_codes import generate_qr_png_bytes  # type: ignore
+    from app.services.qr_codes import generate_qr_png_bytes
     subject = inventory_qr_embed_subject(row)
     for cand in (subject, qrv):
         if not cand:

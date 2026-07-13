@@ -769,10 +769,7 @@ def render() -> None:
         return
 
     eid = str(st.session_state.get(ACTIVE_ESTIMATE_KEY) or "").strip()
-    try:
-        from app.navigation import ESTIMATE_DETAIL_TAB_KEY, navigate_to_estimate_detail, set_nav_slug
-    except ImportError:
-        from navigation import ESTIMATE_DETAIL_TAB_KEY, navigate_to_estimate_detail, set_nav_slug  # type: ignore
+    from app.navigation import ESTIMATE_DETAIL_TAB_KEY, navigate_to_estimate_detail, set_nav_slug
 
     if eid:
         navigate_to_estimate_detail(eid, tab="Materials")

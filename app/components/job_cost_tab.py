@@ -8,40 +8,21 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-try:
-    from app.pages._core._data import load_inventory
-    from app.services.catalog_images import catalog_thumbnail_html
-    from app.services.job_cost_transaction_service import (
-        can_manage_cost_invoice_visibility,
-        fetch_job_cost_transactions,
-        invalidate_job_cost_session,
-        sync_all_sources_for_job,
-        transaction_cost_tab_source,
-        transaction_cost_unit,
-        transaction_datetime_display,
-        transaction_employee_name,
-        transaction_show_on_invoice,
-        update_job_cost_show_on_invoice,
-    )
-    from app.utils.formatting import fmt_currency
-except ImportError:
-    from pages._core._data import load_inventory  # type: ignore
-    from services.catalog_images import catalog_thumbnail_html  # type: ignore
-    from services.job_cost_transaction_service import (  # type: ignore
-        can_manage_cost_invoice_visibility,
-        fetch_job_cost_transactions,
-        invalidate_job_cost_session,
-        sync_all_sources_for_job,
-        transaction_cost_tab_source,
-        transaction_cost_unit,
-        transaction_datetime_display,
-        transaction_employee_name,
-        transaction_show_on_invoice,
-        update_job_cost_show_on_invoice,
-    )
-    from utils.formatting import fmt_currency  # type: ignore
-
-
+from app.pages._core._data import load_inventory
+from app.services.catalog_images import catalog_thumbnail_html
+from app.services.job_cost_transaction_service import (
+    can_manage_cost_invoice_visibility,
+    fetch_job_cost_transactions,
+    invalidate_job_cost_session,
+    sync_all_sources_for_job,
+    transaction_cost_tab_source,
+    transaction_cost_unit,
+    transaction_datetime_display,
+    transaction_employee_name,
+    transaction_show_on_invoice,
+    update_job_cost_show_on_invoice,
+)
+from app.utils.formatting import fmt_currency
 def _join_employee_notes(employee: object, notes: object) -> str:
     emp = str(employee or "").strip()
     note = str(notes or "").strip()
@@ -177,10 +158,7 @@ def inject_job_cost_tab_css() -> None:
 
 
 def _employees_map() -> dict[str, dict[str, Any]]:
-    try:
-        from app.db import fetch_table
-    except ImportError:
-        from db import fetch_table  # type: ignore
+    from app.db import fetch_table
     try:
         rows = fetch_table("employees", limit=5000, order_by="name") or []
     except Exception:

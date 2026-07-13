@@ -28,18 +28,12 @@ _TAB_ICONS: dict[str, str] = {
 
 
 def inject_assets_page_styles() -> None:
-    try:
-        from app.ui.clean_table import inject_clean_table_css
-    except ImportError:
-        from ui.clean_table import inject_clean_table_css  # type: ignore
+    from app.ui.clean_table import inject_clean_table_css
     inject_clean_table_css()
     if st.session_state.get(IPS_ASSETS_PAGE_STYLES_KEY):
         return
     st.session_state[IPS_ASSETS_PAGE_STYLES_KEY] = True
-    try:
-        from app.ui.page_shell import inject_ips_dashboard_layout
-    except ImportError:
-        from ui.page_shell import inject_ips_dashboard_layout  # type: ignore
+    from app.ui.page_shell import inject_ips_dashboard_layout
     inject_ips_dashboard_layout()
     st.markdown(
         """
@@ -1511,11 +1505,7 @@ def table_header_html(label: str, *, sortable: bool = True) -> str:
 
 def asset_number_cell_html(asset: dict) -> str:
     """Asset # column: compact QR thumbnail beside the asset number."""
-    try:
-        from app.services.asset_qr import qr_embed_subject, qr_thumb_data_uri
-    except ImportError:
-        from services.asset_qr import qr_embed_subject, qr_thumb_data_uri  # type: ignore
-
+    from app.services.asset_qr import qr_embed_subject, qr_thumb_data_uri
     num = str(asset.get("asset_number") or "—")
     num_esc = html.escape(num)
     qr_asset = {

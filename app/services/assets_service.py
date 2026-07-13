@@ -55,16 +55,7 @@ from app.services.repository import ServiceResult, fetch_rows, insert_row, updat
 
 
 
-try:
-
-    from app.config import settings
-
-except ImportError:
-
-    from config import settings  # type: ignore
-
-
-
+from app.config import settings
 _ASSET_TABLE = "assets"
 
 _INSPECTIONS_TABLE = "asset_inspections"
@@ -146,10 +137,7 @@ __all__ = [
 
 
 def clear_assets_cache() -> None:
-    try:
-        from app.services.repository import clear_data_cache_for_table
-    except ImportError:
-        from services.repository import clear_data_cache_for_table  # type: ignore
+    from app.services.repository import clear_data_cache_for_table
     clear_data_cache_for_table("assets")
     clear_asset_image_url_cache()
     try:
@@ -162,10 +150,7 @@ def clear_assets_cache() -> None:
 
 def can_manage_asset_actions() -> bool:
     """Admin, manager, or supervisor may retire or delete assets."""
-    try:
-        from app.components.modal_delete import can_admin_mutate
-    except ImportError:
-        from components.modal_delete import can_admin_mutate  # type: ignore
+    from app.components.modal_delete import can_admin_mutate
     return can_admin_mutate()
 
 
@@ -194,10 +179,7 @@ def retire_asset(asset_id: str) -> ServiceResult:
     aid = str(asset_id or "").strip()
     if not aid:
         return ServiceResult(ok=False, error="Missing asset id.")
-    try:
-        from app.pages._core._crud import is_demo_id
-    except ImportError:
-        from pages._core._crud import is_demo_id  # type: ignore
+    from app.pages._core._crud import is_demo_id
     if is_demo_id(aid):
         return ServiceResult(ok=True, data={"id": aid, "status": "Retired"})
     result = update_row(_ASSET_TABLE, {"status": "Retired"}, {"id": aid})
@@ -211,16 +193,10 @@ def delete_asset_record(asset_id: str) -> ServiceResult:
     aid = str(asset_id or "").strip()
     if not aid:
         return ServiceResult(ok=False, error="Missing asset id.")
-    try:
-        from app.pages._core._crud import is_demo_id
-    except ImportError:
-        from pages._core._crud import is_demo_id  # type: ignore
+    from app.pages._core._crud import is_demo_id
     if is_demo_id(aid):
         return ServiceResult(ok=True, data={"id": aid})
-    try:
-        from app.services.asset_service import delete_asset_and_related
-    except ImportError:
-        from services.asset_service import delete_asset_and_related  # type: ignore
+    from app.services.asset_service import delete_asset_and_related
     try:
         delete_asset_and_related(aid)
     except Exception as exc:
@@ -284,14 +260,7 @@ def _ensure_asset_qr_token(row: dict[str, Any]) -> str:
 
         payload["qr_code_value"] = scan_url
 
-    try:
-
-        from app.pages._core._crud import is_demo_id
-
-    except ImportError:
-
-        from pages._core._crud import is_demo_id  # type: ignore
-
+    from app.pages._core._crud import is_demo_id
     if not is_demo_id(iid):
 
         update_row(_ASSET_TABLE, payload, {"id": iid})
@@ -324,10 +293,7 @@ def generate_asset_qr_value(asset: dict[str, Any]) -> str:
         return legacy
     num = str(row.get("asset_id") or row.get("asset_number") or row.get("asset_tag") or "").strip()
     if num:
-        try:
-            from app.services.asset_service import build_qr_value
-        except ImportError:
-            from services.asset_service import build_qr_value  # type: ignore
+        from app.services.asset_service import build_qr_value
         return build_qr_value(num)
     return ""
 
@@ -352,10 +318,7 @@ def ensure_asset_qr_tokens(assets: list[dict[str, Any]] | None = None) -> Servic
             if scan_url:
                 payload["qr_value"] = scan_url
                 payload["qr_code_value"] = scan_url
-            try:
-                from app.pages._core._crud import is_demo_id
-            except ImportError:
-                from pages._core._crud import is_demo_id  # type: ignore
+            from app.pages._core._crud import is_demo_id
             if is_demo_id(iid):
                 continue
             result = update_row(_ASSET_TABLE, payload, {"id": iid})
@@ -379,10 +342,7 @@ def rebuild_asset_qr(asset: dict[str, Any]) -> ServiceResult:
     iid = str((asset or {}).get("id") or "").strip()
     if not iid:
         return ServiceResult(ok=False, error="Missing asset id.")
-    try:
-        from app.pages._core._crud import is_demo_id
-    except ImportError:
-        from pages._core._crud import is_demo_id  # type: ignore
+    from app.pages._core._crud import is_demo_id
     if is_demo_id(iid):
         token = generate_asset_qr_token()
         url = _asset_mobile_scan_url(asset_id=iid, qr_token=token)
@@ -406,14 +366,7 @@ def rebuild_asset_qr(asset: dict[str, Any]) -> ServiceResult:
 
 def get_assets() -> list[dict[str, Any]]:
 
-    try:
-
-        from app.pages._core._data import _DEMO_ASSETS
-
-    except ImportError:
-
-        from pages._core._data import _DEMO_ASSETS  # type: ignore
-
+    from app.pages._core._data import _DEMO_ASSETS
     rows, _ = list_assets(demo=list(_DEMO_ASSETS))
 
     return rows
@@ -448,14 +401,7 @@ def get_asset(asset_id: str) -> dict[str, Any] | None:
 
 def _fetch_asset_from_db(match: str) -> dict[str, Any] | None:
 
-    try:
-
-        from app.db import fetch_by_match_admin
-
-    except ImportError:
-
-        from db import fetch_by_match_admin  # type: ignore
-
+    from app.db import fetch_by_match_admin
     val = str(match or "").strip()
 
     if not val:
@@ -478,14 +424,7 @@ def _fetch_asset_from_db(match: str) -> dict[str, Any] | None:
 
 def _db_fetch_by_match(table: str, match: dict[str, Any], *, limit: int = 5) -> list[dict[str, Any]]:
 
-    try:
-
-        from app.db import fetch_by_match_admin
-
-    except ImportError:
-
-        from db import fetch_by_match_admin  # type: ignore
-
+    from app.db import fetch_by_match_admin
     try:
 
         return fetch_by_match_admin(table, match, limit=limit) or []
@@ -570,10 +509,7 @@ def _persist_asset_qr_url(row: dict[str, Any], scan_url: str) -> None:
     iid = str(row.get("id") or "").strip()
     if not iid or not scan_url:
         return
-    try:
-        from app.pages._core._crud import is_demo_id
-    except ImportError:
-        from pages._core._crud import is_demo_id  # type: ignore
+    from app.pages._core._crud import is_demo_id
     if is_demo_id(iid):
         return
     payload: dict[str, Any] = {"qr_value": scan_url, "qr_code_value": scan_url}
@@ -620,10 +556,7 @@ def get_asset_by_qr(
         return ServiceResult(ok=False, error="This asset is inactive or unavailable.")
 
     item = normalize_asset(rows[0])
-    try:
-        from app.pages._core._crud import is_demo_id
-    except ImportError:
-        from pages._core._crud import is_demo_id  # type: ignore
+    from app.pages._core._crud import is_demo_id
     is_demo = is_demo_id(str(item.get("id") or ""))
 
     stored_token = str(item.get("qr_token") or "").strip()
@@ -746,10 +679,7 @@ def upload_asset_image(
 def _profile_display_names(profile_ids: set[str]) -> dict[str, str]:
     if not profile_ids:
         return {}
-    try:
-        from app.db import fetch_table_admin
-    except ImportError:
-        from db import fetch_table_admin  # type: ignore
+    from app.db import fetch_table_admin
     try:
         rows = fetch_table_admin("profiles", limit=5000) or []
     except Exception:
@@ -808,14 +738,7 @@ def get_asset_document_view_url(doc: dict[str, Any], *, expires_in: int = 3600) 
 
         return None
 
-    try:
-
-        from app.db import create_signed_url
-
-    except ImportError:
-
-        from db import create_signed_url  # type: ignore
-
+    from app.db import create_signed_url
     try:
 
         for bucket in (ASSET_DOCUMENTS_BUCKET, None):
@@ -841,10 +764,7 @@ def get_asset_documents(asset_id: str, *, include_restricted: bool = False) -> l
     aid = str(asset_id or "").strip()
     if not aid:
         return []
-    try:
-        from app.db import fetch_by_match_admin
-    except ImportError:
-        from db import fetch_by_match_admin  # type: ignore
+    from app.db import fetch_by_match_admin
     try:
         rows = fetch_by_match_admin("asset_documents", {"asset_id": aid}, limit=500) or []
     except Exception:
@@ -868,10 +788,7 @@ def get_asset_documents(asset_id: str, *, include_restricted: bool = False) -> l
 
 def delete_asset_document(doc: dict[str, Any]) -> None:
     """Delete one asset document row and its storage object."""
-    try:
-        from app.services.asset_document_util import delete_asset_document_record
-    except ImportError:
-        from services.asset_document_util import delete_asset_document_record  # type: ignore
+    from app.services.asset_document_util import delete_asset_document_record
     delete_asset_document_record(doc)
     clear_assets_cache()
 
@@ -1075,14 +992,7 @@ def create_asset_inspection(asset_id: str, data: dict[str, Any]) -> ServiceResul
 
     }
 
-    try:
-
-        from app.pages._core._crud import is_demo_id
-
-    except ImportError:
-
-        from pages._core._crud import is_demo_id  # type: ignore
-
+    from app.pages._core._crud import is_demo_id
     if is_demo_id(aid):
 
         return ServiceResult(ok=True, data={"id": "demo-inspection", **payload})
@@ -1137,14 +1047,7 @@ def create_asset_issue(asset_id: str, data: dict[str, Any]) -> ServiceResult:
 
     }
 
-    try:
-
-        from app.pages._core._crud import is_demo_id
-
-    except ImportError:
-
-        from pages._core._crud import is_demo_id  # type: ignore
-
+    from app.pages._core._crud import is_demo_id
     if is_demo_id(aid):
 
         return ServiceResult(ok=True, data={"id": "demo-issue", **payload})

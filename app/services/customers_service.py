@@ -45,34 +45,21 @@ CONTACT_ROLE_TYPES = [
 
 
 def _demo_customers() -> list[dict[str, Any]]:
-    try:
-        from app.pages._core._data import (
-            _DEMO_CUSTOMER_CONTACTS,
-            _DEMO_CUSTOMER_LOCATIONS,
-            _DEMO_CUSTOMERS,
-        )
-    except ImportError:
-        from pages._core._data import (  # type: ignore
-            _DEMO_CUSTOMER_CONTACTS,
-            _DEMO_CUSTOMER_LOCATIONS,
-            _DEMO_CUSTOMERS,
-        )
+    from app.pages._core._data import (
+        _DEMO_CUSTOMER_CONTACTS,
+        _DEMO_CUSTOMER_LOCATIONS,
+        _DEMO_CUSTOMERS,
+    )
     return list(_DEMO_CUSTOMERS)
 
 
 def _demo_locations() -> list[dict[str, Any]]:
-    try:
-        from app.pages._core._data import _DEMO_CUSTOMER_LOCATIONS
-    except ImportError:
-        from pages._core._data import _DEMO_CUSTOMER_LOCATIONS  # type: ignore
+    from app.pages._core._data import _DEMO_CUSTOMER_LOCATIONS
     return list(_DEMO_CUSTOMER_LOCATIONS)
 
 
 def _demo_contacts() -> list[dict[str, Any]]:
-    try:
-        from app.pages._core._data import _DEMO_CUSTOMER_CONTACTS
-    except ImportError:
-        from pages._core._data import _DEMO_CUSTOMER_CONTACTS  # type: ignore
+    from app.pages._core._data import _DEMO_CUSTOMER_CONTACTS
     return list(_DEMO_CUSTOMER_CONTACTS)
 
 
@@ -84,10 +71,7 @@ def _primary_location(locations: list[dict[str, Any]]) -> dict[str, Any] | None:
 
 
 def _bulk_locations_by_customer_id() -> dict[str, list[dict[str, Any]]]:
-    try:
-        from app.services.repository import fetch_rows
-    except ImportError:
-        from services.repository import fetch_rows  # type: ignore
+    from app.services.repository import fetch_rows
     rows, err = fetch_rows("customer_locations", limit=5000)
     if err:
         out: dict[str, list[dict[str, Any]]] = {}
@@ -113,10 +97,7 @@ def _bulk_locations_by_customer_id() -> dict[str, list[dict[str, Any]]]:
 
 
 def _bulk_contacts_by_customer_id() -> dict[str, list[dict[str, Any]]]:
-    try:
-        from app.services.repository import fetch_rows
-    except ImportError:
-        from services.repository import fetch_rows  # type: ignore
+    from app.services.repository import fetch_rows
     rows, err = fetch_rows("customer_contacts", limit=5000, alt_tables=("contacts",))
     if err:
         out: dict[str, list[dict[str, Any]]] = {}
@@ -158,10 +139,7 @@ def _enrich_customer(
 
 
 def get_customers(*, enrich: bool = True) -> list[dict[str, Any]]:
-    try:
-        from app.pages._core._data import load_customers
-    except ImportError:
-        from pages._core._data import load_customers  # type: ignore
+    from app.pages._core._data import load_customers
     rows = load_customers()
     if not enrich:
         return rows

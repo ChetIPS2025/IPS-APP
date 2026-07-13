@@ -10,35 +10,19 @@ from typing import Any
 
 _LOG = logging.getLogger(__name__)
 
-try:
-    from app.services.repository import (
-        ServiceResult,
-        delete_row,
-        fetch_list,
-        fetch_rows,
-        fetch_rows_admin,
-        filter_payload_to_table,
-        insert_row,
-        insert_row_admin,
-        table_column_names,
-        update_row,
-        update_row_admin,
-    )
-except ImportError:
-    from services.repository import (  # type: ignore
-        ServiceResult,
-        delete_row,
-        fetch_list,
-        fetch_rows,
-        fetch_rows_admin,
-        filter_payload_to_table,
-        insert_row,
-        insert_row_admin,
-        table_column_names,
-        update_row,
-        update_row_admin,
-    )
-
+from app.services.repository import (
+    ServiceResult,
+    delete_row,
+    fetch_list,
+    fetch_rows,
+    fetch_rows_admin,
+    filter_payload_to_table,
+    insert_row,
+    insert_row_admin,
+    table_column_names,
+    update_row,
+    update_row_admin,
+)
 def _money_field(row: dict[str, Any], primary: str, *fallbacks: str) -> float:
     """Use ``primary`` when the key is present (including 0); else first present fallback."""
     if primary in row:
@@ -103,10 +87,7 @@ def _load_estimate_json_for_patch(*, row_id: str | None, existing_row: dict[str,
     rid = str(row_id or "").strip()
     if not rid:
         return {}
-    try:
-        from app.services.repository import fetch_by_id
-    except ImportError:
-        from services.repository import fetch_by_id  # type: ignore
+    from app.services.repository import fetch_by_id
     row = fetch_by_id("estimates", rid) or {}
     return _parse_estimate_json(row.get("estimate_json"))
 
@@ -275,10 +256,7 @@ def _estimate_json_project_patch(
     ej: dict[str, Any] = {}
     rid = str(row_id or "").strip()
     if rid:
-        try:
-            from app.services.repository import fetch_by_id
-        except ImportError:
-            from services.repository import fetch_by_id  # type: ignore
+        from app.services.repository import fetch_by_id
         existing = fetch_by_id("estimates", rid) or {}
         raw = existing.get("estimate_json")
         if isinstance(raw, dict):
@@ -416,20 +394,14 @@ def normalize_customer_contact(row: dict[str, Any]) -> dict[str, Any]:
 def _customer_name_by_id() -> dict[str, str]:
     """Map customer UUID -> company name for job/estimate normalization."""
     rows: list[dict[str, Any]] = []
-    try:
-        from app.services.customers_service import list_customers
-    except ImportError:
-        from services.customers_service import list_customers  # type: ignore
+    from app.services.customers_service import list_customers
     try:
         listed, _ = list_customers(demo=[])
         rows = listed or []
     except Exception:
         rows = []
     if not rows:
-        try:
-            from app.db import fetch_table_admin
-        except ImportError:
-            from db import fetch_table_admin  # type: ignore
+        from app.db import fetch_table_admin
         try:
             rows = fetch_table_admin(
                 "customers",
@@ -453,10 +425,7 @@ def _resolve_customer_id_for_job(ui: dict[str, Any]) -> str:
     name = str(ui.get("customer") or "").strip()
     if not name:
         return ""
-    try:
-        from app.pages._core._data import customer_id_for_name
-    except ImportError:
-        from pages._core._data import customer_id_for_name  # type: ignore
+    from app.pages._core._data import customer_id_for_name
     return customer_id_for_name(name)
 
 
@@ -585,16 +554,10 @@ def normalize_estimate(
         customer = "—"
     display_project = estimate_project_title(row)
     global_mk = _global_markup_from_row(row)
-    try:
-        from app.services.estimate_expiration_service import (
-            effective_expiration_iso,
-            expiration_is_manual_override,
-        )
-    except ImportError:
-        from services.estimate_expiration_service import (  # type: ignore
-            effective_expiration_iso,
-            expiration_is_manual_override,
-        )
+    from app.services.estimate_expiration_service import (
+        effective_expiration_iso,
+        expiration_is_manual_override,
+    )
     return {
         "id": eid or num,
         "estimate_number": num,
@@ -665,10 +628,7 @@ def normalize_material_line(row: dict[str, Any], estimate_id: str) -> dict[str, 
 
 
 def normalize_inventory(row: dict[str, Any]) -> dict[str, Any]:
-    try:
-        from app.services.inventory_display_helpers import resolve_inventory_qr_value, resolve_inventory_sku
-    except ImportError:
-        from services.inventory_display_helpers import resolve_inventory_qr_value, resolve_inventory_sku  # type: ignore
+    from app.services.inventory_display_helpers import resolve_inventory_qr_value, resolve_inventory_sku
     iid = str(row.get("id") or "").strip()
     sku = resolve_inventory_sku(row)
     qty = row.get("qty_on_hand")
@@ -679,10 +639,7 @@ def normalize_inventory(row: dict[str, Any]) -> dict[str, Any]:
     qty_available = row.get("quantity_available")
     if qty_available is None:
         qty_available = max(float(qty or 0) - qty_allocated, 0)
-    try:
-        from app.utils.inventory_quantity import parse_inventory_quantity
-    except ImportError:
-        from utils.inventory_quantity import parse_inventory_quantity  # type: ignore
+    from app.utils.inventory_quantity import parse_inventory_quantity
     qty_int = parse_inventory_quantity(qty, allow_negative=True, allow_zero=True)
     qty_checked_out = parse_inventory_quantity(row.get("quantity_checked_out"), allow_negative=True, allow_zero=True)
     qty_allocated_int = parse_inventory_quantity(qty_allocated, allow_negative=True, allow_zero=True)
@@ -836,11 +793,7 @@ def normalize_asset(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def normalize_employee(row: dict[str, Any]) -> dict[str, Any]:
-    try:
-        from app.services.employee_role_service import resolve_employee_roles
-    except ImportError:
-        from services.employee_role_service import resolve_employee_roles  # type: ignore
-
+    from app.services.employee_role_service import resolve_employee_roles
     eid = str(row.get("id") or "").strip()
     active = row.get("is_active", row.get("status") == "Active")
     raw_status = str(row.get("status") or "").strip()
@@ -882,11 +835,7 @@ def normalize_employee(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def normalize_cert(row: dict[str, Any], employee_name: str = "") -> dict[str, Any]:
-    try:
-        from app.services.certification_helpers import compute_certification_status
-    except ImportError:
-        from services.certification_helpers import compute_certification_status  # type: ignore
-
+    from app.services.certification_helpers import compute_certification_status
     normalized = {
         "id": str(row.get("id") or ""),
         "employee_id": str(row.get("employee_id") or ""),
@@ -1026,10 +975,7 @@ def list_jobs(*, demo: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], bool
 def list_estimates(*, demo: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], bool]:
     rows, err = fetch_rows("estimates", limit=5000)
     if not rows:
-        try:
-            from app.db import fetch_table_admin
-        except ImportError:
-            from db import fetch_table_admin  # type: ignore
+        from app.db import fetch_table_admin
         try:
             rows = fetch_table_admin("estimates", limit=5000, order_by="quote_number") or []
         except Exception:
@@ -1146,10 +1092,7 @@ def list_tasks(*, demo: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], boo
 
 def list_timekeeping_summaries(week_start: date, *, demo: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], bool]:
     ws = week_start.isoformat()
-    try:
-        from app.db import fetch_by_match
-    except ImportError:
-        from db import fetch_by_match  # type: ignore
+    from app.db import fetch_by_match
     try:
         rows = fetch_by_match("employee_timekeeping_weeks", {"week_start": ws}, limit=5000) or []
         if rows:
@@ -1184,10 +1127,7 @@ def _fetch_employee_timekeeping_day_rows(
     wd = str(work_date or "")[:10] if work_date else ""
     if wd:
         match["work_date"] = wd
-    try:
-        from app.db import fetch_by_match
-    except ImportError:
-        from db import fetch_by_match  # type: ignore
+    from app.db import fetch_by_match
     try:
         return fetch_by_match("employee_timekeeping_days", match, limit=limit) or []
     except Exception as exc:
@@ -1231,10 +1171,7 @@ def list_timekeeping_days(employee_id: str, week_start: date) -> list[dict[str, 
 def list_timekeeping_days_for_week(week_start: date, *, limit: int = 5000) -> list[dict[str, Any]]:
     """Load all employee day rows for one week in a single query when possible."""
     ws = week_start.isoformat()
-    try:
-        from app.db import fetch_by_match
-    except ImportError:
-        from db import fetch_by_match  # type: ignore
+    from app.db import fetch_by_match
     try:
         rows = fetch_by_match("employee_timekeeping_days", {"week_start": ws}, limit=limit) or []
         if rows:
@@ -1269,16 +1206,10 @@ def clear_timekeeping_day_rows(
         rid = str(row.get("id") or "").strip()
         if not rid or rid in keep_all:
             continue
-        try:
-            from app.services.job_cost_transaction_service import (
-                SOURCE_TIMEKEEPING_DAY,
-                delete_job_cost_transaction,
-            )
-        except ImportError:
-            from services.job_cost_transaction_service import (  # type: ignore
-                SOURCE_TIMEKEEPING_DAY,
-                delete_job_cost_transaction,
-            )
+        from app.services.job_cost_transaction_service import (
+            SOURCE_TIMEKEEPING_DAY,
+            delete_job_cost_transaction,
+        )
         delete_job_cost_transaction(SOURCE_TIMEKEEPING_DAY, rid)
         result = delete_row("employee_timekeeping_days", {"id": rid})
         if not result.ok:
@@ -1514,11 +1445,7 @@ def _job_save_failure(
 
 
 def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
-    try:
-        from app.services.jobs_service import normalize_job_status
-    except ImportError:
-        from services.jobs_service import normalize_job_status  # type: ignore
-
+    from app.services.jobs_service import normalize_job_status
     customer_name = str(ui.get("customer") or "").strip()
     customer_id = _resolve_customer_id_for_job(ui)
     if customer_name and not customer_id:
@@ -1569,10 +1496,7 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
 
     if not cols or "location" in cols:
         if loc_id:
-            try:
-                from app.services.job_from_estimate import _location_text_from_customer_location
-            except ImportError:
-                from services.job_from_estimate import _location_text_from_customer_location  # type: ignore
+            from app.services.job_from_estimate import _location_text_from_customer_location
             loc_text = _location_text_from_customer_location(loc_id)
             payload["location"] = loc_text or str(ui.get("location") or "").strip()
         else:
@@ -1594,10 +1518,7 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
         )
 
     if "billing_type" in ui:
-        try:
-            from app.services.job_financial_ui import normalize_billing_type
-        except ImportError:
-            from services.job_financial_ui import normalize_billing_type  # type: ignore
+        from app.services.job_financial_ui import normalize_billing_type
         billing_type = normalize_billing_type(ui.get("billing_type"))
         if not cols or "billing_type" in cols:
             payload["billing_type"] = billing_type
@@ -1619,18 +1540,11 @@ def save_job(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
 
     prior: dict[str, Any] = {}
     if row_id:
-        try:
-            from app.db import fetch_one
-        except ImportError:
-            from db import fetch_one  # type: ignore
+        from app.db import fetch_one
         prior = fetch_one("jobs", {"id": row_id}) or {}
 
     if row_id:
-        try:
-            from app.services.estimate_job_workflow_service import award_job_and_sync_estimate
-        except ImportError:
-            from services.estimate_job_workflow_service import award_job_and_sync_estimate  # type: ignore
-
+        from app.services.estimate_job_workflow_service import award_job_and_sync_estimate
         new_status = normalize_job_status(ui.get("status") or prior.get("status"))
         old_status = normalize_job_status(prior.get("status"))
         awarded_missing = _money_field(prior, "awarded_amount") <= 0
@@ -1683,11 +1597,7 @@ def _estimate_year_from_ui(ui: dict[str, Any]) -> int:
 
 
 def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
-    try:
-        from app.services.shared_sequence import ensure_quote_number_for_save
-    except ImportError:
-        from services.shared_sequence import ensure_quote_number_for_save  # type: ignore
-
+    from app.services.shared_sequence import ensure_quote_number_for_save
     quote_number = str(ui.get("estimate_number") or ui.get("quote_number") or "").strip()
     if not quote_number and not row_id:
         return ServiceResult(ok=False, error="Estimate number is required.")
@@ -1703,10 +1613,7 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
     cols = table_column_names("estimates")
     existing: dict[str, Any] = {}
     if row_id:
-        try:
-            from app.services.repository import fetch_by_id
-        except ImportError:
-            from services.repository import fetch_by_id  # type: ignore
+        from app.services.repository import fetch_by_id
         existing = fetch_by_id("estimates", row_id) or {}
 
     if "scope_of_work" in ui:
@@ -1737,17 +1644,10 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
     else:
         cust_resp = str(ui.get("customer_responsibilities") or "").strip()
 
-    try:
-        from app.services.estimate_expiration_service import resolve_expiration_for_save
-    except ImportError:
-        from services.estimate_expiration_service import resolve_expiration_for_save  # type: ignore
-
+    from app.services.estimate_expiration_service import resolve_expiration_for_save
     manual_override = ui.get("expiration_manual_override")
     if manual_override is None and existing:
-        try:
-            from app.services.estimate_expiration_service import expiration_is_manual_override
-        except ImportError:
-            from services.estimate_expiration_service import expiration_is_manual_override  # type: ignore
+        from app.services.estimate_expiration_service import expiration_is_manual_override
         manual_flag = expiration_is_manual_override(existing)
     else:
         manual_flag = bool(manual_override)
@@ -1840,14 +1740,9 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
             est_row_for_link: dict[str, Any] | None = (
                 result.data if isinstance(result.data, dict) else None
             )
-            try:
-                from app.services.estimate_job_workflow_service import (
-                    ensure_linked_pending_job_for_estimate,
-                )
-            except ImportError:
-                from services.estimate_job_workflow_service import (  # type: ignore
-                    ensure_linked_pending_job_for_estimate,
-                )
+            from app.services.estimate_job_workflow_service import (
+                ensure_linked_pending_job_for_estimate,
+            )
             link_result = ensure_linked_pending_job_for_estimate(
                 saved_id,
                 estimate_row=est_row_for_link,
@@ -1873,14 +1768,9 @@ def save_estimate(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceRe
             elif isinstance(result.data, dict) and link_result.job:
                 result.data["job_id"] = str(link_result.job.get("id") or result.data.get("job_id") or "")
         if saved_id and project_name:
-            try:
-                from app.services.estimate_job_workflow_service import (
-                    sync_linked_job_project_from_estimate,
-                )
-            except ImportError:
-                from services.estimate_job_workflow_service import (  # type: ignore
-                    sync_linked_job_project_from_estimate,
-                )
+            from app.services.estimate_job_workflow_service import (
+                sync_linked_job_project_from_estimate,
+            )
             sync_result = sync_linked_job_project_from_estimate(
                 estimate_id=saved_id,
                 job_id=str(ui.get("job_id") or (result.data or {}).get("job_id") or "").strip() or None,
@@ -1927,10 +1817,7 @@ def _inventory_save_text(value: Any, *, default: str = "") -> str:
 
 
 def save_inventory_item(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
-    try:
-        from app.services.inventory_display_helpers import resolve_inventory_qr_value, resolve_inventory_sku
-    except ImportError:
-        from services.inventory_display_helpers import resolve_inventory_qr_value, resolve_inventory_sku  # type: ignore
+    from app.services.inventory_display_helpers import resolve_inventory_qr_value, resolve_inventory_sku
     sku = str(ui.get("sku") or ui.get("item_number") or "").strip()
     item_name = _inventory_save_text(ui.get("name") or ui.get("item_name"))
     if not item_name:
@@ -1945,10 +1832,7 @@ def save_inventory_item(ui: dict[str, Any], *, row_id: str | None = None) -> Ser
         "vendor": _inventory_save_text(ui.get("vendor")),
         "status": _inventory_save_text(ui.get("status"), default="In Stock"),
     }
-    try:
-        from app.utils.inventory_quantity import try_parse_inventory_quantity
-    except ImportError:
-        from utils.inventory_quantity import try_parse_inventory_quantity  # type: ignore
+    from app.utils.inventory_quantity import try_parse_inventory_quantity
     qty = ui.get("qty_on_hand")
     if qty is not None:
         qty_int, qty_err = try_parse_inventory_quantity(qty, allow_zero=True, field_name="Quantity on hand")
@@ -2011,10 +1895,7 @@ def _job_save_date(value: Any) -> str | None:
 
 
 def _job_save_money(value: Any) -> float | None:
-    try:
-        from app.services.job_financial_ui import parse_money
-    except ImportError:
-        from services.job_financial_ui import parse_money  # type: ignore
+    from app.services.job_financial_ui import parse_money
     return parse_money(value)
 
 
@@ -2028,11 +1909,7 @@ def _asset_save_number(value: Any) -> float | None:
 
 
 def save_asset(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
-    try:
-        from app.services.asset_rental_service import apply_rental_ui_to_payload
-    except ImportError:
-        from services.asset_rental_service import apply_rental_ui_to_payload  # type: ignore
-
+    from app.services.asset_rental_service import apply_rental_ui_to_payload
     description = str(ui.get("description") or ui.get("notes") or "").strip()
     payload: dict[str, Any] = {
         "asset_id": ui.get("asset_number") or ui.get("asset_id"),
@@ -2087,10 +1964,7 @@ def save_asset(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResul
     payload = {k: v for k, v in payload.items() if v is not None}
     prev_job_id: str | None = None
     if row_id and "assigned_job_id" in ui:
-        try:
-            from app.services.repository import fetch_by_id
-        except ImportError:
-            from services.repository import fetch_by_id  # type: ignore
+        from app.services.repository import fetch_by_id
         prev_row = fetch_by_id("assets", row_id)
         if isinstance(prev_row, dict):
             prev_job_id = str(prev_row.get("assigned_job_id") or "").strip() or None
@@ -2099,10 +1973,7 @@ def save_asset(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResul
     else:
         result = insert_row_admin("assets", payload)
     if result.ok and "assigned_job_id" in ui:
-        try:
-            from app.services.rental_equipment_inspection_hooks import notify_asset_job_assignment_changed
-        except ImportError:
-            from services.rental_equipment_inspection_hooks import notify_asset_job_assignment_changed  # type: ignore
+        from app.services.rental_equipment_inspection_hooks import notify_asset_job_assignment_changed
         new_job = str(payload.get("assigned_job_id") or "").strip() or None
         asset_key = row_id or str((result.data or {}).get("id") or "").strip()
         if asset_key:
@@ -2128,29 +1999,18 @@ def _parse_employee_hire_date(value: Any) -> tuple[str | None, str | None]:
     """Return (YYYY-MM-DD or None, error_message)."""
     if value in (None, "", "—"):
         return None, None
-    try:
-        from app.services.certification_helpers import coerce_date, date_to_iso
-    except ImportError:
-        from services.certification_helpers import coerce_date, date_to_iso  # type: ignore
+    from app.services.certification_helpers import coerce_date, date_to_iso
     if not coerce_date(value):
         return None, "Hire date must be a valid date (YYYY-MM-DD)."
     return date_to_iso(value), None
 
 
 def save_employee(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
-    try:
-        from app.services.employee_role_service import (
-            canonical_permission_label,
-            sync_linked_profile_permission_role,
-        )
-        from app.services.users_service import can_edit_employee_profile
-    except ImportError:
-        from services.employee_role_service import (  # type: ignore
-            canonical_permission_label,
-            sync_linked_profile_permission_role,
-        )
-        from services.users_service import can_edit_employee_profile  # type: ignore
-
+    from app.services.employee_role_service import (
+        canonical_permission_label,
+        sync_linked_profile_permission_role,
+    )
+    from app.services.users_service import can_edit_employee_profile
     if not can_edit_employee_profile():
         return ServiceResult(ok=False, error="You do not have permission to update employees.")
 
@@ -2229,19 +2089,11 @@ def save_employee_document(ui: dict[str, Any], *, row_id: str | None = None) -> 
 
 
 def save_certification(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
-    try:
-        from app.services.certification_helpers import (
-            compute_certification_status,
-            date_to_iso,
-            normalize_certification_ui_dates,
-        )
-    except ImportError:
-        from services.certification_helpers import (  # type: ignore
-            compute_certification_status,
-            date_to_iso,
-            normalize_certification_ui_dates,
-        )
-
+    from app.services.certification_helpers import (
+        compute_certification_status,
+        date_to_iso,
+        normalize_certification_ui_dates,
+    )
     ui = normalize_certification_ui_dates(ui)
     payload = {
         "employee_id": ui.get("employee_id"),
@@ -2305,10 +2157,7 @@ def save_document_hub(ui: dict[str, Any], *, row_id: str | None = None) -> Servi
 
 
 def save_company_update(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
-    try:
-        from app.components.company_updates_feed import priority_to_db
-    except ImportError:
-        from components.company_updates_feed import priority_to_db  # type: ignore
+    from app.components.company_updates_feed import priority_to_db
     payload = {
         "title": ui.get("title"),
         "message": ui.get("body") or ui.get("message"),
@@ -2342,10 +2191,7 @@ def save_task(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult
     if job_id is not None:
         resolved_job_id = str(job_id).strip() if job_id else None
     elif linked_job and linked_job not in {"— None —", "None", "—", "-"}:
-        try:
-            from app.services.jobs_service import resolve_job_id_from_label
-        except ImportError:
-            from services.jobs_service import resolve_job_id_from_label  # type: ignore
+        from app.services.jobs_service import resolve_job_id_from_label
         resolved_job_id = resolve_job_id_from_label(linked_job)
     else:
         resolved_job_id = None
@@ -2530,10 +2376,7 @@ def save_timekeeping_day(ui: dict[str, Any], *, row_id: str | None = None) -> Se
     if result.ok:
         row = result.data if isinstance(result.data, dict) else None
         if row:
-            try:
-                from app.services.job_cost_transaction_service import _safe_sync, sync_timekeeping_day
-            except ImportError:
-                from services.job_cost_transaction_service import _safe_sync, sync_timekeeping_day  # type: ignore
+            from app.services.job_cost_transaction_service import _safe_sync, sync_timekeeping_day
             _safe_sync(sync_timekeeping_day, row)
     return result
 
@@ -2598,19 +2441,13 @@ def update_timekeeping_day_status(
         payload["approved_at"] = datetime.now(timezone.utc).isoformat()
     result = update_row("employee_timekeeping_days", payload, {"id": rid})
     if result.ok:
-        try:
-            from app.db import fetch_by_match
-        except ImportError:
-            from db import fetch_by_match  # type: ignore
+        from app.db import fetch_by_match
         try:
             rows = fetch_by_match("employee_timekeeping_days", {"id": rid}, limit=1) or []
         except Exception:
             rows = []
         if rows:
-            try:
-                from app.services.job_cost_transaction_service import _safe_sync, sync_timekeeping_day
-            except ImportError:
-                from services.job_cost_transaction_service import _safe_sync, sync_timekeeping_day  # type: ignore
+            from app.services.job_cost_transaction_service import _safe_sync, sync_timekeeping_day
             _safe_sync(sync_timekeeping_day, rows[0])
     return result
 
@@ -2830,10 +2667,7 @@ def _fetch_rows_by_customer_id(
     cid = str(customer_id or "").strip()
     if not cid:
         return [], None
-    try:
-        from app.db import fetch_by_match
-    except ImportError:
-        from db import fetch_by_match  # type: ignore
+    from app.db import fetch_by_match
     try:
         rows = fetch_by_match(table, {"customer_id": cid}, limit=limit) or []
         return rows, None

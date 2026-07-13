@@ -8,39 +8,21 @@ from typing import Any
 import streamlit as st
 import streamlit.components.v1 as components
 
-try:
-    from app.pages._core._crud import is_demo_id
-    from app.services.asset_document_util import (
-        ASSET_DOCUMENT_UPLOAD_TYPES,
-        delete_asset_document_record,
-        file_type_label,
-        is_image_document,
-        is_pdf_document,
-        persist_asset_document_upload,
-    )
-    from app.services.assets_service import (
-        delete_asset_document,
-        get_asset_document_view_url,
-        get_asset_documents,
-    )
-    from app.utils.formatting import fmt_date
-except ImportError:
-    from pages._core._crud import is_demo_id  # type: ignore
-    from services.asset_document_util import (  # type: ignore
-        ASSET_DOCUMENT_UPLOAD_TYPES,
-        delete_asset_document_record,
-        file_type_label,
-        is_image_document,
-        is_pdf_document,
-        persist_asset_document_upload,
-    )
-    from services.assets_service import (  # type: ignore
-        delete_asset_document,
-        get_asset_document_view_url,
-        get_asset_documents,
-    )
-    from utils.formatting import fmt_date  # type: ignore
-
+from app.pages._core._crud import is_demo_id
+from app.services.asset_document_util import (
+    ASSET_DOCUMENT_UPLOAD_TYPES,
+    delete_asset_document_record,
+    file_type_label,
+    is_image_document,
+    is_pdf_document,
+    persist_asset_document_upload,
+)
+from app.services.assets_service import (
+    delete_asset_document,
+    get_asset_document_view_url,
+    get_asset_documents,
+)
+from app.utils.formatting import fmt_date
 AST_DOC_PREVIEW_KEY = "ast_doc_preview_spec"
 AST_DOC_DELETE_KEY = "ast_doc_delete_confirm"
 
@@ -50,10 +32,7 @@ def asset_documents_count(asset_id: str) -> int:
 
 
 def _current_uploader_id() -> str | None:
-    try:
-        from app.auth import current_profile
-    except ImportError:
-        from auth import current_profile  # type: ignore
+    from app.auth import current_profile
     pid = str((current_profile() or {}).get("id") or "").strip()
     return pid or None
 

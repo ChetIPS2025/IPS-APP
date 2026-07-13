@@ -7,17 +7,10 @@ import html
 import streamlit as st
 import streamlit.components.v1 as components
 
-try:
-    from app.components.install_share import render_install_share_admin
-    from app.config import settings
-    from app.pwa import _start_url, _static_url, inject_pwa_support
-    from app.styles import inject_install_page_css, inject_unauthenticated_shell_css
-except ImportError:
-    from components.install_share import render_install_share_admin  # type: ignore
-    from config import settings  # type: ignore
-    from pwa import _start_url, _static_url, inject_pwa_support  # type: ignore
-    from styles import inject_install_page_css, inject_unauthenticated_shell_css  # type: ignore
-
+from app.components.install_share import render_install_share_admin
+from app.config import settings
+from app.pwa import _start_url, _static_url, inject_pwa_support
+from app.styles import inject_install_page_css, inject_unauthenticated_shell_css
 _INSTALL_SESSION_KEY = "_ips_install_route"
 _PATH_REDIRECT_KEY = "_ips_install_path_redirect_done"
 
@@ -345,11 +338,7 @@ def render_install_page() -> None:
         unsafe_allow_html=True,
     )
 
-    try:
-        from app.pwa import install_page_url
-    except ImportError:
-        from pwa import install_page_url  # type: ignore
-
+    from app.pwa import install_page_url
     icon_url = _absolute_static_url("apple-touch-icon.png")
     open_url = _open_app_url()
     share_url = install_page_url()

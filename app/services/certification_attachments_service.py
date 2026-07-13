@@ -6,13 +6,8 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-try:
-    from app.db import create_signed_url, update_rows_admin, upload_bytes_admin
-    from app.services.repository import ServiceResult, clear_data_cache_for_table, filter_payload_to_table
-except ImportError:
-    from db import create_signed_url, update_rows_admin, upload_bytes_admin  # type: ignore
-    from services.repository import ServiceResult, clear_data_cache_for_table, filter_payload_to_table  # type: ignore
-
+from app.db import create_signed_url, update_rows_admin, upload_bytes_admin
+from app.services.repository import ServiceResult, clear_data_cache_for_table, filter_payload_to_table
 CERTIFICATION_STORAGE_BUCKET = "certification-documents"
 _ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".pdf"}
 _MIME_BY_EXT = {
@@ -76,10 +71,7 @@ def _update_certification_attachment_row(
     cid = str(cert_id or "").strip()
     if not cid:
         return ServiceResult(ok=False, error="Missing certification id.")
-    try:
-        from app.services.repository import table_column_names
-    except ImportError:
-        from services.repository import table_column_names  # type: ignore
+    from app.services.repository import table_column_names
     cols = table_column_names("employee_certifications")
     if cols and "attachment_path" not in cols:
         return ServiceResult(
@@ -98,10 +90,7 @@ def _update_certification_attachment_row(
         configured = _storage_not_configured_message(exc)
         if configured:
             return ServiceResult(ok=False, error=configured)
-        try:
-            from app.auth import friendly_auth_error_message
-        except ImportError:
-            from auth import friendly_auth_error_message  # type: ignore
+        from app.auth import friendly_auth_error_message
         return ServiceResult(
             ok=False,
             error=friendly_auth_error_message(exc, operation="update employee_certifications"),

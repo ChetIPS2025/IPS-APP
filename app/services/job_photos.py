@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from services.field_ops_util import fetch_fn, table_exists, write_fn
+from app.services.field_ops_util import fetch_fn, table_exists, write_fn
 
 _LOG = logging.getLogger(__name__)
 
@@ -25,10 +25,7 @@ PHOTO_CATEGORIES: tuple[str, ...] = (
 
 
 def _upload_fn(*, admin: bool):
-    try:
-        from app.db import upload_bytes, upload_bytes_admin
-    except ImportError:
-        from db import upload_bytes, upload_bytes_admin  # type: ignore
+    from app.db import upload_bytes, upload_bytes_admin
     return upload_bytes_admin if admin else upload_bytes
 
 
@@ -125,10 +122,7 @@ def upload_job_photos(
         cat = "Progress"
     insert_fn, _, _ = write_fn(admin=admin)
     upload = _upload_fn(admin=admin)
-    try:
-        from app.config import settings
-    except ImportError:
-        from config import settings  # type: ignore
+    from app.config import settings
     bucket = getattr(settings, "task_photos_bucket", "task-photos")
     ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     created: list[dict[str, Any]] = []
@@ -157,10 +151,7 @@ def upload_job_photos(
             },
         )
         created.append(row)
-        try:
-            from services.job_timeline import EVENT_PHOTO, log_job_event
-        except ImportError:
-            from app.services.job_timeline import EVENT_PHOTO, log_job_event  # type: ignore
+        from app.services.job_timeline import EVENT_PHOTO, log_job_event
         log_job_event(
             job_id=jid,
             event_type=EVENT_PHOTO,

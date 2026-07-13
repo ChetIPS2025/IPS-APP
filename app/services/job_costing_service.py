@@ -4,22 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-try:
-    from services.employee_labor import entry_labor_dollars
-except ImportError:
-    from app.services.employee_labor import entry_labor_dollars  # type: ignore
-
-try:
-    from services.job_service import job_display_primary
-except ImportError:
-    from app.services.job_service import job_display_primary  # type: ignore
-
-try:
-    from services.time_grid_service import grid_labor_cost_dollars
-except ImportError:
-    from app.services.time_grid_service import grid_labor_cost_dollars  # type: ignore
-
-
+from app.services.employee_labor import entry_labor_dollars
+from app.services.job_service import job_display_primary
+from app.services.time_grid_service import grid_labor_cost_dollars
 def estimate_proposal_value(estimate: dict[str, Any] | None) -> float:
     """Display / profit baseline from linked estimate (proposal first, then final bid)."""
     if not estimate:

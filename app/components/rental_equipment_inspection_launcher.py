@@ -6,11 +6,7 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.navigation import set_nav_slug
-except ImportError:
-    from navigation import set_nav_slug  # type: ignore
-
+from app.navigation import set_nav_slug
 _CTX_KEYS = (
     "rental_insp_id",
     "rental_insp_asset_id",

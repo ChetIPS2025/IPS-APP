@@ -9,11 +9,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-try:
-    from app.config import settings
-except ImportError:
-    from config import settings  # type: ignore
-
+from app.config import settings
 _JSON_FENCE_RE = re.compile(r"```(?:json)?\s*([\s\S]*?)\s*```", re.IGNORECASE)
 
 _TOOL_KINDS = frozenset({"serialized", "small", "inventory"})
@@ -133,13 +129,8 @@ def _openai_vision_extract(
     if not originals:
         raise ValueError("At least one file is required.")
 
-    try:
-        from app.services.asset_autofill_media import pdf_extracted_text_hints
-        from app.services.upload_media_strategy import vision_inputs_from_upload
-    except ImportError:
-        from services.asset_autofill_media import pdf_extracted_text_hints  # type: ignore
-        from services.upload_media_strategy import vision_inputs_from_upload  # type: ignore
-
+    from app.services.asset_autofill_media import pdf_extracted_text_hints
+    from app.services.upload_media_strategy import vision_inputs_from_upload
     images: list[tuple[bytes, str]] = []
     for file_bytes, file_name in originals:
         images.extend(vision_inputs_from_upload(file_bytes, file_name))

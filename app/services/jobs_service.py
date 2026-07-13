@@ -101,20 +101,14 @@ def normalize_job_status(raw: object) -> str:
 
 
 def _current_user_id() -> str | None:
-    try:
-        from app.auth import current_profile
-    except ImportError:
-        from auth import current_profile  # type: ignore
+    from app.auth import current_profile
     pid = str(current_profile().get("id") or "").strip()
     return pid or None
 
 
 def can_manage_job_actions() -> bool:
     """Admin, supervisor, project manager, or PM may complete/cancel/soft-delete jobs."""
-    try:
-        from app.auth import effective_role
-    except ImportError:
-        from auth import effective_role  # type: ignore
+    from app.auth import effective_role
     role = str(effective_role() or "").strip().lower()
     return role in _JOB_ACTION_ROLES
 
@@ -209,11 +203,7 @@ def update_job_status(
     if status not in MANUAL_JOB_STATUSES:
         return ServiceResult(ok=False, error=f"Status '{status}' is not allowed.")
 
-    try:
-        from app.db import fetch_one
-    except ImportError:
-        from db import fetch_one  # type: ignore
-
+    from app.db import fetch_one
     current_row = fetch_one("jobs", {"id": jid}) or {}
     if not current_row:
         return ServiceResult(ok=False, error="Job not found.")
@@ -245,11 +235,7 @@ def update_job_status(
             payload["cancellation_reason"] = reason_text
 
     if status == "Active":
-        try:
-            from app.services.estimate_job_workflow_service import award_job_and_sync_estimate
-        except ImportError:
-            from services.estimate_job_workflow_service import award_job_and_sync_estimate  # type: ignore
-
+        from app.services.estimate_job_workflow_service import award_job_and_sync_estimate
         sync = award_job_and_sync_estimate(
             jid,
             new_status=status,
@@ -267,13 +253,8 @@ def update_job_status(
     if not result.ok:
         return result
 
-    try:
-        from app.auth import current_profile
-        from app.services.job_timeline import EVENT_STATUS, log_job_event
-    except ImportError:
-        from auth import current_profile  # type: ignore
-        from services.job_timeline import EVENT_STATUS, log_job_event  # type: ignore
-
+    from app.auth import current_profile
+    from app.services.job_timeline import EVENT_STATUS, log_job_event
     profile = current_profile()
     desc = f"{old_status} → {status}"
     reason_text = str(reason or "").strip()
@@ -294,11 +275,7 @@ def update_job_status(
 
 def get_job_options(*, include_all: bool = False) -> list[dict[str, Any]]:
     """Return job dropdown options as ``{id, label}`` rows for task linking."""
-    try:
-        from app.pages._core._data import load_jobs
-    except ImportError:
-        from pages._core._data import load_jobs  # type: ignore
-
+    from app.pages._core._data import load_jobs
     opts: list[dict[str, Any]] = [{"id": None, "label": "— None —"}]
     for job in load_jobs():
         jid = str(job.get("id") or "").strip()
@@ -332,10 +309,7 @@ def resolve_job_id_from_label(label: str) -> str | None:
         if str(opt.get("label") or "") == raw:
             jid = opt.get("id")
             return str(jid).strip() if jid else None
-    try:
-        from app.pages._core._data import load_jobs
-    except ImportError:
-        from pages._core._data import load_jobs  # type: ignore
+    from app.pages._core._data import load_jobs
     for job in load_jobs():
         num = str(job.get("job_number") or "").strip()
         name = str(job.get("job_name") or "").strip()

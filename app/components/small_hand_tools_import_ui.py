@@ -6,21 +6,12 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.services.small_hand_tool_import_service import (
-        bulk_import_hand_tools,
-        hand_tool_csv_template_bytes,
-        parse_hand_tool_csv,
-        validate_hand_tool_import_rows,
-    )
-except ImportError:
-    from services.small_hand_tool_import_service import (  # type: ignore
-        bulk_import_hand_tools,
-        hand_tool_csv_template_bytes,
-        parse_hand_tool_csv,
-        validate_hand_tool_import_rows,
-    )
-
+from app.services.small_hand_tool_import_service import (
+    bulk_import_hand_tools,
+    hand_tool_csv_template_bytes,
+    parse_hand_tool_csv,
+    validate_hand_tool_import_rows,
+)
 HAND_TOOL_IMPORT_OPEN_KEY = "ips_hand_tool_import_open"
 _HAND_TOOL_IMPORT_VALID_KEY = "_ips_hand_tool_import_valid"
 _HAND_TOOL_IMPORT_INVALID_KEY = "_ips_hand_tool_import_invalid"

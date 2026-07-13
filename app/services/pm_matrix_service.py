@@ -7,37 +7,18 @@ from typing import Any
 
 import pandas as pd
 
-try:
-    from db import fetch_table_admin
-    from db_time_tracking import (
-        delete_time_entry_by_natural_key,
-        fetch_active_employees as db_fetch_active_employees,
-        fetch_jobs_for_matrix_rows,
-    )
-except ImportError:
-    from app.db import fetch_table_admin  # type: ignore
-    from app.db_time_tracking import (  # type: ignore
-        delete_time_entry_by_natural_key,
-        fetch_active_employees as db_fetch_active_employees,
-        fetch_jobs_for_matrix_rows,
-    )
-
-try:
-    from services.time_grid_service import (
-        delete_time_entries_by_ids,
-        fetch_time_entries_between,
-        fetch_time_entries_for_date,
-        upsert_time_entry,
-    )
-except ImportError:
-    from app.services.time_grid_service import (  # type: ignore
-        delete_time_entries_by_ids,
-        fetch_time_entries_between,
-        fetch_time_entries_for_date,
-        upsert_time_entry,
-    )
-
-
+from app.db import fetch_table_admin
+from app.db_time_tracking import (
+    delete_time_entry_by_natural_key,
+    fetch_active_employees as db_fetch_active_employees,
+    fetch_jobs_for_matrix_rows,
+)
+from app.services.time_grid_service import (
+    delete_time_entries_by_ids,
+    fetch_time_entries_between,
+    fetch_time_entries_for_date,
+    upsert_time_entry,
+)
 def fetch_weekly_entries(week_start: date, week_end: date) -> list[dict[str, Any]]:
     return fetch_time_entries_between(week_start, week_end)
 
@@ -47,10 +28,7 @@ def fetch_active_employees() -> list[dict[str, Any]]:
 
 
 def fetch_jobs_ordered() -> list[dict[str, Any]]:
-    try:
-        from services.job_service import sort_jobs_by_number_then_name
-    except ImportError:
-        from app.services.job_service import sort_jobs_by_number_then_name  # type: ignore
+    from app.services.job_service import sort_jobs_by_number_then_name
     try:
         jobs = fetch_table_admin("jobs", limit=5000, order_by="job_number")
     except Exception:

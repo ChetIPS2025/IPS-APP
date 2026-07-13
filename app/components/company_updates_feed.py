@@ -13,21 +13,9 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.utils.formatting import fmt_date
-except ImportError:
-    from utils.formatting import fmt_date  # type: ignore
-
-try:
-    from app.utils.permissions import can_manage_company_updates
-except ImportError:
-    from utils.permissions import can_manage_company_updates  # type: ignore
-
-try:
-    from app.auth import current_role, effective_role
-except ImportError:
-    from auth import current_role, effective_role  # type: ignore
-
+from app.utils.formatting import fmt_date
+from app.utils.permissions import can_manage_company_updates
+from app.auth import current_role, effective_role
 _CATEGORY_DISPLAY: dict[str, str] = {
     "General": "Announcements",
     "Policy": "Announcements",
@@ -437,10 +425,7 @@ def _open_company_update(update_id: str) -> None:
     uid = str(update_id or "").strip()
     if not uid:
         return
-    try:
-        from app.navigation import set_nav_slug
-    except ImportError:
-        from navigation import set_nav_slug  # type: ignore
+    from app.navigation import set_nav_slug
     st.session_state["selected_update_id"] = uid
     st.session_state["show_update_detail_modal"] = True
     set_nav_slug("company_updates")
@@ -448,10 +433,7 @@ def _open_company_update(update_id: str) -> None:
 
 
 def _go_company_updates_page(*, open_new: bool = False) -> None:
-    try:
-        from app.navigation import set_nav_slug
-    except ImportError:
-        from navigation import set_nav_slug  # type: ignore
+    from app.navigation import set_nav_slug
     if open_new:
         st.session_state["ips_cu_form"] = True
     set_nav_slug("company_updates")

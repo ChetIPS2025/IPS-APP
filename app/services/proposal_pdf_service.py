@@ -20,11 +20,7 @@ def _text(val: Any, default: str = "") -> str:
 
 def _merge_proposal_estimate(estimate: dict[str, Any], estimate_id: str) -> dict[str, Any]:
     """Map Phase 2B estimate fields onto the legacy proposal export shape."""
-    try:
-        from app.services.estimate_expiration_service import with_effective_expiration
-    except ImportError:
-        from services.estimate_expiration_service import with_effective_expiration  # type: ignore
-
+    from app.services.estimate_expiration_service import with_effective_expiration
     out = with_effective_expiration(dict(estimate))
     out["quote_number"] = _text(out.get("quote_number") or out.get("estimate_number"))
     out["prepared_by_name"] = _text(out.get("prepared_by_name") or out.get("created_by") or out.get("prepared_by"))
@@ -36,11 +32,7 @@ def _merge_proposal_estimate(estimate: dict[str, Any], estimate_id: str) -> dict
 
     eid = _text(estimate_id or out.get("id"))
     if eid:
-        try:
-            from db import fetch_one
-        except ImportError:
-            from app.db import fetch_one  # type: ignore
-
+        from app.db import fetch_one
         try:
             row = fetch_one(
                 "estimates",
@@ -136,11 +128,7 @@ def _proposal_context(est: dict[str, Any]) -> dict[str, str]:
     job_name = _text(est.get("project_name") or est.get("job_name"))
     if not job_name and est.get("job_id"):
         jid = str(est.get("job_id") or "").strip()
-        try:
-            from db import fetch_one
-        except ImportError:
-            from app.db import fetch_one  # type: ignore
-
+        from app.db import fetch_one
         try:
             job = fetch_one("jobs", {"id": jid}, columns="id,job_name")
             if job:

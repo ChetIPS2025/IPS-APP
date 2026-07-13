@@ -8,38 +8,20 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.components.action_styles import success_solid_button, warning_solid_button
-    from app.pages._core._crud import is_demo_id
-    from app.services.assets_service import (
-        asset_include_in_pricing_guide,
-        can_manage_asset_actions,
-        clear_assets_cache,
-        set_asset_include_in_pricing_guide,
-    )
-    from app.services.pricing_guide_service import (
-        cached_pricing_guide_rows,
-        link_asset_to_pricing_item,
-        save_pricing_item,
-    )
-    from app.utils.formatting import fmt_currency
-except ImportError:
-    from components.action_styles import success_solid_button, warning_solid_button  # type: ignore
-    from pages._core._crud import is_demo_id  # type: ignore
-    from services.assets_service import (  # type: ignore
-        asset_include_in_pricing_guide,
-        can_manage_asset_actions,
-        clear_assets_cache,
-        set_asset_include_in_pricing_guide,
-    )
-    from services.pricing_guide_service import (  # type: ignore
-        cached_pricing_guide_rows,
-        link_asset_to_pricing_item,
-        save_pricing_item,
-    )
-    from utils.formatting import fmt_currency  # type: ignore
-
-
+from app.components.action_styles import success_solid_button, warning_solid_button
+from app.pages._core._crud import is_demo_id
+from app.services.assets_service import (
+    asset_include_in_pricing_guide,
+    can_manage_asset_actions,
+    clear_assets_cache,
+    set_asset_include_in_pricing_guide,
+)
+from app.services.pricing_guide_service import (
+    cached_pricing_guide_rows,
+    link_asset_to_pricing_item,
+    save_pricing_item,
+)
+from app.utils.formatting import fmt_currency
 def _confirm_state_key(asset_id: str, action: str) -> str:
     return f"confirm_{action}_asset_pg_{asset_id}"
 

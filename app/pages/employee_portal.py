@@ -8,59 +8,31 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.auth import current_profile, effective_role
-    from app.components.company_updates_feed import (
-        _mark_dashboard_update_read,
-        _is_update_unread,
-    )
-    from app.navigation import set_nav_slug
-    from app.pages._core._access import begin_module
-    from app.pages._core._data import get_employee
-    from app.services.certification_attachments_service import cert_has_attachment
-    from app.services.certification_helpers import cert_status_pill_html, resolve_logged_in_employee_id
-    from app.services.employee_portal_service import (
-        list_active_jobs_for_employee,
-        list_bidding_estimates_for_employee,
-        list_employee_portal_updates,
-        list_my_certifications_for_portal,
-        list_portal_dashboard_jobs,
-        portal_employee_avatar_html,
-        portal_employee_title,
-        portal_greeting_name,
-        portal_greeting_period,
-    )
-    from app.services.employees_service import get_certification_attachment_url
-    from app.styles import inject_employee_portal_css, inject_global_css
-    from app.utils.formatting import fmt_date
-    from app.utils.permissions import role_can_access_page
-except ImportError:
-    from auth import current_profile, effective_role  # type: ignore
-    from components.company_updates_feed import (  # type: ignore
-        _mark_dashboard_update_read,
-        _is_update_unread,
-    )
-    from navigation import set_nav_slug  # type: ignore
-    from pages._core._access import begin_module  # type: ignore
-    from pages._core._data import get_employee  # type: ignore
-    from services.certification_attachments_service import cert_has_attachment  # type: ignore
-    from services.certification_helpers import cert_status_pill_html, resolve_logged_in_employee_id  # type: ignore
-    from services.employee_portal_service import (  # type: ignore
-        list_active_jobs_for_employee,
-        list_bidding_estimates_for_employee,
-        list_employee_portal_updates,
-        list_my_certifications_for_portal,
-        list_portal_dashboard_jobs,
-        portal_employee_avatar_html,
-        portal_employee_title,
-        portal_greeting_name,
-        portal_greeting_period,
-    )
-    from services.employees_service import get_certification_attachment_url  # type: ignore
-    from styles import inject_employee_portal_css, inject_global_css  # type: ignore
-    from utils.formatting import fmt_date  # type: ignore
-    from utils.permissions import role_can_access_page  # type: ignore
-
+from app.auth import current_profile, effective_role
+from app.components.company_updates_feed import (
+    _mark_dashboard_update_read,
+    _is_update_unread,
+)
+from app.navigation import set_nav_slug
+from app.pages._core._access import begin_module
+from app.pages._core._data import get_employee
+from app.services.certification_attachments_service import cert_has_attachment
+from app.services.certification_helpers import cert_status_pill_html, resolve_logged_in_employee_id
+from app.services.employee_portal_service import (
+    list_active_jobs_for_employee,
+    list_bidding_estimates_for_employee,
+    list_employee_portal_updates,
+    list_my_certifications_for_portal,
+    list_portal_dashboard_jobs,
+    portal_employee_avatar_html,
+    portal_employee_title,
+    portal_greeting_name,
+    portal_greeting_period,
+)
+from app.services.employees_service import get_certification_attachment_url
+from app.styles import inject_employee_portal_css, inject_global_css
+from app.utils.formatting import fmt_date
+from app.utils.permissions import role_can_access_page
 _PORTAL_UPDATE_KEY = "ips_portal_selected_update"
 _PORTAL_JOB_KEY = "ips_portal_selected_job"
 _PORTAL_BID_KEY = "ips_portal_selected_bid"
@@ -68,10 +40,7 @@ _SHOW_ALL_JOBS_KEY = "ips_ep_show_all_jobs"
 
 
 def _quick_actions_view_mode() -> str:
-    try:
-        from app.utils.view_as import is_view_as_active, view_as_mode
-    except ImportError:
-        from utils.view_as import is_view_as_active, view_as_mode  # type: ignore
+    from app.utils.view_as import is_view_as_active, view_as_mode
     if is_view_as_active():
         return f"preview_{view_as_mode()}"
     return "employee"

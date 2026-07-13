@@ -160,10 +160,7 @@ def _initials(name: str) -> str:
 def _resolve_icon(icon: str | None) -> str:
     if icon and str(icon).strip().startswith("<svg"):
         return str(icon).strip()
-    try:
-        from app.navigation import current_nav_slug
-    except ImportError:
-        from navigation import current_nav_slug  # type: ignore
+    from app.navigation import current_nav_slug
     slug = current_nav_slug()
     if icon:
         return str(icon).strip()
@@ -173,47 +170,29 @@ def _resolve_icon(icon: str | None) -> str:
 def _resolve_subtitle(title: str, subtitle: str | None) -> str | None:
     if subtitle:
         return str(subtitle).strip() or None
-    try:
-        from app.navigation import current_nav_slug
-    except ImportError:
-        from navigation import current_nav_slug  # type: ignore
+    from app.navigation import current_nav_slug
     return DEFAULT_PAGE_SUBTITLES.get(current_nav_slug())
 
 
 def _can_navigate_back() -> bool:
-    try:
-        from app.navigation import IPS_NAV_HISTORY_KEY
-    except ImportError:
-        from navigation import IPS_NAV_HISTORY_KEY  # type: ignore
+    from app.navigation import IPS_NAV_HISTORY_KEY
     history = st.session_state.get(IPS_NAV_HISTORY_KEY) or []
     return bool(history)
 
 
 def _request_sidebar_toggle() -> None:
-    try:
-        from app.components.sidebar_shell import IPS_SIDEBAR_TOGGLE_REQUEST_KEY
-    except ImportError:
-        from components.sidebar_shell import IPS_SIDEBAR_TOGGLE_REQUEST_KEY  # type: ignore
+    from app.components.sidebar_shell import IPS_SIDEBAR_TOGGLE_REQUEST_KEY
     st.session_state[IPS_SIDEBAR_TOGGLE_REQUEST_KEY] = True
     st.rerun()
 
 
 def _navigate_back() -> None:
-    try:
-        from app.navigation import navigate_back
-    except ImportError:
-        from navigation import navigate_back  # type: ignore
+    from app.navigation import navigate_back
     navigate_back()
 
 
 def _unread_notification_count() -> int:
-    try:
-        from app.services.field_dashboard import load_field_dashboard_snapshot
-    except ImportError:
-        try:
-            from services.field_dashboard import load_field_dashboard_snapshot  # type: ignore
-        except Exception:
-            return 0
+    from app.services.field_dashboard import load_field_dashboard_snapshot
     try:
         snap = load_field_dashboard_snapshot()
         return int(snap.get("unread_notifications", 0) or 0)
@@ -239,15 +218,9 @@ def _render_page_actions(actions: list[_ActionFn], *, header_key: str) -> None:
 
 
 def _render_header_utilities(*, header_key: str) -> None:
-    try:
-        from app.auth import current_user_display_name, effective_role, sign_out
-        from app.navigation import set_nav_slug
-        from app.utils.permissions import role_can_access_page
-    except ImportError:
-        from auth import current_user_display_name, effective_role, sign_out  # type: ignore
-        from navigation import set_nav_slug  # type: ignore
-        from utils.permissions import role_can_access_page  # type: ignore
-
+    from app.auth import current_user_display_name, effective_role, sign_out
+    from app.navigation import set_nav_slug
+    from app.utils.permissions import role_can_access_page
     role = effective_role()
     unread = _unread_notification_count()
     display = current_user_display_name()
@@ -379,10 +352,7 @@ def render_person_profile_header(
     ot, ct = "d" + "iv", "/" + "d" + "iv"
     pill = status_html or ""
     if not pill and status:
-        try:
-            from app.components.status import status_pill_html
-        except ImportError:
-            from components.status import status_pill_html  # type: ignore
+        from app.components.status import status_pill_html
         pill = status_pill_html(status)
     sub_parts = [html.escape(x) for x in (role, department) if str(x or "").strip()]
     sub = " · ".join(sub_parts)
@@ -414,23 +384,14 @@ def _navigate_ops_quick_action(slug: str) -> None:
     picked = str(slug or "").strip()
     if not picked:
         return
-    try:
-        from app.auth import effective_role
-        from app.navigation import normalize_nav_slug, set_nav_slug
-        from app.utils.permissions import role_can_access_page
-    except ImportError:
-        from auth import effective_role  # type: ignore
-        from navigation import normalize_nav_slug, set_nav_slug  # type: ignore
-        from utils.permissions import role_can_access_page  # type: ignore
-
+    from app.auth import effective_role
+    from app.navigation import normalize_nav_slug, set_nav_slug
+    from app.utils.permissions import role_can_access_page
     if picked == "job_costing":
         if not role_can_access_page(effective_role(), "jobs"):
             st.warning("You do not have access to that page.")
             return
-        try:
-            from app.navigation import open_jobs_job_costing
-        except ImportError:
-            from navigation import open_jobs_job_costing  # type: ignore
+        from app.navigation import open_jobs_job_costing
         open_jobs_job_costing()
         st.rerun()
         return

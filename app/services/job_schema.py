@@ -40,11 +40,7 @@ from typing import Any
 
 _LOG = logging.getLogger(__name__)
 
-try:
-    from db import fetch_jobs_with_order_fallback, fetch_table, fetch_table_admin
-except ImportError:
-    from app.db import fetch_jobs_with_order_fallback, fetch_table, fetch_table_admin  # type: ignore
-
+from app.db import fetch_jobs_with_order_fallback, fetch_table, fetch_table_admin
 JOB_SOURCE_TYPE_ESTIMATE = "estimate"
 JOB_SOURCE_TYPE_STANDALONE = "standalone"
 

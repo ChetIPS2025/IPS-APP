@@ -8,232 +8,118 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.components.job_actions import render_job_lifecycle_confirmations
-    from app.components.job_detail_header_menu import render_job_detail_header_menu
-    from app.components.job_detail_layout import (
-        build_job_detail_tab_labels,
-        can_view_job_financial_tab,
-        gather_job_detail_stats,
-        inject_job_detail_layout_css,
-        render_job_detail_activity_timeline,
-        render_job_detail_financial_section,
-        render_job_detail_header,
-        render_job_detail_overview_section,
-    )
-    from app.components.job_status_ui import (
-        job_status_pill_html,
-        render_job_status_badge_editor,
-    )
-    from app.components.job_row_actions_ui import render_job_row_actions
-    from app.components.jobs_list_table import (
-        JOBS_TABLE_LAST_ACTION_KEY,
-        JOBS_TABLE_PENDING_MENU_KEY,
-        JOBS_TABLE_PENDING_OPEN_KEY,
-        JOBS_TABLE_PENDING_STATUS_KEY,
-        build_jobs_html_table,
-        job_list_link_html,
-        render_jobs_table_bridge_legacy,
-        render_jobs_table_open_buttons,
-    )
-    from app.components.jobs_page_layout import (
-        close_jobs_filter_bar_shell,
-        inject_jobs_page_layout_css,
-        job_health_badge_html,
-        render_jobs_filter_bar_shell,
-        render_jobs_pagination_footer,
-        render_jobs_summary_badge_bar,
-        render_jobs_summary_cards,
-        render_jobs_table_pagination_header,
-        render_jobs_view_navigation,
-        jobs_visible_table_layout,
-    )
-    from app.components.job_ips_forms import render_job_ips_forms_tab
-    from app.components.job_materials_ui import render_job_materials_tab
-    from app.components.job_cost_tab import render_job_cost_tab
-    from app.components.job_costing_tab import render_job_costing_tab
-    from app.components.job_cost_summary_cards import (
-        render_job_cost_breakdown,
-        render_job_cost_summary_cards,
-    )
-    from app.services.job_financial_ui import (
-        BILLING_TYPE_OPTIONS,
-        billing_type_label,
-        job_is_time_and_material,
-        normalize_billing_type,
-    )
-    from app.services.job_cost_transaction_service import (
-        build_job_cost_summary,
-        cached_job_cost_summary,
-        sync_all_sources_for_job,
-    )
-    from app.components.job_labor_readonly_panel import (
-        render_job_labor_summary_tab,
-        render_job_weekly_timesheets_tab,
-    )
-    from app.components.headers import render_page_brand_header
-    from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.table_filters import (
-        apply_column_filters,
-        build_filter_options,
-        clear_table_filters,
-        render_table_header_cell,
-    )
-    from app.components.table_pagination import (
-        paginate_rows,
-        reset_table_page,
-    )
-    from app.components.record_modal import show_modal_if_pending
-    from app.pages._core._data import (
-        customer_contact_select_options,
-        customer_filter_options,
-        customer_id_for_name,
-        customer_location_select_options,
-        employee_options,
-        load_estimates,
-        load_jobs,
-        lookup_options,
-        persist_job,
-    )
-    from app.pages._core._crud import apply_persist_feedback, is_demo_id
-    from app.pages._core._session import select_key
-    from app.pages.tasks import (
-        clear_job_subjob_selection,
-        on_job_detail_modal_open,
-        render_job_linked_tasks_tab,
-    )
-    from app.components.quote_job_number_autofill import (
-        clear_new_job_number_state,
-        sync_new_job_number,
-    )
-    from app.styles import inject_jobs_module_css, inject_tasks_module_css
-    from app.utils.formatting import fmt_date
-    from app.utils.phone_helpers import format_phone_display
-    from app.utils.field_context import (
-        FIELD_EXPANDED_JOB_KEY,
-        clear_field_expanded,
-        field_expanded_id,
-        inject_field_row_expand_css,
-        is_field_context,
-        is_field_mode,
-        render_field_job_bar,
-        set_field_job_id,
-        toggle_field_expanded,
-    )
-    from app.ui.streamlit_perf import fragment, ips_app_rerun
-except ImportError:
-    from components.job_actions import render_job_lifecycle_confirmations  # type: ignore
-    from components.job_detail_header_menu import render_job_detail_header_menu  # type: ignore
-    from components.job_detail_layout import (  # type: ignore
-        build_job_detail_tab_labels,
-        can_view_job_financial_tab,
-        gather_job_detail_stats,
-        inject_job_detail_layout_css,
-        render_job_detail_activity_timeline,
-        render_job_detail_financial_section,
-        render_job_detail_header,
-        render_job_detail_overview_section,
-    )
-    from components.job_ips_forms import render_job_ips_forms_tab  # type: ignore
-    from components.job_materials_ui import render_job_materials_tab  # type: ignore
-    from components.job_cost_tab import render_job_cost_tab  # type: ignore
-    from components.job_costing_tab import render_job_costing_tab  # type: ignore
-    from services.job_financial_ui import (  # type: ignore
-        BILLING_TYPE_OPTIONS,
-        billing_type_label,
-        job_is_time_and_material,
-        normalize_billing_type,
-    )
-    from services.job_cost_transaction_service import (  # type: ignore
-        build_job_cost_summary,
-        cached_job_cost_summary,
-        sync_all_sources_for_job,
-    )
-    from components.job_status_ui import (  # type: ignore
-        job_status_pill_html,
-        render_job_status_badge_editor,
-    )
-    from components.job_row_actions_ui import render_job_row_actions  # type: ignore
-    from components.jobs_list_table import (  # type: ignore
-        JOBS_TABLE_LAST_ACTION_KEY,
-        JOBS_TABLE_PENDING_MENU_KEY,
-        JOBS_TABLE_PENDING_OPEN_KEY,
-        JOBS_TABLE_PENDING_STATUS_KEY,
-        build_jobs_html_table,
-        job_list_link_html,
-        render_jobs_table_bridge_legacy,
-        render_jobs_table_open_buttons,
-    )
-    from components.jobs_page_layout import (  # type: ignore
-        close_jobs_filter_bar_shell,
-        inject_jobs_page_layout_css,
-        job_health_badge_html,
-        render_jobs_filter_bar_shell,
-        render_jobs_pagination_footer,
-        render_jobs_summary_badge_bar,
-        render_jobs_summary_cards,
-        render_jobs_table_pagination_header,
-        render_jobs_view_navigation,
-        jobs_visible_table_layout,
-    )
-    from components.job_cost_summary_cards import (  # type: ignore
-        render_job_cost_breakdown,
-        render_job_cost_summary_cards,
-    )
-    from components.job_labor_readonly_panel import (  # type: ignore
-        render_job_labor_summary_tab,
-        render_job_weekly_timesheets_tab,
-    )
-    from components.headers import render_page_brand_header  # type: ignore
-    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.table_filters import (  # type: ignore
-        apply_column_filters,
-        build_filter_options,
-        clear_table_filters,
-        render_table_header_cell,
-    )
-    from components.table_pagination import (  # type: ignore
-        paginate_rows,
-        reset_table_page,
-    )
-    from components.record_modal import show_modal_if_pending  # type: ignore
-    from pages._core._data import (  # type: ignore
-        customer_contact_select_options,
-        customer_filter_options,
-        customer_id_for_name,
-        customer_location_select_options,
-        employee_options,
-        load_estimates,
-        load_jobs,
-        lookup_options,
-        persist_job,
-    )
-    from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
-    from pages._core._session import select_key  # type: ignore
-    from pages.tasks import (  # type: ignore
-        clear_job_subjob_selection,
-        on_job_detail_modal_open,
-        render_job_linked_tasks_tab,
-    )
-    from components.quote_job_number_autofill import (  # type: ignore
-        clear_new_job_number_state,
-        sync_new_job_number,
-    )
-    from styles import inject_jobs_module_css, inject_tasks_module_css  # type: ignore
-    from utils.formatting import fmt_date  # type: ignore
-    from utils.field_context import (  # type: ignore
-        FIELD_EXPANDED_JOB_KEY,
-        clear_field_expanded,
-        field_expanded_id,
-        inject_field_row_expand_css,
-        is_field_context,
-        is_field_mode,
-        render_field_job_bar,
-        set_field_job_id,
-        toggle_field_expanded,
-    )
-    from ui.streamlit_perf import fragment, ips_app_rerun  # type: ignore
-
+from app.components.job_actions import render_job_lifecycle_confirmations
+from app.components.job_detail_header_menu import render_job_detail_header_menu
+from app.components.job_detail_layout import (
+    build_job_detail_tab_labels,
+    can_view_job_financial_tab,
+    gather_job_detail_stats,
+    inject_job_detail_layout_css,
+    render_job_detail_activity_timeline,
+    render_job_detail_financial_section,
+    render_job_detail_header,
+    render_job_detail_overview_section,
+)
+from app.components.job_status_ui import (
+    job_status_pill_html,
+    render_job_status_badge_editor,
+)
+from app.components.job_row_actions_ui import render_job_row_actions
+from app.components.jobs_list_table import (
+    JOBS_TABLE_LAST_ACTION_KEY,
+    JOBS_TABLE_PENDING_MENU_KEY,
+    JOBS_TABLE_PENDING_OPEN_KEY,
+    JOBS_TABLE_PENDING_STATUS_KEY,
+    build_jobs_html_table,
+    job_list_link_html,
+    render_jobs_table_bridge_legacy,
+    render_jobs_table_open_buttons,
+)
+from app.components.jobs_page_layout import (
+    close_jobs_filter_bar_shell,
+    inject_jobs_page_layout_css,
+    job_health_badge_html,
+    render_jobs_filter_bar_shell,
+    render_jobs_pagination_footer,
+    render_jobs_summary_badge_bar,
+    render_jobs_summary_cards,
+    render_jobs_table_pagination_header,
+    render_jobs_view_navigation,
+    jobs_visible_table_layout,
+)
+from app.components.job_ips_forms import render_job_ips_forms_tab
+from app.components.job_materials_ui import render_job_materials_tab
+from app.components.job_cost_tab import render_job_cost_tab
+from app.components.job_costing_tab import render_job_costing_tab
+from app.components.job_cost_summary_cards import (
+    render_job_cost_breakdown,
+    render_job_cost_summary_cards,
+)
+from app.services.job_financial_ui import (
+    BILLING_TYPE_OPTIONS,
+    billing_type_label,
+    job_is_time_and_material,
+    normalize_billing_type,
+)
+from app.services.job_cost_transaction_service import (
+    build_job_cost_summary,
+    cached_job_cost_summary,
+    sync_all_sources_for_job,
+)
+from app.components.job_labor_readonly_panel import (
+    render_job_labor_summary_tab,
+    render_job_weekly_timesheets_tab,
+)
+from app.components.headers import render_page_brand_header
+from app.components.layout import render_filter_bar as layout_filter_bar
+from app.components.table_filters import (
+    apply_column_filters,
+    build_filter_options,
+    clear_table_filters,
+    render_table_header_cell,
+)
+from app.components.table_pagination import (
+    paginate_rows,
+    reset_table_page,
+)
+from app.components.record_modal import show_modal_if_pending
+from app.pages._core._data import (
+    customer_contact_select_options,
+    customer_filter_options,
+    customer_id_for_name,
+    customer_location_select_options,
+    employee_options,
+    load_estimates,
+    load_jobs,
+    lookup_options,
+    persist_job,
+)
+from app.pages._core._crud import apply_persist_feedback, is_demo_id
+from app.pages._core._session import select_key
+from app.pages.tasks import (
+    clear_job_subjob_selection,
+    on_job_detail_modal_open,
+    render_job_linked_tasks_tab,
+)
+from app.components.quote_job_number_autofill import (
+    clear_new_job_number_state,
+    sync_new_job_number,
+)
+from app.styles import inject_jobs_module_css, inject_tasks_module_css
+from app.utils.formatting import fmt_date
+from app.utils.phone_helpers import format_phone_display
+from app.utils.field_context import (
+    FIELD_EXPANDED_JOB_KEY,
+    clear_field_expanded,
+    field_expanded_id,
+    inject_field_row_expand_css,
+    is_field_context,
+    is_field_mode,
+    render_field_job_bar,
+    set_field_job_id,
+    toggle_field_expanded,
+)
+from app.ui.streamlit_perf import fragment, ips_app_rerun
 _SEL = select_key("jobs")
 _TABLE_KEY = "jobs_list"
 _JOBS_MODAL_KEY = "ips_jobs_detail_modal_id"
@@ -294,10 +180,7 @@ _JOB_BAR_FILTER_FIELDS = ["customer", "supervisor", "status"]
 
 
 def _normalize_job_status(raw: object) -> str:
-    try:
-        from app.services.jobs_service import normalize_job_status
-    except ImportError:
-        from services.jobs_service import normalize_job_status  # type: ignore
+    from app.services.jobs_service import normalize_job_status
     return normalize_job_status(raw)
 
 
@@ -363,10 +246,7 @@ def _job_location(job: dict) -> str:
             return val
     loc_id = _job_customer_location_id(job)
     if loc_id:
-        try:
-            from app.services.job_from_estimate import _location_text_from_customer_location
-        except ImportError:
-            from services.job_from_estimate import _location_text_from_customer_location  # type: ignore
+        from app.services.job_from_estimate import _location_text_from_customer_location
         label = _location_text_from_customer_location(loc_id)
         if label:
             return label
@@ -446,10 +326,7 @@ def _pct_cell(value: float) -> str:
 
 
 def _load_open_subjob_counts() -> dict[str, int]:
-    try:
-        from app.services.tasks_service import count_open_subjobs_by_job_id
-    except ImportError:
-        from services.tasks_service import count_open_subjobs_by_job_id  # type: ignore
+    from app.services.tasks_service import count_open_subjobs_by_job_id
     try:
         return count_open_subjobs_by_job_id()
     except Exception:
@@ -462,10 +339,7 @@ def _job_open_subjobs_count(job: dict, *, subjob_counts: dict[str, int] | None =
         return 0
     if subjob_counts is not None:
         return int(subjob_counts.get(jid, 0))
-    try:
-        from app.services.tasks_service import get_tasks_by_job
-    except ImportError:
-        from services.tasks_service import get_tasks_by_job  # type: ignore
+    from app.services.tasks_service import get_tasks_by_job
     try:
         closed = {"complete", "completed", "closed", "cancelled", "canceled", "duplicate"}
         return sum(
@@ -478,36 +352,24 @@ def _job_open_subjobs_count(job: dict, *, subjob_counts: dict[str, int] | None =
 
 
 def _projected_job_financials(contract_value: float, estimated_cost: float) -> tuple[float, float]:
-    try:
-        from app.services.job_financial_ui import projected_gross_profit, projected_margin_pct
-    except ImportError:
-        from services.job_financial_ui import projected_gross_profit, projected_margin_pct  # type: ignore
+    from app.services.job_financial_ui import projected_gross_profit, projected_margin_pct
     return projected_gross_profit(contract_value, estimated_cost), projected_margin_pct(
         contract_value, estimated_cost
     )
 
 
 def _job_financials_editable(job: dict) -> bool:
-    try:
-        from app.services.job_financial_ui import job_manual_financials_editable
-    except ImportError:
-        from services.job_financial_ui import job_manual_financials_editable  # type: ignore
+    from app.services.job_financial_ui import job_manual_financials_editable
     return job_manual_financials_editable(job)
 
 
 def _job_po_snapshot(job: dict) -> dict:
-    try:
-        from app.services.job_po_service import job_po_snapshot
-    except ImportError:
-        from services.job_po_service import job_po_snapshot  # type: ignore
+    from app.services.job_po_service import job_po_snapshot
     return job_po_snapshot(job)
 
 
 def _job_po_editable(job: dict) -> bool:
-    try:
-        from app.services.job_po_service import job_po_editable
-    except ImportError:
-        from services.job_po_service import job_po_editable  # type: ignore
+    from app.services.job_po_service import job_po_editable
     return job_po_editable(job)
 
 
@@ -517,10 +379,7 @@ def _customer_po_document_url(doc: dict | None) -> str:
     path = str(doc.get("storage_path") or "").strip()
     if not path:
         return ""
-    try:
-        from app.services.weekly_job_timesheet_service import signed_url_for_timesheet
-    except ImportError:
-        from services.weekly_job_timesheet_service import signed_url_for_timesheet  # type: ignore
+    from app.services.weekly_job_timesheet_service import signed_url_for_timesheet
     return signed_url_for_timesheet(path) or ""
 
 
@@ -569,13 +428,8 @@ def _render_job_customer_po_upload(job: dict) -> None:
     job_key = _job_session_key(job)
     pk = f"job_po_upload_{job_key}"
     admin = _field_admin_read()
-    try:
-        from app.services.asset_document_util import guess_document_content_type
-        from app.services.job_documents import fetch_customer_po_document, upload_customer_po_document
-    except ImportError:
-        from services.asset_document_util import guess_document_content_type  # type: ignore
-        from services.job_documents import fetch_customer_po_document, upload_customer_po_document  # type: ignore
-
+    from app.services.asset_document_util import guess_document_content_type
+    from app.services.job_documents import fetch_customer_po_document, upload_customer_po_document
     existing = fetch_customer_po_document(jid, admin=admin)
     if existing:
         url = _customer_po_document_url(existing)
@@ -617,10 +471,7 @@ def _render_job_customer_po_overview(job: dict) -> None:
     admin = _field_admin_read()
     po_doc = None
     if jid:
-        try:
-            from app.services.job_documents import fetch_customer_po_document
-        except ImportError:
-            from services.job_documents import fetch_customer_po_document  # type: ignore
+        from app.services.job_documents import fetch_customer_po_document
         po_doc = fetch_customer_po_document(jid, admin=admin)
 
     po_left = (
@@ -659,10 +510,7 @@ def _render_job_customer_po_overview(job: dict) -> None:
         key=f"job_po_sync_{_job_session_key(job)}",
         type="secondary",
     ):
-        try:
-            from app.services.job_po_service import sync_job_po_from_estimate
-        except ImportError:
-            from services.job_po_service import sync_job_po_from_estimate  # type: ignore
+        from app.services.job_po_service import sync_job_po_from_estimate
         result = sync_job_po_from_estimate(
             jid,
             job=job,
@@ -787,10 +635,7 @@ def _render_job_financial_inputs(
 
 def _job_list_financials_from_row(job: dict) -> dict[str, float | dict | bool]:
     """List/table financials from stored job columns (no ledger queries)."""
-    try:
-        from app.services.job_financial_ui import job_list_financials_from_row
-    except ImportError:
-        from services.job_financial_ui import job_list_financials_from_row  # type: ignore
+    from app.services.job_financial_ui import job_list_financials_from_row
     fin = job_list_financials_from_row(job)
     actual = float(fin["actual_cost"])
     estimated = float(fin["estimated_cost"])
@@ -872,10 +717,7 @@ def _compute_job_list_cost_fields(job: dict, *, sync_if_empty: bool = False) -> 
 
 
 def _build_jobs_list_cost_cache(jobs: list[dict]) -> dict[str, dict[str, float | dict | bool]]:
-    try:
-        from app.services.job_financial_ui import job_table_list_financials_from_row
-    except ImportError:
-        from services.job_financial_ui import job_table_list_financials_from_row  # type: ignore
+    from app.services.job_financial_ui import job_table_list_financials_from_row
     cache: dict[str, dict[str, float | dict | bool]] = {}
     for job in jobs:
         jid = str(job.get("id") or "").strip()
@@ -893,10 +735,7 @@ def _job_list_cost_fields(
     jid = str(job.get("id") or "").strip()
     if cost_cache is not None and jid and jid in cost_cache:
         return cost_cache[jid]
-    try:
-        from app.services.job_financial_ui import job_table_list_financials_from_row
-    except ImportError:
-        from services.job_financial_ui import job_table_list_financials_from_row  # type: ignore
+    from app.services.job_financial_ui import job_table_list_financials_from_row
     return job_table_list_financials_from_row(job)
 
 
@@ -999,10 +838,7 @@ def _open_job_detail_task_form(job: dict) -> None:
     if not jid:
         return
     st.session_state[f"job_task_form_{jid}"] = True
-    try:
-        from app.navigation import JOBS_DETAIL_FOCUS_TAB_KEY
-    except ImportError:
-        from navigation import JOBS_DETAIL_FOCUS_TAB_KEY  # type: ignore
+    from app.navigation import JOBS_DETAIL_FOCUS_TAB_KEY
     st.session_state[JOBS_DETAIL_FOCUS_TAB_KEY] = "Tasks"
 
 
@@ -1024,10 +860,7 @@ def _open_job_detail_with_tab(job: dict, tab: str) -> None:
         _open_job_detail_print_packet(job)
         ips_app_rerun()
         return
-    try:
-        from app.navigation import JOBS_DETAIL_FOCUS_TAB_KEY
-    except ImportError:
-        from navigation import JOBS_DETAIL_FOCUS_TAB_KEY  # type: ignore
+    from app.navigation import JOBS_DETAIL_FOCUS_TAB_KEY
     st.session_state[JOBS_DETAIL_FOCUS_TAB_KEY] = tab_norm
     _open_jobs_detail_modal(jid, job)
     ips_app_rerun()
@@ -1037,10 +870,7 @@ def _assign_employees_for_job(job: dict) -> None:
     jid = str(job.get("id") or "").strip()
     if not jid:
         return
-    try:
-        from app.navigation import navigate_to_timekeeping
-    except ImportError:
-        from navigation import navigate_to_timekeeping  # type: ignore
+    from app.navigation import navigate_to_timekeeping
     navigate_to_timekeeping(job_id=jid)
     ips_app_rerun()
 
@@ -1168,12 +998,8 @@ def _refresh_job_modal_cache(job_id: str) -> None:
     jid = str(job_id or "").strip()
     if not jid:
         return
-    try:
-        from app.services.repository import fetch_by_id
-        from app.services.phase2_modules_service import normalize_job
-    except ImportError:
-        from services.repository import fetch_by_id  # type: ignore
-        from services.phase2_modules_service import normalize_job  # type: ignore
+    from app.services.repository import fetch_by_id
+    from app.services.phase2_modules_service import normalize_job
     row = fetch_by_id("jobs", jid)
     if not row:
         return
@@ -1190,10 +1016,7 @@ def _show_job_persist_error(msg: str, dev_detail: str | None = None) -> None:
     detail = str(dev_detail or "").strip()
     if not detail:
         return
-    try:
-        from app.config import settings
-    except ImportError:
-        from config import settings  # type: ignore
+    from app.config import settings
     if settings.is_production:
         return
     with st.expander("Development error detail", expanded=True):
@@ -1596,10 +1419,7 @@ def _job_subjob_select_options(job_id: str) -> tuple[list[str], dict[str, str]]:
     jid = str(job_id or "").strip()
     if not jid:
         return labels, label_to_id
-    try:
-        from app.services.tasks_service import get_tasks_by_job
-    except ImportError:
-        from services.tasks_service import get_tasks_by_job  # type: ignore
+    from app.services.tasks_service import get_tasks_by_job
     try:
         for task in get_tasks_by_job(jid, include_closed=True):
             tid = str(task.get("id") or "").strip()
@@ -1673,16 +1493,10 @@ def _render_job_daily_update_add_form(job: dict) -> None:
             if not summary and not details:
                 st.warning("Enter a summary or daily update details before saving.")
             else:
-                try:
-                    from app.services.job_updates_service import (
-                        create_job_daily_update,
-                        daily_updates_table_available,
-                    )
-                except ImportError:
-                    from services.job_updates_service import (  # type: ignore
-                        create_job_daily_update,
-                        daily_updates_table_available,
-                    )
+                from app.services.job_updates_service import (
+                    create_job_daily_update,
+                    daily_updates_table_available,
+                )
                 if not daily_updates_table_available(force=True):
                     st.error(
                         "Daily updates are not available yet. Run the job_daily_updates database migration."
@@ -1698,10 +1512,7 @@ def _render_job_daily_update_add_form(job: dict) -> None:
                         note_lines.append(f"Status: {status}")
                     if subjob and subjob != "— None —":
                         note_lines.append(f"Linked subjob: {subjob}")
-                    try:
-                        from app.auth import current_profile
-                    except ImportError:
-                        from auth import current_profile  # type: ignore
+                    from app.auth import current_profile
                     profile = current_profile() or {}
                     payload: dict[str, object] = {
                         "job_id": jid,
@@ -1734,10 +1545,7 @@ def _job_subjob_label_map(job_id: str) -> dict[str, str]:
     jid = str(job_id or "").strip()
     if not jid:
         return {}
-    try:
-        from app.services.tasks_service import get_tasks_by_job
-    except ImportError:
-        from services.tasks_service import get_tasks_by_job  # type: ignore
+    from app.services.tasks_service import get_tasks_by_job
     try:
         return {
             str(t.get("id") or "").strip(): str(t.get("title") or "").strip()
@@ -1761,10 +1569,7 @@ def _set_job_doc_upload(job_id: str, active: bool) -> None:
 
 
 def _current_document_uploader_name() -> str:
-    try:
-        from app.auth import current_profile
-    except ImportError:
-        from auth import current_profile  # type: ignore
+    from app.auth import current_profile
     prof = current_profile() or {}
     return str(prof.get("full_name") or prof.get("name") or prof.get("email") or "").strip()
 
@@ -1807,12 +1612,8 @@ def _render_job_document_upload_form(job: dict) -> None:
             if not files:
                 st.warning("Choose at least one document to upload.")
             else:
-                try:
-                    from app.services.asset_document_util import guess_document_content_type
-                    from app.services.job_documents import upload_job_document
-                except ImportError:
-                    from services.asset_document_util import guess_document_content_type  # type: ignore
-                    from services.job_documents import upload_job_document  # type: ignore
+                from app.services.asset_document_util import guess_document_content_type
+                from app.services.job_documents import upload_job_document
                 title_override = str(st.session_state.get(f"{pk}_title") or "").strip()
                 doc_type = str(st.session_state.get(f"{pk}_type") or "Job Document")
                 notes = str(st.session_state.get(f"{pk}_notes") or "")
@@ -1864,10 +1665,7 @@ def _handle_delete_job_document(*, doc_id: str, job_id: str, admin: bool) -> Non
     jid = str(job_id or "").strip()
     if not did or not jid:
         return
-    try:
-        from app.services.job_documents import delete_job_document
-    except ImportError:
-        from services.job_documents import delete_job_document  # type: ignore
+    from app.services.job_documents import delete_job_document
     try:
         delete_job_document(did, job_id=jid, admin=admin)
     except Exception as exc:
@@ -1976,13 +1774,8 @@ def _render_job_documents_tab(job: dict) -> None:
     if not jid:
         _render_dialog_placeholder("Save this job before attaching documents.")
         return
-    try:
-        from app.services.job_documents import fetch_job_documents
-        from app.services.weekly_job_timesheet_service import list_timesheets_for_job, signed_url_for_timesheet
-    except ImportError:
-        from services.job_documents import fetch_job_documents  # type: ignore
-        from services.weekly_job_timesheet_service import list_timesheets_for_job, signed_url_for_timesheet  # type: ignore
-
+    from app.services.job_documents import fetch_job_documents
+    from app.services.weekly_job_timesheet_service import list_timesheets_for_job, signed_url_for_timesheet
     admin = _field_admin_read()
     upload_active = _job_doc_upload_active(jid)
 
@@ -2080,11 +1873,7 @@ def _render_job_email_notifications_section(job: dict) -> None:
         return
     if not _field_admin_read():
         return
-    try:
-        from app.services.email_notifications import fetch_job_email_settings_row, upsert_job_email_settings
-    except ImportError:
-        from services.email_notifications import fetch_job_email_settings_row, upsert_job_email_settings  # type: ignore
-
+    from app.services.email_notifications import fetch_job_email_settings_row, upsert_job_email_settings
     job_key = _job_session_key(job)
     existing = fetch_job_email_settings_row(jid, admin=True) or {}
     with st.expander("Email notifications", expanded=bool(existing)):
@@ -2179,11 +1968,7 @@ def _render_job_daily_updates_tab(job: dict) -> None:
 
     entries: list[tuple[str, str, str, str]] = []
 
-    try:
-        from app.services.job_updates_service import get_job_daily_updates
-    except ImportError:
-        from services.job_updates_service import get_job_daily_updates  # type: ignore
-
+    from app.services.job_updates_service import get_job_daily_updates
     for row in get_job_daily_updates(jid):
         if not isinstance(row, dict):
             continue
@@ -2199,11 +1984,7 @@ def _render_job_daily_updates_tab(job: dict) -> None:
             body = body[len(summary) :].lstrip("\n").strip()
         entries.append((dt, author, headline, body or text))
 
-    try:
-        from app.services.supervisor_daily_reports import fetch_reports_for_job
-    except ImportError:
-        from services.supervisor_daily_reports import fetch_reports_for_job  # type: ignore
-
+    from app.services.supervisor_daily_reports import fetch_reports_for_job
     for row in fetch_reports_for_job(jid, admin=_field_admin_read()):
         if not isinstance(row, dict):
             continue
@@ -2262,10 +2043,7 @@ def _render_job_photos_tab(job: dict) -> None:
     if not jid:
         _render_dialog_placeholder("Save this job before uploading photos.")
         return
-    try:
-        from app.ui.field_components import render_job_photos_panel
-    except ImportError:
-        from ui.field_components import render_job_photos_panel  # type: ignore
+    from app.ui.field_components import render_job_photos_panel
     render_job_photos_panel(
         job_id=jid,
         admin_read=_field_admin_read(),
@@ -2275,10 +2053,7 @@ def _render_job_photos_tab(job: dict) -> None:
 
 
 def _job_inventory_action_label(txn_type: str) -> str:
-    try:
-        from app.services.inventory_service import inventory_action_label
-    except ImportError:
-        from services.inventory_service import inventory_action_label  # type: ignore
+    from app.services.inventory_service import inventory_action_label
     return inventory_action_label(txn_type)
 
 
@@ -2287,25 +2062,12 @@ def get_inventory_transactions(job_id=None, limit=200):
     Safe inventory transaction fetcher for Job Detail Inventory tab.
     Prevents Job Details modal/page from crashing if inventory transaction data is missing.
     """
-    try:
-        from app.services.inventory_service import get_inventory_transactions as _fetch_txns
-
-        return _fetch_txns(job_id=str(job_id).strip() or None, limit=limit)
-    except ImportError:
-        try:
-            from services.inventory_service import get_inventory_transactions as _fetch_txns  # type: ignore
-
-            return _fetch_txns(job_id=str(job_id).strip() or None, limit=limit)
-        except Exception:
-            pass
+    from app.services.inventory_service import get_inventory_transactions as _fetch_txns
+    return _fetch_txns(job_id=str(job_id).strip() or None, limit=limit)
     except Exception:
         pass
 
-    try:
-        from app.db import get_client, run_user_supabase_operation
-    except ImportError:
-        from db import get_client, run_user_supabase_operation  # type: ignore
-
+    from app.db import get_client, run_user_supabase_operation
     try:
         jid = str(job_id).strip() if job_id else ""
 
@@ -2367,15 +2129,9 @@ def _render_job_equipment_tab(job: dict) -> None:
         _render_dialog_placeholder("Save this job before linking equipment inspections.")
         return
 
-    try:
-        from app.components.coupling_inspection_launcher import render_coupling_inspection_launcher
-        from app.db import fetch_table
-        from app.pages._core._data import load_assets
-    except ImportError:
-        from components.coupling_inspection_launcher import render_coupling_inspection_launcher  # type: ignore
-        from db import fetch_table  # type: ignore
-        from pages._core._data import load_assets  # type: ignore
-
+    from app.components.coupling_inspection_launcher import render_coupling_inspection_launcher
+    from app.db import fetch_table
+    from app.pages._core._data import load_assets
     equip_rows: list[dict] = []
     try:
         equip_rows = fetch_table("job_equipment", limit=500, order_by="created_at") or []
@@ -2411,10 +2167,7 @@ def _render_job_equipment_tab(job: dict) -> None:
 
 
 def _field_admin_read() -> bool:
-    try:
-        from auth import current_role, effective_role
-    except ImportError:
-        from app.auth import current_role, effective_role  # type: ignore
+    from app.auth import current_role, effective_role
     return effective_role() in {"admin", "manager"}
 
 
@@ -2427,13 +2180,8 @@ def _render_field_job_detail_tabs(job: dict) -> None:
     supervisor = _safe_value(job.get("supervisor"))
     jid = str(job.get("id") or "").strip()
 
-    try:
-        from app.pages.supervisor_daily_reports import render_daily_reports_for_job
-        from app.services.job_service import job_row_select_label
-    except ImportError:
-        from pages.supervisor_daily_reports import render_daily_reports_for_job  # type: ignore
-        from services.job_service import job_row_select_label  # type: ignore
-
+    from app.pages.supervisor_daily_reports import render_daily_reports_for_job
+    from app.services.job_service import job_row_select_label
     tab_overview, tab_materials, tab_tasks, tab_photos, tab_daily = st.tabs(_FIELD_JOB_TABS)
 
     with tab_overview:
@@ -2556,10 +2304,7 @@ def _render_job_overview_financials(job: dict, *, cost_summary: dict | None = No
         key=f"jobs_overview_costing_{_job_session_key(job)}",
         type="secondary",
     ):
-        try:
-            from app.navigation import open_jobs_job_costing
-        except ImportError:
-            from navigation import open_jobs_job_costing  # type: ignore
+        from app.navigation import open_jobs_job_costing
         open_jobs_job_costing(job_id=str(job.get("id") or ""))
         st.rerun()
 
@@ -2730,10 +2475,7 @@ def _render_job_estimates_section(job: dict) -> None:
         status_lbl = str(est.get("status") or "Draft")
         total = est.get("customer_price") or est.get("total") or 0
         approved_at = fmt_date(est.get("approved_at")) if est.get("approved_at") else "—"
-        try:
-            from app.utils.formatting import fmt_currency
-        except ImportError:
-            from utils.formatting import fmt_currency  # type: ignore
+        from app.utils.formatting import fmt_currency
         st.markdown(
             f'<div class="ips-detail-grid">'
             f"{_detail_field('Estimate #', est_no)}"
@@ -2748,18 +2490,12 @@ def _render_job_estimates_section(job: dict) -> None:
         bc1, bc2 = st.columns(2, gap="small")
         with bc1:
             if st.button("View Estimate", key=f"job_est_view_{jid}_{est.get('id')}", use_container_width=True):
-                try:
-                    from app.navigation import navigate_to_estimate_detail
-                except ImportError:
-                    from navigation import navigate_to_estimate_detail  # type: ignore
+                from app.navigation import navigate_to_estimate_detail
                 navigate_to_estimate_detail(str(est.get("id") or ""))
                 st.rerun()
         with bc2:
             if st.button("Proposal PDF", key=f"job_est_pdf_{jid}_{est.get('id')}", use_container_width=True):
-                try:
-                    from app.services.proposal_pdf_service import generate_estimate_proposal_pdf_by_id
-                except ImportError:
-                    from services.proposal_pdf_service import generate_estimate_proposal_pdf_by_id  # type: ignore
+                from app.services.proposal_pdf_service import generate_estimate_proposal_pdf_by_id
                 pdf_bytes = generate_estimate_proposal_pdf_by_id(str(est.get("id") or ""), est)
                 if pdf_bytes:
                     st.download_button(
@@ -2790,10 +2526,7 @@ def _render_job_edit_form(job: dict) -> None:
     )
 
     cust_opts = customer_filter_options(include_names={str(job.get("customer") or "")})
-    try:
-        from app.services.jobs_service import MANUAL_JOB_STATUSES, normalize_job_status
-    except ImportError:
-        from services.jobs_service import MANUAL_JOB_STATUSES, normalize_job_status  # type: ignore
+    from app.services.jobs_service import MANUAL_JOB_STATUSES, normalize_job_status
     cur_status = normalize_job_status(job.get("status"))
     status_opts = list(MANUAL_JOB_STATUSES)
     if cur_status not in status_opts:
@@ -2906,10 +2639,7 @@ def _render_job_edit_form(job: dict) -> None:
         if ok:
             st.session_state[edit_mode_key] = False
             _refresh_job_modal_cache(jid)
-            try:
-                from app.pages._core._data import clear_jobs_list_cache
-            except ImportError:
-                from pages._core._data import clear_jobs_list_cache  # type: ignore
+            from app.pages._core._data import clear_jobs_list_cache
             clear_jobs_list_cache()
             st.success(msg or "Job updated successfully.")
             st.rerun()
@@ -3018,10 +2748,7 @@ def render_job_detail_dialog(job: dict) -> None:
 
 def _focus_job_detail_tab_if_requested() -> None:
     """Select a Job Detail tab when opened via deep-link (Financial, Crew & Time, etc.)."""
-    try:
-        from app.navigation import JOBS_DETAIL_FOCUS_TAB_KEY
-    except ImportError:
-        from navigation import JOBS_DETAIL_FOCUS_TAB_KEY  # type: ignore
+    from app.navigation import JOBS_DETAIL_FOCUS_TAB_KEY
     focus = str(st.session_state.pop(JOBS_DETAIL_FOCUS_TAB_KEY, "") or "").strip()
     if not focus:
         return
@@ -3038,10 +2765,7 @@ def _focus_job_detail_tab_if_requested() -> None:
         "subjobs": "tasks",
     }
     resolved = alias_map.get(focus_lower, focus_lower)
-    try:
-        from app.ui.clean_table import _components_html
-    except ImportError:
-        from ui.clean_table import _components_html  # type: ignore
+    from app.ui.clean_table import _components_html
     label_js = resolved.replace("\\", "\\\\").replace("'", "\\'")
     _components_html(
         f"""
@@ -3087,12 +2811,8 @@ def _show_jobs_detail_modal() -> None:
 
 
 def render() -> None:
-    try:
-        from app.pages._core._access import begin_module
-        from app.perf_debug import perf_span
-    except ImportError:
-        from pages._core._access import begin_module  # type: ignore
-        from perf_debug import perf_span  # type: ignore
+    from app.pages._core._access import begin_module
+    from app.perf_debug import perf_span
     if not begin_module("jobs"):
         return
     with perf_span("page.jobs.render"):
@@ -3127,10 +2847,7 @@ def _render_jobs_page() -> None:
     )
 
     if is_field_mode():
-        try:
-            from app.services.job_service import sort_jobs_by_number_then_name
-        except ImportError:
-            from services.job_service import sort_jobs_by_number_then_name  # type: ignore
+        from app.services.job_service import sort_jobs_by_number_then_name
         field_jobs = sort_jobs_by_number_then_name(all_jobs)
         if field_jobs:
             render_field_job_bar(field_jobs, key_prefix="jobs")
@@ -3161,10 +2878,7 @@ def _render_jobs_page() -> None:
                     sync_new_job_number()
                     st.text_input("Job number", key="job_new_num")
                     st.text_input("Job name", key="job_new_name")
-                    try:
-                        from app.services.jobs_service import MANUAL_JOB_STATUSES
-                    except ImportError:
-                        from services.jobs_service import MANUAL_JOB_STATUSES  # type: ignore
+                    from app.services.jobs_service import MANUAL_JOB_STATUSES
                     st.selectbox("Status", list(MANUAL_JOB_STATUSES), key="job_new_status")
                     _render_billing_type_select(key="job_new_billing")
                 st.text_area("Description", key="job_new_desc")

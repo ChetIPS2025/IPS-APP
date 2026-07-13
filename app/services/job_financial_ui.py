@@ -108,10 +108,7 @@ def job_list_financials_from_row(job: dict[str, Any]) -> dict[str, float | bool]
 
 def _linked_estimate_for_jobs_table(job: dict[str, Any]) -> dict[str, Any] | None:
     """Resolve estimate linked by ``jobs.estimate_id`` or ``estimates.job_id``."""
-    try:
-        from app.services.estimate_job_workflow_service import _linked_estimate_row_for_job
-    except ImportError:
-        from services.estimate_job_workflow_service import _linked_estimate_row_for_job  # type: ignore
+    from app.services.estimate_job_workflow_service import _linked_estimate_row_for_job
     row = _linked_estimate_row_for_job(job)
     return row if row else None
 
@@ -143,10 +140,7 @@ def job_table_list_financials_from_row(job: dict[str, Any]) -> dict[str, float |
     """
     fin = dict(job_list_financials_from_row(job))
     est = _linked_estimate_for_jobs_table(job)
-    try:
-        from app.services.job_cost_transaction_service import _contract_value
-    except ImportError:
-        from services.job_cost_transaction_service import _contract_value  # type: ignore
+    from app.services.job_cost_transaction_service import _contract_value
     contract = _contract_value(job, est if est else None)
     actual = float(fin["actual_cost"])
     profit, margin = live_job_profit_margin(contract, actual)
@@ -161,18 +155,12 @@ def _fetch_estimate_for_financial_lock(estimate_id: str) -> dict[str, Any]:
     eid = str(estimate_id or "").strip()
     if not eid:
         return {}
-    try:
-        from app.pages._core._data import get_estimate
-    except ImportError:
-        from pages._core._data import get_estimate  # type: ignore
+    from app.pages._core._data import get_estimate
     return get_estimate(eid) or {}
 
 
 def _job_matches_linked_estimate_quote(job: dict[str, Any], estimate: dict[str, Any]) -> bool:
-    try:
-        from app.services.job_from_estimate import _job_matches_estimate_quote
-    except ImportError:
-        from services.job_from_estimate import _job_matches_estimate_quote  # type: ignore
+    from app.services.job_from_estimate import _job_matches_estimate_quote
     quote = str(estimate.get("quote_number") or estimate.get("estimate_number") or "").strip()
     return bool(quote) and _job_matches_estimate_quote(job, quote)
 
@@ -187,10 +175,7 @@ def job_financials_locked_by_approved_estimate(job: dict[str, Any]) -> bool:
     eid = str(job.get("estimate_id") or "").strip()
     if not jid or not eid:
         return False
-    try:
-        from app.services.job_cost_transaction_service import _estimate_is_approved
-    except ImportError:
-        from services.job_cost_transaction_service import _estimate_is_approved  # type: ignore
+    from app.services.job_cost_transaction_service import _estimate_is_approved
     est = _fetch_estimate_for_financial_lock(eid)
     if not est or not _estimate_is_approved(est):
         return False

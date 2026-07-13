@@ -8,22 +8,12 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.services.jobs_service import (
-        MANUAL_JOB_STATUSES,
-        can_manage_job_actions,
-        normalize_job_status,
-        update_job_status,
-    )
-except ImportError:
-    from services.jobs_service import (  # type: ignore
-        MANUAL_JOB_STATUSES,
-        can_manage_job_actions,
-        normalize_job_status,
-        update_job_status,
-    )
-
-
+from app.services.jobs_service import (
+    MANUAL_JOB_STATUSES,
+    can_manage_job_actions,
+    normalize_job_status,
+    update_job_status,
+)
 def job_status_table_label(raw: object) -> str:
     """Display label for Jobs table status pills (preserves Pending/Scheduled when stored)."""
     s = str(raw or "").strip().lower().replace("_", " ")

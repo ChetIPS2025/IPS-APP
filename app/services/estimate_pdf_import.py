@@ -9,11 +9,7 @@ import json
 import re
 from typing import Any
 
-try:
-    from config import settings
-except ImportError:
-    from app.config import settings  # type: ignore
-
+from app.config import settings
 from openai import OpenAI
 
 MAX_PDF_TEXT_CHARS = 240_000
@@ -191,11 +187,7 @@ def suggest_customer_and_job(
     Best-effort fuzzy match to customers / jobs. Does NOT modify the estimate dict.
     Returns metadata for UI; caller decides whether to apply customer_id / job_id.
     """
-    try:
-        from db import fetch_table
-    except ImportError:
-        from app.db import fetch_table  # type: ignore
-
+    from app.db import fetch_table
     customers = fetch_table("customers", columns="id,customer_name", limit=3000, order_by="customer_name")
     jobs = fetch_table("jobs", columns="id,job_name,customer_id,job_number", limit=3000, order_by="job_number")
 

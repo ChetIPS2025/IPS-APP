@@ -10,33 +10,18 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any
 
-try:
-    from app.branding import get_header_logo_path, header_logo_html
-    from app.utils.formatting import fmt_hours, fmt_money
-    from app.db import (
-        create_signed_url,
-        delete_rows_admin,
-        fetch_by_match_admin,
-        fetch_table_admin,
-        insert_row_admin,
-        update_rows_admin,
-        upload_bytes_admin,
-    )
-    from app.services.job_weekly_timesheets import monday_of_week, week_bounds
-except ImportError:
-    from branding import get_header_logo_path, header_logo_html  # type: ignore
-    from utils.formatting import fmt_hours, fmt_money  # type: ignore
-    from db import (  # type: ignore
-        create_signed_url,
-        delete_rows_admin,
-        fetch_by_match_admin,
-        fetch_table_admin,
-        insert_row_admin,
-        update_rows_admin,
-        upload_bytes_admin,
-    )
-    from services.job_weekly_timesheets import monday_of_week, week_bounds  # type: ignore
-
+from app.branding import get_header_logo_path, header_logo_html
+from app.utils.formatting import fmt_hours, fmt_money
+from app.db import (
+    create_signed_url,
+    delete_rows_admin,
+    fetch_by_match_admin,
+    fetch_table_admin,
+    insert_row_admin,
+    update_rows_admin,
+    upload_bytes_admin,
+)
+from app.services.job_weekly_timesheets import monday_of_week, week_bounds
 _TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "templates" / "weekly_job_timesheet.html"
 _FALLBACK_TEMPLATE = Path(__file__).resolve().parents[1] / "templates" / "weekly_timesheet_form.html"
 
@@ -390,28 +375,16 @@ def _build_charges_from_job_cost_transactions(
     ws: date,
     we: date,
 ) -> tuple[list[TimesheetLine], list[TimesheetLine], list[TimesheetLine]]:
-    try:
-        from app.services.job_cost_transaction_service import (
-            COST_EQUIPMENT,
-            COST_LABOR,
-            COST_MATERIAL,
-            COST_OTHER,
-            COST_RENTAL,
-            COST_SUBCONTRACT,
-            fetch_job_cost_transactions,
-            transaction_show_on_invoice,
-        )
-    except ImportError:
-        from services.job_cost_transaction_service import (  # type: ignore
-            COST_EQUIPMENT,
-            COST_LABOR,
-            COST_MATERIAL,
-            COST_OTHER,
-            COST_RENTAL,
-            COST_SUBCONTRACT,
-            fetch_job_cost_transactions,
-            transaction_show_on_invoice,
-        )
+    from app.services.job_cost_transaction_service import (
+        COST_EQUIPMENT,
+        COST_LABOR,
+        COST_MATERIAL,
+        COST_OTHER,
+        COST_RENTAL,
+        COST_SUBCONTRACT,
+        fetch_job_cost_transactions,
+        transaction_show_on_invoice,
+    )
     materials: list[TimesheetLine] = []
     equipment: list[TimesheetLine] = []
     other: list[TimesheetLine] = []
@@ -534,10 +507,7 @@ def render_timesheet_html(
 
 def build_timesheet_pdf_bytes(data: WeeklyJobTimesheetData) -> bytes:
     """Portrait PDF export matching TIMESHEET WEEKLY layout."""
-    try:
-        from app.services.weekly_timesheet_export_service import export_data_to_pdf
-    except ImportError:
-        from services.weekly_timesheet_export_service import export_data_to_pdf  # type: ignore
+    from app.services.weekly_timesheet_export_service import export_data_to_pdf
     return export_data_to_pdf(data)
 
 
@@ -588,10 +558,7 @@ def _timekeeping_row_matches_job(job_id: str, job: dict[str, Any], row: dict[str
     low = label.lower()
     if not label or low in {"— no job —", "- no job -", "no job", "none", "—", "-"}:
         return False
-    try:
-        from app.services.jobs_service import resolve_job_id_from_label
-    except ImportError:
-        from services.jobs_service import resolve_job_id_from_label  # type: ignore
+    from app.services.jobs_service import resolve_job_id_from_label
     resolved = resolve_job_id_from_label(label)
     if resolved and resolved == job_id:
         return True
@@ -821,10 +788,7 @@ def get_job_timesheet_header(job_id: str, week_start: date) -> dict[str, str]:
 
 def _build_work_performed(job_id: str, ws: date, we: date) -> str:
     parts: list[str] = []
-    try:
-        from app.services.job_updates_service import get_job_daily_updates_for_week, format_work_performed_from_updates
-    except ImportError:
-        from services.job_updates_service import get_job_daily_updates_for_week, format_work_performed_from_updates  # type: ignore
+    from app.services.job_updates_service import get_job_daily_updates_for_week, format_work_performed_from_updates
     try:
         daily = format_work_performed_from_updates(get_job_daily_updates_for_week(job_id, ws))
         if daily:
@@ -867,10 +831,7 @@ def build_timesheet_data(
     job = _fetch_job(job_id)
     if not job:
         raise ValueError("Job not found.")
-    try:
-        from app.services.job_cost_transaction_service import sync_all_sources_for_job
-    except ImportError:
-        from services.job_cost_transaction_service import sync_all_sources_for_job  # type: ignore
+    from app.services.job_cost_transaction_service import sync_all_sources_for_job
     try:
         sync_all_sources_for_job(job_id)
     except Exception:
@@ -1119,10 +1080,7 @@ def save_timesheet(
 
     excel_storage = ""
     if regenerate_exports:
-        try:
-            from app.services.weekly_timesheet_export_service import ensure_excel_template, export_data_to_excel_bytes
-        except ImportError:
-            from services.weekly_timesheet_export_service import ensure_excel_template, export_data_to_excel_bytes  # type: ignore
+        from app.services.weekly_timesheet_export_service import ensure_excel_template, export_data_to_excel_bytes
         try:
             ensure_excel_template()
             excel_bytes = export_data_to_excel_bytes(data)

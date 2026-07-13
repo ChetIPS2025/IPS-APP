@@ -4,11 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-try:
-    from app.ui.theme import COLORS
-except ImportError:
-    from ui.theme import COLORS  # type: ignore
-
+from app.ui.theme import COLORS
 IPS_ROW_ACTION_COLORS_KEY = "ips_row_action_colors_v2"
 
 ROW_ACTION_COLORS = {

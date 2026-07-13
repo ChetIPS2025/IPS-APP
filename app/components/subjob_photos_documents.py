@@ -7,45 +7,24 @@ import re
 
 import streamlit as st
 
-try:
-    from app.components.record_modal import dialog_card_html
-    from app.config import settings
-    from app.db import create_signed_url
-    from app.services.asset_document_util import guess_document_content_type
-    from app.services.job_documents import (
-        delete_job_document,
-        fetch_job_documents,
-        link_job_document_to_task,
-        unlink_job_document_from_task,
-        upload_job_document,
-    )
-    from app.services.job_photos import (
-        PHOTO_CATEGORIES,
-        fetch_job_photos,
-        link_job_photo_to_task,
-        unlink_job_photo_from_task,
-        upload_job_photos,
-    )
-except ImportError:
-    from components.record_modal import dialog_card_html  # type: ignore
-    from config import settings  # type: ignore
-    from db import create_signed_url  # type: ignore
-    from services.asset_document_util import guess_document_content_type  # type: ignore
-    from services.job_documents import (  # type: ignore
-        delete_job_document,
-        fetch_job_documents,
-        link_job_document_to_task,
-        unlink_job_document_from_task,
-        upload_job_document,
-    )
-    from services.job_photos import (  # type: ignore
-        PHOTO_CATEGORIES,
-        fetch_job_photos,
-        link_job_photo_to_task,
-        unlink_job_photo_from_task,
-        upload_job_photos,
-    )
-
+from app.components.record_modal import dialog_card_html
+from app.config import settings
+from app.db import create_signed_url
+from app.services.asset_document_util import guess_document_content_type
+from app.services.job_documents import (
+    delete_job_document,
+    fetch_job_documents,
+    link_job_document_to_task,
+    unlink_job_document_from_task,
+    upload_job_document,
+)
+from app.services.job_photos import (
+    PHOTO_CATEGORIES,
+    fetch_job_photos,
+    link_job_photo_to_task,
+    unlink_job_photo_from_task,
+    upload_job_photos,
+)
 JOB_SUBJOB_PHOTO_LINK_MODE_KEY = "job_subjob_photo_link_mode"
 JOB_SUBJOB_PHOTO_UPLOAD_MODE_KEY = "job_subjob_photo_upload_mode"
 JOB_SUBJOB_DOC_LINK_MODE_KEY = "job_subjob_doc_link_mode"
@@ -71,10 +50,7 @@ def _scope_key(job_id: str, task_id: str) -> str:
 
 
 def _admin_read() -> bool:
-    try:
-        from app.auth import current_role, effective_role
-    except ImportError:
-        from auth import current_role, effective_role  # type: ignore
+    from app.auth import current_role, effective_role
     return effective_role() in {"admin", "manager"}
 
 
@@ -109,10 +85,7 @@ def _set_mode(session_key: str, job_id: str, task_id: str, active: bool) -> None
 
 
 def _current_uploader_name() -> str:
-    try:
-        from app.auth import current_profile
-    except ImportError:
-        from auth import current_profile  # type: ignore
+    from app.auth import current_profile
     prof = current_profile() or {}
     return str(prof.get("full_name") or prof.get("name") or prof.get("email") or "").strip()
 

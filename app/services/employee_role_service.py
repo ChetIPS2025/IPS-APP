@@ -4,17 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-try:
-    from app.services.lookup_service import load_lookup_values
-    from app.services.repository import fetch_rows
-    from app.utils.constants import ROLES
-    from app.utils.permissions import normalize_role
-except ImportError:
-    from services.lookup_service import load_lookup_values  # type: ignore
-    from services.repository import fetch_rows  # type: ignore
-    from utils.constants import ROLES  # type: ignore
-    from utils.permissions import normalize_role  # type: ignore
-
+from app.services.lookup_service import load_lookup_values
+from app.services.repository import fetch_rows
+from app.utils.constants import ROLES
+from app.utils.permissions import normalize_role
 _PERMISSION_LABELS: frozenset[str] = frozenset(ROLES)
 _PERMISSION_ALIASES: dict[str, str] = {
     "admin": "Admin",
@@ -151,15 +144,9 @@ def sync_linked_profile_permission_role(
     email: str = "",
 ) -> str | None:
     """Update linked profile role when employee permission changes. Returns warning or None."""
-    try:
-        from app.db import update_rows_admin
-        from app.services.repository import clear_data_cache_for_table, filter_payload_to_table
-        from app.services.users_service import _find_profile_for_employee
-    except ImportError:
-        from db import update_rows_admin  # type: ignore
-        from services.repository import clear_data_cache_for_table, filter_payload_to_table  # type: ignore
-        from services.users_service import _find_profile_for_employee  # type: ignore
-
+    from app.db import update_rows_admin
+    from app.services.repository import clear_data_cache_for_table, filter_payload_to_table
+    from app.services.users_service import _find_profile_for_employee
     eid = str(employee_id or "").strip()
     if not eid:
         return None

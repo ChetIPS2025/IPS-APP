@@ -8,28 +8,15 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.auth import current_profile
-    from app.components.action_styles import danger_solid_button, success_solid_button, warning_solid_button
-    from app.services.users_service import (
-        activate_user,
-        can_delete_user,
-        can_manage_user_actions,
-        deactivate_user,
-        soft_delete_user,
-    )
-except ImportError:
-    from auth import current_profile  # type: ignore
-    from components.action_styles import danger_solid_button, success_solid_button, warning_solid_button  # type: ignore
-    from services.users_service import (  # type: ignore
-        activate_user,
-        can_delete_user,
-        can_manage_user_actions,
-        deactivate_user,
-        soft_delete_user,
-    )
-
-
+from app.auth import current_profile
+from app.components.action_styles import danger_solid_button, success_solid_button, warning_solid_button
+from app.services.users_service import (
+    activate_user,
+    can_delete_user,
+    can_manage_user_actions,
+    deactivate_user,
+    soft_delete_user,
+)
 def _confirm_state_key(user_id: str, action: str) -> str:
     return f"confirm_{action}_user_{user_id}"
 

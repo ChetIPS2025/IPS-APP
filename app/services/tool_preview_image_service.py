@@ -13,23 +13,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-try:
-    from app.services.item_images import (
-        description_image_match_key,
-        has_stored_item_image,
-        normalize_image_match_key,
-        record_has_item_image,
-    )
-    from app.services.task_attachment_autofill import download_signed_url
-except ImportError:
-    from services.item_images import (  # type: ignore
-        description_image_match_key,
-        has_stored_item_image,
-        normalize_image_match_key,
-        record_has_item_image,
-    )
-    from services.task_attachment_autofill import download_signed_url  # type: ignore
-
+from app.services.item_images import (
+    description_image_match_key,
+    has_stored_item_image,
+    normalize_image_match_key,
+    record_has_item_image,
+)
+from app.services.task_attachment_autofill import download_signed_url
 _RASTER_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".webp"})
 _MAX_SUGGESTIONS = 4
 
@@ -56,11 +46,7 @@ def pick_best_upload_preview(uploads: list[tuple[bytes, str]]) -> ToolPreviewIma
     if not uploads:
         raise ValueError("At least one upload is required.")
 
-    try:
-        from app.services.upload_media_strategy import build_display_preview
-    except ImportError:
-        from services.upload_media_strategy import build_display_preview  # type: ignore
-
+    from app.services.upload_media_strategy import build_display_preview
     rasters = [(b, n) for b, n in uploads if _ext(n) in _RASTER_EXTENSIONS]
     candidates = rasters or list(uploads)
     best_bytes, best_name = max(candidates, key=lambda pair: len(pair[0]))
@@ -82,28 +68,16 @@ def _download_row_preview(row: dict[str, Any], *, kind: str) -> tuple[bytes, str
     url: str | None = None
     filename = "catalog-preview.jpg"
     if kind == "pricing_guide":
-        try:
-            from app.services.pricing_guide_images import get_pricing_guide_stored_image_url, pricing_guide_display_record
-        except ImportError:
-            from services.pricing_guide_images import (  # type: ignore
-                get_pricing_guide_stored_image_url,
-                pricing_guide_display_record,
-            )
+        from app.services.pricing_guide_images import get_pricing_guide_stored_image_url, pricing_guide_display_record
         display = pricing_guide_display_record(row)
         url = get_pricing_guide_stored_image_url(display)
         filename = str(display.get("image_file_name") or display.get("model_number") or "pricing-guide") + ".jpg"
     elif kind == "asset":
-        try:
-            from app.services.asset_images import get_asset_stored_image_url
-        except ImportError:
-            from services.asset_images import get_asset_stored_image_url  # type: ignore
+        from app.services.asset_images import get_asset_stored_image_url
         url = get_asset_stored_image_url(row)
         filename = str(row.get("image_file_name") or row.get("asset_id") or "asset") + ".jpg"
     elif kind == "inventory":
-        try:
-            from app.services.inventory_images import get_inventory_stored_image_url
-        except ImportError:
-            from services.inventory_images import get_inventory_stored_image_url  # type: ignore
+        from app.services.inventory_images import get_inventory_stored_image_url
         url = get_inventory_stored_image_url(row)
         filename = str(row.get("image_file_name") or row.get("item_name") or "inventory") + ".jpg"
 
@@ -181,11 +155,7 @@ def find_product_image_suggestions(fields: dict[str, Any]) -> list[ToolPreviewIm
     suggestions: list[ToolPreviewImage] = []
     seen: set[str] = set()
 
-    try:
-        from app.services.pricing_guide_service import cached_pricing_guide_rows
-    except ImportError:
-        from services.pricing_guide_service import cached_pricing_guide_rows  # type: ignore
-
+    from app.services.pricing_guide_service import cached_pricing_guide_rows
     for idx, row in enumerate(cached_pricing_guide_rows(include_inactive=True)):
         if model_key and normalize_image_match_key(row.get("model_number")) == model_key:
             _append_suggestion(
@@ -218,11 +188,7 @@ def find_product_image_suggestions(fields: dict[str, Any]) -> list[ToolPreviewIm
                 suggestion_id=f"pg_name_{idx}",
             )
 
-    try:
-        from app.pages._core._data import load_assets, load_inventory
-    except ImportError:
-        from pages._core._data import load_assets, load_inventory  # type: ignore
-
+    from app.pages._core._data import load_assets, load_inventory
     for idx, row in enumerate(load_assets()):
         if _row_matches_fields(row, model_key=model_key, name_key=name_key):
             _append_suggestion(

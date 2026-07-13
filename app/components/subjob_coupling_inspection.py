@@ -6,31 +6,15 @@ import html
 
 import streamlit as st
 
-try:
-    from app.components.coupling_inspection_launcher import open_coupling_inspection
-    from app.components.record_modal import detail_field_html, dialog_card_html, status_pill_html
-    from app.services.coupling_inspection_service import (
-        coupling_inspection_status_label,
-        link_coupling_inspection_to_task,
-        list_coupling_inspections,
-        list_unlinked_coupling_inspections_for_job,
-        unlink_coupling_inspection_from_task,
-    )
-except ImportError:
-    from components.coupling_inspection_launcher import open_coupling_inspection  # type: ignore
-    from components.record_modal import (  # type: ignore
-        detail_field_html,
-        dialog_card_html,
-        status_pill_html,
-    )
-    from services.coupling_inspection_service import (  # type: ignore
-        coupling_inspection_status_label,
-        link_coupling_inspection_to_task,
-        list_coupling_inspections,
-        list_unlinked_coupling_inspections_for_job,
-        unlink_coupling_inspection_from_task,
-    )
-
+from app.components.coupling_inspection_launcher import open_coupling_inspection
+from app.components.record_modal import detail_field_html, dialog_card_html, status_pill_html
+from app.services.coupling_inspection_service import (
+    coupling_inspection_status_label,
+    link_coupling_inspection_to_task,
+    list_coupling_inspections,
+    list_unlinked_coupling_inspections_for_job,
+    unlink_coupling_inspection_from_task,
+)
 JOB_SUBJOB_CI_LINK_MODE_KEY = "job_subjob_ci_link_mode"
 
 

@@ -13,10 +13,7 @@ WELCOME_INSTALL_UPDATE_ID = "cu-welcome-ips-app-install"
 
 
 def install_share_url() -> str:
-    try:
-        from app.pwa import install_page_url
-    except ImportError:
-        from pwa import install_page_url  # type: ignore
+    from app.pwa import install_page_url
     return install_page_url()
 
 
@@ -59,10 +56,7 @@ def with_welcome_install_update(rows: list[dict[str, Any]]) -> list[dict[str, An
 
 def render_install_share_admin(*, compact: bool = False) -> None:
     """Admin copy/email workflow for the public install page."""
-    try:
-        from app.services.users_service import can_manage_user_actions
-    except ImportError:
-        from services.users_service import can_manage_user_actions  # type: ignore
+    from app.services.users_service import can_manage_user_actions
     if not can_manage_user_actions():
         return
 
@@ -96,10 +90,7 @@ def render_install_share_admin(*, compact: bool = False) -> None:
 
 def render_install_share_user_details() -> None:
     """Compact install link block inside User Details (admins)."""
-    try:
-        from app.services.users_service import can_manage_user_actions
-    except ImportError:
-        from services.users_service import can_manage_user_actions  # type: ignore
+    from app.services.users_service import can_manage_user_actions
     if not can_manage_user_actions():
         return
     share_url = install_share_url()

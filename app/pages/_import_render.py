@@ -9,11 +9,7 @@ from typing import Callable
 def _multipage_auth_gate() -> None:
     import streamlit as st
 
-    try:
-        from app.auth import bootstrap_auth_at_startup, init_session, is_authenticated
-    except ImportError:
-        from auth import bootstrap_auth_at_startup, init_session, is_authenticated  # type: ignore
-
+    from app.auth import bootstrap_auth_at_startup, init_session, is_authenticated
     init_session()
     bootstrap_auth_at_startup()
     if is_authenticated():

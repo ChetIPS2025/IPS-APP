@@ -7,12 +7,7 @@ from app.db import fetch_table
 
 from app.estimate.calculations import _D0, _dec, money
 
-try:
-    from app.services.phase2_modules_service import asset_is_rentable
-except ImportError:
-    from services.phase2_modules_service import asset_is_rentable  # type: ignore
-
-
+from app.services.phase2_modules_service import asset_is_rentable
 def _truthy_rental(val) -> bool:
     if val is None:
         return False

@@ -25,41 +25,22 @@ except ImportError:  # pragma: no cover
     Workbook = None  # type: ignore[misc, assignment]
     load_workbook = None  # type: ignore[misc, assignment]
 
-try:
-    from app.branding import get_header_logo_path
-    from app.services.job_weekly_timesheets import monday_of_week
-    from app.utils.formatting import fmt_hours, fmt_money
-    from app.services.weekly_job_timesheet_service import (
-        TimesheetLine,
-        WeeklyJobTimesheetData,
-        TIMESHEET_LABOR_MIN_ROWS,
-        TIMESHEET_CHARGE_MIN_ROWS,
-        _day_labels,
-        _pad_charge_rows,
-        _pad_labor_rows,
-        _parse_date,
-        _weekly_summary,
-        load_timesheet_data,
-        render_timesheet_html,
-    )
-except ImportError:
-    from branding import get_header_logo_path  # type: ignore
-    from utils.formatting import fmt_hours, fmt_money  # type: ignore
-    from services.job_weekly_timesheets import monday_of_week  # type: ignore
-    from services.weekly_job_timesheet_service import (  # type: ignore
-        TimesheetLine,
-        WeeklyJobTimesheetData,
-        TIMESHEET_LABOR_MIN_ROWS,
-        TIMESHEET_CHARGE_MIN_ROWS,
-        _day_labels,
-        _pad_charge_rows,
-        _pad_labor_rows,
-        _parse_date,
-        _weekly_summary,
-        load_timesheet_data,
-        render_timesheet_html,
-    )
-
+from app.branding import get_header_logo_path
+from app.services.job_weekly_timesheets import monday_of_week
+from app.utils.formatting import fmt_hours, fmt_money
+from app.services.weekly_job_timesheet_service import (
+    TimesheetLine,
+    WeeklyJobTimesheetData,
+    TIMESHEET_LABOR_MIN_ROWS,
+    TIMESHEET_CHARGE_MIN_ROWS,
+    _day_labels,
+    _pad_charge_rows,
+    _pad_labor_rows,
+    _parse_date,
+    _weekly_summary,
+    load_timesheet_data,
+    render_timesheet_html,
+)
 _ROOT = Path(__file__).resolve().parents[2]
 _TEMPLATE_PATH = _ROOT / "templates" / "TIMESHEET WEEKLY.xlsx"
 _HTML_TEMPLATE = Path(__file__).resolve().parents[1] / "templates" / "weekly_job_timesheet.html"

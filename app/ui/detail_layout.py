@@ -8,15 +8,9 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.components.record_modal import render_modal_header, render_modal_meta_grid
-    from app.components.tabs import render_tabs
-    from app.ui.status_badge import render_status_badge, status_badge_html
-except ImportError:
-    from components.record_modal import render_modal_header, render_modal_meta_grid  # type: ignore
-    from components.tabs import render_tabs  # type: ignore
-    from ui.status_badge import render_status_badge, status_badge_html  # type: ignore
-
+from app.components.record_modal import render_modal_header, render_modal_meta_grid
+from app.components.tabs import render_tabs
+from app.ui.status_badge import render_status_badge, status_badge_html
 _ActionFn = Callable[[], None]
 
 

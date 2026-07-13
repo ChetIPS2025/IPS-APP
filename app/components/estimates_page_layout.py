@@ -6,23 +6,13 @@ import html
 
 import streamlit as st
 
-try:
-    from app.components.table_pagination import (
-        DEFAULT_CATALOG_PAGE_SIZE,
-        page_key,
-        page_size_key,
-        pagination_meta,
-        reset_table_page,
-    )
-except ImportError:
-    from components.table_pagination import (  # type: ignore
-        DEFAULT_CATALOG_PAGE_SIZE,
-        page_key,
-        page_size_key,
-        pagination_meta,
-        reset_table_page,
-    )
-
+from app.components.table_pagination import (
+    DEFAULT_CATALOG_PAGE_SIZE,
+    page_key,
+    page_size_key,
+    pagination_meta,
+    reset_table_page,
+)
 _PAGE_SIZE_OPTIONS = (50, 75, 100, 150)
 
 ESTIMATES_LIST_HEADER_SPECS: list[tuple[str, str | None]] = [

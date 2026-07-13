@@ -6,21 +6,12 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.components.estimates_list_table import (
-        build_approve_flags,
-        build_estimates_html_table,
-        filter_waiting_approval_rows,
-        render_estimates_table_bridge,
-    )
-except ImportError:
-    from components.estimates_list_table import (  # type: ignore
-        build_approve_flags,
-        build_estimates_html_table,
-        filter_waiting_approval_rows,
-        render_estimates_table_bridge,
-    )
-
+from app.components.estimates_list_table import (
+    build_approve_flags,
+    build_estimates_html_table,
+    filter_waiting_approval_rows,
+    render_estimates_table_bridge,
+)
 _EST_WAITING_LAST_KEY = "_ips_dash_est_waiting_last"
 
 
@@ -51,10 +42,7 @@ def render_dashboard_estimates_waiting_table(
         with hdr_r:
             if st.button("View All", key="ips_dash_est_waiting_all", use_container_width=True):
                 st.session_state["estimates_view"] = "Waiting Approval"
-                try:
-                    from app.navigation import set_nav_slug
-                except ImportError:
-                    from navigation import set_nav_slug  # type: ignore
+                from app.navigation import set_nav_slug
                 set_nav_slug("estimates")
                 st.rerun()
 

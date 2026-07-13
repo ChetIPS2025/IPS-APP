@@ -17,22 +17,12 @@ try:
 except ImportError:  # pragma: no cover
     Image = None  # type: ignore[misc, assignment]
 
-try:
-    from app.branding import render_header
-    from app.db import create_signed_url, fetch_by_match_admin, fetch_table_admin, update_rows_admin, upload_bytes_admin
-    from app.device_label import request_user_agent
-    from app.services.job_weekly_timesheets import build_timesheet_pdf_bytes, week_bounds
-    from app.services.job_service import job_row_select_label
-    from app.services.weekly_job_timesheet_service import TIMESHEET_TABLE
-except ImportError:
-    from branding import render_header  # type: ignore
-    from db import create_signed_url, fetch_by_match_admin, fetch_table_admin, update_rows_admin, upload_bytes_admin  # type: ignore
-    from device_label import request_user_agent  # type: ignore
-    from services.job_weekly_timesheets import build_timesheet_pdf_bytes, week_bounds  # type: ignore
-    from services.job_service import job_row_select_label  # type: ignore
-    from services.weekly_job_timesheet_service import TIMESHEET_TABLE  # type: ignore
-
-
+from app.branding import render_header
+from app.db import create_signed_url, fetch_by_match_admin, fetch_table_admin, update_rows_admin, upload_bytes_admin
+from app.device_label import request_user_agent
+from app.services.job_weekly_timesheets import build_timesheet_pdf_bytes, week_bounds
+from app.services.job_service import job_row_select_label
+from app.services.weekly_job_timesheet_service import TIMESHEET_TABLE
 def _sig_b64(canvas_result) -> str | None:
     if canvas_result is None:
         return None
@@ -260,16 +250,10 @@ def render_public(sign_token: str) -> None:
 
     # Build signed PDF by regenerating with signature.
     if ts_table == TIMESHEET_TABLE:
-        try:
-            from app.services.weekly_job_timesheet_service import (
-                build_timesheet_pdf_bytes as build_wjt_pdf,
-                load_timesheet_data,
-            )
-        except ImportError:
-            from services.weekly_job_timesheet_service import (  # type: ignore
-                build_timesheet_pdf_bytes as build_wjt_pdf,
-                load_timesheet_data,
-            )
+        from app.services.weekly_job_timesheet_service import (
+            build_timesheet_pdf_bytes as build_wjt_pdf,
+            load_timesheet_data,
+        )
         data = load_timesheet_data(str(ts["id"]))
         if not data:
             st.error("Could not load timesheet data.")

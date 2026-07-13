@@ -4,17 +4,9 @@ from __future__ import annotations
 
 import streamlit as st
 
-try:
-    from app.navigation import WJT_PREFILL_JOB_KEY, WJT_PREFILL_WEEK_KEY, open_jobs_weekly_timesheets
-except ImportError:
-    from navigation import WJT_PREFILL_JOB_KEY, WJT_PREFILL_WEEK_KEY, open_jobs_weekly_timesheets  # type: ignore
-
-
+from app.navigation import WJT_PREFILL_JOB_KEY, WJT_PREFILL_WEEK_KEY, open_jobs_weekly_timesheets
 def render() -> None:
-    try:
-        from app.pages._core._access import begin_module
-    except ImportError:
-        from pages._core._access import begin_module  # type: ignore
+    from app.pages._core._access import begin_module
     if not begin_module("weekly_timesheets"):
         return
 

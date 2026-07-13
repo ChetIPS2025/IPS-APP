@@ -11,48 +11,25 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
-try:
-    from app.auth import current_profile, current_role, effective_role
-    from app.components.status import status_pill_html
-    from app.services.job_labor_summary_service import get_job_labor_summary
-    from app.services.job_weekly_timesheets import monday_of_week, week_bounds
-    from app.services.weekly_job_timesheet_service import (
-        TIMESHEET_TABLE_MISSING_MSG,
-        build_timesheet_data,
-        build_timesheet_pdf_bytes,
-        fetch_timesheet_by_job_week,
-        list_timesheets_for_job,
-        load_timesheet_data,
-        render_timesheet_html,
-        save_timesheet,
-        signed_url_for_timesheet,
-        timesheet_table_available,
-    )
-    from app.services.weekly_timesheet_service import mark_timesheet_sent
-    from app.utils.formatting import fmt_currency, fmt_date, fmt_hours
-    from app.utils.permissions import can_submit_timekeeping
-except ImportError:
-    from auth import current_profile, current_role, effective_role  # type: ignore
-    from components.status import status_pill_html  # type: ignore
-    from services.job_labor_summary_service import get_job_labor_summary  # type: ignore
-    from services.job_weekly_timesheets import monday_of_week, week_bounds  # type: ignore
-    from services.weekly_job_timesheet_service import (  # type: ignore
-        TIMESHEET_TABLE_MISSING_MSG,
-        build_timesheet_data,
-        build_timesheet_pdf_bytes,
-        fetch_timesheet_by_job_week,
-        list_timesheets_for_job,
-        load_timesheet_data,
-        render_timesheet_html,
-        save_timesheet,
-        signed_url_for_timesheet,
-        timesheet_table_available,
-    )
-    from services.weekly_timesheet_service import mark_timesheet_sent  # type: ignore
-    from utils.formatting import fmt_currency, fmt_date, fmt_hours  # type: ignore
-    from utils.permissions import can_submit_timekeeping  # type: ignore
-
-
+from app.auth import current_profile, current_role, effective_role
+from app.components.status import status_pill_html
+from app.services.job_labor_summary_service import get_job_labor_summary
+from app.services.job_weekly_timesheets import monday_of_week, week_bounds
+from app.services.weekly_job_timesheet_service import (
+    TIMESHEET_TABLE_MISSING_MSG,
+    build_timesheet_data,
+    build_timesheet_pdf_bytes,
+    fetch_timesheet_by_job_week,
+    list_timesheets_for_job,
+    load_timesheet_data,
+    render_timesheet_html,
+    save_timesheet,
+    signed_url_for_timesheet,
+    timesheet_table_available,
+)
+from app.services.weekly_timesheet_service import mark_timesheet_sent
+from app.utils.formatting import fmt_currency, fmt_date, fmt_hours
+from app.utils.permissions import can_submit_timekeeping
 def _week_start_key(key_prefix: str) -> str:
     return f"{key_prefix}_week_start"
 
@@ -61,10 +38,7 @@ def _init_week_state(key_prefix: str) -> date:
     state_key = _week_start_key(key_prefix)
     prefill_key = f"{key_prefix}_week_prefilled"
     if prefill_key not in st.session_state:
-        try:
-            from app.navigation import WJT_PREFILL_WEEK_KEY
-        except ImportError:
-            from navigation import WJT_PREFILL_WEEK_KEY  # type: ignore
+        from app.navigation import WJT_PREFILL_WEEK_KEY
         pre_week = str(st.session_state.pop(WJT_PREFILL_WEEK_KEY, "") or "").strip()[:10]
         if pre_week:
             try:
@@ -89,10 +63,7 @@ def _can_edit_time_in_timekeeping() -> bool:
 
 
 def _navigate_edit_timekeeping(job_id: str, week_start: date) -> None:
-    try:
-        from app.navigation import navigate_to_timekeeping
-    except ImportError:
-        from navigation import navigate_to_timekeeping  # type: ignore
+    from app.navigation import navigate_to_timekeeping
     navigate_to_timekeeping(job_id=job_id, week_start=week_start.isoformat())
     st.rerun()
 
@@ -252,10 +223,7 @@ def render_job_weekly_timesheets_tab(job: dict[str, Any], *, key_prefix: str) ->
     )
     can_generate = labor_count > 0 or charge_count > 0
 
-    try:
-        from app.services.weekly_job_timesheet_service import _weekly_summary
-    except ImportError:
-        from services.weekly_job_timesheet_service import _weekly_summary  # type: ignore
+    from app.services.weekly_job_timesheet_service import _weekly_summary
     totals = _weekly_summary(data)
     m1, m2, m3, m4, m5 = st.columns(5, gap="small")
     m1.metric("Approved labor hrs", fmt_hours(totals["labor_hours"]))

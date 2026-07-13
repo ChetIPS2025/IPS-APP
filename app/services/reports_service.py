@@ -11,11 +11,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
-try:
-    from app.services.repository import fetch_rows
-except ImportError:
-    from services.repository import fetch_rows  # type: ignore
-
+from app.services.repository import fetch_rows
 _OPEN_ESTIMATE_STATUSES = frozenset({"draft", "pending", "sent"})
 _COMPLETED_JOB_STATUSES = frozenset({"complete", "completed", "closed"})
 _REJECTED_TIMEKEEPING = frozenset({"rejected", "void", "voided"})
@@ -46,10 +42,7 @@ def _admin_table(
     order_by: str | None = None,
 ) -> tuple[list[dict[str, Any]], bool]:
     """Return (rows, is_live). ``is_live`` is False when the table could not be read."""
-    try:
-        from app.db import fetch_table_admin
-    except ImportError:
-        from db import fetch_table_admin  # type: ignore
+    from app.db import fetch_table_admin
     try:
         rows = list(fetch_table_admin(table, columns=columns, limit=limit, order_by=order_by) or [])
         return rows, True
@@ -58,10 +51,7 @@ def _admin_table(
 
 
 def _load_jobs_live() -> tuple[list[dict[str, Any]], bool]:
-    try:
-        from app.services.phase2_modules_service import list_jobs
-    except ImportError:
-        from services.phase2_modules_service import list_jobs  # type: ignore
+    from app.services.phase2_modules_service import list_jobs
     rows, used_demo = list_jobs(demo=[])
     return list(rows), not used_demo
 
@@ -95,10 +85,7 @@ def _resolve_job_from_timekeeping_row(
     low = label.lower()
     if low in {"— no job —", "- no job -", "no job", "none", "—", "-", "shop", "administrative"}:
         return None
-    try:
-        from app.services.jobs_service import resolve_job_id_from_label
-    except ImportError:
-        from services.jobs_service import resolve_job_id_from_label  # type: ignore
+    from app.services.jobs_service import resolve_job_id_from_label
     resolved = resolve_job_id_from_label(label)
     if resolved and resolved in jobs_by_id:
         return jobs_by_id[resolved]
@@ -263,11 +250,7 @@ def live_labor_by_employee_report() -> ReportData:
 
 
 def live_job_profitability_report(*, sync_sources: bool = True) -> ReportData:
-    try:
-        from app.services.job_cost_transaction_service import build_job_cost_summary, sync_all_sources_for_job
-    except ImportError:
-        from services.job_cost_transaction_service import build_job_cost_summary, sync_all_sources_for_job  # type: ignore
-
+    from app.services.job_cost_transaction_service import build_job_cost_summary, sync_all_sources_for_job
     jobs, jobs_live = _load_jobs_live()
     rows: list[dict[str, Any]] = []
     for job in jobs:
@@ -383,10 +366,7 @@ def live_low_stock_report() -> ReportData:
 
 
 def live_certs_expiring_report() -> ReportData:
-    try:
-        from app.services.phase2_modules_service import list_all_certifications, list_employees
-    except ImportError:
-        from services.phase2_modules_service import list_all_certifications, list_employees  # type: ignore
+    from app.services.phase2_modules_service import list_all_certifications, list_employees
     employees, emp_live = list_employees(demo=[])
     cert_rows, cert_demo = list_all_certifications(demo=[], employees=employees)
     live = emp_live and not cert_demo
@@ -413,10 +393,7 @@ def live_certs_expiring_report() -> ReportData:
 
 
 def live_asset_maintenance_report() -> ReportData:
-    try:
-        from app.services.phase2_modules_service import list_assets
-    except ImportError:
-        from services.phase2_modules_service import list_assets  # type: ignore
+    from app.services.phase2_modules_service import list_assets
     assets, used_demo = list_assets(demo=[])
     live = not used_demo
     out: list[dict[str, Any]] = []
@@ -446,10 +423,7 @@ def live_asset_maintenance_report() -> ReportData:
 
 def live_timekeeping_summary_report(week_start: date | None = None) -> ReportData:
     ws = week_start or date.today()
-    try:
-        from app.services.timekeeping_service import list_timekeeping_summaries
-    except ImportError:
-        from services.timekeeping_service import list_timekeeping_summaries  # type: ignore
+    from app.services.timekeeping_service import list_timekeeping_summaries
     rows, used_demo = list_timekeeping_summaries(ws, demo=[])
     out: list[dict[str, Any]] = []
     for row in rows:

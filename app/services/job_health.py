@@ -7,36 +7,12 @@ from collections import defaultdict
 from datetime import date, timedelta
 from typing import Any
 
-try:
-    from app.services.supervisor_daily_reports import (
-        delay_labels_map,
-        estimated_bid_labor_hours_from_estimate_json,
-        job_status_needs_daily_report,
-    )
-except ImportError:
-    from services.supervisor_daily_reports import (  # type: ignore
-        delay_labels_map,
-        estimated_bid_labor_hours_from_estimate_json,
-        job_status_needs_daily_report,
-    )
-
-try:
-    from app.services.supervisor_planning import active_goal_job_ids_for_date, active_task_job_ids
-except ImportError:
-    try:
-        from services.supervisor_planning import active_goal_job_ids_for_date, active_task_job_ids  # type: ignore
-    except ImportError:
-
-        def active_goal_job_ids_for_date(*, goals: list, target: date) -> set[str]:  # type: ignore[misc,no-redef]
-            _ = goals
-            _ = target
-            return set()
-
-        def active_task_job_ids(*, tasks: list, today: date) -> set[str]:  # type: ignore[misc,no-redef]
-            _ = tasks
-            _ = today
-            return set()
-
+from app.services.supervisor_daily_reports import (
+    delay_labels_map,
+    estimated_bid_labor_hours_from_estimate_json,
+    job_status_needs_daily_report,
+)
+from app.services.supervisor_planning import active_goal_job_ids_for_date, active_task_job_ids
 _DELAY_KEYS = tuple(delay_labels_map().keys())
 _MAJOR_DELAY_KEYS = frozenset(
     {
@@ -424,11 +400,7 @@ def compute_job_health_rows(
     goals: list[dict[str, Any]] | None = None,
     job_tasks: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    try:
-        from app.services.job_service import job_row_select_label
-    except ImportError:
-        from services.job_service import job_row_select_label  # type: ignore
-
+    from app.services.job_service import job_row_select_label
     by_job = _reports_by_job(reports)
     goal_ids = active_goal_job_ids_for_date(goals=list(goals or []), target=today)
     task_job_ids = active_task_job_ids(tasks=list(job_tasks or []), today=today)

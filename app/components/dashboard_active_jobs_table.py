@@ -7,17 +7,10 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.components.job_status_ui import job_status_pill_html
-    from app.services.job_financial_ui import job_list_financials_from_row
-    from app.services.jobs_service import normalize_job_status
-    from app.services.tasks_service import count_open_subjobs_by_job_id
-except ImportError:
-    from components.job_status_ui import job_status_pill_html  # type: ignore
-    from services.job_financial_ui import job_list_financials_from_row  # type: ignore
-    from services.jobs_service import normalize_job_status  # type: ignore
-    from services.tasks_service import count_open_subjobs_by_job_id  # type: ignore
-
+from app.components.job_status_ui import job_status_pill_html
+from app.services.job_financial_ui import job_list_financials_from_row
+from app.services.jobs_service import normalize_job_status
+from app.services.tasks_service import count_open_subjobs_by_job_id
 _DASH_HEADERS: tuple[tuple[str, str], ...] = (
     ("num", "JOB #"),
     ("desc", "PROJECT / DESCRIPTION"),
@@ -109,23 +102,14 @@ def _open_job_nav(job_id: str, job: dict[str, Any]) -> None:
     st.session_state["selected_job_id"] = jid
     st.session_state["show_job_detail_modal"] = True
     st.session_state["ips_jobs_detail_modal_id"] = jid
-    try:
-        from app.pages._core._session import select_key
-    except ImportError:
-        from pages._core._session import select_key  # type: ignore
+    from app.pages._core._session import select_key
     st.session_state[select_key("jobs")] = jid
-    try:
-        from app.pages.tasks import on_job_detail_modal_open
-    except ImportError:
-        from pages.tasks import on_job_detail_modal_open  # type: ignore
+    from app.pages.tasks import on_job_detail_modal_open
     try:
         on_job_detail_modal_open(jid)
     except Exception:
         pass
-    try:
-        from app.navigation import set_nav_slug
-    except ImportError:
-        from navigation import set_nav_slug  # type: ignore
+    from app.navigation import set_nav_slug
     set_nav_slug("jobs")
     st.rerun()
 
@@ -308,11 +292,7 @@ def _build_active_jobs_table_html(
 
 
 def _render_dashboard_job_link_bridge(jobs_by_id: dict[str, dict[str, Any]]) -> None:
-    try:
-        from app.ui.clean_table import _components_html
-    except ImportError:
-        from ui.clean_table import _components_html  # type: ignore
-
+    from app.ui.clean_table import _components_html
     st.markdown(
         '<span class="ips-dash-job-link-bridge-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
@@ -389,19 +369,12 @@ def render_dashboard_active_jobs_table(
     limit: int = 10,
 ) -> None:
     """Render the Active Jobs table on the dashboard using a real HTML table."""
-    try:
-        from app.components.jobs_page_layout import inject_dashboard_active_jobs_table_css
-    except ImportError:
-        from components.jobs_page_layout import inject_dashboard_active_jobs_table_css  # type: ignore
-
+    from app.components.jobs_page_layout import inject_dashboard_active_jobs_table_css
     inject_dashboard_active_jobs_table_css()
     rows = list(jobs)[: max(1, int(limit))]
 
     def _go_jobs() -> None:
-        try:
-            from app.navigation import set_nav_slug
-        except ImportError:
-            from navigation import set_nav_slug  # type: ignore
+        from app.navigation import set_nav_slug
         set_nav_slug("jobs")
         st.rerun()
 

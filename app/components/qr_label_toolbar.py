@@ -6,19 +6,11 @@ from collections.abc import Callable
 
 import streamlit as st
 
-try:
-    from app.services.inventory_qr_labels import (
-        LABEL_PNG_SIZE_1X4,
-        LABEL_PNG_SIZE_2X6,
-        label_png_download_filename,
-    )
-except ImportError:
-    from services.inventory_qr_labels import (  # type: ignore
-        LABEL_PNG_SIZE_1X4,
-        LABEL_PNG_SIZE_2X6,
-        label_png_download_filename,
-    )
-
+from app.services.inventory_qr_labels import (
+    LABEL_PNG_SIZE_1X4,
+    LABEL_PNG_SIZE_2X6,
+    label_png_download_filename,
+)
 _LABEL_PNG_BUTTONS: tuple[tuple[str, str], ...] = (
     (LABEL_PNG_SIZE_1X4, '1"×4" label'),
     (LABEL_PNG_SIZE_2X6, '2"×6" label'),

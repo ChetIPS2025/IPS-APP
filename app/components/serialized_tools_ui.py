@@ -6,40 +6,21 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.pages._core._data import load_assets, load_employees, load_jobs
-    from app.services.asset_kits_service import asset_is_kit, get_tool_trailers
-    from app.services.quick_add_tool_service import bulk_import_tools, parse_bulk_import_file
-    from app.services.serialized_tool_service import (
-        MILWAUKEE_TOOL_TYPES,
-        SERIALIZED_TOOL_STATUSES,
-        assign_tool_to_trailer,
-        checkin_serialized_tool,
-        checkout_serialized_tool,
-        create_serialized_tool,
-        is_serialized_tool_asset,
-        mark_serialized_tool_status,
-        serialized_tool_view,
-    )
-    from app.utils.formatting import fmt_date
-except ImportError:
-    from pages._core._data import load_assets, load_employees, load_jobs  # type: ignore
-    from services.asset_kits_service import asset_is_kit, get_tool_trailers  # type: ignore
-    from services.quick_add_tool_service import bulk_import_tools, parse_bulk_import_file  # type: ignore
-    from services.serialized_tool_service import (  # type: ignore
-        MILWAUKEE_TOOL_TYPES,
-        SERIALIZED_TOOL_STATUSES,
-        assign_tool_to_trailer,
-        checkin_serialized_tool,
-        checkout_serialized_tool,
-        create_serialized_tool,
-        is_serialized_tool_asset,
-        mark_serialized_tool_status,
-        serialized_tool_view,
-    )
-    from utils.formatting import fmt_date  # type: ignore
-
-
+from app.pages._core._data import load_assets, load_employees, load_jobs
+from app.services.asset_kits_service import asset_is_kit, get_tool_trailers
+from app.services.quick_add_tool_service import bulk_import_tools, parse_bulk_import_file
+from app.services.serialized_tool_service import (
+    MILWAUKEE_TOOL_TYPES,
+    SERIALIZED_TOOL_STATUSES,
+    assign_tool_to_trailer,
+    checkin_serialized_tool,
+    checkout_serialized_tool,
+    create_serialized_tool,
+    is_serialized_tool_asset,
+    mark_serialized_tool_status,
+    serialized_tool_view,
+)
+from app.utils.formatting import fmt_date
 def _trailer_options() -> tuple[list[str], dict[str, str]]:
     trailers = get_tool_trailers()
     labels = ["— None —"]

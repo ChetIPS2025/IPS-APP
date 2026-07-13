@@ -8,26 +8,14 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.components.action_styles import danger_solid_button, warning_solid_button
-    from app.pages._core._crud import is_demo_id
-    from app.services.assets_service import (
-        can_manage_asset_actions,
-        clear_assets_cache,
-        delete_asset_record,
-        retire_asset,
-    )
-except ImportError:
-    from components.action_styles import danger_solid_button, warning_solid_button  # type: ignore
-    from pages._core._crud import is_demo_id  # type: ignore
-    from services.assets_service import (  # type: ignore
-        can_manage_asset_actions,
-        clear_assets_cache,
-        delete_asset_record,
-        retire_asset,
-    )
-
-
+from app.components.action_styles import danger_solid_button, warning_solid_button
+from app.pages._core._crud import is_demo_id
+from app.services.assets_service import (
+    can_manage_asset_actions,
+    clear_assets_cache,
+    delete_asset_record,
+    retire_asset,
+)
 def _confirm_state_key(asset_id: str, action: str) -> str:
     return f"confirm_{action}_asset_{asset_id}"
 

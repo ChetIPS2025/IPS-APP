@@ -7,70 +7,32 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, FrozenSet
 
-try:
-    from app.services.job_from_estimate import (
-        CreateJobFromEstimateResult,
-        _JOB_COLLISION_COLUMNS,
-        _as_json_dict,
-        _build_job_notes,
-        _existing_job_for_estimate,
-        _fetch_estimate_row_for_create,
-        _fallback_job_name,
-        _jobs_has_customer_contact_column,
-        _jobs_has_customer_location_column,
-        _location_text_from_customer_location,
-        _normalize_job_number_key,
-        _patch_estimate_row,
-        _resolve_customer_id_for_estimate,
-        _safe_location,
-        estimate_quote_to_job_number,
-        get_estimate_description,
-        fetch_jobs_by_exact_job_number,
-        job_number_conflict_is_reclaimable,
-        renumber_estimate_quote_for_job_collision,
-        resolve_job_number_collisions,
-    )
-    from app.services.job_schema import fetch_jobs_for_job_database
-    from app.services.job_service import job_number_display, next_job_number
-    from app.services.repository import ServiceResult, filter_payload_to_table, update_row
-except ImportError:
-    from services.job_from_estimate import (  # type: ignore
-        CreateJobFromEstimateResult,
-        _as_json_dict,
-        _build_job_notes,
-        _existing_job_for_estimate,
-        _fetch_estimate_row_for_create,
-        _fallback_job_name,
-        _jobs_has_customer_contact_column,
-        _jobs_has_customer_location_column,
-        _location_text_from_customer_location,
-        _patch_estimate_row,
-        _resolve_customer_id_for_estimate,
-        _safe_location,
-        estimate_quote_to_job_number,
-        get_estimate_description,
-        fetch_jobs_by_exact_job_number,
-        job_number_conflict_is_reclaimable,
-        renumber_estimate_quote_for_job_collision,
-        resolve_job_number_collisions,
-        _JOB_COLLISION_COLUMNS,
-        _normalize_job_number_key,
-    )
-    from services.job_schema import fetch_jobs_for_job_database  # type: ignore
-    from services.job_service import job_number_display, next_job_number  # type: ignore
-    from services.repository import ServiceResult, filter_payload_to_table, update_row  # type: ignore
-
-try:
-    from db import delete_rows_admin, fetch_by_match_admin, fetch_one, insert_row_admin, update_rows_admin
-except ImportError:
-    from app.db import (  # type: ignore
-        delete_rows_admin,
-        fetch_by_match_admin,
-        fetch_one,
-        insert_row_admin,
-        update_rows_admin,
-    )
-
+from app.services.job_from_estimate import (
+    CreateJobFromEstimateResult,
+    _JOB_COLLISION_COLUMNS,
+    _as_json_dict,
+    _build_job_notes,
+    _existing_job_for_estimate,
+    _fetch_estimate_row_for_create,
+    _fallback_job_name,
+    _jobs_has_customer_contact_column,
+    _jobs_has_customer_location_column,
+    _location_text_from_customer_location,
+    _normalize_job_number_key,
+    _patch_estimate_row,
+    _resolve_customer_id_for_estimate,
+    _safe_location,
+    estimate_quote_to_job_number,
+    get_estimate_description,
+    fetch_jobs_by_exact_job_number,
+    job_number_conflict_is_reclaimable,
+    renumber_estimate_quote_for_job_collision,
+    resolve_job_number_collisions,
+)
+from app.services.job_schema import fetch_jobs_for_job_database
+from app.services.job_service import job_number_display, next_job_number
+from app.services.repository import ServiceResult, filter_payload_to_table, update_row
+from app.db import delete_rows_admin, fetch_by_match_admin, fetch_one, insert_row_admin, update_rows_admin
 _LOG = logging.getLogger(__name__)
 
 JOB_STATUS_ESTIMATE_PENDING = "Active"
@@ -151,10 +113,7 @@ def can_approve_estimates(role: str | None) -> bool:
 
 
 def current_user_profile_id() -> str | None:
-    try:
-        from app.auth import current_profile
-    except ImportError:
-        from auth import current_profile  # type: ignore
+    from app.auth import current_profile
     try:
         prof = current_profile() or {}
         uid = str(prof.get("id") or prof.get("user_id") or "").strip()
@@ -235,19 +194,12 @@ def _linked_estimate_row_for_job(job: dict[str, Any]) -> dict[str, Any] | None:
 
 def _estimate_financial_totals(row: dict[str, Any]) -> tuple[float, float]:
     """Return (customer_price, internal_cost) for a linked estimate row."""
-    try:
-        from app.services.estimate_revision_service import _estimate_customer_price
-    except ImportError:
-        from services.estimate_revision_service import _estimate_customer_price  # type: ignore
-
+    from app.services.estimate_revision_service import _estimate_customer_price
     customer_price = float(_estimate_customer_price(row) or 0)
     internal_cost = 0.0
     eid = str(row.get("id") or "").strip()
     if eid:
-        try:
-            from app.services.estimate_costing_service import calculate_estimate_totals
-        except ImportError:
-            from services.estimate_costing_service import calculate_estimate_totals  # type: ignore
+        from app.services.estimate_costing_service import calculate_estimate_totals
         try:
             totals = calculate_estimate_totals(eid)
             internal_cost = float(totals.get("total_cost") or 0)
@@ -759,15 +711,9 @@ def sync_estimate_job_links_and_financials(
         job_patch["awarded_amount"] = round(customer_price, 2)
     if internal_cost > 0:
         job_patch["estimated_cost"] = round(internal_cost, 2)
-    try:
-        from app.services.job_po_service import apply_po_fields_to_job_payload, ensure_customer_po_document_from_estimate
-    except ImportError:
-        from services.job_po_service import apply_po_fields_to_job_payload, ensure_customer_po_document_from_estimate  # type: ignore
+    from app.services.job_po_service import apply_po_fields_to_job_payload, ensure_customer_po_document_from_estimate
     job_patch.update(apply_po_fields_to_job_payload(job, est, overwrite=True))
-    try:
-        from app.services.job_financial_ui import apply_projected_financials_to_job_payload
-    except ImportError:
-        from services.job_financial_ui import apply_projected_financials_to_job_payload  # type: ignore
+    from app.services.job_financial_ui import apply_projected_financials_to_job_payload
     projected = apply_projected_financials_to_job_payload({**job, **job_patch})
     job_patch["projected_gross_profit"] = projected["projected_gross_profit"]
     job_patch["projected_margin_pct"] = projected["projected_margin_pct"]
@@ -824,11 +770,7 @@ def award_job_and_sync_estimate(
     When a job is set to Active, approve its linked estimate (if any) and return
     job column updates for the caller to merge.
     """
-    try:
-        from app.services.jobs_service import normalize_job_status
-    except ImportError:
-        from services.jobs_service import normalize_job_status  # type: ignore
-
+    from app.services.jobs_service import normalize_job_status
     status = normalize_job_status(new_status)
     if status not in JOB_AWARD_SYNC_STATUSES:
         return ServiceResult(ok=True, data={"skipped": True, "reason": "status_not_awarded"})
@@ -873,11 +815,7 @@ def _linked_job_title_sync_payload(project_name: str) -> dict[str, Any]:
     name = str(project_name or "").strip()
     if not name:
         return {}
-    try:
-        from app.services.repository import table_column_names
-    except ImportError:
-        from services.repository import table_column_names  # type: ignore
-
+    from app.services.repository import table_column_names
     cols = table_column_names("jobs")
     allowed = ("job_name", "project_name", "name")
     raw: dict[str, Any] = {"job_name": name}
@@ -977,10 +915,7 @@ def enrich_estimates_with_job_numbers(
     jobs: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     if jobs is None:
-        try:
-            from app.db import fetch_table_admin
-        except ImportError:
-            from db import fetch_table_admin  # type: ignore
+        from app.db import fetch_table_admin
         try:
             jobs = list(fetch_table_admin("jobs", limit=10000) or [])
         except Exception:

@@ -16,11 +16,7 @@ except ImportError:
     class StorageApiError(Exception):
         """Fallback when storage3 is not installed."""
 
-try:
-    from app.config import ROOT_DIR, settings
-except ImportError:
-    from config import ROOT_DIR, settings  # type: ignore
-
+from app.config import ROOT_DIR, settings
 _LOG = logging.getLogger(__name__)
 
 try:
@@ -230,11 +226,7 @@ def get_client() -> Client:
     The underlying ``create_client`` is wrapped with ``streamlit.cache_resource`` so the
     heavy client is built once per process per (url, key) pair.
     """
-    try:
-        from app.config import validate_supabase_public_config
-    except ImportError:
-        from config import validate_supabase_public_config  # type: ignore
-
+    from app.config import validate_supabase_public_config
     cfg_err = validate_supabase_public_config()
     if cfg_err:
         raise RuntimeError(cfg_err)
@@ -290,10 +282,7 @@ def get_admin_client() -> Client:
 
 def allocate_next_shared_sequence_int() -> int:
     """Call DB RPC ``ips_next_yearly_seq`` (implementation in ``services.shared_sequence``)."""
-    try:
-        from app.services.shared_sequence import get_next_sequence_number
-    except ImportError:
-        from services.shared_sequence import get_next_sequence_number  # type: ignore
+    from app.services.shared_sequence import get_next_sequence_number
     return get_next_sequence_number()
 
 
@@ -372,10 +361,7 @@ def _fetch_table_query(
     *,
     use_admin: bool,
 ) -> list[dict[str, Any]]:
-    try:
-        from app.db_table_columns import resolve_list_columns
-    except ImportError:
-        from db_table_columns import resolve_list_columns  # type: ignore
+    from app.db_table_columns import resolve_list_columns
     columns = resolve_list_columns(table_name, columns)
     if table_name == "jobs":
         columns, order_by = _normalize_jobs_query(columns=columns, order_by=order_by)
@@ -614,10 +600,7 @@ def fetch_rows_unfiltered(
     """``select`` with optional ``order_by`` — same normalization as :func:`fetch_table`."""
     fn = fetch_table_admin if use_admin else fetch_table
     if table_name == "jobs":
-        try:
-            from app.db_table_columns import JOBS_COLUMNS
-        except ImportError:
-            from db_table_columns import JOBS_COLUMNS  # type: ignore
+        from app.db_table_columns import JOBS_COLUMNS
         return fn(table_name, columns=JOBS_COLUMNS, limit=limit, order_by=order_by)
     return fn(table_name, limit=limit, order_by=order_by)
 
@@ -701,21 +684,12 @@ def run_user_supabase_operation(
     PostgREST / PGRST303 text). Use this for any direct ``get_client()`` query that
     does not go through :func:`insert_row`, :func:`update_rows`, or :func:`fetch_table`.
     """
-    try:
-        from app.auth import (
-            SESSION_EXPIRED_USER_MESSAGE,
-            friendly_auth_error_message,
-            is_jwt_expired_error,
-            try_refresh_supabase_session,
-        )
-    except ImportError:
-        from auth import (  # type: ignore
-            SESSION_EXPIRED_USER_MESSAGE,
-            friendly_auth_error_message,
-            is_jwt_expired_error,
-            try_refresh_supabase_session,
-        )
-
+    from app.auth import (
+        SESSION_EXPIRED_USER_MESSAGE,
+        friendly_auth_error_message,
+        is_jwt_expired_error,
+        try_refresh_supabase_session,
+    )
     op = str(operation or "request").strip() or "request"
 
     def _session_expired_raise(exc: Exception) -> None:
@@ -1043,12 +1017,7 @@ def create_signed_url(
     return _signed_url_from_response(resp)
 
 
-try:
-    from app.services.shared_sequence import next_quote_number_string
-except ImportError:
-    from services.shared_sequence import next_quote_number_string  # type: ignore
-
-
+from app.services.shared_sequence import next_quote_number_string
 def next_quote_number() -> str:
     return next_quote_number_string()
 
@@ -1414,10 +1383,7 @@ def find_auth_user_by_email_admin(email: str) -> dict[str, Any] | None:
 
 def _filter_admin_table_payload(table: str, payload: dict[str, Any]) -> dict[str, Any]:
     """Drop keys that are not present on the live table (legacy schema drift)."""
-    try:
-        from app.db_table_columns import SCHEMA_INTROSPECTION_COLUMNS
-    except ImportError:
-        from db_table_columns import SCHEMA_INTROSPECTION_COLUMNS  # type: ignore
+    from app.db_table_columns import SCHEMA_INTROSPECTION_COLUMNS
     try:
         rows = fetch_table_admin(table, columns=SCHEMA_INTROSPECTION_COLUMNS, limit=1)  # type: ignore[name-defined]
         if rows:

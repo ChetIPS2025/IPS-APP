@@ -8,32 +8,17 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.auth import current_profile, current_role, effective_role
-    from app.pages._core._crud import apply_persist_feedback, is_demo_id
-    from app.pages._core._data import load_tasks, task_assignee_options
-    from app.services.management_reminders_service import (
-        can_create_office_reminder,
-        complete_management_reminder,
-        create_management_reminder,
-        due_date_badge,
-        filter_dashboard_reminders,
-    )
-    from app.utils.formatting import fmt_date
-except ImportError:
-    from auth import current_profile, current_role, effective_role  # type: ignore
-    from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
-    from pages._core._data import load_tasks, task_assignee_options  # type: ignore
-    from services.management_reminders_service import (  # type: ignore
-        can_create_office_reminder,
-        complete_management_reminder,
-        create_management_reminder,
-        due_date_badge,
-        filter_dashboard_reminders,
-    )
-    from utils.formatting import fmt_date  # type: ignore
-
-
+from app.auth import current_profile, current_role, effective_role
+from app.pages._core._crud import apply_persist_feedback, is_demo_id
+from app.pages._core._data import load_tasks, task_assignee_options
+from app.services.management_reminders_service import (
+    can_create_office_reminder,
+    complete_management_reminder,
+    create_management_reminder,
+    due_date_badge,
+    filter_dashboard_reminders,
+)
+from app.utils.formatting import fmt_date
 def _default_assignee(profile: dict[str, Any], options: list[str]) -> str:
     full = str(profile.get("full_name") or "").strip()
     if full and full in options:
@@ -62,10 +47,7 @@ def render_dashboard_management_reminders_section(*, limit: int = 8) -> None:
     ot = "d" + "iv"
 
     def _go_tasks() -> None:
-        try:
-            from app.navigation import set_nav_slug
-        except ImportError:
-            from navigation import set_nav_slug  # type: ignore
+        from app.navigation import set_nav_slug
         set_nav_slug("tasks")
         st.rerun()
 

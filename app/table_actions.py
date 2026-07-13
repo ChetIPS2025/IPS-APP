@@ -27,11 +27,7 @@ from collections.abc import Callable
 import pandas as pd
 import streamlit as st
 
-try:
-    from app.components.action_styles import danger_outline, danger_solid
-except ImportError:
-    from components.action_styles import danger_outline, danger_solid  # type: ignore
-
+from app.components.action_styles import danger_outline, danger_solid
 # Legacy: dict-based storage (migrated on read into selected_<table_key>_ids)
 IPS_ROW_SELECTIONS = "ips_row_selections"
 

@@ -8,17 +8,10 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.services.catalog_images import catalog_thumbnail_html
-    from app.services.phase2_modules_service import asset_is_rentable
-    from app.services.status_maps import normalize_asset_status
-    from app.utils.formatting import fmt_date
-except ImportError:
-    from services.catalog_images import catalog_thumbnail_html  # type: ignore
-    from services.phase2_modules_service import asset_is_rentable  # type: ignore
-    from services.status_maps import normalize_asset_status  # type: ignore
-    from utils.formatting import fmt_date  # type: ignore
-
+from app.services.catalog_images import catalog_thumbnail_html
+from app.services.phase2_modules_service import asset_is_rentable
+from app.services.status_maps import normalize_asset_status
+from app.utils.formatting import fmt_date
 ASSETS_TABLE_LAST_ACTION_KEY = "assets_list_last_action"
 
 
@@ -378,11 +371,7 @@ def render_assets_table_bridge(
     hook_key: str = "ipsAssetsList::action",
     field_mode: bool = False,
 ) -> str | None:
-    try:
-        from app.ui.clean_table import _components_html
-    except ImportError:
-        from ui.clean_table import _components_html  # type: ignore
-
+    from app.ui.clean_table import _components_html
     field_mode_js = "true" if field_mode else "false"
     return _components_html(
         f"""

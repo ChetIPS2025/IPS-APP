@@ -8,13 +8,8 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.components.job_status_ui import job_status_pill_html, job_status_table_label
-    from app.services.jobs_service import can_manage_job_actions
-except ImportError:
-    from components.job_status_ui import job_status_pill_html, job_status_table_label  # type: ignore
-    from services.jobs_service import can_manage_job_actions  # type: ignore
-
+from app.components.job_status_ui import job_status_pill_html, job_status_table_label
+from app.services.jobs_service import can_manage_job_actions
 JOBS_TABLE_LAST_ACTION_KEY = "jobs_list_last_action"
 JOBS_TABLE_PENDING_STATUS_KEY = "jobs_table_pending_status_id"
 JOBS_TABLE_PENDING_MENU_KEY = "jobs_table_pending_menu_id"
@@ -456,11 +451,7 @@ def render_jobs_table_bridge(
     hook_key: str = "ipsJobsList::action",
     field_mode: bool = False,
 ) -> str | None:
-    try:
-        from app.ui.clean_table import _components_html
-    except ImportError:
-        from ui.clean_table import _components_html  # type: ignore
-
+    from app.ui.clean_table import _components_html
     field_mode_js = "true" if field_mode else "false"
     return _components_html(
         f"""

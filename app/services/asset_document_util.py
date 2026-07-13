@@ -88,11 +88,7 @@ def persist_asset_document_upload(
     """
     Upload bytes to the ``asset_documents`` storage bucket and insert ``asset_documents``.
     """
-    try:
-        from app.db import delete_storage_object_admin, insert_row_admin, upload_bytes_admin
-    except ImportError:
-        from db import delete_storage_object_admin, insert_row_admin, upload_bytes_admin  # type: ignore
-
+    from app.db import delete_storage_object_admin, insert_row_admin, upload_bytes_admin
     asset_id = str(asset_row.get("id") or "").strip()
     if not asset_id:
         raise ValueError("Missing asset id.")
@@ -137,29 +133,19 @@ def persist_asset_document_upload(
             except Exception:
                 pass
             raise
-    try:
-        from app.services.repository import clear_data_cache_for_table
-    except ImportError:
-        from services.repository import clear_data_cache_for_table  # type: ignore
+    from app.services.repository import clear_data_cache_for_table
     clear_data_cache_for_table("asset_documents")
     return row
 
 
 def delete_asset_document_record(doc: dict[str, Any]) -> None:
     """Remove storage object and DB row for an asset document."""
-    try:
-        from app.db import delete_storage_object_admin, delete_rows_admin
-    except ImportError:
-        from db import delete_storage_object_admin, delete_rows_admin  # type: ignore
-
+    from app.db import delete_storage_object_admin, delete_rows_admin
     path = str(doc.get("file_path") or doc.get("storage_path") or "").strip()
     doc_id = str(doc.get("id") or "").strip()
     if path:
         delete_storage_object_admin(path, bucket=ASSET_DOCUMENTS_BUCKET)
     if doc_id:
         delete_rows_admin("asset_documents", {"id": doc_id})
-    try:
-        from app.services.repository import clear_data_cache_for_table
-    except ImportError:
-        from services.repository import clear_data_cache_for_table  # type: ignore
+    from app.services.repository import clear_data_cache_for_table
     clear_data_cache_for_table("asset_documents")

@@ -6,106 +6,53 @@ import html
 
 import streamlit as st
 
-try:
-    from app.components.headers import render_page_brand_header
-    from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.table_filters import (
-        apply_column_filters,
-        build_filter_options,
-        clear_table_filters,
-        render_table_header_cell,
-    )
-    from app.components.record_modal import (
-        build_modal_cache,
-        clear_edit_modes,
-        clear_record_modal,
-        detail_field_html,
-        dialog_card_html,
-        edit_mode_key,
-        get_modal_record,
-        is_edit_mode,
-        open_record_modal,
-        placeholder_html,
-        record_session_key,
-        render_edit_form_header,
-        render_modal_edit_button,
-        render_modal_header,
-        render_modal_meta_grid,
-        render_modal_shell,
-        render_missing_record,
-        render_save_cancel_actions,
-        set_edit_mode,
-        set_view_mode,
-    )
-    from app.pages._core._data import (
-        delete_company_update,
-        load_company_updates,
-        load_employees,
-        persist_company_update,
-        persist_company_update_banner,
-        persist_company_update_record,
-        remove_company_update_banner_row,
-    )
-    from app.pages._core._crud import apply_persist_feedback, is_demo_id
-    from app.pages._core._session import select_key
-    from app.styles import inject_updates_module_css
-    from app.utils.formatting import fmt_date, fmt_datetime
-    from app.utils.permissions import can_manage_company_updates
-    from app.components.company_updates_feed import PRIORITY_EDIT_OPTS, priority_for_form
-    from app.services.updates_service import BANNER_UPLOAD_TYPES, resolve_company_update_banner_url
-except ImportError:
-    from components.headers import render_page_brand_header  # type: ignore
-    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.table_filters import (  # type: ignore
-        apply_column_filters,
-        build_filter_options,
-        clear_table_filters,
-        render_table_header_cell,
-    )
-    from components.record_modal import (  # type: ignore
-        build_modal_cache,
-        clear_edit_modes,
-        clear_record_modal,
-        detail_field_html,
-        dialog_card_html,
-        edit_mode_key,
-        get_modal_record,
-        is_edit_mode,
-        open_record_modal,
-        placeholder_html,
-        record_session_key,
-        render_edit_form_header,
-        render_modal_edit_button,
-        render_modal_header,
-        render_modal_meta_grid,
-        render_modal_shell,
-        render_missing_record,
-        render_save_cancel_actions,
-        set_edit_mode,
-        set_view_mode,
-    )
-    from pages._core._data import (  # type: ignore
-        delete_company_update,
-        load_company_updates,
-        load_employees,
-        persist_company_update,
-        persist_company_update_banner,
-        persist_company_update_record,
-        remove_company_update_banner_row,
-    )
-    from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
-    from pages._core._session import select_key  # type: ignore
-    from styles import inject_updates_module_css  # type: ignore
-    from utils.formatting import fmt_date, fmt_datetime  # type: ignore
-    from utils.permissions import can_manage_company_updates  # type: ignore
-    from components.company_updates_feed import PRIORITY_EDIT_OPTS, priority_for_form  # type: ignore
-    from services.updates_service import BANNER_UPLOAD_TYPES, resolve_company_update_banner_url  # type: ignore
-
-try:
-    from app.auth import current_role, effective_role
-except ImportError:
-    from auth import current_role, effective_role  # type: ignore
-
+from app.components.headers import render_page_brand_header
+from app.components.layout import render_filter_bar as layout_filter_bar
+from app.components.table_filters import (
+    apply_column_filters,
+    build_filter_options,
+    clear_table_filters,
+    render_table_header_cell,
+)
+from app.components.record_modal import (
+    build_modal_cache,
+    clear_edit_modes,
+    clear_record_modal,
+    detail_field_html,
+    dialog_card_html,
+    edit_mode_key,
+    get_modal_record,
+    is_edit_mode,
+    open_record_modal,
+    placeholder_html,
+    record_session_key,
+    render_edit_form_header,
+    render_modal_edit_button,
+    render_modal_header,
+    render_modal_meta_grid,
+    render_modal_shell,
+    render_missing_record,
+    render_save_cancel_actions,
+    set_edit_mode,
+    set_view_mode,
+)
+from app.pages._core._data import (
+    delete_company_update,
+    load_company_updates,
+    load_employees,
+    persist_company_update,
+    persist_company_update_banner,
+    persist_company_update_record,
+    remove_company_update_banner_row,
+)
+from app.pages._core._crud import apply_persist_feedback, is_demo_id
+from app.pages._core._session import select_key
+from app.styles import inject_updates_module_css
+from app.utils.formatting import fmt_date, fmt_datetime
+from app.utils.permissions import can_manage_company_updates
+from app.components.company_updates_feed import PRIORITY_EDIT_OPTS, priority_for_form
+from app.services.updates_service import BANNER_UPLOAD_TYPES, resolve_company_update_banner_url
+from app.auth import current_role, effective_role
 _SEL = select_key("company_updates")
 _MODULE = "company_updates"
 _TABLE_KEY = "company_updates_list"
@@ -803,10 +750,7 @@ def _render_custom_updates_table(
 
 
 def render() -> None:
-    try:
-        from app.pages._core._access import begin_module
-    except ImportError:
-        from pages._core._access import begin_module  # type: ignore
+    from app.pages._core._access import begin_module
     if not begin_module("company_updates"):
         return
 

@@ -6,7 +6,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from services.field_ops_util import fetch_fn, table_exists, write_fn
+from app.services.field_ops_util import fetch_fn, table_exists, write_fn
 
 _LOG = logging.getLogger(__name__)
 
@@ -65,10 +65,7 @@ def check_in(
             "status": "checked_in",
         },
     )
-    try:
-        from services.job_timeline import EVENT_CHECKIN, log_job_event
-    except ImportError:
-        from app.services.job_timeline import EVENT_CHECKIN, log_job_event  # type: ignore
+    from app.services.job_timeline import EVENT_CHECKIN, log_job_event
     log_job_event(
         job_id=jid,
         event_type=EVENT_CHECKIN,
@@ -110,10 +107,7 @@ def check_out(
     fn = fetch_fn(admin=admin)
     rows = fn("job_checkins", {"id": cid}, limit=1)
     row = rows[0] if rows else {"id": cid}
-    try:
-        from services.job_timeline import EVENT_CHECKIN, log_job_event
-    except ImportError:
-        from app.services.job_timeline import EVENT_CHECKIN, log_job_event  # type: ignore
+    from app.services.job_timeline import EVENT_CHECKIN, log_job_event
     log_job_event(
         job_id=str(row.get("job_id") or ""),
         event_type=EVENT_CHECKIN,

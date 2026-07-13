@@ -7,18 +7,10 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.services.shared_sequence import (
-        peek_quote_job_number,
-        quote_number_to_job_number,
-    )
-except ImportError:
-    from services.shared_sequence import (  # type: ignore
-        peek_quote_job_number,
-        quote_number_to_job_number,
-    )
-
-
+from app.services.shared_sequence import (
+    peek_quote_job_number,
+    quote_number_to_job_number,
+)
 def _year_from_value(value: Any) -> int:
     if isinstance(value, datetime):
         return value.year

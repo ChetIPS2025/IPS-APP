@@ -4,15 +4,9 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-try:
-    from app.services.asset_kits_service import asset_is_kit
-    from app.services.repository import ServiceResult, fetch_rows, update_row
-    from app.services.small_hand_tool_service import save_hand_tool
-except ImportError:
-    from services.asset_kits_service import asset_is_kit  # type: ignore
-    from services.repository import ServiceResult, fetch_rows, update_row  # type: ignore
-    from services.small_hand_tool_service import save_hand_tool  # type: ignore
-
+from app.services.asset_kits_service import asset_is_kit
+from app.services.repository import ServiceResult, fetch_rows, update_row
+from app.services.small_hand_tool_service import save_hand_tool
 TrackingType = Literal["equipment", "serialized", "quantity"]
 
 TRACKING_TYPES: tuple[str, ...] = ("equipment", "serialized", "quantity")
@@ -214,11 +208,7 @@ def reclassify_asset(
     notes: str = "",
 ) -> ServiceResult:
     """Move an existing asset between Equipment, Serialized Tools, and Small Tools."""
-    try:
-        from app.services.repository import fetch_by_id
-    except ImportError:
-        from services.repository import fetch_by_id  # type: ignore
-
+    from app.services.repository import fetch_by_id
     aid = _clean_text(asset_id)
     bucket = _normalize_tracking_type(target)
     if bucket not in TRACKING_TYPES:
@@ -327,10 +317,7 @@ def reclassify_asset(
     result = update_row(_ASSETS, payload, {"id": aid})
     if result.ok:
         if bucket == "serialized":
-            try:
-                from app.services.assets_service import rebuild_asset_qr
-            except ImportError:
-                from services.assets_service import rebuild_asset_qr  # type: ignore
+            from app.services.assets_service import rebuild_asset_qr
             merged = {**asset, **payload}
             rebuild_asset_qr(merged)
         data = dict(result.data or {})

@@ -23,10 +23,7 @@ _ActionFn = Callable[[], None]
 def _resolve_icon(icon: str | None) -> str:
     if icon and str(icon).strip().startswith("<svg"):
         return str(icon).strip()
-    try:
-        from app.navigation import current_nav_slug
-    except ImportError:
-        from navigation import current_nav_slug  # type: ignore
+    from app.navigation import current_nav_slug
     slug = current_nav_slug()
     if icon:
         return str(icon).strip()
@@ -36,47 +33,29 @@ def _resolve_icon(icon: str | None) -> str:
 def _resolve_subtitle(title: str, subtitle: str | None) -> str | None:
     if subtitle:
         return str(subtitle).strip() or None
-    try:
-        from app.navigation import current_nav_slug
-    except ImportError:
-        from navigation import current_nav_slug  # type: ignore
+    from app.navigation import current_nav_slug
     return DEFAULT_PAGE_SUBTITLES.get(current_nav_slug())
 
 
 def _can_navigate_back() -> bool:
-    try:
-        from app.navigation import IPS_NAV_HISTORY_KEY
-    except ImportError:
-        from navigation import IPS_NAV_HISTORY_KEY  # type: ignore
+    from app.navigation import IPS_NAV_HISTORY_KEY
     history = st.session_state.get(IPS_NAV_HISTORY_KEY) or []
     return bool(history)
 
 
 def _navigate_back() -> None:
-    try:
-        from app.navigation import navigate_back
-    except ImportError:
-        from navigation import navigate_back  # type: ignore
+    from app.navigation import navigate_back
     navigate_back()
 
 
 def _request_sidebar_toggle() -> None:
-    try:
-        from app.components.sidebar_shell import IPS_SIDEBAR_TOGGLE_REQUEST_KEY
-    except ImportError:
-        from components.sidebar_shell import IPS_SIDEBAR_TOGGLE_REQUEST_KEY  # type: ignore
+    from app.components.sidebar_shell import IPS_SIDEBAR_TOGGLE_REQUEST_KEY
     st.session_state[IPS_SIDEBAR_TOGGLE_REQUEST_KEY] = True
     st.rerun()
 
 
 def _unread_notification_count() -> int:
-    try:
-        from app.services.field_dashboard import load_field_dashboard_snapshot
-    except ImportError:
-        try:
-            from services.field_dashboard import load_field_dashboard_snapshot  # type: ignore
-        except Exception:
-            return 0
+    from app.services.field_dashboard import load_field_dashboard_snapshot
     try:
         snap = load_field_dashboard_snapshot()
         return int(snap.get("unread_notifications", 0) or 0)
@@ -137,14 +116,9 @@ def _render_refresh(*, key: str) -> None:
 
 
 def _header_auth_context() -> tuple[str, str, str, Callable[[], None]]:
-    try:
-        from app.auth import current_user_display_name, effective_role, sign_out
-        from app.navigation import set_nav_slug
-        from app.utils.permissions import role_can_access_page
-    except ImportError:
-        from auth import current_user_display_name, effective_role, sign_out  # type: ignore
-        from navigation import set_nav_slug  # type: ignore
-        from utils.permissions import role_can_access_page  # type: ignore
+    from app.auth import current_user_display_name, effective_role, sign_out
+    from app.navigation import set_nav_slug
+    from app.utils.permissions import role_can_access_page
     role = effective_role()
     display = current_user_display_name()
     initials = _initials(display)
@@ -152,13 +126,8 @@ def _header_auth_context() -> tuple[str, str, str, Callable[[], None]]:
 
 
 def _render_bell(*, header_key: str, role: str) -> None:
-    try:
-        from app.navigation import set_nav_slug
-        from app.utils.permissions import role_can_access_page
-    except ImportError:
-        from navigation import set_nav_slug  # type: ignore
-        from utils.permissions import role_can_access_page  # type: ignore
-
+    from app.navigation import set_nav_slug
+    from app.utils.permissions import role_can_access_page
     st.markdown('<span class="ips-ph-util-bell" aria-hidden="true"></span>', unsafe_allow_html=True)
     unread = _unread_notification_count()
     if unread > 0:
@@ -182,13 +151,8 @@ def _render_help() -> None:
 
 
 def _render_settings(*, header_key: str, role: str) -> None:
-    try:
-        from app.navigation import set_nav_slug
-        from app.utils.permissions import role_can_access_page
-    except ImportError:
-        from navigation import set_nav_slug  # type: ignore
-        from utils.permissions import role_can_access_page  # type: ignore
-
+    from app.navigation import set_nav_slug
+    from app.utils.permissions import role_can_access_page
     st.markdown('<span class="ips-ph-util-settings" aria-hidden="true"></span>', unsafe_allow_html=True)
     if role_can_access_page(role, "settings"):
         if st.button(" ", key=f"{header_key}_settings", help="Settings"):
@@ -243,13 +207,8 @@ def render_page_header(
 
     inject_ips_ui_styles()
 
-    try:
-        from app.branding import wording_logo_html
-        from app.navigation import current_nav_slug
-    except ImportError:
-        from branding import wording_logo_html  # type: ignore
-        from navigation import current_nav_slug  # type: ignore
-
+    from app.branding import wording_logo_html
+    from app.navigation import current_nav_slug
     resolved_subtitle = _resolve_subtitle(title, subtitle)
     resolved_icon = _resolve_icon(icon)
     slug = current_nav_slug()

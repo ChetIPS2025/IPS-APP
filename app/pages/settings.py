@@ -2,7 +2,4 @@
 
 from __future__ import annotations
 
-try:
-    from app.pages.admin import render
-except ImportError:
-    from pages.admin import render  # type: ignore
+from app.pages.admin import render

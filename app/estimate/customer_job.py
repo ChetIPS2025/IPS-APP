@@ -103,11 +103,7 @@ def _fetch_contacts_for_estimate_editor(
     customer_location_id: str | None = None,
 ) -> list[dict]:
     """Contacts for the customer, scoped by job site when a location is selected (RLS-aware)."""
-    try:
-        from services.customer_contacts import fetch_contacts_for_customer_scope
-    except ImportError:
-        from app.services.customer_contacts import fetch_contacts_for_customer_scope  # type: ignore
-
+    from app.services.customer_contacts import fetch_contacts_for_customer_scope
     admin_read = current_role() in {"admin", "estimator"}
     cid = str(customer_id or "").strip()
     if not cid:

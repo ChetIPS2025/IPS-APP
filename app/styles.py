@@ -10557,10 +10557,7 @@ def inject_authenticated_shell_css() -> None:
         '<script>document.body.classList.remove("ips-auth-login");document.body.classList.add("ips-authed-app");</script>',
         unsafe_allow_html=True,
     )
-    try:
-        from app.components.sidebar_shell import inject_desktop_nav_rail_css
-    except ImportError:
-        from components.sidebar_shell import inject_desktop_nav_rail_css  # type: ignore
+    from app.components.sidebar_shell import inject_desktop_nav_rail_css
     inject_desktop_nav_rail_css()
 
 
@@ -15357,20 +15354,14 @@ section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="st
 """,
         unsafe_allow_html=True,
     )
-    try:
-        from app.ui.clean_table import inject_clean_table_css
-    except ImportError:
-        from ui.clean_table import inject_clean_table_css  # type: ignore
+    from app.ui.clean_table import inject_clean_table_css
     inject_clean_table_css()
     inject_compact_table_rows_css()
     inject_table_header_filter_css()
     inject_table_viewport_fit()
     inject_ips_dialog_styles()
     inject_action_colors_css()
-    try:
-        from app.ui.row_action_colors import inject_row_action_colors_css
-    except ImportError:
-        from ui.row_action_colors import inject_row_action_colors_css  # type: ignore
+    from app.ui.row_action_colors import inject_row_action_colors_css
     inject_row_action_colors_css()
     inject_global_button_css()
     _inject_timekeeping_list_row_gap_css()

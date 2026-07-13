@@ -30,11 +30,7 @@ from app.db import fetch_one, fetch_table, fetch_table_admin, insert_row, insert
 
 def job_display_label(job_row: dict) -> str:
     """Readable label for selectors, e.g. ``J26025 – Fireline Repair`` (IPS job number rules)."""
-    try:
-        from app.utils.formatters import job_display_label as _fmt_label
-    except ImportError:
-        from utils.formatters import job_display_label as _fmt_label  # type: ignore
-
+    from app.utils.formatters import job_display_label as _fmt_label
     out = _fmt_label(job_row.get("job_number"), job_row.get("job_name"))
     s = str(out).strip()
     return s if s else "(unnamed job)"
@@ -58,11 +54,7 @@ def _job_costing_admin_read() -> bool:
 
 
 def _sort_jobs(jobs: list[dict]) -> list[dict]:
-    try:
-        from services.job_service import sort_jobs_by_number_then_name
-    except ImportError:
-        from app.services.job_service import sort_jobs_by_number_then_name  # type: ignore
-
+    from app.services.job_service import sort_jobs_by_number_then_name
     return sort_jobs_by_number_then_name(jobs)
 
 
@@ -94,14 +86,7 @@ def _insert_row_resilient(table: str, payload: dict[str, Any]) -> dict[str, Any]
         row = insert_row(table, payload)
     except Exception:
         row = insert_row_admin(table, payload)
-    try:
-        from app.services.job_cost_transaction_service import _safe_sync, sync_job_equipment, sync_job_material
-    except ImportError:
-        from services.job_cost_transaction_service import (  # type: ignore
-            _safe_sync,
-            sync_job_equipment,
-            sync_job_material,
-        )
+    from app.services.job_cost_transaction_service import _safe_sync, sync_job_equipment, sync_job_material
     if table == "job_materials":
         _safe_sync(sync_job_material, row)
     elif table == "job_equipment":
@@ -263,31 +248,21 @@ def _section_card(*, title: str | None = None):
 
 def render() -> None:
     """Legacy standalone route — open Jobs with Job Details on the Job Costing tab."""
-    try:
-        from app.navigation import redirect_to_jobs_job_costing
-        from app.pages import jobs as jobs_page
-    except ImportError:
-        from navigation import redirect_to_jobs_job_costing  # type: ignore
-        import pages.jobs as jobs_page  # type: ignore
+    from app.navigation import redirect_to_jobs_job_costing
+    from app.pages import jobs as jobs_page
     redirect_to_jobs_job_costing()
     jobs_page.render()
 
 
 def _render_standalone_job_costing_page() -> None:
-    try:
-        from app.pages._core._access import begin_module
-    except ImportError:
-        from pages._core._access import begin_module  # type: ignore
+    from app.pages._core._access import begin_module
     if not begin_module("job_costing"):
         return
     st.markdown(
         '<span class="ips-job-costing-page ips-page-shell-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
-    try:
-        from app.components.headers import render_page_brand_header
-    except ImportError:
-        from components.headers import render_page_brand_header  # type: ignore
+    from app.components.headers import render_page_brand_header
     render_page_brand_header(
         "Job Costing",
         "Costing by job — labor, materials, equipment, and estimate comparison.",
@@ -370,11 +345,7 @@ def _render_standalone_job_costing_page() -> None:
     job = jobs_sorted[ix]
     job_id = job.get("id")
 
-    try:
-        from app.services.customer_locations import location_display_name_city_state
-    except ImportError:
-        from services.customer_locations import location_display_name_city_state  # type: ignore
-
+    from app.services.customer_locations import location_display_name_city_state
     loc_hdr = ""
     clid = str(job.get("customer_location_id") or "").strip()
     if clid:
@@ -386,11 +357,7 @@ def _render_standalone_job_costing_page() -> None:
     if loc_hdr:
         st.caption(f"Location: {loc_hdr}")
 
-    try:
-        from app.services.delete_safety import job_costing_block_reason
-    except ImportError:
-        from services.delete_safety import job_costing_block_reason  # type: ignore
-
+    from app.services.delete_safety import job_costing_block_reason
     _del_block = job_costing_block_reason(str(job_id), admin_read=admin)
     if _del_block:
         st.caption(f"⚠ {_del_block} — this job cannot be removed from Job Database until costing rows are cleared.")

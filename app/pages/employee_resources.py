@@ -7,41 +7,22 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.auth import current_role, effective_role
-    from app.components.headers import render_page_header
-    from app.pages._core._access import begin_module
-    from app.services.employee_resources_service import (
-        RESOURCE_TYPES,
-        ROLE_VISIBILITY_OPTIONS,
-        delete_employee_resource,
-        list_all_employee_resources_admin,
-        list_employee_resources,
-        normalize_resource,
-        resource_open_url,
-        save_employee_resource,
-    )
-    from app.styles import inject_employee_portal_css, inject_global_css
-    from app.utils.formatting import fmt_date
-    from app.utils.permissions import normalize_role
-except ImportError:
-    from auth import current_role, effective_role  # type: ignore
-    from components.headers import render_page_header  # type: ignore
-    from pages._core._access import begin_module  # type: ignore
-    from services.employee_resources_service import (  # type: ignore
-        RESOURCE_TYPES,
-        ROLE_VISIBILITY_OPTIONS,
-        delete_employee_resource,
-        list_all_employee_resources_admin,
-        list_employee_resources,
-        normalize_resource,
-        resource_open_url,
-        save_employee_resource,
-    )
-    from styles import inject_employee_portal_css, inject_global_css  # type: ignore
-    from utils.formatting import fmt_date  # type: ignore
-    from utils.permissions import normalize_role  # type: ignore
-
+from app.auth import current_role, effective_role
+from app.components.headers import render_page_header
+from app.pages._core._access import begin_module
+from app.services.employee_resources_service import (
+    RESOURCE_TYPES,
+    ROLE_VISIBILITY_OPTIONS,
+    delete_employee_resource,
+    list_all_employee_resources_admin,
+    list_employee_resources,
+    normalize_resource,
+    resource_open_url,
+    save_employee_resource,
+)
+from app.styles import inject_employee_portal_css, inject_global_css
+from app.utils.formatting import fmt_date
+from app.utils.permissions import normalize_role
 _ADMIN_EDIT_KEY = "ips_er_admin_edit"
 
 

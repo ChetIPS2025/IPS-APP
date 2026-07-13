@@ -8,157 +8,80 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.components.headers import render_page_brand_header
-    from app.components.customers_list_table import (
-        customer_avatar_html,
-        customer_count_cell_html,
-        customer_status_pill_html,
-        normalize_customer_status,
-    )
-    from app.components.customers_page_layout import (
-        close_customers_filter_bar_shell,
-        inject_customers_page_layout_css,
-        render_customers_filter_bar_shell,
-    )
-    from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.table_filters import (
-        apply_column_filters,
-        build_filter_options,
-        clear_table_filters,
-        has_active_column_filters,
-        render_table_header_cell,
-        sanitize_column_filters,
-    )
-    from app.components.table_pagination import (
-        paginate_rows,
-        render_table_pagination_footer,
-        render_table_pagination_header,
-        reset_table_page,
-    )
-    from app.components.record_modal import (
-        build_modal_cache,
-        clear_edit_modes,
-        clear_record_modal,
-        detail_field_html,
-        dialog_card_html,
-        get_modal_record,
-        is_edit_mode,
-        open_record_modal,
-        placeholder_html,
-        record_session_key,
-        render_edit_form_header,
-        render_missing_record,
-        render_modal_edit_button,
-        render_modal_header,
-        render_modal_meta_grid,
-        render_modal_shell,
-        render_save_cancel_actions,
-        safe_value,
-        set_edit_mode,
-        set_view_mode,
-        show_modal_if_pending,
-        status_pill_html as modal_status_pill_html,
-    )
-    from app.components.status import status_pill_html
-    from app.components.tables import render_data_table
-    from app.pages._core._crud import apply_persist_feedback, is_demo_id
-    from app.pages._core._data import estimates_for_customer, jobs_for_customer, load_estimates, load_jobs
-    from app.pages._core._session import select_key
-    from app.services.customers_service import (
-        CONTACT_ROLE_TYPES,
-        LOCATION_TYPES,
-        create_customer,
-        create_customer_contact,
-        create_customer_location,
-        get_customer,
-        get_customer_contact,
-        get_customer_contacts,
-        get_customer_location,
-        get_customer_locations,
-        get_customers,
-        update_customer,
-        update_customer_contact,
-        update_customer_location,
-    )
-    from app.styles import inject_customers_module_css
-    from app.ui.streamlit_perf import fragment
-except ImportError:
-    from components.headers import render_page_brand_header  # type: ignore
-    from components.customers_list_table import (  # type: ignore
-        customer_avatar_html,
-        customer_count_cell_html,
-        customer_status_pill_html,
-        normalize_customer_status,
-    )
-    from components.customers_page_layout import (  # type: ignore
-        close_customers_filter_bar_shell,
-        inject_customers_page_layout_css,
-        render_customers_filter_bar_shell,
-    )
-    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.table_filters import (  # type: ignore
-        apply_column_filters,
-        build_filter_options,
-        clear_table_filters,
-        has_active_column_filters,
-        render_table_header_cell,
-        sanitize_column_filters,
-    )
-    from components.table_pagination import (  # type: ignore
-        paginate_rows,
-        render_table_pagination_footer,
-        render_table_pagination_header,
-        reset_table_page,
-    )
-    from components.record_modal import (  # type: ignore
-        build_modal_cache,
-        clear_edit_modes,
-        clear_record_modal,
-        detail_field_html,
-        dialog_card_html,
-        get_modal_record,
-        is_edit_mode,
-        open_record_modal,
-        placeholder_html,
-        record_session_key,
-        render_edit_form_header,
-        render_missing_record,
-        render_modal_edit_button,
-        render_modal_header,
-        render_modal_meta_grid,
-        render_modal_shell,
-        render_save_cancel_actions,
-        safe_value,
-        set_edit_mode,
-        set_view_mode,
-        show_modal_if_pending,
-        status_pill_html as modal_status_pill_html,
-    )
-    from components.status import status_pill_html  # type: ignore
-    from components.tables import render_data_table  # type: ignore
-    from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
-    from pages._core._data import estimates_for_customer, jobs_for_customer, load_estimates, load_jobs  # type: ignore
-    from pages._core._session import select_key  # type: ignore
-    from services.customers_service import (  # type: ignore
-        CONTACT_ROLE_TYPES,
-        LOCATION_TYPES,
-        create_customer,
-        create_customer_contact,
-        create_customer_location,
-        get_customer,
-        get_customer_contact,
-        get_customer_contacts,
-        get_customer_location,
-        get_customer_locations,
-        get_customers,
-        update_customer,
-        update_customer_contact,
-        update_customer_location,
-    )
-    from styles import inject_customers_module_css  # type: ignore
-    from ui.streamlit_perf import fragment  # type: ignore
-
+from app.components.headers import render_page_brand_header
+from app.components.customers_list_table import (
+    customer_avatar_html,
+    customer_count_cell_html,
+    customer_status_pill_html,
+    normalize_customer_status,
+)
+from app.components.customers_page_layout import (
+    close_customers_filter_bar_shell,
+    inject_customers_page_layout_css,
+    render_customers_filter_bar_shell,
+)
+from app.components.layout import render_filter_bar as layout_filter_bar
+from app.components.table_filters import (
+    apply_column_filters,
+    build_filter_options,
+    clear_table_filters,
+    has_active_column_filters,
+    render_table_header_cell,
+    sanitize_column_filters,
+)
+from app.components.table_pagination import (
+    paginate_rows,
+    render_table_pagination_footer,
+    render_table_pagination_header,
+    reset_table_page,
+)
+from app.components.record_modal import (
+    build_modal_cache,
+    clear_edit_modes,
+    clear_record_modal,
+    detail_field_html,
+    dialog_card_html,
+    get_modal_record,
+    is_edit_mode,
+    open_record_modal,
+    placeholder_html,
+    record_session_key,
+    render_edit_form_header,
+    render_missing_record,
+    render_modal_edit_button,
+    render_modal_header,
+    render_modal_meta_grid,
+    render_modal_shell,
+    render_save_cancel_actions,
+    safe_value,
+    set_edit_mode,
+    set_view_mode,
+    show_modal_if_pending,
+    status_pill_html as modal_status_pill_html,
+)
+from app.components.status import status_pill_html
+from app.components.tables import render_data_table
+from app.pages._core._crud import apply_persist_feedback, is_demo_id
+from app.pages._core._data import estimates_for_customer, jobs_for_customer, load_estimates, load_jobs
+from app.pages._core._session import select_key
+from app.services.customers_service import (
+    CONTACT_ROLE_TYPES,
+    LOCATION_TYPES,
+    create_customer,
+    create_customer_contact,
+    create_customer_location,
+    get_customer,
+    get_customer_contact,
+    get_customer_contacts,
+    get_customer_location,
+    get_customer_locations,
+    get_customers,
+    update_customer,
+    update_customer_contact,
+    update_customer_location,
+)
+from app.styles import inject_customers_module_css
+from app.ui.streamlit_perf import fragment
 _SEL = select_key("customers")
 _LOC_SEL = select_key("customer_locations")
 _CT_SEL = select_key("customer_contacts")
@@ -437,10 +360,7 @@ def _render_custom_customers_table(
 
 
 def _service_feedback(result: Any, *, success: str) -> tuple[bool, str]:
-    try:
-        from app.services.repository import user_facing_error
-    except ImportError:
-        from services.repository import user_facing_error  # type: ignore
+    from app.services.repository import user_facing_error
     err = user_facing_error(result)
     if err:
         return False, err
@@ -455,17 +375,10 @@ def _open_counts_by_customer_name(
     jobs: list[dict],
     estimates: list[dict],
 ) -> tuple[dict[str, int], dict[str, int]]:
-    try:
-        from app.services.status_maps import (
-            is_estimate_open_for_customer_count,
-            is_job_open_for_customer_count,
-        )
-    except ImportError:
-        from services.status_maps import (  # type: ignore
-            is_estimate_open_for_customer_count,
-            is_job_open_for_customer_count,
-        )
-
+    from app.services.status_maps import (
+        is_estimate_open_for_customer_count,
+        is_job_open_for_customer_count,
+    )
     open_jobs: dict[str, int] = {}
     open_ests: dict[str, int] = {}
     for job in jobs:
@@ -484,11 +397,7 @@ def _open_counts_by_customer_name(
 
 
 def _enrich_list_rows(rows: list[dict]) -> list[dict]:
-    try:
-        from app.perf_debug import perf_span
-    except ImportError:
-        from perf_debug import perf_span  # type: ignore
-
+    from app.perf_debug import perf_span
     with perf_span("customers.enrich_list_rows"):
         jobs = load_jobs()
         estimates = load_estimates()
@@ -2591,10 +2500,7 @@ def _show_contact_detail_modal() -> None:
 
 
 def render() -> None:
-    try:
-        from app.pages._core._access import begin_module
-    except ImportError:
-        from pages._core._access import begin_module  # type: ignore
+    from app.pages._core._access import begin_module
     if not begin_module("customers"):
         return
 

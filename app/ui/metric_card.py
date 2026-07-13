@@ -6,13 +6,8 @@ import html
 
 import streamlit as st
 
-try:
-    from app.components.cards import render_kpi_card as _legacy_kpi_card
-    from app.components.cards import render_ops_kpi_row as _legacy_ops_kpi_row
-except ImportError:
-    from components.cards import render_kpi_card as _legacy_kpi_card  # type: ignore
-    from components.cards import render_ops_kpi_row as _legacy_ops_kpi_row  # type: ignore
-
+from app.components.cards import render_kpi_card as _legacy_kpi_card
+from app.components.cards import render_ops_kpi_row as _legacy_ops_kpi_row
 _TONE_ACCENTS = {
     "default": "#e2e8f0",
     "primary": "#3158e6",

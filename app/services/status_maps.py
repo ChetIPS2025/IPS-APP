@@ -5,13 +5,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
-try:
-    from app.services.jobs_service import normalize_job_status
-    from app.utils.constants import ASSET_STATUSES, ESTIMATE_STATUSES, JOB_STATUSES, TASK_STATUSES
-except ImportError:
-    from services.jobs_service import normalize_job_status  # type: ignore
-    from utils.constants import ASSET_STATUSES, ESTIMATE_STATUSES, JOB_STATUSES, TASK_STATUSES  # type: ignore
-
+from app.services.jobs_service import normalize_job_status
+from app.utils.constants import ASSET_STATUSES, ESTIMATE_STATUSES, JOB_STATUSES, TASK_STATUSES
 __all__ = [
     "ASSET_STATUSES",
     "ESTIMATE_STATUSES",
@@ -63,10 +58,7 @@ def is_job_open_for_customer_count(job: dict[str, Any]) -> bool:
 
 def is_estimate_open_for_customer_count(est: dict[str, Any]) -> bool:
     """Match Estimates active view — same rows as 'Active Estimates' filter."""
-    try:
-        from app.services.estimate_job_workflow_service import estimate_visible_in_active_view
-    except ImportError:
-        from services.estimate_job_workflow_service import estimate_visible_in_active_view  # type: ignore
+    from app.services.estimate_job_workflow_service import estimate_visible_in_active_view
     return estimate_visible_in_active_view(est)
 
 

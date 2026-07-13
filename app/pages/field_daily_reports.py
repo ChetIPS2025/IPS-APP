@@ -6,41 +6,23 @@ import streamlit as st
 
 from app.auth import current_profile, current_role, effective_role
 
-try:
-    from app.components.headers import render_page_brand_header
-    from app.db import fetch_jobs_with_order_fallback
-    from app.mobile_ui import ensure_narrow_viewport_detected
-    from app.pages.supervisor_daily_reports import render_daily_reports_for_job
-    from app.services.job_service import sort_jobs_by_number_then_name
-    from app.utils.field_context import (
-        inject_field_day_shell_css,
-        navigate_to_field_day,
-        render_field_checkin_block,
-        render_field_job_bar,
-    )
-except ImportError:
-    from components.headers import render_page_brand_header  # type: ignore
-    from db import fetch_jobs_with_order_fallback  # type: ignore
-    from mobile_ui import ensure_narrow_viewport_detected  # type: ignore
-    from pages.supervisor_daily_reports import render_daily_reports_for_job  # type: ignore
-    from services.job_service import sort_jobs_by_number_then_name  # type: ignore
-    from utils.field_context import (  # type: ignore
-        inject_field_day_shell_css,
-        navigate_to_field_day,
-        render_field_checkin_block,
-        render_field_job_bar,
-    )
-
-
+from app.components.headers import render_page_brand_header
+from app.db import fetch_jobs_with_order_fallback
+from app.mobile_ui import ensure_narrow_viewport_detected
+from app.pages.supervisor_daily_reports import render_daily_reports_for_job
+from app.services.job_service import sort_jobs_by_number_then_name
+from app.utils.field_context import (
+    inject_field_day_shell_css,
+    navigate_to_field_day,
+    render_field_checkin_block,
+    render_field_job_bar,
+)
 def _admin_read() -> bool:
     return effective_role() in {"admin", "manager"}
 
 
 def render() -> None:
-    try:
-        from app.pages._core._access import begin_module
-    except ImportError:
-        from pages._core._access import begin_module  # type: ignore
+    from app.pages._core._access import begin_module
     if not begin_module("field_daily_reports"):
         return
 

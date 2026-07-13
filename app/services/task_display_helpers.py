@@ -2,23 +2,13 @@
 
 from __future__ import annotations
 
-try:
-    from app.services.status_maps import (
-        normalize_task_status,
-        normalize_task_status_label,
-        task_priority_to_db,
-        task_status_filter_bucket,
-        task_status_to_db,
-    )
-except ImportError:
-    from services.status_maps import (  # type: ignore
-        normalize_task_status,
-        normalize_task_status_label,
-        task_priority_to_db,
-        task_status_filter_bucket,
-        task_status_to_db,
-    )
-
+from app.services.status_maps import (
+    normalize_task_status,
+    normalize_task_status_label,
+    task_priority_to_db,
+    task_status_filter_bucket,
+    task_status_to_db,
+)
 __all__ = [
     "display_to_priority",
     "display_to_status",

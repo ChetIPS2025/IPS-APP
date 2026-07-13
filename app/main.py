@@ -11,74 +11,32 @@ if _root_str not in sys.path:
 
 import streamlit as st
 
-try:
-    from app.app_icon import page_icon_path
-    from app.config import settings
-except ImportError:
-    from app_icon import page_icon_path  # type: ignore
-    from config import settings  # type: ignore
-
-try:
-    from app.auth import (
-        bootstrap_auth_at_startup,
-        init_session,
-        is_authenticated,
-        log_auth_state,
-        must_reset_password,
-        persist_auth_cookies_if_pending,
-        sign_in,
-        start_phone_otp,
-        update_password,
-        verify_phone_otp,
-    )
-except ImportError:
-    from auth import (  # type: ignore
-        bootstrap_auth_at_startup,
-        init_session,
-        is_authenticated,
-        log_auth_state,
-        must_reset_password,
-        persist_auth_cookies_if_pending,
-        sign_in,
-        start_phone_otp,
-        update_password,
-        verify_phone_otp,
-    )
-
-try:
-    from app.errors import show_auth_error, show_page_error
-except ImportError:
-    from errors import show_auth_error, show_page_error  # type: ignore
-
-try:
-    from app.logging_config import configure_logging
-except ImportError:
-    from logging_config import configure_logging  # type: ignore
-
-try:
-    from app.components.sidebar import render_sidebar
-    from app.navigation import (
-        apply_pending_navigation,
-        current_nav_slug,
-        ensure_nav_defaults,
-        on_nav_change,
-        render_module,
-    )
-    from app.styles import inject_authenticated_shell_css, inject_global_css, inject_unauthenticated_shell_css
-    from app.utils.constants import SESSION_NAV_KEY
-except ImportError:
-    from components.sidebar import render_sidebar  # type: ignore
-    from navigation import (  # type: ignore
-        apply_pending_navigation,
-        current_nav_slug,
-        ensure_nav_defaults,
-        on_nav_change,
-        render_module,
-    )
-    from styles import inject_authenticated_shell_css, inject_global_css, inject_unauthenticated_shell_css  # type: ignore
-    from utils.constants import SESSION_NAV_KEY  # type: ignore
-
-
+from app.app_icon import page_icon_path
+from app.config import settings
+from app.auth import (
+    bootstrap_auth_at_startup,
+    init_session,
+    is_authenticated,
+    log_auth_state,
+    must_reset_password,
+    persist_auth_cookies_if_pending,
+    sign_in,
+    start_phone_otp,
+    update_password,
+    verify_phone_otp,
+)
+from app.errors import show_auth_error, show_page_error
+from app.logging_config import configure_logging
+from app.components.sidebar import render_sidebar
+from app.navigation import (
+    apply_pending_navigation,
+    current_nav_slug,
+    ensure_nav_defaults,
+    on_nav_change,
+    render_module,
+)
+from app.styles import inject_authenticated_shell_css, inject_global_css, inject_unauthenticated_shell_css
+from app.utils.constants import SESSION_NAV_KEY
 def _render_login() -> None:
     inject_unauthenticated_shell_css()
     st.markdown(
@@ -176,10 +134,7 @@ def _render_login() -> None:
                         except Exception as exc:
                             show_auth_error(exc)
 
-            try:
-                from app.components.install_share import render_install_share_login_footer
-            except ImportError:
-                from components.install_share import render_install_share_login_footer  # type: ignore
+            from app.components.install_share import render_install_share_login_footer
             render_install_share_login_footer()
 
 
@@ -202,10 +157,7 @@ def _render_password_reset() -> None:
 
 def main() -> None:
     configure_logging(settings.log_level)
-    try:
-        from app.perf_debug import perf_enabled
-    except ImportError:
-        from perf_debug import perf_enabled  # type: ignore
+    from app.perf_debug import perf_enabled
     if perf_enabled():
         import logging
 
@@ -221,51 +173,29 @@ def main() -> None:
         initial_sidebar_state="collapsed",
     )
 
-    try:
-        from app.pwa import inject_pwa_support
-    except ImportError:
-        from pwa import inject_pwa_support  # type: ignore
+    from app.pwa import inject_pwa_support
     inject_pwa_support()
 
     init_session()
     bootstrap_auth_at_startup()
     inject_global_css()
-    try:
-        from app.mobile_ui import inject_ips_global_mobile_css, inject_sidebar_mobile_auto_collapse_once
-    except ImportError:
-        from mobile_ui import inject_ips_global_mobile_css, inject_sidebar_mobile_auto_collapse_once  # type: ignore
+    from app.mobile_ui import inject_ips_global_mobile_css, inject_sidebar_mobile_auto_collapse_once
     inject_ips_global_mobile_css()
 
-    try:
-        from app.pages.inventory_scan import capture_inventory_scan_from_query, inventory_scan_route_active
-    except ImportError:
-        from pages.inventory_scan import capture_inventory_scan_from_query, inventory_scan_route_active  # type: ignore
+    from app.pages.inventory_scan import capture_inventory_scan_from_query, inventory_scan_route_active
     capture_inventory_scan_from_query()
 
-    try:
-        from app.pages.asset_scan import capture_asset_scan_from_query, asset_scan_route_active
-    except ImportError:
-        from pages.asset_scan import capture_asset_scan_from_query, asset_scan_route_active  # type: ignore
+    from app.pages.asset_scan import capture_asset_scan_from_query, asset_scan_route_active
     capture_asset_scan_from_query()
 
-    try:
-        from app.services.asset_qr import capture_asset_deeplink_from_query
-    except ImportError:
-        from services.asset_qr import capture_asset_deeplink_from_query  # type: ignore
+    from app.services.asset_qr import capture_asset_deeplink_from_query
     capture_asset_deeplink_from_query()
 
-    try:
-        from app.pages.install_app import (
-            capture_install_route_from_query,
-            install_route_active,
-            render_install_page,
-        )
-    except ImportError:
-        from pages.install_app import (  # type: ignore
-            capture_install_route_from_query,
-            install_route_active,
-            render_install_page,
-        )
+    from app.pages.install_app import (
+        capture_install_route_from_query,
+        install_route_active,
+        render_install_page,
+    )
     capture_install_route_from_query()
 
     if install_route_active():
@@ -273,10 +203,7 @@ def main() -> None:
         st.stop()
 
     if inventory_scan_route_active():
-        try:
-            from app.pages.inventory_scan import render_inventory_scan_page
-        except ImportError:
-            from pages.inventory_scan import render_inventory_scan_page  # type: ignore
+        from app.pages.inventory_scan import render_inventory_scan_page
         if is_authenticated():
             persist_auth_cookies_if_pending()
             inject_authenticated_shell_css()
@@ -286,10 +213,7 @@ def main() -> None:
         st.stop()
 
     if asset_scan_route_active():
-        try:
-            from app.pages.asset_scan import render_asset_scan_page
-        except ImportError:
-            from pages.asset_scan import render_asset_scan_page  # type: ignore
+        from app.pages.asset_scan import render_asset_scan_page
         if is_authenticated():
             persist_auth_cookies_if_pending()
             inject_authenticated_shell_css()
@@ -300,10 +224,7 @@ def main() -> None:
 
     _tsign = str(st.query_params.get("tsign") or "").strip()
     if _tsign:
-        try:
-            from app.pages.sign_timesheet import render_public as render_sign_timesheet_public
-        except ImportError:
-            from pages.sign_timesheet import render_public as render_sign_timesheet_public  # type: ignore
+        from app.pages.sign_timesheet import render_public as render_sign_timesheet_public
         inject_unauthenticated_shell_css()
         render_sign_timesheet_public(_tsign)
         st.stop()
@@ -319,20 +240,12 @@ def main() -> None:
     inject_sidebar_mobile_auto_collapse_once()
     log_auth_state("app_authenticated")
 
-    try:
-        from app.components.sidebar_shell import (
-            capture_logout_from_query,
-            capture_nav_slug_from_query,
-            ensure_sidebar_collapsed_hydrated,
-            inject_sidebar_shell,
-        )
-    except ImportError:
-        from components.sidebar_shell import (  # type: ignore
-            capture_logout_from_query,
-            capture_nav_slug_from_query,
-            ensure_sidebar_collapsed_hydrated,
-            inject_sidebar_shell,
-        )
+    from app.components.sidebar_shell import (
+        capture_logout_from_query,
+        capture_nav_slug_from_query,
+        ensure_sidebar_collapsed_hydrated,
+        inject_sidebar_shell,
+    )
     capture_logout_from_query()
     capture_nav_slug_from_query()
     ensure_sidebar_collapsed_hydrated()
@@ -344,19 +257,13 @@ def main() -> None:
 
     apply_pending_navigation()
 
-    try:
-        from app.auth import is_authenticated as _auth_check
-        from app.navigation import (
-            ASSET_SCAN_EMBED_KEY,
-            INVENTORY_SCAN_EMBED_KEY,
-        )
-        from app.pages.asset_scan import asset_scan_route_active
-        from app.pages.inventory_scan import inventory_scan_route_active
-    except ImportError:
-        from auth import is_authenticated as _auth_check  # type: ignore
-        from navigation import ASSET_SCAN_EMBED_KEY, INVENTORY_SCAN_EMBED_KEY  # type: ignore
-        from pages.asset_scan import asset_scan_route_active  # type: ignore
-        from pages.inventory_scan import inventory_scan_route_active  # type: ignore
+    from app.auth import is_authenticated as _auth_check
+    from app.navigation import (
+        ASSET_SCAN_EMBED_KEY,
+        INVENTORY_SCAN_EMBED_KEY,
+    )
+    from app.pages.asset_scan import asset_scan_route_active
+    from app.pages.inventory_scan import inventory_scan_route_active
     if _auth_check():
         if inventory_scan_route_active():
             st.session_state[SESSION_NAV_KEY] = "inventory"
@@ -375,18 +282,12 @@ def main() -> None:
         on_nav_change(str(prev_slug), slug)
     st.session_state["_ips_last_slug"] = slug
 
-    try:
-        from app.services.asset_qr import apply_asset_deeplink_navigation
-    except ImportError:
-        from services.asset_qr import apply_asset_deeplink_navigation  # type: ignore
+    from app.services.asset_qr import apply_asset_deeplink_navigation
     apply_asset_deeplink_navigation()
     slug = current_nav_slug()
     st.session_state[SESSION_NAV_KEY] = slug
 
-    try:
-        from app.utils.view_as import ensure_view_as_navigation, is_view_as_mobile_preview
-    except ImportError:
-        from utils.view_as import ensure_view_as_navigation, is_view_as_mobile_preview  # type: ignore
+    from app.utils.view_as import ensure_view_as_navigation, is_view_as_mobile_preview
     ensure_view_as_navigation()
     slug = current_nav_slug()
     st.session_state[SESSION_NAV_KEY] = slug
@@ -399,16 +300,10 @@ def main() -> None:
     except Exception as exc:
         show_page_error(exc, context=f"module:{slug}")
 
-    try:
-        from app.utils.view_as import render_view_as_mobile_bottom_nav
-    except ImportError:
-        from utils.view_as import render_view_as_mobile_bottom_nav  # type: ignore
+    from app.utils.view_as import render_view_as_mobile_bottom_nav
     render_view_as_mobile_bottom_nav(slug)
 
-    try:
-        from app.components.sidebar_shell import inject_desktop_nav_rail_markup
-    except ImportError:
-        from components.sidebar_shell import inject_desktop_nav_rail_markup  # type: ignore
+    from app.components.sidebar_shell import inject_desktop_nav_rail_markup
     if not is_view_as_mobile_preview():
         inject_desktop_nav_rail_markup(active_slug=slug)
 

@@ -28,20 +28,10 @@ from app.services.phase2_modules_service import (
 )
 from app.services.repository import ServiceResult, fetch_rows, insert_row, update_row
 
-try:
-    from app.utils.inventory_quantity import parse_inventory_quantity, try_parse_inventory_quantity
-except ImportError:
-    from utils.inventory_quantity import parse_inventory_quantity, try_parse_inventory_quantity  # type: ignore
-
-try:
-    from app.services.inventory_display_helpers import resolve_inventory_qr_value, resolve_inventory_sku
-    from app.services.qr_codes import generate_inventory_qr_token, inventory_qr_link_url
-    from app.config import settings
-except ImportError:
-    from services.inventory_display_helpers import resolve_inventory_qr_value, resolve_inventory_sku  # type: ignore
-    from services.qr_codes import generate_inventory_qr_token, inventory_qr_link_url  # type: ignore
-    from config import settings  # type: ignore
-
+from app.utils.inventory_quantity import parse_inventory_quantity, try_parse_inventory_quantity
+from app.services.inventory_display_helpers import resolve_inventory_qr_value, resolve_inventory_sku
+from app.services.qr_codes import generate_inventory_qr_token, inventory_qr_link_url
+from app.config import settings
 _INV_TABLE = "inventory_items"
 _TXN_TABLE = "inventory_transactions"
 
@@ -55,17 +45,10 @@ INVENTORY_TXN_TYPES = (
     "adjustment",
 )
 
-try:
-    from app.services.tracking_terminology import (
-        INVENTORY_ACTION_LABELS,
-        inventory_action_label,
-    )
-except ImportError:
-    from services.tracking_terminology import (  # type: ignore
-        INVENTORY_ACTION_LABELS,
-        inventory_action_label,
-    )
-
+from app.services.tracking_terminology import (
+    INVENTORY_ACTION_LABELS,
+    inventory_action_label,
+)
 _JOB_REQUIRED_TYPES = frozenset({"issue_to_job", "return_from_job", "consume_on_job"})
 _DECREASE_ON_HAND = frozenset({"check_out", "issue_to_job", "consume_on_job", "consume_in_shop"})
 
@@ -98,16 +81,9 @@ __all__ = [
 
 
 def clear_inventory_cache() -> None:
-    try:
-        from app.perf_debug import perf_span
-    except ImportError:
-        from perf_debug import perf_span  # type: ignore
-
+    from app.perf_debug import perf_span
     with perf_span("inventory.clear_cache"):
-        try:
-            from app.services.repository import clear_data_cache_for_table
-        except ImportError:
-            from services.repository import clear_data_cache_for_table  # type: ignore
+        from app.services.repository import clear_data_cache_for_table
         clear_data_cache_for_table("inventory_items")
         clear_inventory_image_url_cache()
         try:
@@ -120,10 +96,7 @@ def clear_inventory_cache() -> None:
 
 def can_manage_inventory_actions() -> bool:
     """Admin, manager, or supervisor may deactivate or delete inventory items."""
-    try:
-        from app.components.modal_delete import can_admin_mutate
-    except ImportError:
-        from components.modal_delete import can_admin_mutate  # type: ignore
+    from app.components.modal_delete import can_admin_mutate
     return can_admin_mutate()
 
 
@@ -148,10 +121,7 @@ def _linked_pricing_item_ids(inventory_id: str, inventory_row: dict[str, Any] | 
             pid = str(inventory_row.get(key) or "").strip()
             if pid:
                 pg_ids.add(pid)
-    try:
-        from app.db import fetch_table_admin
-    except ImportError:
-        from db import fetch_table_admin  # type: ignore
+    from app.db import fetch_table_admin
     try:
         pg_rows = list(fetch_table_admin("pricing_guide_items", limit=10000) or [])
     except Exception:
@@ -173,10 +143,7 @@ def remove_inventory_keep_pricing_item(item_id: str) -> ServiceResult:
     iid = str(item_id or "").strip()
     if not iid:
         return ServiceResult(ok=False, error="Missing inventory item id.")
-    try:
-        from app.pages._core._crud import is_demo_id
-    except ImportError:
-        from pages._core._crud import is_demo_id  # type: ignore
+    from app.pages._core._crud import is_demo_id
     if is_demo_id(iid):
         return ServiceResult(ok=False, error="Demo records cannot be removed.")
 
@@ -185,11 +152,7 @@ def remove_inventory_keep_pricing_item(item_id: str) -> ServiceResult:
         return ServiceResult(ok=False, error="Inventory item not found.")
 
     pg_ids = _linked_pricing_item_ids(iid, inv)
-    try:
-        from app.services.repository import update_row_admin
-    except ImportError:
-        from services.repository import update_row_admin  # type: ignore
-
+    from app.services.repository import update_row_admin
     updated: list[str] = []
     now = datetime.now(timezone.utc).isoformat()
     for pid in sorted(pg_ids):
@@ -230,10 +193,7 @@ def remove_inventory_keep_pricing_item(item_id: str) -> ServiceResult:
 
 
 def get_inventory() -> list[dict[str, Any]]:
-    try:
-        from app.pages._core._data import _DEMO_INVENTORY
-    except ImportError:
-        from pages._core._data import _DEMO_INVENTORY  # type: ignore
+    from app.pages._core._data import _DEMO_INVENTORY
     rows, _ = list_inventory(demo=list(_DEMO_INVENTORY))
     return rows
 
@@ -263,10 +223,7 @@ def upload_inventory_image(item_id: str, uploaded_file: Any, *, uploaded_by: str
 
 
 def _db_fetch_by_match(table: str, match: dict[str, Any], *, limit: int = 5) -> list[dict[str, Any]]:
-    try:
-        from app.db import fetch_by_match_admin
-    except ImportError:
-        from db import fetch_by_match_admin  # type: ignore
+    from app.db import fetch_by_match_admin
     try:
         return fetch_by_match_admin(table, match, limit=limit) or []
     except Exception:
@@ -303,10 +260,7 @@ def generate_inventory_qr_value(item: dict[str, Any]) -> str:
         return inventory_qr_link_url(sku=sku, qr_token=token, app_base_url=base, item_id=iid)
     qrv = resolve_inventory_qr_value(row)
     if base and qrv:
-        try:
-            from app.services.qr_codes import inventory_scan_link_url
-        except ImportError:
-            from services.qr_codes import inventory_scan_link_url  # type: ignore
+        from app.services.qr_codes import inventory_scan_link_url
         return inventory_scan_link_url(qr_code_value=qrv, app_base_url=base)
     return qrv
 
@@ -501,10 +455,7 @@ def record_inventory_transaction(data: dict[str, Any]) -> ServiceResult:
         signed_qty = float(signed)
 
     ts = datetime.now(timezone.utc).isoformat()
-    try:
-        from app.services.catalog_stock_policy_service import inventory_status_fields_for_qty
-    except ImportError:
-        from services.catalog_stock_policy_service import inventory_status_fields_for_qty  # type: ignore
+    from app.services.catalog_stock_policy_service import inventory_status_fields_for_qty
     inv_update = {
         "quantity_on_hand": new_qoh,
         "quantity_checked_out": new_out,
@@ -582,11 +533,7 @@ def get_inventory_transactions(
         jobs_by_id = {str(j.get("id") or ""): j for j in job_rows}
     except Exception:
         pass
-    try:
-        from app.services.job_service import job_row_select_label
-    except ImportError:
-        from services.job_service import job_row_select_label  # type: ignore
-
+    from app.services.job_service import job_row_select_label
     inv_filter = str(inventory_id or "").strip()
     job_filter = str(job_id or "").strip()
     out: list[dict[str, Any]] = []

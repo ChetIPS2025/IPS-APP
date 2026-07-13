@@ -7,23 +7,13 @@ import io
 import re
 from typing import Any
 
-try:
-    from app.services.repository import ServiceResult
-    from app.services.small_hand_tool_service import (
-        HAND_TOOL_CATEGORIES,
-        HAND_TOOL_CONDITIONS,
-        HAND_TOOL_STATUSES,
-        import_hand_tool_row,
-    )
-except ImportError:
-    from services.repository import ServiceResult  # type: ignore
-    from services.small_hand_tool_service import (  # type: ignore
-        HAND_TOOL_CATEGORIES,
-        HAND_TOOL_CONDITIONS,
-        HAND_TOOL_STATUSES,
-        import_hand_tool_row,
-    )
-
+from app.services.repository import ServiceResult
+from app.services.small_hand_tool_service import (
+    HAND_TOOL_CATEGORIES,
+    HAND_TOOL_CONDITIONS,
+    HAND_TOOL_STATUSES,
+    import_hand_tool_row,
+)
 _TEMPLATE_HEADERS = (
     "tool_name",
     "category",
@@ -214,11 +204,7 @@ def _build_lookup_maps() -> tuple[dict[str, str], dict[str, str], dict[str, str]
     job_by_number: dict[str, str] = {}
     job_by_label: dict[str, str] = {}
 
-    try:
-        from app.services.asset_kits_service import get_tool_trailers
-    except ImportError:
-        from services.asset_kits_service import get_tool_trailers  # type: ignore
-
+    from app.services.asset_kits_service import get_tool_trailers
     for trailer in get_tool_trailers():
         tid = _clean(trailer.get("id"))
         if not tid:
@@ -233,11 +219,7 @@ def _build_lookup_maps() -> tuple[dict[str, str], dict[str, str], dict[str, str]
         if name:
             trailer_by_label[name.casefold()] = tid
 
-    try:
-        from app.pages._core._data import load_jobs
-    except ImportError:
-        from pages._core._data import load_jobs  # type: ignore
-
+    from app.pages._core._data import load_jobs
     for job in load_jobs():
         jid = _clean(job.get("id"))
         if not jid:

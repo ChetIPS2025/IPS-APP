@@ -8,7 +8,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from services.field_ops_util import fetch_fn, table_exists, write_fn
+from app.services.field_ops_util import fetch_fn, table_exists, write_fn
 
 _LOG = logging.getLogger(__name__)
 
@@ -19,10 +19,7 @@ CUSTOMER_PO_LINKED_REF = "customer_po"
 
 
 def _upload_fn(*, admin: bool):
-    try:
-        from app.db import upload_bytes, upload_bytes_admin
-    except ImportError:
-        from db import upload_bytes, upload_bytes_admin  # type: ignore
+    from app.db import upload_bytes, upload_bytes_admin
     return upload_bytes_admin if admin else upload_bytes
 
 
@@ -77,10 +74,7 @@ def upload_job_document(
         raise ValueError("Empty file")
     if not table_exists(TABLE, admin=admin):
         raise RuntimeError("documents_hub table not found — run sql/008_documents.sql")
-    try:
-        from app.config import settings
-    except ImportError:
-        from config import settings  # type: ignore
+    from app.config import settings
     bucket = getattr(settings, "storage_bucket", "ips-storage")
     insert_fn, _, _ = write_fn(admin=admin)
     upload = _upload_fn(admin=admin)
@@ -138,10 +132,7 @@ def upload_customer_po_document(
         raise ValueError("Empty file")
     if not table_exists(TABLE, admin=admin):
         raise RuntimeError("documents_hub table not found — run sql/008_documents.sql")
-    try:
-        from app.config import settings
-    except ImportError:
-        from config import settings  # type: ignore
+    from app.config import settings
     bucket = getattr(settings, "storage_bucket", "ips-storage")
     insert_fn, _, _ = write_fn(admin=admin)
     upload = _upload_fn(admin=admin)
@@ -209,15 +200,9 @@ def delete_job_document(
         raise ValueError("Document does not belong to this job")
     storage_path = str(row.get("storage_path") or "").strip()
     if storage_path and admin:
-        try:
-            from app.config import settings
-        except ImportError:
-            from config import settings  # type: ignore
+        from app.config import settings
         bucket = getattr(settings, "storage_bucket", "ips-storage")
-        try:
-            from app.db import delete_storage_object_admin
-        except ImportError:
-            from db import delete_storage_object_admin  # type: ignore
+        from app.db import delete_storage_object_admin
         try:
             delete_storage_object_admin(storage_path, bucket=bucket)
         except Exception:

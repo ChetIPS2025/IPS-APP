@@ -6,23 +6,13 @@ import html
 
 import streamlit as st
 
-try:
-    from app.components.table_pagination import (
-        page_key,
-        page_size_key,
-        pagination_meta,
-        reset_table_page,
-        DEFAULT_CATALOG_PAGE_SIZE,
-    )
-except ImportError:
-    from components.table_pagination import (  # type: ignore
-        page_key,
-        page_size_key,
-        pagination_meta,
-        reset_table_page,
-        DEFAULT_CATALOG_PAGE_SIZE,
-    )
-
+from app.components.table_pagination import (
+    page_key,
+    page_size_key,
+    pagination_meta,
+    reset_table_page,
+    DEFAULT_CATALOG_PAGE_SIZE,
+)
 _PAGE_SIZE_OPTIONS = (50, 75, 100, 150)
 _HIDE_IF_EMPTY_COLUMNS: frozenset[str] = frozenset()
 _JOB_COL_WEIGHTS = [0.72, 2.55, 1.1, 0.68, 0.9, 0.9, 0.9, 0.72]
@@ -1577,11 +1567,7 @@ def render_jobs_view_navigation(
 
 def render_jobs_row_click_bridge() -> str | None:
     """Zero-height bridge: row click opens job detail via marker data-row-id."""
-    try:
-        from app.ui.clean_table import _components_html
-    except ImportError:
-        from ui.clean_table import _components_html  # type: ignore
-
+    from app.ui.clean_table import _components_html
     st.markdown(
         '<span class="ips-jobs-row-click-bridge-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,

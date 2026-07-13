@@ -119,11 +119,7 @@ def render_proposal_export_actions(estimate_data: dict[str, Any]) -> None:
                 st.success("Word saved to storage.")
         with u2:
             if st.button("Save PDF to library", use_container_width=True, key="proposal_save_pdf_cloud_review"):
-                try:
-                    from proposal import try_convert_proposal_docx_to_pdf
-                except ImportError:
-                    from app.proposal import try_convert_proposal_docx_to_pdf  # type: ignore
-
+                from app.proposal import try_convert_proposal_docx_to_pdf
                 epdf = pdf_b
                 if epdf is None and docx is not None:
                     epdf, _conv = try_convert_proposal_docx_to_pdf(docx)

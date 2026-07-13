@@ -15,46 +15,24 @@ from reportlab.lib.units import inch
 from reportlab.platypus import Image as RLImage
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-try:
-    from app.branding import get_header_logo_path
-    from app.services.coupling_inspection_service import (
-        FORM_SIGNATURE_ROLES,
-        PHOTO_SLOT_LABELS,
-        normalize_inspection_results,
-        normalize_signatures_meta,
-        photo_view_url,
-    )
-    from app.services.coupling_inspection_specs import (
-        BOLT_COUNT,
-        CLOCK_POSITION_ANGLES,
-        FORM_VERSION,
-        INSPECTION_RESULT_ITEMS,
-        TORQUE_CLOCK_SEQUENCE,
-        normalize_torque_rows,
-        torque_pass_labels,
-        torque_sequence_caption,
-    )
-except ImportError:
-    from branding import get_header_logo_path  # type: ignore
-    from services.coupling_inspection_service import (  # type: ignore
-        FORM_SIGNATURE_ROLES,
-        PHOTO_SLOT_LABELS,
-        normalize_inspection_results,
-        normalize_signatures_meta,
-        photo_view_url,
-    )
-    from services.coupling_inspection_specs import (  # type: ignore
-        BOLT_COUNT,
-        CLOCK_POSITION_ANGLES,
-        FORM_VERSION,
-        INSPECTION_RESULT_ITEMS,
-        TORQUE_CLOCK_SEQUENCE,
-        normalize_torque_rows,
-        torque_pass_labels,
-        torque_sequence_caption,
-    )
-
-
+from app.branding import get_header_logo_path
+from app.services.coupling_inspection_service import (
+    FORM_SIGNATURE_ROLES,
+    PHOTO_SLOT_LABELS,
+    normalize_inspection_results,
+    normalize_signatures_meta,
+    photo_view_url,
+)
+from app.services.coupling_inspection_specs import (
+    BOLT_COUNT,
+    CLOCK_POSITION_ANGLES,
+    FORM_VERSION,
+    INSPECTION_RESULT_ITEMS,
+    TORQUE_CLOCK_SEQUENCE,
+    normalize_torque_rows,
+    torque_pass_labels,
+    torque_sequence_caption,
+)
 def _sig_png_bytes(signature_data: str) -> bytes | None:
     s = str(signature_data or "").strip()
     if not s:

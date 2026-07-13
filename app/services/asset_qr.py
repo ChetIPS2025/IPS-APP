@@ -8,19 +8,10 @@ from functools import lru_cache
 from typing import Any
 from urllib.parse import parse_qs, quote, unquote, unquote_plus, urlparse
 
-try:
-    from db import fetch_table
-    from services.asset_service import build_qr_value
-except ImportError:
-    from app.db import fetch_table  # type: ignore
-    from app.services.asset_service import build_qr_value  # type: ignore
-
-
+from app.db import fetch_table
+from app.services.asset_service import build_qr_value
 def _app_base_url() -> str:
-    try:
-        from app.config import settings
-    except ImportError:
-        from config import settings  # type: ignore
+    from app.config import settings
     return str(getattr(settings, "app_base_url", "") or "").strip().rstrip("/")
 
 
@@ -78,10 +69,7 @@ def qr_payload(asset: dict[str, Any]) -> str:
 
 def qr_embed_subject(asset: dict[str, Any], *, app_base_url: str | None = None) -> str:
     """Value encoded inside the QR image — mobile scan URL when ``APP_BASE_URL`` is configured."""
-    try:
-        from app.services.assets_service import generate_asset_qr_value
-    except ImportError:
-        from services.assets_service import generate_asset_qr_value  # type: ignore
+    from app.services.assets_service import generate_asset_qr_value
     url = generate_asset_qr_value(asset)
     if url and str(url).startswith("http"):
         return url
@@ -132,10 +120,7 @@ def resolve_asset_uuid_from_scan(raw: str) -> str | None:
     token = _normalize_scan_token(_normalize_scan_input(raw))
     if not token:
         return None
-    try:
-        from app.pages._core._data import load_assets
-    except ImportError:
-        from pages._core._data import load_assets  # type: ignore
+    from app.pages._core._data import load_assets
     su = token.upper()
     for asset in load_assets():
         uuid = str(asset.get("id") or "").strip()
@@ -198,11 +183,7 @@ def apply_asset_deeplink_navigation() -> None:
     """Open Assets with the scanned asset selected (call after nav-change clears)."""
     import streamlit as st
 
-    try:
-        from app.utils.constants import SESSION_NAV_KEY
-    except ImportError:
-        from utils.constants import SESSION_NAV_KEY  # type: ignore
-
+    from app.utils.constants import SESSION_NAV_KEY
     wants_assets = bool(st.session_state.pop("_ips_asset_deeplink_nav", False))
     scan_raw = str(st.session_state.pop("_ips_asset_deeplink_code", "") or "").strip()
     if not wants_assets and not scan_raw:
@@ -534,15 +515,9 @@ def _draw_meta_line(
 
 def load_asset_primary_photo_bytes(asset: dict[str, Any]) -> bytes | None:
     """Load the asset's primary uploaded photo bytes for label rendering."""
-    try:
-        from app.db import _local_file_path_for_storage, _storage_is_local, create_signed_url
-        from app.services.asset_images import asset_display_record
-        from app.services.item_images import _bucket_for_image_path, has_stored_item_image
-    except ImportError:
-        from db import _local_file_path_for_storage, _storage_is_local, create_signed_url  # type: ignore
-        from services.asset_images import asset_display_record  # type: ignore
-        from services.item_images import _bucket_for_image_path, has_stored_item_image  # type: ignore
-
+    from app.db import _local_file_path_for_storage, _storage_is_local, create_signed_url
+    from app.services.asset_images import asset_display_record
+    from app.services.item_images import _bucket_for_image_path, has_stored_item_image
     display = asset_display_record(asset)
     if not has_stored_item_image(display):
         return None
@@ -766,19 +741,11 @@ def qr_label_png_bytes(
     """Landscape asset label PNG at 300 DPI — QR | photo | asset info."""
     from PIL import Image, ImageDraw
 
-    try:
-        from app.services.inventory_qr_labels import (
-            label_company_name,
-            label_png_pixel_size,
-            normalize_label_png_size,
-        )
-    except ImportError:
-        from services.inventory_qr_labels import (  # type: ignore
-            label_company_name,
-            label_png_pixel_size,
-            normalize_label_png_size,
-        )
-
+    from app.services.inventory_qr_labels import (
+        label_company_name,
+        label_png_pixel_size,
+        normalize_label_png_size,
+    )
     size_key = normalize_label_png_size(size)
     w_px, h_px = label_png_pixel_size(size_key)
     scale = h_px / 300.0

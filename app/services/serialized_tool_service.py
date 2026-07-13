@@ -5,49 +5,26 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-try:
-    from app.services.asset_kits_service import (
-        ITEM_STATUSES,
-        assign_asset_kit,
-        asset_is_kit,
-        create_asset_kit_audit,
-        create_asset_kit_item,
-        create_asset_kit_items_multi,
-        create_asset_kit_transaction,
-        get_asset_kit_items,
-        update_asset_kit_item,
-    )
-    from app.services.assets_service import ensure_asset_qr_tokens
-    from app.services.repository import (
-        ServiceResult,
-        fetch_rows,
-        insert_row,
-        insert_row_admin,
-        update_row,
-        update_row_admin,
-    )
-except ImportError:
-    from services.asset_kits_service import (  # type: ignore
-        ITEM_STATUSES,
-        assign_asset_kit,
-        asset_is_kit,
-        create_asset_kit_audit,
-        create_asset_kit_item,
-        create_asset_kit_items_multi,
-        create_asset_kit_transaction,
-        get_asset_kit_items,
-        update_asset_kit_item,
-    )
-    from services.assets_service import ensure_asset_qr_tokens  # type: ignore
-    from services.repository import (  # type: ignore
-        ServiceResult,
-        fetch_rows,
-        insert_row,
-        insert_row_admin,
-        update_row,
-        update_row_admin,
-    )
-
+from app.services.asset_kits_service import (
+    ITEM_STATUSES,
+    assign_asset_kit,
+    asset_is_kit,
+    create_asset_kit_audit,
+    create_asset_kit_item,
+    create_asset_kit_items_multi,
+    create_asset_kit_transaction,
+    get_asset_kit_items,
+    update_asset_kit_item,
+)
+from app.services.assets_service import ensure_asset_qr_tokens
+from app.services.repository import (
+    ServiceResult,
+    fetch_rows,
+    insert_row,
+    insert_row_admin,
+    update_row,
+    update_row_admin,
+)
 _ASSETS = "assets"
 _TOOL_TXN = "tool_transactions"
 
@@ -212,10 +189,7 @@ def serialized_tool_view(
 
 def is_serialized_tool_asset(asset: dict[str, Any]) -> bool:
     """True for individually serial-tracked tools (not quantity hand tools)."""
-    try:
-        from app.services.asset_classification_service import is_serialized_tab_asset
-    except ImportError:
-        from services.asset_classification_service import is_serialized_tab_asset  # type: ignore
+    from app.services.asset_classification_service import is_serialized_tab_asset
     return is_serialized_tab_asset(asset)
 
 
@@ -304,11 +278,7 @@ def merge_serialized_tool_fields(asset_id: str, data: dict[str, Any]) -> Service
     aid = _clean_text(asset_id)
     if not aid:
         return ServiceResult(ok=False, error="Asset id is required.")
-    try:
-        from app.services.repository import fetch_by_id
-    except ImportError:
-        from services.repository import fetch_by_id  # type: ignore
-
+    from app.services.repository import fetch_by_id
     existing = fetch_by_id(_ASSETS, aid) or {}
     if not existing:
         return ServiceResult(ok=False, error="Existing tool not found.")
@@ -368,20 +338,14 @@ def create_serialized_tool(data: dict[str, Any]) -> ServiceResult:
 
     trailer_id = _clean_text(data.get("current_container_asset_id") or data.get("trailer_id"))
     if trailer_id:
-        try:
-            from app.services.repository import fetch_by_id
-        except ImportError:
-            from services.repository import fetch_by_id  # type: ignore
+        from app.services.repository import fetch_by_id
         trailer = fetch_by_id(_ASSETS, trailer_id) or {}
         if not asset_is_kit(trailer):
             return ServiceResult(ok=False, error="Selected container is not a Tool Trailer / kit.")
 
     asset_tag = _clean_text(data.get("asset_number")) or _clean_text(data.get("asset_id"))
     if not asset_tag:
-        try:
-            from app.services.asset_service import next_asset_id
-        except ImportError:
-            from services.asset_service import next_asset_id  # type: ignore
+        from app.services.asset_service import next_asset_id
         existing_assets, _ = fetch_rows(_ASSETS, limit=5000, order_by="asset_id")
         asset_tag = next_asset_id(existing_assets)
 
@@ -442,11 +406,7 @@ def assign_tool_to_trailer(tool_id: str, trailer_id: str) -> ServiceResult:
     if not tid or not pid:
         return ServiceResult(ok=False, error="Tool and Tool Trailer are required.")
 
-    try:
-        from app.services.repository import fetch_by_id
-    except ImportError:
-        from services.repository import fetch_by_id  # type: ignore
-
+    from app.services.repository import fetch_by_id
     tool = fetch_by_id(_ASSETS, tid) or {}
     trailer = fetch_by_id(_ASSETS, pid) or {}
     if not tool:
@@ -573,10 +533,7 @@ def checkout_serialized_tool(
                     "assigned_to_name": employee_name,
                 },
             )
-    try:
-        from app.services.rental_equipment_inspection_hooks import notify_rental_equipment_assigned
-    except ImportError:
-        from services.rental_equipment_inspection_hooks import notify_rental_equipment_assigned  # type: ignore
+    from app.services.rental_equipment_inspection_hooks import notify_rental_equipment_assigned
     try:
         row = result.data if isinstance(result.data, dict) else {}
         notify_rental_equipment_assigned(row, job_id=job_id)
@@ -712,10 +669,7 @@ def audit_trailer_tools(
 
 def import_serialized_tools(rows: list[dict[str, Any]], *, trailer_id: str = "") -> ServiceResult:
     """Import serialized tools from normalized spreadsheet rows (use parse_bulk_import_file first)."""
-    try:
-        from app.services.quick_add_tool_service import bulk_import_tools
-    except ImportError:
-        from services.quick_add_tool_service import bulk_import_tools  # type: ignore
+    from app.services.quick_add_tool_service import bulk_import_tools
     return bulk_import_tools(rows, default_kind="serialized", default_trailer_id=trailer_id)
 
 

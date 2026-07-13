@@ -272,10 +272,7 @@ def handle_customers_table_action(
     if not row:
         return
     open_item_fn(row_id, row)
-    try:
-        from app.ui.streamlit_perf import ips_app_rerun
-    except ImportError:
-        from ui.streamlit_perf import ips_app_rerun  # type: ignore
+    from app.ui.streamlit_perf import ips_app_rerun
     ips_app_rerun()
 
 
@@ -307,11 +304,7 @@ def render_customers_table_bridge(
     component_key: str = "ips_customers_list_bridge",
     hook_key: str = "ipsCustList::action",
 ) -> str | None:
-    try:
-        from app.ui.clean_table import _components_html
-    except ImportError:
-        from ui.clean_table import _components_html  # type: ignore
-
+    from app.ui.clean_table import _components_html
     return _components_html(
         f"""
 <script>

@@ -9,24 +9,8 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Any
 
-try:
-    from db import delete_rows, fetch_by_match, fetch_table, fetch_table_admin, insert_row, update_rows
-except ImportError:
-    from app.db import (  # type: ignore
-        delete_rows,
-        fetch_by_match,
-        fetch_table,
-        fetch_table_admin,
-        insert_row,
-        update_rows,
-    )
-
-try:
-    from services.job_service import sort_jobs_by_number_then_name
-except ImportError:
-    from app.services.job_service import sort_jobs_by_number_then_name  # type: ignore
-
-
+from app.db import delete_rows, fetch_by_match, fetch_table, fetch_table_admin, insert_row, update_rows
+from app.services.job_service import sort_jobs_by_number_then_name
 # Closed job statuses excluded from matrix rows (case-insensitive); see pm_matrix_service.
 _PM_CLOSED_STATUSES = frozenset(
     {"completed", "closed", "cancelled", "canceled", "archived", "on hold", "on_hold"}
@@ -72,11 +56,7 @@ def fetch_time_entries_for_week(week_start: date) -> list[dict[str, Any]]:
 
 def fetch_time_entries_between(work_start: date, work_end: date) -> list[dict[str, Any]]:
     """Inclusive date range on ``work_date`` (delegates to :mod:`services.time_grid_service`)."""
-    try:
-        from services.time_grid_service import fetch_time_entries_between as _between
-    except ImportError:
-        from app.services.time_grid_service import fetch_time_entries_between as _between  # type: ignore
-
+    from app.services.time_grid_service import fetch_time_entries_between as _between
     return _between(work_start, work_end)
 
 
@@ -94,11 +74,7 @@ def upsert_time_entry_by_key(
     Insert or update the single row for (employee_id, job_id, work_date).
     Delegates to :func:`services.time_grid_service.upsert_time_entry`.
     """
-    try:
-        from services.time_grid_service import upsert_time_entry
-    except ImportError:
-        from app.services.time_grid_service import upsert_time_entry  # type: ignore
-
+    from app.services.time_grid_service import upsert_time_entry
     from datetime import datetime, timezone
 
     ts = updated_at_iso or datetime.now(timezone.utc).isoformat()

@@ -7,242 +7,121 @@ from datetime import date, timedelta
 
 import streamlit as st
 
-try:
-    from app.components.record_modal import (
-        build_modal_cache,
-        clear_edit_modes,
-        clear_record_modal,
-        detail_field_html,
-        dialog_card_html,
-        get_modal_record,
-        is_edit_mode,
-        open_record_modal,
-        placeholder_html,
-        record_session_key,
-        render_edit_form_header,
-        render_missing_record,
-        render_modal_header,
-        render_modal_meta_grid,
-        render_modal_shell,
-        render_save_cancel_actions,
-        safe_value,
-        set_edit_mode,
-        set_view_mode,
-        show_modal_if_pending,
-        status_pill_html as modal_status_pill_html,
-    )
-    from app.components.tabs import render_tabs
-    from app.pages.estimate_builder_ui import (
-        render_equipment_tab,
-        render_labor_tab,
-        render_other_costs_tab,
-        render_scope_of_work_tab,
-        render_subcontractors_tab,
-        render_summary_tab,
-        render_travel_tab,
-    )
-    from app.pages.estimate_materials import render_estimate_materials_panel
-    from app.navigation import ESTIMATE_DETAIL_TAB_KEY
-    from app.pages._core._data import (
-        ACTIVE_ESTIMATE_KEY,
-        customer_contact_select_options,
-        customer_filter_options,
-        customer_id_for_name,
-        customer_location_select_options,
-        get_estimate,
-        load_assets,
-        load_documents_hub,
-        load_estimates,
-        load_inventory,
-        load_jobs,
-        lookup_options,
-        persist_document,
-        persist_estimate,
-    )
-    from app.components.estimate_actions import render_estimate_action_buttons
-    from app.components.estimates_page_layout import (
-        close_estimates_filter_bar_shell,
-        estimates_list_header_specs,
-        inject_estimates_page_layout_css,
-        render_estimates_filter_bar_shell,
-        render_estimates_pagination_footer,
-        render_estimates_summary_badge_bar,
-        render_estimates_summary_cards,
-        render_estimates_table_pagination_header,
-        render_estimates_view_navigation,
-    )
-    from app.components.estimates_list_table import (
-        ESTIMATES_MODE_KEY,
-        build_approve_flags,
-        build_approved_flags,
-        filter_waiting_approval_rows,
-        open_estimate_detail,
-        render_estimates_list_table_body,
-        render_estimates_list_table_header,
-    )
-    from app.components.headers import render_page_brand_header
-    from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.table_filters import (
-        apply_column_filters,
-        build_filter_options,
-        clear_table_filters,
-        render_table_header_cell,
-    )
-    from app.components.table_pagination import paginate_rows, reset_table_page
-    from app.pages._core._crud import apply_persist_feedback, is_demo_id
-    from app.pages._core._session import select_key
-    from app.services.estimates_service import (
-        approve_estimate_and_sync_job,
-        begin_approved_estimate_revision,
-        cancel_approved_estimate_revision,
-        complete_approved_estimate_revision,
-        can_approve_estimates,
-        can_revise_approved_estimates,
-        estimate_status_approvable,
-        estimate_visible_in_active_view,
-        estimate_visible_in_approved_view,
-        estimate_visible_in_archived_view,
-        estimate_visible_in_draft_view,
-        estimate_visible_in_rejected_view,
-        estimate_visible_in_sent_view,
-    )
-    from app.auth import current_role, effective_role
-    from app.components.quote_job_number_autofill import (
-        clear_new_estimate_number_state,
-        linked_job_number_preview,
-        sync_new_estimate_number,
-    )
-    from app.styles import inject_estimates_module_css
-    from app.utils.formatting import fmt_currency, fmt_date
-    from app.utils.permissions import normalize_role
-    from app.services.estimate_expiration_service import (
-        default_expiration_date,
-        effective_expiration_date,
-        ensure_estimate_expiration_persisted,
-        format_effective_expiration,
-        format_estimate_date,
-    )
-except ImportError:
-    from components.record_modal import (  # type: ignore
-        build_modal_cache,
-        clear_edit_modes,
-        clear_record_modal,
-        detail_field_html,
-        dialog_card_html,
-        get_modal_record,
-        is_edit_mode,
-        open_record_modal,
-        placeholder_html,
-        record_session_key,
-        render_edit_form_header,
-        render_missing_record,
-        render_modal_header,
-        render_modal_meta_grid,
-        render_modal_shell,
-        render_save_cancel_actions,
-        safe_value,
-        set_edit_mode,
-        set_view_mode,
-        show_modal_if_pending,
-        status_pill_html as modal_status_pill_html,
-    )
-    from components.tabs import render_tabs  # type: ignore
-    from pages.estimate_builder_ui import (  # type: ignore
-        render_equipment_tab,
-        render_labor_tab,
-        render_other_costs_tab,
-        render_scope_of_work_tab,
-        render_subcontractors_tab,
-        render_summary_tab,
-        render_travel_tab,
-    )
-    from pages.estimate_materials import render_estimate_materials_panel  # type: ignore
-    from navigation import ESTIMATE_DETAIL_TAB_KEY  # type: ignore
-    from pages._core._data import (  # type: ignore
-        ACTIVE_ESTIMATE_KEY,
-        customer_contact_select_options,
-        customer_filter_options,
-        customer_id_for_name,
-        customer_location_select_options,
-        get_estimate,
-        load_assets,
-        load_documents_hub,
-        load_estimates,
-        load_inventory,
-        load_jobs,
-        lookup_options,
-        persist_document,
-        persist_estimate,
-    )
-    from components.estimate_actions import render_estimate_action_buttons  # type: ignore
-    from components.table_pagination import paginate_rows, reset_table_page  # type: ignore
-    from components.estimates_page_layout import (  # type: ignore
-        close_estimates_filter_bar_shell,
-        estimates_list_header_specs,
-        inject_estimates_page_layout_css,
-        render_estimates_filter_bar_shell,
-        render_estimates_pagination_footer,
-        render_estimates_summary_badge_bar,
-        render_estimates_summary_cards,
-        render_estimates_table_pagination_header,
-        render_estimates_view_navigation,
-    )
-    from components.estimates_list_table import (  # type: ignore
-        ESTIMATES_MODE_KEY,
-        build_approve_flags,
-        build_approved_flags,
-        filter_waiting_approval_rows,
-        open_estimate_detail,
-        render_estimates_list_table_body,
-        render_estimates_list_table_header,
-    )
-    from components.headers import render_page_brand_header  # type: ignore
-    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.table_filters import (  # type: ignore
-        apply_column_filters,
-        build_filter_options,
-        clear_table_filters,
-        render_table_header_cell,
-    )
-    from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
-    from pages._core._session import select_key  # type: ignore
-    from services.estimates_service import (  # type: ignore
-        approve_estimate_and_sync_job,
-        begin_approved_estimate_revision,
-        cancel_approved_estimate_revision,
-        complete_approved_estimate_revision,
-        can_approve_estimates,
-        can_revise_approved_estimates,
-        estimate_status_approvable,
-        estimate_visible_in_active_view,
-        estimate_visible_in_approved_view,
-        estimate_visible_in_archived_view,
-        estimate_visible_in_draft_view,
-        estimate_visible_in_rejected_view,
-        estimate_visible_in_sent_view,
-    )
-    from auth import current_role, effective_role  # type: ignore
-    from components.quote_job_number_autofill import (  # type: ignore
-        clear_new_estimate_number_state,
-        linked_job_number_preview,
-        sync_new_estimate_number,
-    )
-    from styles import inject_estimates_module_css  # type: ignore
-    from utils.formatting import fmt_currency, fmt_date  # type: ignore
-    from utils.permissions import normalize_role  # type: ignore
-    from services.estimate_expiration_service import (  # type: ignore
-        default_expiration_date,
-        effective_expiration_date,
-        ensure_estimate_expiration_persisted,
-        format_effective_expiration,
-        format_estimate_date,
-    )
-
-try:
-    from app.ui.streamlit_perf import fragment
-except ImportError:
-    from ui.streamlit_perf import fragment  # type: ignore
-
+from app.components.record_modal import (
+    build_modal_cache,
+    clear_edit_modes,
+    clear_record_modal,
+    detail_field_html,
+    dialog_card_html,
+    get_modal_record,
+    is_edit_mode,
+    open_record_modal,
+    placeholder_html,
+    record_session_key,
+    render_edit_form_header,
+    render_missing_record,
+    render_modal_header,
+    render_modal_meta_grid,
+    render_modal_shell,
+    render_save_cancel_actions,
+    safe_value,
+    set_edit_mode,
+    set_view_mode,
+    show_modal_if_pending,
+    status_pill_html as modal_status_pill_html,
+)
+from app.components.tabs import render_tabs
+from app.pages.estimate_builder_ui import (
+    render_equipment_tab,
+    render_labor_tab,
+    render_other_costs_tab,
+    render_scope_of_work_tab,
+    render_subcontractors_tab,
+    render_summary_tab,
+    render_travel_tab,
+)
+from app.pages.estimate_materials import render_estimate_materials_panel
+from app.navigation import ESTIMATE_DETAIL_TAB_KEY
+from app.pages._core._data import (
+    ACTIVE_ESTIMATE_KEY,
+    customer_contact_select_options,
+    customer_filter_options,
+    customer_id_for_name,
+    customer_location_select_options,
+    get_estimate,
+    load_assets,
+    load_documents_hub,
+    load_estimates,
+    load_inventory,
+    load_jobs,
+    lookup_options,
+    persist_document,
+    persist_estimate,
+)
+from app.components.estimate_actions import render_estimate_action_buttons
+from app.components.estimates_page_layout import (
+    close_estimates_filter_bar_shell,
+    estimates_list_header_specs,
+    inject_estimates_page_layout_css,
+    render_estimates_filter_bar_shell,
+    render_estimates_pagination_footer,
+    render_estimates_summary_badge_bar,
+    render_estimates_summary_cards,
+    render_estimates_table_pagination_header,
+    render_estimates_view_navigation,
+)
+from app.components.estimates_list_table import (
+    ESTIMATES_MODE_KEY,
+    build_approve_flags,
+    build_approved_flags,
+    filter_waiting_approval_rows,
+    open_estimate_detail,
+    render_estimates_list_table_body,
+    render_estimates_list_table_header,
+)
+from app.components.headers import render_page_brand_header
+from app.components.layout import render_filter_bar as layout_filter_bar
+from app.components.table_filters import (
+    apply_column_filters,
+    build_filter_options,
+    clear_table_filters,
+    render_table_header_cell,
+)
+from app.components.table_pagination import paginate_rows, reset_table_page
+from app.pages._core._crud import apply_persist_feedback, is_demo_id
+from app.pages._core._session import select_key
+from app.services.estimates_service import (
+    approve_estimate_and_sync_job,
+    begin_approved_estimate_revision,
+    cancel_approved_estimate_revision,
+    complete_approved_estimate_revision,
+    can_approve_estimates,
+    can_revise_approved_estimates,
+    estimate_status_approvable,
+    estimate_visible_in_active_view,
+    estimate_visible_in_approved_view,
+    estimate_visible_in_archived_view,
+    estimate_visible_in_draft_view,
+    estimate_visible_in_rejected_view,
+    estimate_visible_in_sent_view,
+)
+from app.auth import current_role, effective_role
+from app.components.quote_job_number_autofill import (
+    clear_new_estimate_number_state,
+    linked_job_number_preview,
+    sync_new_estimate_number,
+)
+from app.styles import inject_estimates_module_css
+from app.utils.formatting import fmt_currency, fmt_date
+from app.utils.permissions import normalize_role
+from app.services.estimate_expiration_service import (
+    default_expiration_date,
+    effective_expiration_date,
+    ensure_estimate_expiration_persisted,
+    format_effective_expiration,
+    format_estimate_date,
+)
+from app.ui.streamlit_perf import fragment
 _SEL = select_key("estimates")
 _MOD = "estimates"
 _TABLE_KEY = "estimates_list"
@@ -325,10 +204,7 @@ def _estimate_row_label(row: dict, key: str) -> str:
 
 def _estimate_project(row: dict) -> str:
     """Project name only for list/export (not scope, proposal, or notes)."""
-    try:
-        from app.services.phase2_modules_service import estimate_project_title
-    except ImportError:
-        from services.phase2_modules_service import estimate_project_title  # type: ignore
+    from app.services.phase2_modules_service import estimate_project_title
     return estimate_project_title(row)
 
 
@@ -353,10 +229,7 @@ def _estimate_job(row: dict) -> str:
             return val
     linked = row.get("linked_job")
     if isinstance(linked, dict):
-        try:
-            from app.utils.formatters import job_display_label
-        except ImportError:
-            from utils.formatters import job_display_label  # type: ignore
+        from app.utils.formatters import job_display_label
         label = job_display_label(linked.get("job_number"), linked.get("job_name"))
         if label:
             return label
@@ -396,10 +269,7 @@ def _estimate_live_customer_price_amount(row: dict) -> float:
     eid = str(row.get("id") or "").strip()
     if not eid or is_demo_id(eid):
         return 0.0
-    try:
-        from app.services.estimate_costing_service import calculate_estimate_totals
-    except ImportError:
-        from services.estimate_costing_service import calculate_estimate_totals  # type: ignore
+    from app.services.estimate_costing_service import calculate_estimate_totals
     try:
         return float(calculate_estimate_totals(eid).get("customer_price") or 0)
     except Exception:
@@ -419,10 +289,7 @@ def _estimate_customer_price_from_builder(row: dict, *, field: str = "customer_p
     eid = str(row.get("id") or "").strip()
     if not eid or is_demo_id(eid):
         return fmt_currency(0)
-    try:
-        from app.services.estimate_costing_service import calculate_estimate_totals
-    except ImportError:
-        from services.estimate_costing_service import calculate_estimate_totals  # type: ignore
+    from app.services.estimate_costing_service import calculate_estimate_totals
     try:
         totals = calculate_estimate_totals(eid)
         amount = float(totals.get(field) or totals.get("customer_price") or 0)
@@ -462,17 +329,11 @@ def _sync_estimate_rollups_if_stale(estimate_id: str) -> None:
     sync_key = f"_est_rollups_synced_{eid}"
     if st.session_state.get(sync_key) == live:
         return
-    try:
-        from app.services.estimate_costing_service import recalculate_and_save_estimate_totals
-    except ImportError:
-        from services.estimate_costing_service import recalculate_and_save_estimate_totals  # type: ignore
+    from app.services.estimate_costing_service import recalculate_and_save_estimate_totals
     try:
         if recalculate_and_save_estimate_totals(eid).ok:
             st.session_state[sync_key] = live
-            try:
-                from app.pages._core._data import clear_estimates_list_cache, clear_catalog_session_datasets
-            except ImportError:
-                from pages._core._data import clear_estimates_list_cache, clear_catalog_session_datasets  # type: ignore
+            from app.pages._core._data import clear_estimates_list_cache, clear_catalog_session_datasets
             clear_estimates_list_cache()
             clear_catalog_session_datasets()
     except Exception:
@@ -517,26 +378,17 @@ def _on_estimate_cost_builder_saved(estimate_id: str) -> None:
 
 
 def _inventory_options() -> list[tuple[str, dict]]:
-    try:
-        from app.services.estimate_builder_helpers import inventory_options_as_select
-    except ImportError:
-        from services.estimate_builder_helpers import inventory_options_as_select  # type: ignore
+    from app.services.estimate_builder_helpers import inventory_options_as_select
     return inventory_options_as_select()
 
 
 def _pricing_guide_options() -> list[tuple[str, dict]]:
-    try:
-        from app.services.estimate_builder_helpers import pricing_guide_options_as_select
-    except ImportError:
-        from services.estimate_builder_helpers import pricing_guide_options_as_select  # type: ignore
+    from app.services.estimate_builder_helpers import pricing_guide_options_as_select
     return pricing_guide_options_as_select()
 
 
 def _asset_options() -> list[tuple[str, dict]]:
-    try:
-        from app.services.estimate_builder_helpers import asset_options_as_select
-    except ImportError:
-        from services.estimate_builder_helpers import asset_options_as_select  # type: ignore
+    from app.services.estimate_builder_helpers import asset_options_as_select
     return asset_options_as_select()
 
 
@@ -673,12 +525,8 @@ def _persist_estimate_partial(data: dict, row_id: str) -> tuple[bool, str]:
 def _persist_scope_of_work(data: dict, row_id: str) -> tuple[bool, str]:
     """Persist scope fields via dedicated patch (also mirrors into estimate_json)."""
     est = get_estimate(row_id) or {"id": row_id}
-    try:
-        from app.estimate.persistence import patch_estimate_job_scope
-        from app.services.repository import clear_data_cache_for_table
-    except ImportError:
-        from estimate.persistence import patch_estimate_job_scope  # type: ignore
-        from services.repository import clear_data_cache_for_table  # type: ignore
+    from app.estimate.persistence import patch_estimate_job_scope
+    from app.services.repository import clear_data_cache_for_table
     ok, err = patch_estimate_job_scope(
         row_id,
         est,
@@ -1025,10 +873,7 @@ def _render_approve_confirmation_panel(rows_by_id: dict[str, dict]) -> None:
         if st.button("Approve Job", key=f"est_confirm_approve_{eid}", type="primary", use_container_width=True):
             res = approve_estimate_and_sync_job(eid)
             if res.ok:
-                try:
-                    from app.services.repository import clear_data_cache_for_table
-                except ImportError:
-                    from services.repository import clear_data_cache_for_table  # type: ignore
+                from app.services.repository import clear_data_cache_for_table
                 clear_data_cache_for_table("estimates")
                 st.session_state.pop(_PENDING_APPROVE_KEY, None)
                 st.success(res.message or "Estimate approved and linked job activated.")
@@ -1380,10 +1225,7 @@ def _render_estimate_documents_tab(est: dict) -> None:
                 if st.button("Save attachment", key=f"est_doc_save_{eid}", type="primary", use_container_width=True):
                     up = st.session_state.get(f"est_doc_file_{eid}")
                     fname = str(getattr(up, "name", "") or "attachment.pdf") if up else "attachment.pdf"
-                    try:
-                        from app.auth import current_profile
-                    except ImportError:
-                        from auth import current_profile  # type: ignore
+                    from app.auth import current_profile
                     prof = current_profile() or {}
                     ok, msg = persist_document(
                         {
@@ -1468,10 +1310,7 @@ def _render_estimate_detail_tabs(est: dict) -> None:
         )
         st.markdown(dialog_card_html("Estimate Summary", overview_html), unsafe_allow_html=True)
 
-        try:
-            from app.services.estimate_costing_service import calculate_estimate_totals
-        except ImportError:
-            from services.estimate_costing_service import calculate_estimate_totals  # type: ignore
+        from app.services.estimate_costing_service import calculate_estimate_totals
         overview_totals = (
             calculate_estimate_totals(eid) if eid and not is_demo_id(eid) else {}
         )
@@ -1606,10 +1445,7 @@ def _render_estimate_revision_panel(est: dict) -> None:
                         update_job_contract=update_job,
                     )
                     if result.ok:
-                        try:
-                            from app.services.repository import clear_data_cache_for_table
-                        except ImportError:
-                            from services.repository import clear_data_cache_for_table  # type: ignore
+                        from app.services.repository import clear_data_cache_for_table
                         clear_data_cache_for_table("estimates")
                         _refresh_estimate_modal_cache(eid)
                         _exit_revise_mode(est)
@@ -1635,10 +1471,7 @@ def _render_estimate_revision_panel(est: dict) -> None:
                 if st.button("Confirm Cancel Revision", key=f"est_revise_cancel_ok_{eid}", use_container_width=True):
                     result = cancel_approved_estimate_revision(eid, baseline_snapshot=baseline)
                     if result.ok:
-                        try:
-                            from app.services.repository import clear_data_cache_for_table
-                        except ImportError:
-                            from services.repository import clear_data_cache_for_table  # type: ignore
+                        from app.services.repository import clear_data_cache_for_table
                         clear_data_cache_for_table("estimates")
                         _refresh_estimate_modal_cache(eid)
                         _exit_revise_mode(est)
@@ -1957,10 +1790,7 @@ def _export_estimates_csv(rows: list[dict]) -> str:
 
 
 def render() -> None:
-    try:
-        from app.pages._core._access import begin_module
-    except ImportError:
-        from pages._core._access import begin_module  # type: ignore
+    from app.pages._core._access import begin_module
     if not begin_module("estimates"):
         return
 

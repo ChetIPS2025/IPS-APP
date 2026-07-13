@@ -7,56 +7,27 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.components.table_filters import (
-        apply_column_filters,
-        build_filter_options,
-        render_table_header_cell,
-    )
-    from app.components.table_pagination import paginate_rows, render_table_pagination_footer, render_table_pagination_header, reset_table_page
-    from app.components.table_filters import clear_table_filters
-    from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.pages._core._data import load_assets, load_inventory
-    from app.services.asset_kits_service import get_tool_trailers
-    from app.services.catalog_images import CatalogImageContext, build_catalog_image_context, catalog_thumbnail_html
-    from app.services.small_hand_tool_service import (
-        HAND_TOOL_CATEGORIES,
-        HAND_TOOL_CONDITIONS,
-        HAND_TOOL_STATUSES,
-        STORAGE_TYPES,
-        adjust_hand_tool_quantity,
-        delete_hand_tool,
-        list_hand_tools,
-        save_hand_tool,
-    )
-except ImportError:
-    from components.table_filters import (  # type: ignore
-        apply_column_filters,
-        build_filter_options,
-        clear_table_filters,
-        render_table_header_cell,
-    )
-    from components.table_pagination import (  # type: ignore
-        paginate_rows,
-        render_table_pagination_footer,
-        render_table_pagination_header,
-        reset_table_page,
-    )
-    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from pages._core._data import load_assets, load_inventory  # type: ignore
-    from services.asset_kits_service import get_tool_trailers  # type: ignore
-    from services.catalog_images import CatalogImageContext, build_catalog_image_context, catalog_thumbnail_html  # type: ignore
-    from services.small_hand_tool_service import (  # type: ignore
-        HAND_TOOL_CATEGORIES,
-        HAND_TOOL_CONDITIONS,
-        HAND_TOOL_STATUSES,
-        STORAGE_TYPES,
-        adjust_hand_tool_quantity,
-        delete_hand_tool,
-        list_hand_tools,
-        save_hand_tool,
-    )
-
+from app.components.table_filters import (
+    apply_column_filters,
+    build_filter_options,
+    render_table_header_cell,
+)
+from app.components.table_pagination import paginate_rows, render_table_pagination_footer, render_table_pagination_header, reset_table_page
+from app.components.table_filters import clear_table_filters
+from app.components.layout import render_filter_bar as layout_filter_bar
+from app.pages._core._data import load_assets, load_inventory
+from app.services.asset_kits_service import get_tool_trailers
+from app.services.catalog_images import CatalogImageContext, build_catalog_image_context, catalog_thumbnail_html
+from app.services.small_hand_tool_service import (
+    HAND_TOOL_CATEGORIES,
+    HAND_TOOL_CONDITIONS,
+    HAND_TOOL_STATUSES,
+    STORAGE_TYPES,
+    adjust_hand_tool_quantity,
+    delete_hand_tool,
+    list_hand_tools,
+    save_hand_tool,
+)
 _TABLE_KEY = "assets_hand_tools_list"
 _COLS = [0.22, 0.42, 2.35, 1.0, 0.48, 0.48, 1.0, 0.92, 0.85, 0.78]
 _HEADER_SPECS: list[tuple[str, str | None]] = [
@@ -94,10 +65,7 @@ def _trailer_options() -> tuple[list[str], dict[str, str]]:
 
 
 def _job_options() -> tuple[list[str], dict[str, str]]:
-    try:
-        from app.pages._core._data import load_jobs
-    except ImportError:
-        from pages._core._data import load_jobs  # type: ignore
+    from app.pages._core._data import load_jobs
     labels = ["— None —"]
     label_to_id: dict[str, str] = {}
     for job in load_jobs():
@@ -344,10 +312,7 @@ def render_hand_tools_tab(all_assets: list[dict] | None = None) -> None:
         for a in (all_assets or load_assets())
         if str(a.get("id") or "").strip()
     }
-    try:
-        from app.pages._core._data import load_jobs
-    except ImportError:
-        from pages._core._data import load_jobs  # type: ignore
+    from app.pages._core._data import load_jobs
     jobs_by_id = {str(j.get("id") or "").strip(): j for j in load_jobs() if str(j.get("id") or "").strip()}
 
     rows = list_hand_tools(assets_by_id=assets_by_id, jobs_by_id=jobs_by_id)

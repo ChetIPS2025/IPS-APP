@@ -8,28 +8,15 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.components.action_styles import danger_solid_button, warning_solid_button
-    from app.pages._core._crud import is_demo_id
-    from app.services.inventory_service import (
-        can_manage_inventory_actions,
-        clear_inventory_cache,
-        deactivate_inventory_item,
-        delete_inventory_item,
-        remove_inventory_keep_pricing_item,
-    )
-except ImportError:
-    from components.action_styles import danger_solid_button, warning_solid_button  # type: ignore
-    from pages._core._crud import is_demo_id  # type: ignore
-    from services.inventory_service import (  # type: ignore
-        can_manage_inventory_actions,
-        clear_inventory_cache,
-        deactivate_inventory_item,
-        delete_inventory_item,
-        remove_inventory_keep_pricing_item,
-    )
-
-
+from app.components.action_styles import danger_solid_button, warning_solid_button
+from app.pages._core._crud import is_demo_id
+from app.services.inventory_service import (
+    can_manage_inventory_actions,
+    clear_inventory_cache,
+    deactivate_inventory_item,
+    delete_inventory_item,
+    remove_inventory_keep_pricing_item,
+)
 def _confirm_state_key(item_id: str, action: str) -> str:
     return f"confirm_{action}_inventory_{item_id}"
 

@@ -117,12 +117,8 @@ def build_proposal_view_model(
     Build the canonical view model (same inputs as legacy ``proposal.proposal_values`` kwargs
     minus customer location).
     """
-    from proposal import _proposal_prepared_by_display
-    try:
-        from app.services.proposal_pdf_service import _stored_estimate_price
-    except ImportError:
-        from services.proposal_pdf_service import _stored_estimate_price  # type: ignore
-
+    from app.proposal import _proposal_prepared_by_display
+    from app.services.proposal_pdf_service import _stored_estimate_price
     cust = _s(customer_name or est.get("customer_name"))
     pt = _fmt_money(
         totals.get("proposal_total")
@@ -141,18 +137,11 @@ def build_proposal_view_model(
     phone = _s(prepared_by_phone)
     if not phone:
         phone = _DEFAULT_QUOTE_FOOTER_PHONE
-    try:
-        from app.services.estimate_expiration_service import (
-            effective_expiration_date,
-            estimate_date_for_expiration,
-            format_proposal_long_date,
-        )
-    except ImportError:
-        from services.estimate_expiration_service import (  # type: ignore
-            effective_expiration_date,
-            estimate_date_for_expiration,
-            format_proposal_long_date,
-        )
+    from app.services.estimate_expiration_service import (
+        effective_expiration_date,
+        estimate_date_for_expiration,
+        format_proposal_long_date,
+    )
     est_d = estimate_date_for_expiration(est)
     exp_d = effective_expiration_date(est)
     return ProposalViewModel(

@@ -4,31 +4,17 @@ from __future__ import annotations
 
 from typing import Any
 
-try:
-    from app.services.inventory_service import clear_inventory_cache, get_inventory_item
-    from app.services.item_images import (
-        copy_item_image_metadata,
-        has_owned_stored_item_image,
-        has_stored_item_image,
-        is_image_approved,
-        record_has_item_image,
-        record_has_foreign_image_path,
-    )
-    from app.services.pricing_guide_service import cached_pricing_guide_rows, clear_pricing_guide_cache
-    from app.services.repository import ServiceResult
-except ImportError:
-    from services.inventory_service import clear_inventory_cache, get_inventory_item  # type: ignore
-    from services.item_images import (  # type: ignore
-        copy_item_image_metadata,
-        has_owned_stored_item_image,
-        has_stored_item_image,
-        is_image_approved,
-        record_has_item_image,
-        record_has_foreign_image_path,
-    )
-    from services.pricing_guide_service import cached_pricing_guide_rows, clear_pricing_guide_cache  # type: ignore
-    from services.repository import ServiceResult  # type: ignore
-
+from app.services.inventory_service import clear_inventory_cache, get_inventory_item
+from app.services.item_images import (
+    copy_item_image_metadata,
+    has_owned_stored_item_image,
+    has_stored_item_image,
+    is_image_approved,
+    record_has_item_image,
+    record_has_foreign_image_path,
+)
+from app.services.pricing_guide_service import cached_pricing_guide_rows, clear_pricing_guide_cache
+from app.services.repository import ServiceResult
 __all__ = [
     "clear_catalog_image_sync_cache",
     "preserve_catalog_image_before_catalog_remove",
@@ -38,22 +24,13 @@ __all__ = [
 ]
 
 def clear_catalog_image_sync_cache() -> None:
-    try:
-        from app.services.pricing_guide_images import clear_catalog_image_maps_cache
-    except ImportError:
-        from services.pricing_guide_images import clear_catalog_image_maps_cache  # type: ignore
+    from app.services.pricing_guide_images import clear_catalog_image_maps_cache
     clear_catalog_image_maps_cache()
     clear_pricing_guide_cache()
     clear_inventory_cache()
-    try:
-        from app.services.assets_service import clear_assets_cache
-    except ImportError:
-        from services.assets_service import clear_assets_cache  # type: ignore
+    from app.services.assets_service import clear_assets_cache
     clear_assets_cache()
-    try:
-        from app.services.item_images import clear_item_image_url_cache
-    except ImportError:
-        from services.item_images import clear_item_image_url_cache  # type: ignore
+    from app.services.item_images import clear_item_image_url_cache
     clear_item_image_url_cache()
 
 
@@ -77,10 +54,7 @@ def _load_asset_row(asset_id: str) -> dict[str, Any] | None:
     aid = str(asset_id or "").strip()
     if not aid:
         return None
-    try:
-        from app.pages._core._data import load_assets
-    except ImportError:
-        from pages._core._data import load_assets  # type: ignore
+    from app.pages._core._data import load_assets
     return next((r for r in load_assets() if str(r.get("id") or "") == aid), None)
 
 

@@ -9,125 +9,64 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.components.headers import render_page_brand_header
-    from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.table_filters import (
-        apply_column_filters,
-        build_filter_options,
-        clear_table_filters,
-        render_table_header_cell,
-    )
-    from app.components.record_modal import (
-        detail_field_html,
-        dialog_card_html,
-        edit_mode_key,
-        is_edit_mode,
-        placeholder_html,
-        record_session_key,
-        render_edit_form_header,
-        render_modal_edit_button,
-        render_modal_header,
-        render_modal_meta_grid,
-        render_modal_shell,
-        render_save_cancel_actions,
-        set_view_mode,
-    )
-    from app.pages._core._crud import is_demo_id
-    from app.pages._core._data import (
-        ACTIVE_EMPLOYEE_KEY,
-        certification_alerts,
-        get_employee,
-        load_all_certifications,
-        load_certifications,
-        load_employees,
-    )
-    from app.components.action_styles import danger_outline, danger_solid
-    from app.services.certification_helpers import (
-        CERT_STATUS_VALUES,
-        can_delete_employee_certifications,
-        can_manage_employee_certifications,
-        can_view_certification_attachment,
-        cert_status_pill_html,
-        certification_visible_to_user,
-        coerce_date,
-        days_until_expiration,
-        is_twic_certification_type,
-        resolve_logged_in_employee_id,
-    )
-    from app.services.certification_attachments_service import cert_has_attachment
-    from app.services.employees_service import (
-        clear_certifications_cache,
-        create_employee_certification,
-        delete_employee_certification,
-        get_certification_attachment_url,
-        update_employee_certification,
-        upload_certification_attachment,
-    )
-    from app.services.phase2_modules_service import normalize_cert
-    from app.styles import inject_certifications_module_css
-    from app.utils.constants import CERTIFICATION_TYPES
-    from app.utils.formatting import fmt_date
-except ImportError:
-    from components.headers import render_page_brand_header  # type: ignore
-    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.table_filters import (  # type: ignore
-        apply_column_filters,
-        build_filter_options,
-        clear_table_filters,
-        render_table_header_cell,
-    )
-    from components.record_modal import (  # type: ignore
-        detail_field_html,
-        dialog_card_html,
-        edit_mode_key,
-        is_edit_mode,
-        placeholder_html,
-        record_session_key,
-        render_edit_form_header,
-        render_modal_edit_button,
-        render_modal_header,
-        render_modal_meta_grid,
-        render_modal_shell,
-        render_save_cancel_actions,
-        set_view_mode,
-    )
-    from pages._core._crud import is_demo_id  # type: ignore
-    from pages._core._data import (  # type: ignore
-        ACTIVE_EMPLOYEE_KEY,
-        certification_alerts,
-        get_employee,
-        load_all_certifications,
-        load_certifications,
-        load_employees,
-    )
-    from components.action_styles import danger_outline, danger_solid  # type: ignore
-    from services.certification_helpers import (  # type: ignore
-        CERT_STATUS_VALUES,
-        can_delete_employee_certifications,
-        can_manage_employee_certifications,
-        can_view_certification_attachment,
-        cert_status_pill_html,
-        certification_visible_to_user,
-        coerce_date,
-        days_until_expiration,
-        is_twic_certification_type,
-        resolve_logged_in_employee_id,
-    )
-    from services.certification_attachments_service import cert_has_attachment  # type: ignore
-    from services.employees_service import (  # type: ignore
-        clear_certifications_cache,
-        create_employee_certification,
-        delete_employee_certification,
-        get_certification_attachment_url,
-        update_employee_certification,
-        upload_certification_attachment,
-    )
-    from services.phase2_modules_service import normalize_cert  # type: ignore
-    from styles import inject_certifications_module_css  # type: ignore
-    from utils.constants import CERTIFICATION_TYPES  # type: ignore
-    from utils.formatting import fmt_date  # type: ignore
-
+from app.components.headers import render_page_brand_header
+from app.components.layout import render_filter_bar as layout_filter_bar
+from app.components.table_filters import (
+    apply_column_filters,
+    build_filter_options,
+    clear_table_filters,
+    render_table_header_cell,
+)
+from app.components.record_modal import (
+    detail_field_html,
+    dialog_card_html,
+    edit_mode_key,
+    is_edit_mode,
+    placeholder_html,
+    record_session_key,
+    render_edit_form_header,
+    render_modal_edit_button,
+    render_modal_header,
+    render_modal_meta_grid,
+    render_modal_shell,
+    render_save_cancel_actions,
+    set_view_mode,
+)
+from app.pages._core._crud import is_demo_id
+from app.pages._core._data import (
+    ACTIVE_EMPLOYEE_KEY,
+    certification_alerts,
+    get_employee,
+    load_all_certifications,
+    load_certifications,
+    load_employees,
+)
+from app.components.action_styles import danger_outline, danger_solid
+from app.services.certification_helpers import (
+    CERT_STATUS_VALUES,
+    can_delete_employee_certifications,
+    can_manage_employee_certifications,
+    can_view_certification_attachment,
+    cert_status_pill_html,
+    certification_visible_to_user,
+    coerce_date,
+    days_until_expiration,
+    is_twic_certification_type,
+    resolve_logged_in_employee_id,
+)
+from app.services.certification_attachments_service import cert_has_attachment
+from app.services.employees_service import (
+    clear_certifications_cache,
+    create_employee_certification,
+    delete_employee_certification,
+    get_certification_attachment_url,
+    update_employee_certification,
+    upload_certification_attachment,
+)
+from app.services.phase2_modules_service import normalize_cert
+from app.styles import inject_certifications_module_css
+from app.utils.constants import CERTIFICATION_TYPES
+from app.utils.formatting import fmt_date
 _MODULE = "employee_certifications"
 _TABLE_KEY = "certifications_list"
 _ALL_CERT_IDS_KEY = "_cert_page_all_ids"
@@ -271,10 +210,7 @@ def _reload_certification_for_detail(cert: dict) -> dict:
     cid = str(cert.get("id") or "").strip()
     if not cid or is_demo_id(cid):
         return cert
-    try:
-        from app.services.repository import fetch_by_id
-    except ImportError:
-        from services.repository import fetch_by_id  # type: ignore
+    from app.services.repository import fetch_by_id
     employee_name = str(cert.get("employee_name") or "")
     row = fetch_by_id(
         "employee_certifications",
@@ -331,10 +267,7 @@ def _filter_certs(rows: list[dict], *, q: str, hide_employee: bool) -> list[dict
 
 
 def _current_profile() -> dict:
-    try:
-        from app.auth import current_profile
-    except ImportError:
-        from auth import current_profile  # type: ignore
+    from app.auth import current_profile
     prof = current_profile()
     return prof if isinstance(prof, dict) else {}
 
@@ -442,10 +375,7 @@ def _current_user_id() -> str | None:
 
 
 def _effective_role() -> str:
-    try:
-        from app.auth import current_role, effective_role
-    except ImportError:
-        from auth import current_role, effective_role  # type: ignore
+    from app.auth import current_role, effective_role
     return effective_role()
 
 
@@ -1356,10 +1286,7 @@ def render_employee_detail_certifications_tab(
 
 
 def render() -> None:
-    try:
-        from app.pages._core._access import begin_module
-    except ImportError:
-        from pages._core._access import begin_module  # type: ignore
+    from app.pages._core._access import begin_module
     if not begin_module("employee_certifications"):
         return
 

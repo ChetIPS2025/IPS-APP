@@ -5,47 +5,25 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from typing import Any
 
-try:
-    from app.db import fetch_by_match_admin, insert_row_admin, update_rows_admin, upload_bytes_admin
-    from app.services.job_weekly_timesheets import monday_of_week, week_bounds
-    from app.services.weekly_job_timesheet_service import (
-        TIMESHEET_TABLE,
-        TIMESHEET_TABLE_MISSING_MSG,
-        TimesheetLine,
-        WeeklyJobTimesheetData,
-        build_timesheet_data,
-        fetch_timesheet_by_job_week,
-        list_timesheets_for_job,
-        load_timesheet_data,
-        save_timesheet,
-        signed_url_for_timesheet,
-    )
-    from app.services.weekly_timesheet_export_service import (
-        export_data_to_pdf,
-        export_weekly_timesheet_to_excel,
-        export_weekly_timesheet_to_pdf,
-    )
-except ImportError:
-    from db import fetch_by_match_admin, insert_row_admin, update_rows_admin, upload_bytes_admin  # type: ignore
-    from services.job_weekly_timesheets import monday_of_week, week_bounds  # type: ignore
-    from services.weekly_job_timesheet_service import (  # type: ignore
-        TIMESHEET_TABLE,
-        TIMESHEET_TABLE_MISSING_MSG,
-        TimesheetLine,
-        WeeklyJobTimesheetData,
-        build_timesheet_data,
-        fetch_timesheet_by_job_week,
-        list_timesheets_for_job,
-        load_timesheet_data,
-        save_timesheet,
-        signed_url_for_timesheet,
-    )
-    from services.weekly_timesheet_export_service import (  # type: ignore
-        export_data_to_pdf,
-        export_weekly_timesheet_to_excel,
-        export_weekly_timesheet_to_pdf,
-    )
-
+from app.db import fetch_by_match_admin, insert_row_admin, update_rows_admin, upload_bytes_admin
+from app.services.job_weekly_timesheets import monday_of_week, week_bounds
+from app.services.weekly_job_timesheet_service import (
+    TIMESHEET_TABLE,
+    TIMESHEET_TABLE_MISSING_MSG,
+    TimesheetLine,
+    WeeklyJobTimesheetData,
+    build_timesheet_data,
+    fetch_timesheet_by_job_week,
+    list_timesheets_for_job,
+    load_timesheet_data,
+    save_timesheet,
+    signed_url_for_timesheet,
+)
+from app.services.weekly_timesheet_export_service import (
+    export_data_to_pdf,
+    export_weekly_timesheet_to_excel,
+    export_weekly_timesheet_to_pdf,
+)
 _SHEET_TABLE = TIMESHEET_TABLE
 _LOCKED = frozenset({"Approved", "Signed", "Voided"})
 
@@ -176,10 +154,7 @@ def approve_timesheet(
     }
     update_rows_admin(_SHEET_TABLE, extra, {"id": timesheet_id})
     _register_timesheet_documents(timesheet_id)
-    try:
-        from app.services.job_cost_transaction_service import sync_all_sources_for_job
-    except ImportError:
-        from services.job_cost_transaction_service import sync_all_sources_for_job  # type: ignore
+    from app.services.job_cost_transaction_service import sync_all_sources_for_job
     jid = str(data.job_id or "").strip()
     if jid:
         try:

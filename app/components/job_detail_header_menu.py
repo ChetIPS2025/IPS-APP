@@ -7,16 +7,9 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.auth import current_role
-    from app.services.jobs_service import can_manage_job_actions
-    from app.ui.streamlit_perf import ips_app_rerun
-except ImportError:
-    from auth import current_role  # type: ignore
-    from services.jobs_service import can_manage_job_actions  # type: ignore
-    from ui.streamlit_perf import ips_app_rerun  # type: ignore
-
-
+from app.auth import current_role
+from app.services.jobs_service import can_manage_job_actions
+from app.ui.streamlit_perf import ips_app_rerun
 def _confirm_state_key(job_id: str, action: str) -> str:
     return f"confirm_{action}_job_{job_id}"
 
@@ -45,10 +38,7 @@ def _normalize_status(job: dict[str, Any]) -> str:
 
 
 def _is_job_admin() -> bool:
-    try:
-        from app.auth import effective_role
-    except ImportError:
-        from auth import effective_role  # type: ignore
+    from app.auth import effective_role
     return str(effective_role() or "").strip().lower() == "admin"
 
 
@@ -83,10 +73,7 @@ def _linked_estimate_for_job(job: dict[str, Any]) -> dict[str, Any] | None:
     job_est_id = str(job.get("estimate_id") or "").strip()
     if not jid and not job_est_id:
         return None
-    try:
-        from app.pages._core._data import load_estimates
-    except ImportError:
-        from pages._core._data import load_estimates  # type: ignore
+    from app.pages._core._data import load_estimates
     linked = [
         e
         for e in load_estimates()
@@ -98,10 +85,7 @@ def _linked_estimate_for_job(job: dict[str, Any]) -> dict[str, Any] | None:
 def _generate_estimate_pdf(est: dict[str, Any]) -> tuple[bytes | None, str, str]:
     """Return proposal PDF bytes, download name, and optional user-facing error note."""
     est_no = str(est.get("estimate_number") or "estimate").strip() or "estimate"
-    try:
-        from app.services.proposal_pdf_service import generate_estimate_proposal_pdf_by_id
-    except ImportError:
-        from services.proposal_pdf_service import generate_estimate_proposal_pdf_by_id  # type: ignore
+    from app.services.proposal_pdf_service import generate_estimate_proposal_pdf_by_id
     try:
         pdf_bytes = generate_estimate_proposal_pdf_by_id(str(est.get("id") or ""), est)
     except RuntimeError as exc:

@@ -2,9 +2,5 @@
 
 from __future__ import annotations
 
-try:
-    from app.pages.employees import render
-except ImportError:
-    from pages.employees import render  # type: ignore
-
+from app.pages.employees import render
 __all__ = ["render"]

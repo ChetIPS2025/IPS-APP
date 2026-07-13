@@ -6,34 +6,17 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-try:
-    from app.services.estimate_costing_service import (
-        calculate_estimate_totals,
-        get_estimate_bundle,
-        recalculate_and_save_estimate_totals,
-    )
-    from app.services.estimate_job_workflow_service import (
-        current_user_profile_id,
-        estimate_visible_in_approved_view,
-    )
-    from app.services.repository import ServiceResult, fetch_by_id, filter_payload_to_table, update_row
-except ImportError:
-    from services.estimate_costing_service import (  # type: ignore
-        calculate_estimate_totals,
-        get_estimate_bundle,
-        recalculate_and_save_estimate_totals,
-    )
-    from services.estimate_job_workflow_service import (  # type: ignore
-        current_user_profile_id,
-        estimate_visible_in_approved_view,
-    )
-    from services.repository import ServiceResult, fetch_by_id, filter_payload_to_table, update_row  # type: ignore
-
-try:
-    from db import fetch_by_match_admin, insert_row_admin, update_rows_admin
-except ImportError:
-    from app.db import fetch_by_match_admin, insert_row_admin, update_rows_admin  # type: ignore
-
+from app.services.estimate_costing_service import (
+    calculate_estimate_totals,
+    get_estimate_bundle,
+    recalculate_and_save_estimate_totals,
+)
+from app.services.estimate_job_workflow_service import (
+    current_user_profile_id,
+    estimate_visible_in_approved_view,
+)
+from app.services.repository import ServiceResult, fetch_by_id, filter_payload_to_table, update_row
+from app.db import fetch_by_match_admin, insert_row_admin, update_rows_admin
 _LOG = logging.getLogger(__name__)
 
 

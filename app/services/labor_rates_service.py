@@ -5,21 +5,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-try:
-    from app.services.repository import (
-        ServiceResult,
-        fetch_rows,
-        insert_row,
-        update_row,
-    )
-except ImportError:
-    from services.repository import (  # type: ignore
-        ServiceResult,
-        fetch_rows,
-        insert_row,
-        update_row,
-    )
-
+from app.services.repository import (
+    ServiceResult,
+    fetch_rows,
+    insert_row,
+    update_row,
+)
 _TABLE = "labor_rates"
 OT_MULTIPLIER = 1.5
 

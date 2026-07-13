@@ -246,16 +246,10 @@ def apply_global_css() -> None:
         unsafe_allow_html=True,
     )
 
-    try:
-        from app.ui.page_shell import inject_ips_dashboard_layout
-    except ImportError:
-        from ui.page_shell import inject_ips_dashboard_layout  # type: ignore
+    from app.ui.page_shell import inject_ips_dashboard_layout
     inject_ips_dashboard_layout()
 
-    try:
-        from app.ips_app_shell import inject_ips_app_shell_styles
-    except ImportError:
-        from ips_app_shell import inject_ips_app_shell_styles  # type: ignore
+    from app.ips_app_shell import inject_ips_app_shell_styles
     inject_ips_app_shell_styles()
 
     if not st.session_state.get(IPS_THEME_CSS_KEY):
@@ -495,10 +489,7 @@ def apply_global_css() -> None:
         unsafe_allow_html=True,
         )
 
-    try:
-        from app.ui.clean_table import inject_clean_table_css
-    except ImportError:
-        from ui.clean_table import inject_clean_table_css  # type: ignore
+    from app.ui.clean_table import inject_clean_table_css
     inject_clean_table_css()
 
     inject_force_white_final_override()

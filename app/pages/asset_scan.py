@@ -10,45 +10,24 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.auth import current_profile, current_role, effective_role, is_authenticated
-    from app.services.assets_service import (
-        create_asset_inspection,
-        create_asset_issue,
-        generate_asset_qr_value,
-        get_asset_by_qr,
-        get_asset_document_view_url,
-        get_asset_documents_grouped,
-        get_asset_image_url,
-        get_asset_inspections,
-        get_asset_issues,
-        upload_asset_image,
-    )
-    from app.utils.formatting import fmt_date
-    from app.services.asset_kits_service import asset_is_kit
-    from app.pages.trailer_dashboard import render_trailer_dashboard
-    from app.services.rental_equipment_inspection_service import is_rental_equipment
-    from app.pages.rental_equipment_dashboard import render_rental_equipment_dashboard
-except ImportError:
-    from auth import current_profile, current_role, effective_role, is_authenticated  # type: ignore
-    from services.assets_service import (  # type: ignore
-        create_asset_inspection,
-        create_asset_issue,
-        generate_asset_qr_value,
-        get_asset_by_qr,
-        get_asset_document_view_url,
-        get_asset_documents_grouped,
-        get_asset_image_url,
-        get_asset_inspections,
-        get_asset_issues,
-        upload_asset_image,
-    )
-    from utils.formatting import fmt_date  # type: ignore
-    from services.asset_kits_service import asset_is_kit  # type: ignore
-    from pages.trailer_dashboard import render_trailer_dashboard  # type: ignore
-    from services.rental_equipment_inspection_service import is_rental_equipment  # type: ignore
-    from pages.rental_equipment_dashboard import render_rental_equipment_dashboard  # type: ignore
-
+from app.auth import current_profile, current_role, effective_role, is_authenticated
+from app.services.assets_service import (
+    create_asset_inspection,
+    create_asset_issue,
+    generate_asset_qr_value,
+    get_asset_by_qr,
+    get_asset_document_view_url,
+    get_asset_documents_grouped,
+    get_asset_image_url,
+    get_asset_inspections,
+    get_asset_issues,
+    upload_asset_image,
+)
+from app.utils.formatting import fmt_date
+from app.services.asset_kits_service import asset_is_kit
+from app.pages.trailer_dashboard import render_trailer_dashboard
+from app.services.rental_equipment_inspection_service import is_rental_equipment
+from app.pages.rental_equipment_dashboard import render_rental_equipment_dashboard
 _SCAN_SESSION_KEY = "_ips_asset_scan_page"
 _SUCCESS_KEY = "asset_scan_success_payload"
 _VIEW_KEY = "asset_scan_view"
@@ -82,10 +61,7 @@ def _qp(name: str) -> str | None:
 
 
 def _debug_qr_enabled() -> bool:
-    try:
-        from app.config import settings
-    except ImportError:
-        from config import settings  # type: ignore
+    from app.config import settings
     flag = str(getattr(settings, "debug_qr", "") or "").strip().lower()
     if flag in {"1", "true", "yes", "on"}:
         return True
@@ -408,11 +384,7 @@ def _render_inspection_form(asset: dict[str, Any]) -> None:
     if not submit:
         return
 
-    try:
-        from app.utils.phone_helpers import format_phone_display, is_valid_phone, normalize_phone
-    except ImportError:
-        from utils.phone_helpers import format_phone_display, is_valid_phone, normalize_phone  # type: ignore
-
+    from app.utils.phone_helpers import format_phone_display, is_valid_phone, normalize_phone
     actor = prof_name if (prof_name and is_authenticated()) else str(inspector or "").strip()
     if not actor:
         st.error("Inspector name is required.")
@@ -497,11 +469,7 @@ def _render_issue_form(asset: dict[str, Any]) -> None:
     if not submit:
         return
 
-    try:
-        from app.utils.phone_helpers import format_phone_display, is_valid_phone, normalize_phone
-    except ImportError:
-        from utils.phone_helpers import format_phone_display, is_valid_phone, normalize_phone  # type: ignore
-
+    from app.utils.phone_helpers import format_phone_display, is_valid_phone, normalize_phone
     actor = prof_name if (prof_name and is_authenticated()) else str(reporter or "").strip()
     if not actor:
         st.error("Name is required.")
@@ -652,15 +620,8 @@ def _render_qr_debug(params: dict[str, str]) -> None:
 
 def render_asset_scan_page() -> None:
     """Dedicated mobile asset card — no sidebar, no dashboard routing."""
-    try:
-        from app.mobile_ui import ensure_narrow_viewport_detected
-    except ImportError:
-        from app.mobile_ui import ensure_narrow_viewport_detected  # type: ignore
-    try:
-        from app.styles import inject_asset_qr_scan_css
-    except ImportError:
-        from styles import inject_asset_qr_scan_css  # type: ignore
-
+    from app.mobile_ui import ensure_narrow_viewport_detected
+    from app.styles import inject_asset_qr_scan_css
     ensure_narrow_viewport_detected()
     inject_asset_qr_scan_css()
     st.markdown('<span class="ips-asset-qr-scan-scope" aria-hidden="true"></span>', unsafe_allow_html=True)

@@ -4,15 +4,9 @@ from __future__ import annotations
 
 import streamlit as st
 
-try:
-    from app.auth import current_role, effective_role
-    from app.styles import inject_global_css
-    from app.utils.permissions import role_can_access_page
-except ImportError:
-    from auth import current_role, effective_role  # type: ignore
-    from styles import inject_global_css  # type: ignore
-    from utils.permissions import role_can_access_page  # type: ignore
-
+from app.auth import current_role, effective_role
+from app.styles import inject_global_css
+from app.utils.permissions import role_can_access_page
 _DEMO_FLAG = "ips_showing_demo_data"
 _MODULE_SHELL_KEY = "_ips_module_page_shell_open"
 

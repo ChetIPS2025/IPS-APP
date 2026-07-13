@@ -5,11 +5,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Any
 
-try:
-    from app.services.shared_sequence import parse_number_parts, quote_number_to_job_number
-except ImportError:
-    from services.shared_sequence import parse_number_parts, quote_number_to_job_number  # type: ignore
-
+from app.services.shared_sequence import parse_number_parts, quote_number_to_job_number
 PIPELINE_VIEWS: tuple[str, ...] = (
     "All Pipeline",
     "Needs Attention",

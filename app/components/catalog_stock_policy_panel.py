@@ -7,30 +7,16 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.components.action_styles import success_solid_button
-    from app.pages._core._crud import is_demo_id
-    from app.services.catalog_stock_policy_service import (
-        STOCK_POLICIES,
-        STOCK_POLICY_LABELS,
-        linked_inventory_quantity,
-        normalize_stock_policy,
-        save_pricing_stock_settings,
-        stock_policy_label,
-    )
-except ImportError:
-    from components.action_styles import success_solid_button  # type: ignore
-    from pages._core._crud import is_demo_id  # type: ignore
-    from services.catalog_stock_policy_service import (  # type: ignore
-        STOCK_POLICIES,
-        STOCK_POLICY_LABELS,
-        linked_inventory_quantity,
-        normalize_stock_policy,
-        save_pricing_stock_settings,
-        stock_policy_label,
-    )
-
-
+from app.components.action_styles import success_solid_button
+from app.pages._core._crud import is_demo_id
+from app.services.catalog_stock_policy_service import (
+    STOCK_POLICIES,
+    STOCK_POLICY_LABELS,
+    linked_inventory_quantity,
+    normalize_stock_policy,
+    save_pricing_stock_settings,
+    stock_policy_label,
+)
 def _draft_key(item_id: str, field: str) -> str:
     return f"pg_stock_{field}_{item_id}"
 

@@ -4,18 +4,10 @@ from __future__ import annotations
 
 import streamlit as st
 
-try:
-    from app.components.headers import render_page_header
-    from app.navigation import set_nav_slug
-    from app.pages._core._access import begin_module
-    from app.styles import inject_employee_portal_css, inject_global_css
-except ImportError:
-    from components.headers import render_page_header  # type: ignore
-    from navigation import set_nav_slug  # type: ignore
-    from pages._core._access import begin_module  # type: ignore
-    from styles import inject_employee_portal_css, inject_global_css  # type: ignore
-
-
+from app.components.headers import render_page_header
+from app.navigation import set_nav_slug
+from app.pages._core._access import begin_module
+from app.styles import inject_employee_portal_css, inject_global_css
 def render() -> None:
     if not begin_module("employee_qr_scan"):
         return

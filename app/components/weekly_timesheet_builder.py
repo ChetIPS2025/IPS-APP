@@ -12,67 +12,35 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
-try:
-    from app.auth import current_profile, current_role, effective_role
-    from app.components.status import status_pill_html
-    from app.services.job_weekly_timesheets import monday_of_week, week_bounds
-    from app.services.weekly_job_timesheet_service import (
-        TIMESHEET_TABLE_MISSING_MSG,
-        TimesheetLine,
-        WeeklyJobTimesheetData,
-        build_timesheet_data,
-        build_timesheet_pdf_bytes,
-        fetch_timesheet_by_job_week,
-        get_job_timesheet_header,
-        list_timesheets_for_job,
-        load_timesheet_data,
-        render_timesheet_html,
-        save_timesheet,
-        signed_url_for_timesheet,
-        timesheet_table_available,
-    )
-    from app.services.job_updates_service import (
-        DAILY_UPDATES_MISSING_MSG,
-        daily_updates_table_available,
-    )
-    from app.services.weekly_timesheet_export_service import export_data_to_excel_bytes
-    from app.services.weekly_timesheet_service import (
-        mark_timesheet_sent,
-        timesheet_is_locked,
-        void_timesheet,
-    )
-    from app.utils.permissions import can_manage_weekly_timesheets
-except ImportError:
-    from auth import current_profile, current_role, effective_role  # type: ignore
-    from components.status import status_pill_html  # type: ignore
-    from services.job_weekly_timesheets import monday_of_week, week_bounds  # type: ignore
-    from services.weekly_job_timesheet_service import (  # type: ignore
-        TIMESHEET_TABLE_MISSING_MSG,
-        TimesheetLine,
-        WeeklyJobTimesheetData,
-        build_timesheet_data,
-        build_timesheet_pdf_bytes,
-        fetch_timesheet_by_job_week,
-        get_job_timesheet_header,
-        list_timesheets_for_job,
-        load_timesheet_data,
-        render_timesheet_html,
-        save_timesheet,
-        signed_url_for_timesheet,
-        timesheet_table_available,
-    )
-    from services.job_updates_service import (  # type: ignore
-        DAILY_UPDATES_MISSING_MSG,
-        daily_updates_table_available,
-    )
-    from services.weekly_timesheet_export_service import export_data_to_excel_bytes  # type: ignore
-    from services.weekly_timesheet_service import (  # type: ignore
-        mark_timesheet_sent,
-        timesheet_is_locked,
-        void_timesheet,
-    )
-    from utils.permissions import can_manage_weekly_timesheets  # type: ignore
-
+from app.auth import current_profile, current_role, effective_role
+from app.components.status import status_pill_html
+from app.services.job_weekly_timesheets import monday_of_week, week_bounds
+from app.services.weekly_job_timesheet_service import (
+    TIMESHEET_TABLE_MISSING_MSG,
+    TimesheetLine,
+    WeeklyJobTimesheetData,
+    build_timesheet_data,
+    build_timesheet_pdf_bytes,
+    fetch_timesheet_by_job_week,
+    get_job_timesheet_header,
+    list_timesheets_for_job,
+    load_timesheet_data,
+    render_timesheet_html,
+    save_timesheet,
+    signed_url_for_timesheet,
+    timesheet_table_available,
+)
+from app.services.job_updates_service import (
+    DAILY_UPDATES_MISSING_MSG,
+    daily_updates_table_available,
+)
+from app.services.weekly_timesheet_export_service import export_data_to_excel_bytes
+from app.services.weekly_timesheet_service import (
+    mark_timesheet_sent,
+    timesheet_is_locked,
+    void_timesheet,
+)
+from app.utils.permissions import can_manage_weekly_timesheets
 try:
     from streamlit_drawable_canvas import st_canvas
 except ImportError:
@@ -729,10 +697,7 @@ def render_weekly_timesheet_builder(
                 if data.signature_data:
                     data.signed_at = date.today().isoformat()
                 row = save_timesheet(data, created_by=uid, lock=True)
-                try:
-                    from app.services.weekly_timesheet_service import _register_timesheet_documents
-                except ImportError:
-                    from services.weekly_timesheet_service import _register_timesheet_documents  # type: ignore
+                from app.services.weekly_timesheet_service import _register_timesheet_documents
                 _register_timesheet_documents(str(row.get("id")))
                 st.success("Timesheet approved and locked.")
             else:

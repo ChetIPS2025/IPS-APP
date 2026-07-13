@@ -5,59 +5,31 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-try:
-    from app.auth import current_role, effective_role
-    from app.confirm_delete import (
-        close_destructive_confirmation,
-        destructive_confirm_open_key,
-        open_destructive_confirmation,
-        render_destructive_confirmation,
-    )
-    from app.pages._core._data import load_labor_rates
-    from app.db import delete_rows_admin, fetch_one, fetch_table, update_rows_admin
-    from app.ips_crud_list_styles import (
-        IPS_CRUD_LIST_PAGE_GAP,
-        IPS_CRUD_LIST_PAGE_SPLIT,
-        inject_ips_crud_list_styles,
-    )
-    from app.services.labor_rates_service import (
-        make_unique_classification,
-        save_labor_rate,
-    )
-    from app.table_actions import (
-        clear_selected_ids,
-        get_selected_ids,
-        inject_table_action_styles,
-        render_selectable_dataframe,
-    )
-    from app.ui.page_shell import render_page_header
-except ImportError:
-    from auth import current_role, effective_role  # type: ignore
-    from confirm_delete import (  # type: ignore
-        close_destructive_confirmation,
-        destructive_confirm_open_key,
-        open_destructive_confirmation,
-        render_destructive_confirmation,
-    )
-    from pages._core._data import load_labor_rates  # type: ignore
-    from db import delete_rows_admin, fetch_one, fetch_table, update_rows_admin  # type: ignore
-    from ips_crud_list_styles import (  # type: ignore
-        IPS_CRUD_LIST_PAGE_GAP,
-        IPS_CRUD_LIST_PAGE_SPLIT,
-        inject_ips_crud_list_styles,
-    )
-    from services.labor_rates_service import (  # type: ignore
-        make_unique_classification,
-        save_labor_rate,
-    )
-    from table_actions import (  # type: ignore
-        clear_selected_ids,
-        get_selected_ids,
-        inject_table_action_styles,
-        render_selectable_dataframe,
-    )
-    from ui.page_shell import render_page_header  # type: ignore
-
+from app.auth import current_role, effective_role
+from app.confirm_delete import (
+    close_destructive_confirmation,
+    destructive_confirm_open_key,
+    open_destructive_confirmation,
+    render_destructive_confirmation,
+)
+from app.pages._core._data import load_labor_rates
+from app.db import delete_rows_admin, fetch_one, fetch_table, update_rows_admin
+from app.ips_crud_list_styles import (
+    IPS_CRUD_LIST_PAGE_GAP,
+    IPS_CRUD_LIST_PAGE_SPLIT,
+    inject_ips_crud_list_styles,
+)
+from app.services.labor_rates_service import (
+    make_unique_classification,
+    save_labor_rate,
+)
+from app.table_actions import (
+    clear_selected_ids,
+    get_selected_ids,
+    inject_table_action_styles,
+    render_selectable_dataframe,
+)
+from app.ui.page_shell import render_page_header
 LABOR_TABLE_COLUMNS: tuple[str, ...] = ("classification", "st_rate", "ot_rate")
 
 

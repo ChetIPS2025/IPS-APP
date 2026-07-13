@@ -8,172 +8,89 @@ from datetime import date
 
 import streamlit as st
 
-try:
-    from app.components.headers import render_page_brand_header
-    from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.table_filters import (
-        apply_column_filters,
-        build_filter_options,
-        clear_table_filters,
-        render_table_header_cell,
-    )
-    from app.components.table_pagination import (
-        paginate_rows,
-        render_table_pagination_footer,
-        render_table_pagination_header,
-        reset_table_page,
-    )
-    from app.components.record_modal import (
-        build_modal_cache,
-        clear_record_modal,
-        clear_edit_modes,
-        detail_field_html,
-        dialog_card_html,
-        get_modal_record,
-        is_edit_mode,
-        open_record_modal,
-        placeholder_html,
-        record_session_key,
-        render_edit_form_header,
-        render_missing_record,
-        render_modal_edit_button,
-        render_modal_header,
-        render_modal_meta_grid,
-        render_modal_shell,
-        render_save_cancel_actions,
-        safe_value,
-        set_view_mode,
-        status_pill_html,
-    )
-    from app.components.subjob_coupling_inspection import (
-        clear_job_subjob_coupling_state,
-        render_subjob_coupling_inspection_section,
-    )
-    from app.components.subjob_photos_documents import (
-        clear_job_subjob_media_state,
-        render_subjob_documents_section,
-        render_subjob_photos_section,
-    )
-    from app.pages._core._crud import apply_persist_feedback, is_demo_id
-    from app.pages._core._data import (
-        load_employees,
-        load_jobs,
-        lookup_options,
-        persist_task,
-        task_assignee_options,
-        task_estimate_options,
-    )
-    from app.pages._core._session import select_key
-    from app.services.jobs_service import get_job_options
-    from app.services.repository import user_facing_error
-    from app.services.task_display_helpers import (
-        normalize_task_priority,
-        normalize_task_status,
-        priority_to_db,
-        status_to_db,
-    )
-    from app.services.tasks_service import (
-        clear_tasks_cache,
-        delete_job_subjob,
-        get_tasks,
-        get_tasks_by_job,
-        update_task,
-    )
-    from app.styles import inject_tasks_module_css
-    from app.utils.field_context import (
-        FIELD_EXPANDED_TASK_KEY,
-        clear_field_expanded,
-        field_expanded_id,
-        get_field_job_id,
-        inject_field_row_expand_css,
-        is_field_context,
-        is_field_mode,
-        render_field_job_bar,
-        toggle_field_expanded,
-    )
-    from app.utils.formatting import fmt_date
-except ImportError:
-    from components.headers import render_page_brand_header  # type: ignore
-    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.table_filters import (  # type: ignore
-        apply_column_filters,
-        build_filter_options,
-        clear_table_filters,
-        render_table_header_cell,
-    )
-    from components.table_pagination import (  # type: ignore
-        paginate_rows,
-        render_table_pagination_footer,
-        render_table_pagination_header,
-        reset_table_page,
-    )
-    from components.record_modal import (  # type: ignore
-        build_modal_cache,
-        clear_record_modal,
-        clear_edit_modes,
-        detail_field_html,
-        dialog_card_html,
-        get_modal_record,
-        is_edit_mode,
-        open_record_modal,
-        placeholder_html,
-        record_session_key,
-        render_edit_form_header,
-        render_missing_record,
-        render_modal_edit_button,
-        render_modal_header,
-        render_modal_meta_grid,
-        render_modal_shell,
-        render_save_cancel_actions,
-        safe_value,
-        set_view_mode,
-        status_pill_html,
-    )
-    from components.subjob_coupling_inspection import (  # type: ignore
-        clear_job_subjob_coupling_state,
-        render_subjob_coupling_inspection_section,
-    )
-    from components.subjob_photos_documents import (  # type: ignore
-        clear_job_subjob_media_state,
-        render_subjob_documents_section,
-        render_subjob_photos_section,
-    )
-    from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
-    from pages._core._data import (  # type: ignore
-        load_employees,
-        load_jobs,
-        lookup_options,
-        persist_task,
-        task_assignee_options,
-        task_estimate_options,
-    )
-    from pages._core._session import select_key  # type: ignore
-    from services.jobs_service import get_job_options  # type: ignore
-    from services.repository import user_facing_error  # type: ignore
-    from services.task_display_helpers import (  # type: ignore
-        normalize_task_priority,
-        normalize_task_status,
-        priority_to_db,
-        status_to_db,
-    )
-    from services.tasks_service import (  # type: ignore
-        clear_tasks_cache,
-        delete_job_subjob,
-        get_tasks,
-        get_tasks_by_job,
-        update_task,
-    )
-    from styles import inject_tasks_module_css  # type: ignore
-    from utils.field_context import get_field_job_id, is_field_context, is_field_mode, render_field_job_bar  # type: ignore
-    from utils.field_context import (  # type: ignore
-        FIELD_EXPANDED_TASK_KEY,
-        clear_field_expanded,
-        field_expanded_id,
-        inject_field_row_expand_css,
-        toggle_field_expanded,
-    )
-    from utils.formatting import fmt_date  # type: ignore
-
+from app.components.headers import render_page_brand_header
+from app.components.layout import render_filter_bar as layout_filter_bar
+from app.components.table_filters import (
+    apply_column_filters,
+    build_filter_options,
+    clear_table_filters,
+    render_table_header_cell,
+)
+from app.components.table_pagination import (
+    paginate_rows,
+    render_table_pagination_footer,
+    render_table_pagination_header,
+    reset_table_page,
+)
+from app.components.record_modal import (
+    build_modal_cache,
+    clear_record_modal,
+    clear_edit_modes,
+    detail_field_html,
+    dialog_card_html,
+    get_modal_record,
+    is_edit_mode,
+    open_record_modal,
+    placeholder_html,
+    record_session_key,
+    render_edit_form_header,
+    render_missing_record,
+    render_modal_edit_button,
+    render_modal_header,
+    render_modal_meta_grid,
+    render_modal_shell,
+    render_save_cancel_actions,
+    safe_value,
+    set_view_mode,
+    status_pill_html,
+)
+from app.components.subjob_coupling_inspection import (
+    clear_job_subjob_coupling_state,
+    render_subjob_coupling_inspection_section,
+)
+from app.components.subjob_photos_documents import (
+    clear_job_subjob_media_state,
+    render_subjob_documents_section,
+    render_subjob_photos_section,
+)
+from app.pages._core._crud import apply_persist_feedback, is_demo_id
+from app.pages._core._data import (
+    load_employees,
+    load_jobs,
+    lookup_options,
+    persist_task,
+    task_assignee_options,
+    task_estimate_options,
+)
+from app.pages._core._session import select_key
+from app.services.jobs_service import get_job_options
+from app.services.repository import user_facing_error
+from app.services.task_display_helpers import (
+    normalize_task_priority,
+    normalize_task_status,
+    priority_to_db,
+    status_to_db,
+)
+from app.services.tasks_service import (
+    clear_tasks_cache,
+    delete_job_subjob,
+    get_tasks,
+    get_tasks_by_job,
+    update_task,
+)
+from app.styles import inject_tasks_module_css
+from app.utils.field_context import (
+    FIELD_EXPANDED_TASK_KEY,
+    clear_field_expanded,
+    field_expanded_id,
+    get_field_job_id,
+    inject_field_row_expand_css,
+    is_field_context,
+    is_field_mode,
+    render_field_job_bar,
+    toggle_field_expanded,
+)
+from app.utils.formatting import fmt_date
 _SEL = select_key("tasks")
 _TABLE_KEY = "tasks_list"
 MODULE = "tasks"
@@ -275,10 +192,7 @@ def _build_assignee_lookup() -> dict[str, str]:
         name = str(emp.get("name") or "").strip()
         if eid and name:
             lookup[eid] = name
-    try:
-        from app.pages._core._data import load_user_profiles
-    except ImportError:
-        from pages._core._data import load_user_profiles  # type: ignore
+    from app.pages._core._data import load_user_profiles
     try:
         for profile in load_user_profiles():
             pid = str(profile.get("id") or "").strip()
@@ -372,10 +286,7 @@ def _priority_pill_html(priority: object) -> str:
 
 
 def _field_assignee_match_keys() -> set[str]:
-    try:
-        from app.auth import current_profile
-    except ImportError:
-        from auth import current_profile  # type: ignore
+    from app.auth import current_profile
     prof = current_profile() or {}
     keys: set[str] = set()
     for val in (
@@ -415,10 +326,7 @@ def _apply_field_task_filters(rows: list[dict], *, assignee_lookup: dict[str, st
     fid = get_field_job_id()
     if fid:
         out = [t for t in out if str(t.get("job_id") or "").strip() == fid]
-    try:
-        from app.auth import current_role, effective_role
-    except ImportError:
-        from auth import current_role, effective_role  # type: ignore
+    from app.auth import current_role, effective_role
     if str(effective_role() or "").strip().lower() == "employee":
         out = [t for t in out if _task_matches_field_assignee(t, assignee_lookup)]
     return out
@@ -654,10 +562,7 @@ def _job_label_options(task: dict, job_options: list[dict]) -> list[str]:
 
 def _estimate_options(task: dict) -> list[str]:
     opts = ["— None —"]
-    try:
-        from app.pages._core._data import task_estimate_options
-    except ImportError:
-        from pages._core._data import task_estimate_options  # type: ignore
+    from app.pages._core._data import task_estimate_options
     opts = task_estimate_options()
     cur = str(task.get("linked_estimate") or "").strip()
     if cur and cur not in opts:
@@ -1459,10 +1364,7 @@ def render_job_linked_tasks_tab(job: dict) -> None:
 
 
 def render() -> None:
-    try:
-        from app.pages._core._access import begin_module
-    except ImportError:
-        from pages._core._access import begin_module  # type: ignore
+    from app.pages._core._access import begin_module
     if not begin_module("tasks"):
         return
 
@@ -1497,10 +1399,7 @@ def render() -> None:
     )
 
     if is_field_mode():
-        try:
-            from app.services.job_service import sort_jobs_by_number_then_name
-        except ImportError:
-            from services.job_service import sort_jobs_by_number_then_name  # type: ignore
+        from app.services.job_service import sort_jobs_by_number_then_name
         jobs = sort_jobs_by_number_then_name(load_jobs())
         if jobs:
             render_field_job_bar(jobs, key_prefix="tasks")

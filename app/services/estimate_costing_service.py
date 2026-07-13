@@ -1448,10 +1448,7 @@ def _markup_defaults_for_estimate_id(estimate_id: str) -> dict[str, float]:
     row = fetch_by_id("estimates", eid)
     if not row:
         return {cat: 0.0 for cat in _MARKUP_CATEGORIES}
-    try:
-        from app.services.phase2_modules_service import normalize_estimate
-    except ImportError:
-        from services.phase2_modules_service import normalize_estimate  # type: ignore
+    from app.services.phase2_modules_service import normalize_estimate
     est = normalize_estimate(row)
     return resolve_category_markup_defaults(est)
 
@@ -1590,13 +1587,8 @@ def save_category_markup_settings(
     if not eid:
         return ServiceResult(ok=False, error="Estimate id is required.")
 
-    try:
-        from app.services.repository import table_column_names
-        from app.services.phase2_modules_service import _estimate_json_category_markups_patch
-    except ImportError:
-        from services.repository import table_column_names  # type: ignore
-        from services.phase2_modules_service import _estimate_json_category_markups_patch  # type: ignore
-
+    from app.services.repository import table_column_names
+    from app.services.phase2_modules_service import _estimate_json_category_markups_patch
     cols = table_column_names("estimates")
     existing = fetch_by_id("estimates", eid) or {}
 
@@ -1631,13 +1623,8 @@ def save_global_markup_settings(
         return ServiceResult(ok=False, error="Estimate id is required.")
     mk = max(_num(markup_pct), 0.0)
 
-    try:
-        from app.services.repository import table_column_names
-        from app.services.phase2_modules_service import _estimate_json_markup_patch
-    except ImportError:
-        from services.repository import table_column_names  # type: ignore
-        from services.phase2_modules_service import _estimate_json_markup_patch  # type: ignore
-
+    from app.services.repository import table_column_names
+    from app.services.phase2_modules_service import _estimate_json_markup_patch
     cols = table_column_names("estimates")
     existing = fetch_by_id("estimates", eid) or {}
 

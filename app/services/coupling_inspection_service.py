@@ -8,54 +8,28 @@ from datetime import date, datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-try:
-    from app.auth import current_profile
-    from app.db import (
-        create_signed_url,
-        fetch_by_match_admin,
-        insert_row_admin,
-        update_rows_admin,
-        upload_bytes_admin,
-    )
-    from app.services.coupling_inspection_specs import (
-        BOLT_COUNT,
-        COUPLING_MODEL_OPTIONS,
-        FORM_VERSION,
-        default_inspection_results,
-        default_torque_rows,
-        normalize_torque_rows,
-        specs_for_model,
-    )
-    from app.services.repository import ServiceResult, clear_data_cache_for_table, fetch_by_id
-    from app.services.task_photos import compress_image_bytes
-except ImportError:
-    from auth import current_profile  # type: ignore
-    from db import (  # type: ignore
-        create_signed_url,
-        fetch_by_match_admin,
-        insert_row_admin,
-        update_rows_admin,
-        upload_bytes_admin,
-    )
-    from services.coupling_inspection_specs import (  # type: ignore
-        BOLT_COUNT,
-        COUPLING_MODEL_OPTIONS,
-        FORM_VERSION,
-        default_inspection_results,
-        default_torque_rows,
-        normalize_torque_rows,
-        specs_for_model,
-    )
-    from services.repository import ServiceResult, clear_data_cache_for_table, fetch_by_id  # type: ignore
-    from services.task_photos import compress_image_bytes  # type: ignore
-
+from app.auth import current_profile
+from app.db import (
+    create_signed_url,
+    fetch_by_match_admin,
+    insert_row_admin,
+    update_rows_admin,
+    upload_bytes_admin,
+)
+from app.services.coupling_inspection_specs import (
+    BOLT_COUNT,
+    COUPLING_MODEL_OPTIONS,
+    FORM_VERSION,
+    default_inspection_results,
+    default_torque_rows,
+    normalize_torque_rows,
+    specs_for_model,
+)
+from app.services.repository import ServiceResult, clear_data_cache_for_table, fetch_by_id
+from app.services.task_photos import compress_image_bytes
 _LOG = logging.getLogger(__name__)
 
-try:
-    from app.services.task_display import task_number_display
-except ImportError:
-    from services.task_display import task_number_display  # type: ignore
-
+from app.services.task_display import task_number_display
 TABLE = "coupling_inspections"
 JOB_TASKS_TABLE = "job_tasks"
 IPS_TASK_TABLES: tuple[str, ...] = ("todos", "tasks")
@@ -520,11 +494,7 @@ def _sync_child_records(inspection_id: str, data: dict[str, Any]) -> None:
     """Mirror JSON payload into V7 child tables (best-effort)."""
     if not inspection_id:
         return
-    try:
-        from app.services.repository import delete_row_admin, insert_row_admin
-    except ImportError:
-        from services.repository import delete_row_admin, insert_row_admin  # type: ignore
-
+    from app.services.repository import delete_row_admin, insert_row_admin
     try:
         delete_row_admin(TORQUE_TABLE, {"inspection_id": inspection_id})
         for row in normalize_torque_rows(
@@ -641,11 +611,7 @@ def save_coupling_inspection(
         payload["status"] = status if status in {"draft", "complete", "exported"} else "draft"
 
     rid = str(inspection_id or data.get("id") or "").strip()
-    try:
-        from app.services.repository import insert_row_admin, update_row_admin
-    except ImportError:
-        from services.repository import insert_row_admin, update_row_admin  # type: ignore
-
+    from app.services.repository import insert_row_admin, update_row_admin
     try:
         if rid:
             result = update_row_admin(TABLE, payload, {"id": rid})

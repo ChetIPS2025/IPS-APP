@@ -7,205 +7,104 @@ import html
 
 import streamlit as st
 
-try:
-    from app.components.inventory_actions import render_inventory_action_buttons
-    from app.components.inventory_list_table import (
-        INVENTORY_TABLE_LAST_ACTION_KEY,
-        build_inventory_html_table,
-        inventory_category,
-        inventory_description,
-        inventory_location,
-        inventory_vendor,
-        normalize_inventory_status,
-        render_inventory_table_bridge_legacy,
-        render_inventory_table_open_buttons,
-    )
-    from app.components.inventory_page_layout import (
-        close_inventory_filter_bar_shell,
-        inject_inventory_page_layout_css,
-        render_inventory_filter_bar_shell,
-    )
-    from app.components.inventory_pricing_guide_actions import render_inventory_pricing_guide_actions
-    from app.components.item_photo_manager import render_item_photo_manager
-    from app.components.headers import render_page_brand_header
-    from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.table_filters import (
-        apply_column_filters,
-        build_filter_options,
-        clear_table_filters,
-        render_table_header_cell,
-    )
-    from app.components.table_pagination import (
-        paginate_rows,
-        render_table_pagination_footer,
-        render_table_pagination_header,
-        reset_table_page,
-    )
-    from app.components.qr_scan_history_ui import inject_qr_scan_history_css, render_qr_scan_history_table
-    from app.components.record_modal import (
-        build_modal_cache,
-        clear_edit_modes,
-        clear_record_modal,
-        detail_field_html,
-        dialog_card_html,
-        get_modal_record,
-        is_edit_mode,
-        open_record_modal,
-        placeholder_html,
-        record_session_key,
-        render_edit_form_header,
-        render_modal_edit_button,
-        render_modal_header,
-        render_modal_meta_grid,
-        render_modal_shell,
-        render_missing_record,
-        render_save_cancel_actions,
-        set_view_mode,
-        show_modal_if_pending,
-        status_pill_html,
-    )
-    from app.pages._core._data import load_inventory, load_recent_qr_scans, lookup_options
-    from app.pages._core._crud import is_demo_id
-    from app.pages._core._session import select_key
-    from app.services.inventory_display_helpers import (
-        inventory_qr_png_bytes,
-        resolve_inventory_sku,
-    )
-    from app.services.inventory_images import (
-        clear_inventory_image,
-        inventory_display_record,
-        inventory_image_is_inherited,
-        upload_inventory_image as upload_inventory_image_file,
-    )
-    from app.services.item_images import ITEM_IMAGE_UPLOAD_TYPES
-    from app.services.inventory_service import (
-        clear_inventory_cache,
-        generate_inventory_qr_value,
-        get_inventory_image_url,
-        get_inventory_transactions,
-        update_inventory_item,
-        upload_inventory_image,
-    )
-    from app.services.catalog_stock_policy_service import (
-        INVENTORY_VIEW_FILTERS,
-        enrich_inventory_rows,
-        inventory_needs_reorder,
-        passes_inventory_view_filter,
-    )
-    from app.styles import inject_inventory_module_css
-    from app.utils.formatting import fmt_currency, fmt_date
-    from app.utils.inventory_quantity import format_inventory_quantity, inventory_qty_input_kwargs
-    from app.utils.phone_helpers import format_phone_display
-    from app.utils.field_context import (
-        FIELD_EXPANDED_INVENTORY_KEY,
-        clear_field_expanded,
-        field_expanded_id,
-        inject_field_row_expand_css,
-        is_field_context,
-        is_field_mode,
-        render_field_scan_bar,
-        toggle_field_expanded,
-    )
-except ImportError:
-    from components.qr_scan_history_ui import inject_qr_scan_history_css, render_qr_scan_history_table  # type: ignore
-    from components.inventory_actions import render_inventory_action_buttons  # type: ignore
-    from components.inventory_list_table import (  # type: ignore
-        INVENTORY_TABLE_LAST_ACTION_KEY,
-        build_inventory_html_table,
-        inventory_category,
-        inventory_description,
-        inventory_location,
-        inventory_vendor,
-        normalize_inventory_status,
-        render_inventory_table_bridge_legacy,
-        render_inventory_table_open_buttons,
-    )
-    from components.inventory_page_layout import (  # type: ignore
-        close_inventory_filter_bar_shell,
-        inject_inventory_page_layout_css,
-        render_inventory_filter_bar_shell,
-    )
-    from components.inventory_pricing_guide_actions import render_inventory_pricing_guide_actions  # type: ignore
-    from components.item_photo_manager import render_item_photo_manager  # type: ignore
-    from components.headers import render_page_header  # type: ignore
-    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.table_filters import (  # type: ignore
-        apply_column_filters,
-        build_filter_options,
-        clear_table_filters,
-        render_table_header_cell,
-    )
-    from components.table_pagination import (  # type: ignore
-        paginate_rows,
-        render_table_pagination_footer,
-        render_table_pagination_header,
-        reset_table_page,
-    )
-    from components.record_modal import (  # type: ignore
-        build_modal_cache,
-        clear_edit_modes,
-        clear_record_modal,
-        detail_field_html,
-        dialog_card_html,
-        get_modal_record,
-        is_edit_mode,
-        open_record_modal,
-        placeholder_html,
-        record_session_key,
-        render_edit_form_header,
-        render_modal_edit_button,
-        render_modal_header,
-        render_modal_meta_grid,
-        render_modal_shell,
-        render_missing_record,
-        render_save_cancel_actions,
-        set_view_mode,
-        show_modal_if_pending,
-        status_pill_html,
-    )
-    from pages._core._data import load_inventory, load_recent_qr_scans, lookup_options  # type: ignore
-    from pages._core._crud import is_demo_id  # type: ignore
-    from pages._core._session import select_key  # type: ignore
-    from services.inventory_display_helpers import (  # type: ignore
-        inventory_qr_png_bytes,
-        resolve_inventory_sku,
-    )
-    from services.inventory_images import (  # type: ignore
-        clear_inventory_image,
-        inventory_display_record,
-        inventory_image_is_inherited,
-        upload_inventory_image as upload_inventory_image_file,
-    )
-    from services.item_images import ITEM_IMAGE_UPLOAD_TYPES  # type: ignore
-    from services.inventory_service import (  # type: ignore
-        clear_inventory_cache,
-        generate_inventory_qr_value,
-        get_inventory_image_url,
-        get_inventory_transactions,
-        update_inventory_item,
-        upload_inventory_image,
-    )
-    from services.catalog_stock_policy_service import (  # type: ignore
-        INVENTORY_VIEW_FILTERS,
-        enrich_inventory_rows,
-        inventory_needs_reorder,
-        passes_inventory_view_filter,
-    )
-    from styles import inject_inventory_module_css  # type: ignore
-    from utils.formatting import fmt_currency, fmt_date  # type: ignore
-    from utils.inventory_quantity import format_inventory_quantity, inventory_qty_input_kwargs  # type: ignore
-    from utils.phone_helpers import format_phone_display  # type: ignore
-    from utils.field_context import (  # type: ignore
-        FIELD_EXPANDED_INVENTORY_KEY,
-        clear_field_expanded,
-        field_expanded_id,
-        inject_field_row_expand_css,
-        is_field_context,
-        is_field_mode,
-        render_field_scan_bar,
-        toggle_field_expanded,
-    )
-
+from app.components.inventory_actions import render_inventory_action_buttons
+from app.components.inventory_list_table import (
+    INVENTORY_TABLE_LAST_ACTION_KEY,
+    build_inventory_html_table,
+    inventory_category,
+    inventory_description,
+    inventory_location,
+    inventory_vendor,
+    normalize_inventory_status,
+    render_inventory_table_bridge_legacy,
+    render_inventory_table_open_buttons,
+)
+from app.components.inventory_page_layout import (
+    close_inventory_filter_bar_shell,
+    inject_inventory_page_layout_css,
+    render_inventory_filter_bar_shell,
+)
+from app.components.inventory_pricing_guide_actions import render_inventory_pricing_guide_actions
+from app.components.item_photo_manager import render_item_photo_manager
+from app.components.headers import render_page_brand_header
+from app.components.layout import render_filter_bar as layout_filter_bar
+from app.components.table_filters import (
+    apply_column_filters,
+    build_filter_options,
+    clear_table_filters,
+    render_table_header_cell,
+)
+from app.components.table_pagination import (
+    paginate_rows,
+    render_table_pagination_footer,
+    render_table_pagination_header,
+    reset_table_page,
+)
+from app.components.qr_scan_history_ui import inject_qr_scan_history_css, render_qr_scan_history_table
+from app.components.record_modal import (
+    build_modal_cache,
+    clear_edit_modes,
+    clear_record_modal,
+    detail_field_html,
+    dialog_card_html,
+    get_modal_record,
+    is_edit_mode,
+    open_record_modal,
+    placeholder_html,
+    record_session_key,
+    render_edit_form_header,
+    render_modal_edit_button,
+    render_modal_header,
+    render_modal_meta_grid,
+    render_modal_shell,
+    render_missing_record,
+    render_save_cancel_actions,
+    set_view_mode,
+    show_modal_if_pending,
+    status_pill_html,
+)
+from app.pages._core._data import load_inventory, load_recent_qr_scans, lookup_options
+from app.pages._core._crud import is_demo_id
+from app.pages._core._session import select_key
+from app.services.inventory_display_helpers import (
+    inventory_qr_png_bytes,
+    resolve_inventory_sku,
+)
+from app.services.inventory_images import (
+    clear_inventory_image,
+    inventory_display_record,
+    inventory_image_is_inherited,
+    upload_inventory_image as upload_inventory_image_file,
+)
+from app.services.item_images import ITEM_IMAGE_UPLOAD_TYPES
+from app.services.inventory_service import (
+    clear_inventory_cache,
+    generate_inventory_qr_value,
+    get_inventory_image_url,
+    get_inventory_transactions,
+    update_inventory_item,
+    upload_inventory_image,
+)
+from app.services.catalog_stock_policy_service import (
+    INVENTORY_VIEW_FILTERS,
+    enrich_inventory_rows,
+    inventory_needs_reorder,
+    passes_inventory_view_filter,
+)
+from app.styles import inject_inventory_module_css
+from app.utils.formatting import fmt_currency, fmt_date
+from app.utils.inventory_quantity import format_inventory_quantity, inventory_qty_input_kwargs
+from app.utils.phone_helpers import format_phone_display
+from app.utils.field_context import (
+    FIELD_EXPANDED_INVENTORY_KEY,
+    clear_field_expanded,
+    field_expanded_id,
+    inject_field_row_expand_css,
+    is_field_context,
+    is_field_mode,
+    render_field_scan_bar,
+    toggle_field_expanded,
+)
 _SEL = select_key("inventory")
 _MODAL_KEY = "ips_inventory_detail_modal_id"
 _CACHE_KEY = "_ips_inventory_modal_by_id"
@@ -282,10 +181,7 @@ def _inventory_qty(row: dict) -> str:
 
 
 def _current_user_id() -> str | None:
-    try:
-        from app.auth import current_profile
-    except ImportError:
-        from auth import current_profile  # type: ignore
+    from app.auth import current_profile
     uid = str((current_profile() or {}).get("id") or "").strip()
     return uid or None
 
@@ -480,10 +376,7 @@ def _inventory_select_options(slug: str, current: str) -> list[str]:
     """Lookup dropdown values with constants fallback and the record's current value."""
     opts = list(lookup_options(slug))
     if not opts:
-        try:
-            from app.utils.constants import INVENTORY_CATEGORIES, INVENTORY_STATUSES
-        except ImportError:
-            from utils.constants import INVENTORY_CATEGORIES, INVENTORY_STATUSES  # type: ignore
+        from app.utils.constants import INVENTORY_CATEGORIES, INVENTORY_STATUSES
         opts = list(INVENTORY_CATEGORIES if slug == "inventory_categories" else INVENTORY_STATUSES)
     cur = str(current or "").strip()
     if cur and cur not in opts and cur != "—":
@@ -504,21 +397,12 @@ def _seed_inventory_edit_form(item: dict) -> None:
 
 def _render_inventory_qr_block(item: dict) -> None:
     """Clickable QR, scan link, and printable label downloads."""
-    try:
-        from app.components.qr_label_toolbar import render_qr_label_png_buttons
-        from app.services.inventory_qr_labels import (
-            inventory_label_download_basename,
-            inventory_label_png_bytes,
-            inventory_qr_subject,
-        )
-    except ImportError:
-        from components.qr_label_toolbar import render_qr_label_png_buttons  # type: ignore
-        from services.inventory_qr_labels import (  # type: ignore
-            inventory_label_download_basename,
-            inventory_label_png_bytes,
-            inventory_qr_subject,
-        )
-
+    from app.components.qr_label_toolbar import render_qr_label_png_buttons
+    from app.services.inventory_qr_labels import (
+        inventory_label_download_basename,
+        inventory_label_png_bytes,
+        inventory_qr_subject,
+    )
     scan_url = generate_inventory_qr_value(item)
     subject = inventory_qr_subject(item)
     qr_png = inventory_qr_png_bytes(item)
@@ -559,10 +443,7 @@ def _render_inventory_qr_block(item: dict) -> None:
 
 
 def _txn_action_label(txn_type: str) -> str:
-    try:
-        from app.services.inventory_service import inventory_action_label
-    except ImportError:
-        from services.inventory_service import inventory_action_label  # type: ignore
+    from app.services.inventory_service import inventory_action_label
     return inventory_action_label(txn_type)
 
 
@@ -571,15 +452,9 @@ def _render_inventory_issue_to_job_form(item: dict) -> None:
     iid = str(item.get("id") or "").strip()
     if not iid:
         return
-    try:
-        from app.pages._core._data import load_jobs
-        from app.services.job_materials_service import issue_inventory_to_job
-        from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
-    except ImportError:
-        from pages._core._data import load_jobs  # type: ignore
-        from services.job_materials_service import issue_inventory_to_job  # type: ignore
-        from services.job_service import job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
-
+    from app.pages._core._data import load_jobs
+    from app.services.job_materials_service import issue_inventory_to_job
+    from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
     jobs = sort_jobs_by_number_then_name([j for j in load_jobs() if j.get("id")])
     job_labels = [job_row_select_label(j) for j in jobs]
     job_map = {job_row_select_label(j): str(j.get("id") or "") for j in jobs}
@@ -881,21 +756,12 @@ def _sync_inventory_export_cache(filtered: list[dict]) -> str:
 
 
 def render() -> None:
-    try:
-        from app.pages._core._access import begin_module
-    except ImportError:
-        from pages._core._access import begin_module  # type: ignore
+    from app.pages._core._access import begin_module
     if not begin_module("inventory"):
         return
-    try:
-        from app.navigation import INVENTORY_SCAN_EMBED_KEY
-    except ImportError:
-        from navigation import INVENTORY_SCAN_EMBED_KEY  # type: ignore
+    from app.navigation import INVENTORY_SCAN_EMBED_KEY
     if st.session_state.pop(INVENTORY_SCAN_EMBED_KEY, False):
-        try:
-            from app.pages.inventory_scan import render_inventory_scan_page
-        except ImportError:
-            from pages.inventory_scan import render_inventory_scan_page  # type: ignore
+        from app.pages.inventory_scan import render_inventory_scan_page
         render_inventory_scan_page()
         return
     inject_inventory_module_css()
@@ -920,20 +786,12 @@ def render() -> None:
     export_cache_key = _sync_inventory_export_cache(filtered_export)
 
     def _inv_export() -> None:
-        try:
-            from app.services.inventory_qr_labels import (
-                build_inventory_labels_csv,
-                build_inventory_labels_zip,
-                inventory_labels_csv_filename,
-                inventory_labels_zip_filename,
-            )
-        except ImportError:
-            from services.inventory_qr_labels import (  # type: ignore
-                build_inventory_labels_csv,
-                build_inventory_labels_zip,
-                inventory_labels_csv_filename,
-                inventory_labels_zip_filename,
-            )
+        from app.services.inventory_qr_labels import (
+            build_inventory_labels_csv,
+            build_inventory_labels_zip,
+            inventory_labels_csv_filename,
+            inventory_labels_zip_filename,
+        )
         count = len(filtered_export)
         if not count:
             st.caption("No items match the current filters.")
@@ -1017,10 +875,7 @@ def render() -> None:
                 key="inv_new_image",
             )
             if st.button("Save item", key="inv_save_new", type="primary"):
-                try:
-                    from app.services.inventory_service import save_inventory_item
-                except ImportError:
-                    from services.inventory_service import save_inventory_item  # type: ignore
+                from app.services.inventory_service import save_inventory_item
                 result = save_inventory_item(
                     {
                         "sku": st.session_state.get("inv_new_sku"),

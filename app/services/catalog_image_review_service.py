@@ -5,44 +5,23 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-try:
-    from app.services.catalog_import_service import (
-        find_matching_asset_item,
-        find_matching_inventory_item,
-        find_matching_pricing_item,
-        import_catalog_csv,
-        normalize_item_class,
-        _fetch_all,
-    )
-    from app.services.item_images import (
-        IMAGE_STATUS_APPROVED,
-        IMAGE_STATUS_MISSING,
-        build_uploaded_image_index,
-        find_image_match_for_row,
-        is_image_approved,
-        persist_item_image,
-        save_approved_local_image,
-    )
-except ImportError:
-    from services.catalog_import_service import (  # type: ignore
-        find_matching_asset_item,
-        find_matching_inventory_item,
-        find_matching_pricing_item,
-        import_catalog_csv,
-        normalize_item_class,
-        _fetch_all,
-    )
-    from services.item_images import (  # type: ignore
-        IMAGE_STATUS_APPROVED,
-        IMAGE_STATUS_MISSING,
-        build_uploaded_image_index,
-        find_image_match_for_row,
-        is_image_approved,
-        persist_item_image,
-        save_approved_local_image,
-    )
-
-
+from app.services.catalog_import_service import (
+    find_matching_asset_item,
+    find_matching_inventory_item,
+    find_matching_pricing_item,
+    import_catalog_csv,
+    normalize_item_class,
+    _fetch_all,
+)
+from app.services.item_images import (
+    IMAGE_STATUS_APPROVED,
+    IMAGE_STATUS_MISSING,
+    build_uploaded_image_index,
+    find_image_match_for_row,
+    is_image_approved,
+    persist_item_image,
+    save_approved_local_image,
+)
 DECISION_PENDING = "pending"
 DECISION_APPROVE = "approve"
 DECISION_SKIP = "skip"

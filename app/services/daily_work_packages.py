@@ -6,16 +6,8 @@ from collections import defaultdict
 from datetime import date, timedelta
 from typing import Any
 
-try:
-    from app.services import task_photos as _tp
-except ImportError:
-    import services.task_photos as _tp  # type: ignore
-
-try:
-    from app.services.supervisor_planning import delay_reason_label
-except ImportError:
-    from services.supervisor_planning import delay_reason_label  # type: ignore
-
+from app.services import task_photos as _tp
+from app.services.supervisor_planning import delay_reason_label
 _TASK_TERMINAL = frozenset(
     {"complete", "duplicate", "electrical", "waiting_on_customer", "cancelled"}
 )

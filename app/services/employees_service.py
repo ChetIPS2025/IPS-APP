@@ -51,11 +51,7 @@ def clear_certifications_cache() -> None:
 
 
 def get_employee_certifications(employee_id: str | None = None) -> list[dict[str, Any]]:
-    try:
-        from app.pages._core._data import _DEMO_CERTIFICATIONS
-    except ImportError:
-        from pages._core._data import _DEMO_CERTIFICATIONS  # type: ignore
-
+    from app.pages._core._data import _DEMO_CERTIFICATIONS
     if employee_id:
         rows, _ = list_certifications(str(employee_id), demo=list(_DEMO_CERTIFICATIONS))
         return rows

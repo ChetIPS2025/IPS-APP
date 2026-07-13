@@ -5,18 +5,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Any
 
-try:
-    from db import delete_rows, get_client, insert_row, run_user_supabase_operation, update_rows
-except ImportError:
-    from app.db import (  # type: ignore
-        delete_rows,
-        get_client,
-        insert_row,
-        run_user_supabase_operation,
-        update_rows,
-    )
-
-
+from app.db import delete_rows, get_client, insert_row, run_user_supabase_operation, update_rows
 def _run_time_entries_query(operation: str, fn):
     return run_user_supabase_operation(operation, fn, friendly_on_failure=False)
 
@@ -92,10 +81,7 @@ def grid_labor_cost_dollars(hours: float, employee: dict | None, *, time_type: s
     """Grid hours billed at employee burdened rate (respects ST/OT/DT when provided)."""
     if not employee:
         return 0.0
-    try:
-        from app.services.employee_labor import time_entry_burdened_cost
-    except ImportError:
-        from services.employee_labor import time_entry_burdened_cost  # type: ignore
+    from app.services.employee_labor import time_entry_burdened_cost
     _, total = time_entry_burdened_cost(
         {"hours": hours, "time_type": time_type or "ST"},
         employee,
@@ -121,16 +107,10 @@ def fetch_entries_employee_between(employee_id: str, work_start: date, work_end:
 
 
 def delete_time_entries_by_ids(entry_ids: list[str]) -> None:
-    try:
-        from app.services.job_cost_transaction_service import (
-            SOURCE_TIME_ENTRY,
-            delete_job_cost_transaction,
-        )
-    except ImportError:
-        from services.job_cost_transaction_service import (  # type: ignore
-            SOURCE_TIME_ENTRY,
-            delete_job_cost_transaction,
-        )
+    from app.services.job_cost_transaction_service import (
+        SOURCE_TIME_ENTRY,
+        delete_job_cost_transaction,
+    )
     for eid in entry_ids:
         if eid:
             delete_job_cost_transaction(SOURCE_TIME_ENTRY, str(eid))
@@ -210,10 +190,7 @@ def upsert_time_entry(
     }
     if row0:
         update_rows("time_entries", payload_update, {"id": row0["id"]})
-        try:
-            from app.services.job_cost_transaction_service import _safe_sync, sync_time_entry
-        except ImportError:
-            from services.job_cost_transaction_service import _safe_sync, sync_time_entry  # type: ignore
+        from app.services.job_cost_transaction_service import _safe_sync, sync_time_entry
         merged = {**row0, **payload_update, "id": row0["id"], "employee_id": employee_id, "job_id": job_id, "work_date": wd}
         _safe_sync(sync_time_entry, merged)
         return
@@ -234,10 +211,7 @@ def upsert_time_entry(
         ins["non_job_code"] = (non_job_code or "").strip()
     row = insert_row("time_entries", ins)
     if job_id and row:
-        try:
-            from app.services.job_cost_transaction_service import _safe_sync, sync_time_entry
-        except ImportError:
-            from services.job_cost_transaction_service import _safe_sync, sync_time_entry  # type: ignore
+        from app.services.job_cost_transaction_service import _safe_sync, sync_time_entry
         _safe_sync(sync_time_entry, row)
 
 

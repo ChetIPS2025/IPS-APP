@@ -18,11 +18,7 @@ from collections.abc import Callable
 
 import streamlit as st
 
-try:
-    from app.components.action_styles import danger_solid
-except ImportError:
-    from components.action_styles import danger_solid  # type: ignore
-
+from app.components.action_styles import danger_solid
 IPS_DELETE_CONFIRM_STYLE_KEY = "ips_delete_confirm_styles_injected"
 
 

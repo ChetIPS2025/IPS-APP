@@ -14,11 +14,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-try:
-    from app.utils.constants import SESSION_NAV_KEY
-except ImportError:
-    from utils.constants import SESSION_NAV_KEY  # type: ignore
-
+from app.utils.constants import SESSION_NAV_KEY
 # Slugs registered in the rebuilt router (``phase2.BUILT_MODULES``).
 ACTIVE_MODULE_SLUGS: frozenset[str] = frozenset(
     {
@@ -194,10 +190,7 @@ def navigate_to_estimate_detail(estimate_id: str, *, tab: str = "Details") -> No
     eid = str(estimate_id or "").strip()
     if not eid:
         return
-    try:
-        from app.pages._core._data import ACTIVE_ESTIMATE_KEY
-    except ImportError:
-        from pages._core._data import ACTIVE_ESTIMATE_KEY  # type: ignore
+    from app.pages._core._data import ACTIVE_ESTIMATE_KEY
     st.session_state[ACTIVE_ESTIMATE_KEY] = eid
     st.session_state["selected_estimate_id"] = eid
     st.session_state["estimates_mode"] = "detail"
@@ -217,10 +210,7 @@ def navigate_to_timekeeping(*, job_id: str = "", week_start: str | None = None) 
     ws = str(week_start or "").strip()[:10]
     if jid:
         st.session_state[TK_PREFILL_JOB_KEY] = jid
-        try:
-            from app.utils.field_context import set_field_job_id
-        except ImportError:
-            from utils.field_context import set_field_job_id  # type: ignore
+        from app.utils.field_context import set_field_job_id
         set_field_job_id(jid)
     if ws:
         st.session_state[TK_PREFILL_WEEK_KEY] = ws
@@ -275,12 +265,8 @@ def apply_pending_navigation() -> None:
 
 def default_nav_slug() -> str:
     """Safe fallback when ``ips_nav_page`` cannot be resolved to a built module."""
-    try:
-        from app.auth import effective_role
-        from app.utils.permissions import role_default_nav_slug
-    except ImportError:
-        from auth import effective_role  # type: ignore
-        from utils.permissions import role_default_nav_slug  # type: ignore
+    from app.auth import effective_role
+    from app.utils.permissions import role_default_nav_slug
     return role_default_nav_slug(
         effective_role(),
         field_mode=bool(st.session_state.get("ips_field_mode")),
@@ -333,10 +319,7 @@ def _record_nav_history(prev_slug: str, new_slug: str) -> None:
     new = normalize_nav_slug(str(new_slug or "").strip())
     if not prev or prev == new:
         return
-    try:
-        from app.navigation import IPS_NAV_HISTORY_KEY
-    except ImportError:
-        from navigation import IPS_NAV_HISTORY_KEY  # type: ignore
+    from app.navigation import IPS_NAV_HISTORY_KEY
     history: list[str] = list(st.session_state.get(IPS_NAV_HISTORY_KEY) or [])
     if history and history[-1] == prev:
         history[-1] = prev
@@ -349,10 +332,7 @@ def _record_nav_history(prev_slug: str, new_slug: str) -> None:
 
 def navigate_back() -> None:
     """Return to the previous module slug, if any."""
-    try:
-        from app.navigation import IPS_NAV_HISTORY_KEY
-    except ImportError:
-        from navigation import IPS_NAV_HISTORY_KEY  # type: ignore
+    from app.navigation import IPS_NAV_HISTORY_KEY
     history: list[str] = list(st.session_state.get(IPS_NAV_HISTORY_KEY) or [])
     if not history:
         return
@@ -388,35 +368,23 @@ def set_nav_slug(slug: str) -> None:
 
 
 def ensure_nav_defaults() -> None:
-    try:
-        from app.phase2 import ensure_nav_defaults as _impl
-    except ImportError:
-        from phase2 import ensure_nav_defaults as _impl  # type: ignore
+    from app.phase2 import ensure_nav_defaults as _impl
     _impl()
 
 
 def on_nav_change(prev_slug: str, new_slug: str) -> None:
-    try:
-        from app.phase2 import on_nav_change as _impl
-    except ImportError:
-        from phase2 import on_nav_change as _impl  # type: ignore
+    from app.phase2 import on_nav_change as _impl
     _impl(prev_slug, new_slug)
 
 
 def render_module(slug: str | None = None) -> None:
-    try:
-        from app.phase2 import render_module as _impl
-    except ImportError:
-        from phase2 import render_module as _impl  # type: ignore
+    from app.phase2 import render_module as _impl
     _impl(slug)
 
 
 def __getattr__(name: str):
     if name == "BUILT_MODULES":
-        try:
-            from app.phase2 import BUILT_MODULES
-        except ImportError:
-            from phase2 import BUILT_MODULES  # type: ignore
+        from app.phase2 import BUILT_MODULES
         return BUILT_MODULES
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 

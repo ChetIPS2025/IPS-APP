@@ -4,12 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-try:
-    from db import fetch_by_match, fetch_by_match_admin, fetch_table, fetch_table_admin
-except ImportError:
-    from app.db import fetch_by_match, fetch_by_match_admin, fetch_table, fetch_table_admin  # type: ignore
-
-
+from app.db import fetch_by_match, fetch_by_match_admin, fetch_table, fetch_table_admin
 def fetch_locations_for_customer(
     customer_id: str,
     *,

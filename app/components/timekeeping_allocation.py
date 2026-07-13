@@ -9,11 +9,7 @@ from typing import Any, Callable
 
 import streamlit as st
 
-try:
-    from app.utils.formatting import fmt_date
-except ImportError:
-    from utils.formatting import fmt_date  # type: ignore
-
+from app.utils.formatting import fmt_date
 ALLOC_HOUR_TYPE_OPTS = ("Auto", "S/T", "O/T")
 # Streamlit column weights (layout widths come from CSS grid/flex in styles.py).
 # Reference layout: Assignment | Type | Hours (+ Remaining/Status below) | Notes
@@ -102,17 +98,10 @@ def allocation_day_block_class(state: str) -> str:
 
 def allocation_day_approval_class(day_status: str, *, alloc_state: str = "") -> str:
     """CSS hook for day-level approval state on allocation cards."""
-    try:
-        from app.services.timekeeping_day_ui import (
-            day_fully_approved_and_allocated,
-            normalize_timecard_status,
-        )
-    except ImportError:
-        from services.timekeeping_day_ui import (  # type: ignore
-            day_fully_approved_and_allocated,
-            normalize_timecard_status,
-        )
-
+    from app.services.timekeeping_day_ui import (
+        day_fully_approved_and_allocated,
+        normalize_timecard_status,
+    )
     mapping = {
         "Draft": "timekeeping-alloc-approval-draft",
         "Pending": "timekeeping-alloc-approval-pending",
@@ -320,10 +309,7 @@ def _render_day_actions_bar(
     status_col, add_col, actions_col = st.columns([1.2, 1.4, 1.4], gap="small", vertical_alignment="center")
     with status_col:
         status_wrap_cls = ""
-        try:
-            from app.services.timekeeping_day_ui import day_fully_approved_and_allocated
-        except ImportError:
-            from services.timekeeping_day_ui import day_fully_approved_and_allocated  # type: ignore
+        from app.services.timekeeping_day_ui import day_fully_approved_and_allocated
         if day_fully_approved_and_allocated(str(ctx.alloc_state or ""), day_status):
             status_wrap_cls = " timekeeping-alloc-day-actions-status-approved-complete"
         st.markdown(

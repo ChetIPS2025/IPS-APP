@@ -54,13 +54,8 @@ def clear_catalog_image_maps_cache() -> None:
 @st.cache_data(ttl=120, show_spinner=False)
 def _catalog_image_maps_cached() -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
     """Normalized inventory and asset rows keyed by id for linked photo inheritance."""
-    try:
-        from app.db import fetch_table_admin
-        from app.services.phase2_modules_service import normalize_asset, normalize_inventory
-    except ImportError:
-        from db import fetch_table_admin  # type: ignore
-        from services.phase2_modules_service import normalize_asset, normalize_inventory  # type: ignore
-
+    from app.db import fetch_table_admin
+    from app.services.phase2_modules_service import normalize_asset, normalize_inventory
     inventory_by_id: dict[str, dict[str, Any]] = {}
     asset_by_id: dict[str, dict[str, Any]] = {}
     try:
@@ -157,17 +152,10 @@ def pricing_guide_has_image(row: dict[str, Any]) -> bool:
 
 
 def get_pricing_guide_image_url(row: dict[str, Any], *, expires_in: int = 3600) -> str | None:
-    try:
-        from app.services.item_images import (
-            CATALOG_IMAGE_FIELD_PRIORITY,
-            resolve_image_url_by_field_priority,
-        )
-    except ImportError:
-        from services.item_images import (  # type: ignore
-            CATALOG_IMAGE_FIELD_PRIORITY,
-            resolve_image_url_by_field_priority,
-        )
-
+    from app.services.item_images import (
+        CATALOG_IMAGE_FIELD_PRIORITY,
+        resolve_image_url_by_field_priority,
+    )
     url = resolve_image_url_by_field_priority(row, CATALOG_IMAGE_FIELD_PRIORITY, expires_in=expires_in)
     if url:
         return url

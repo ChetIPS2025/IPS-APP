@@ -9,85 +9,44 @@ from uuid import uuid4
 
 import streamlit as st
 
-try:
-    from app.auth import current_profile
-    from app.branding import header_logo_html
-    from app.components.coupling_inspection_launcher import coupling_inspection_context
-    from app.components.signature_pad import render_signature_field
-    from app.pages._core._access import begin_module
-    from app.pages._core._data import load_assets, load_jobs
-    from app.services.coupling_inspection_pdf import build_coupling_inspection_pdf_bytes
-    from app.services.coupling_inspection_service import (
-        PHOTO_SLOTS,
-        PHOTO_SLOT_LABELS,
-        apply_task_link_to_payload,
-        build_header_context,
-        completion_percentage,
-        fetch_job_task,
-        get_coupling_inspection,
-        list_coupling_inspections,
-        list_job_tasks_for_job,
-        new_inspection_payload,
-        pdf_export_filename,
-        photo_view_url,
-        save_coupling_inspection,
-        task_link_option_label,
-        task_link_snapshot,
-        upload_inspection_photo,
-        validate_for_complete,
-    )
-    from app.services.coupling_inspection_specs import (
-        COUPLING_MODEL_OPTIONS,
-        FORM_VERSION,
-        INSPECTION_RESULT_ITEMS,
-        default_inspection_results,
-        normalize_torque_rows,
-        specs_for_model,
-        torque_pattern_svg,
-        torque_pass_labels,
-        torque_sequence_caption,
-    )
-    from app.styles import inject_coupling_inspection_css
-except ImportError:
-    from auth import current_profile  # type: ignore
-    from branding import header_logo_html  # type: ignore
-    from components.coupling_inspection_launcher import coupling_inspection_context  # type: ignore
-    from components.signature_pad import render_signature_field  # type: ignore
-    from pages._core._access import begin_module  # type: ignore
-    from pages._core._data import load_assets, load_jobs  # type: ignore
-    from services.coupling_inspection_pdf import build_coupling_inspection_pdf_bytes  # type: ignore
-    from services.coupling_inspection_service import (  # type: ignore
-        PHOTO_SLOTS,
-        PHOTO_SLOT_LABELS,
-        apply_task_link_to_payload,
-        build_header_context,
-        completion_percentage,
-        fetch_job_task,
-        get_coupling_inspection,
-        list_coupling_inspections,
-        list_job_tasks_for_job,
-        new_inspection_payload,
-        pdf_export_filename,
-        photo_view_url,
-        save_coupling_inspection,
-        task_link_option_label,
-        task_link_snapshot,
-        upload_inspection_photo,
-        validate_for_complete,
-    )
-    from services.coupling_inspection_specs import (  # type: ignore
-        COUPLING_MODEL_OPTIONS,
-        FORM_VERSION,
-        INSPECTION_RESULT_ITEMS,
-        default_inspection_results,
-        normalize_torque_rows,
-        specs_for_model,
-        torque_pattern_svg,
-        torque_pass_labels,
-        torque_sequence_caption,
-    )
-    from styles import inject_coupling_inspection_css  # type: ignore
-
+from app.auth import current_profile
+from app.branding import header_logo_html
+from app.components.coupling_inspection_launcher import coupling_inspection_context
+from app.components.signature_pad import render_signature_field
+from app.pages._core._access import begin_module
+from app.pages._core._data import load_assets, load_jobs
+from app.services.coupling_inspection_pdf import build_coupling_inspection_pdf_bytes
+from app.services.coupling_inspection_service import (
+    PHOTO_SLOTS,
+    PHOTO_SLOT_LABELS,
+    apply_task_link_to_payload,
+    build_header_context,
+    completion_percentage,
+    fetch_job_task,
+    get_coupling_inspection,
+    list_coupling_inspections,
+    list_job_tasks_for_job,
+    new_inspection_payload,
+    pdf_export_filename,
+    photo_view_url,
+    save_coupling_inspection,
+    task_link_option_label,
+    task_link_snapshot,
+    upload_inspection_photo,
+    validate_for_complete,
+)
+from app.services.coupling_inspection_specs import (
+    COUPLING_MODEL_OPTIONS,
+    FORM_VERSION,
+    INSPECTION_RESULT_ITEMS,
+    default_inspection_results,
+    normalize_torque_rows,
+    specs_for_model,
+    torque_pattern_svg,
+    torque_pass_labels,
+    torque_sequence_caption,
+)
+from app.styles import inject_coupling_inspection_css
 _DRAFT_KEY = "coupling_insp_draft"
 _FORM_SIGNATURE_ROLES: tuple[str, ...] = ("technician", "supervisor")
 _SIGNATURE_LABELS = {
@@ -659,19 +618,9 @@ def _render_existing_list(ctx: dict[str, str | None]) -> str | None:
 
 def _render_context_picker() -> None:
     """Let users pick job/equipment when opening Coupling Inspection from the sidebar."""
-    try:
-        from app.components.coupling_inspection_launcher import open_coupling_inspection
-    except ImportError:
-        from components.coupling_inspection_launcher import open_coupling_inspection  # type: ignore
-    try:
-        from app.pages._core._data import load_assets, load_jobs
-    except ImportError:
-        from pages._core._data import load_assets, load_jobs  # type: ignore
-    try:
-        from app.services.jobs_service import job_row_select_label
-    except ImportError:
-        from services.jobs_service import job_row_select_label  # type: ignore
-
+    from app.components.coupling_inspection_launcher import open_coupling_inspection
+    from app.pages._core._data import load_assets, load_jobs
+    from app.services.jobs_service import job_row_select_label
     st.info("Select a job and/or equipment record, then continue.")
     assets = [a for a in load_assets() if str(a.get("id") or "").strip()]
     job_opts = ["— Select job —"] + [job_row_select_label(j) for j in jobs]

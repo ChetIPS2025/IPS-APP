@@ -9,21 +9,12 @@ from typing import Any, Callable, Literal
 
 import streamlit as st
 
-try:
-    from app.services.materials_catalog_merge import (
-        estimate_materials_payload_from_inventory,
-        inventory_row_to_material_catalog_shape,
-        is_inventory_materials_category,
-        item_key_from_inventory_row,
-    )
-except ImportError:
-    from services.materials_catalog_merge import (  # type: ignore
-        estimate_materials_payload_from_inventory,
-        inventory_row_to_material_catalog_shape,
-        is_inventory_materials_category,
-        item_key_from_inventory_row,
-    )
-
+from app.services.materials_catalog_merge import (
+    estimate_materials_payload_from_inventory,
+    inventory_row_to_material_catalog_shape,
+    is_inventory_materials_category,
+    item_key_from_inventory_row,
+)
 _LOG = logging.getLogger(__name__)
 
 _INV_FETCH_LIMIT = 100_000
@@ -137,11 +128,7 @@ def fetch_estimate_materials_catalog_rows(
     fetch_table: Callable[..., list[dict[str, Any]]],
     fetch_table_admin: Callable[..., list[dict[str, Any]]] | None = None,
 ) -> list[dict[str, Any]]:
-    try:
-        from app.services.pricing_guide_service import fetch_pricing_guide_rows
-    except ImportError:
-        from services.pricing_guide_service import fetch_pricing_guide_rows  # type: ignore
-
+    from app.services.pricing_guide_service import fetch_pricing_guide_rows
     unified = fetch_pricing_guide_rows(
         include_inactive=False,
         fetch_table=fetch_table,
@@ -173,7 +160,7 @@ def fetch_estimate_materials_catalog_rows(
 
 @st.cache_data(ttl=120, show_spinner=False)
 def cached_estimate_materials_catalog_rows() -> list[dict[str, Any]]:
-    from db import fetch_table, fetch_table_admin
+    from app.db import fetch_table, fetch_table_admin
 
     return fetch_estimate_materials_catalog_rows(
         fetch_table=fetch_table,

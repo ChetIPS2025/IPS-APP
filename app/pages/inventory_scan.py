@@ -22,94 +22,49 @@ from typing import Any
 import streamlit as st
 
 try:
-    from mobile_ui import ensure_narrow_viewport_detected
+    from app.mobile_ui import ensure_narrow_viewport_detected
 except ImportError:
     from app.mobile_ui import ensure_narrow_viewport_detected  # type: ignore
 
-try:
-    from app.device_label import (
-        device_family_from_user_agent,
-        ensure_inventory_device_suffix_initialized,
-        format_device_label,
-        persist_device_label_to_browser,
-        request_user_agent,
-    )
-except ImportError:
-    from device_label import (  # type: ignore
-        device_family_from_user_agent,
-        ensure_inventory_device_suffix_initialized,
-        format_device_label,
-        persist_device_label_to_browser,
-        request_user_agent,
-    )
-
-try:
-    from app.auth import current_profile, current_role, effective_role, is_authenticated
-    from app.ui.page_shell import render_page_header
-    from app.ui.nav_permissions import role_can_open_page
-    from app.db import (
-        create_signed_url,
-        delete_rows_admin,
-        fetch_by_match_admin,
-        fetch_table,
-        fetch_table_admin,
-        insert_row_admin,
-        update_rows_admin,
-    )
-    from app.services.job_service import (
-        build_job_dropdown_label_maps,
-        job_row_select_label,
-        sort_jobs_by_number_then_name,
-    )
-    from app.ui.streamlit_perf import fragment
-except ImportError:
-    from auth import current_profile, current_role, effective_role, is_authenticated  # type: ignore
-    from branding import render_header  # type: ignore
-    from app.ui.nav_permissions import role_can_open_page  # type: ignore
-    from db import (  # type: ignore
-        create_signed_url,
-        delete_rows_admin,
-        fetch_by_match_admin,
-        fetch_table,
-        fetch_table_admin,
-        insert_row_admin,
-        update_rows_admin,
-    )
-    from services.job_service import (  # type: ignore
-        build_job_dropdown_label_maps,
-        job_row_select_label,
-        sort_jobs_by_number_then_name,
-    )
-    from ui.streamlit_perf import fragment  # type: ignore
-
+from app.device_label import (
+    device_family_from_user_agent,
+    ensure_inventory_device_suffix_initialized,
+    format_device_label,
+    persist_device_label_to_browser,
+    request_user_agent,
+)
+from app.auth import current_profile, current_role, effective_role, is_authenticated
+from app.ui.page_shell import render_page_header
+from app.ui.nav_permissions import role_can_open_page
+from app.db import (
+    create_signed_url,
+    delete_rows_admin,
+    fetch_by_match_admin,
+    fetch_table,
+    fetch_table_admin,
+    insert_row_admin,
+    update_rows_admin,
+)
+from app.services.job_service import (
+    build_job_dropdown_label_maps,
+    job_row_select_label,
+    sort_jobs_by_number_then_name,
+)
+from app.ui.streamlit_perf import fragment
 _INV = "inventory_items"
 _TXN = "inventory_transactions"
 _JM = "job_materials"
 _ASSETS = "assets"
 _TOOL_TXN = "tool_transactions"
 
-try:
-    from app.services.tracking_terminology import (
-        INVENTORY_ADJUST_LABEL,
-        INVENTORY_USE_IN_SHOP_LABEL,
-        INVENTORY_USE_ON_JOB_LABEL,
-        inventory_action_label,
-        serialized_tool_action_label,
-    )
-except ImportError:
-    from services.tracking_terminology import (  # type: ignore
-        INVENTORY_ADJUST_LABEL,
-        INVENTORY_USE_IN_SHOP_LABEL,
-        INVENTORY_USE_ON_JOB_LABEL,
-        inventory_action_label,
-        serialized_tool_action_label,
-    )
-
-try:
-    from app.utils.formatting import fmt_money
-except ImportError:
-    from utils.formatting import fmt_money  # type: ignore
-
+from app.services.tracking_terminology import (
+    INVENTORY_ADJUST_LABEL,
+    INVENTORY_USE_IN_SHOP_LABEL,
+    INVENTORY_USE_ON_JOB_LABEL,
+    inventory_action_label,
+    serialized_tool_action_label,
+)
+from app.utils.formatting import fmt_money
 _ISSUE_TYPES = (INVENTORY_USE_ON_JOB_LABEL, INVENTORY_ADJUST_LABEL, INVENTORY_USE_IN_SHOP_LABEL)
 _TXN_MAP = {
     INVENTORY_USE_ON_JOB_LABEL: "TO_JOB",
@@ -185,18 +140,12 @@ def _inject_inv_scan_mobile_css() -> None:
 
 
 def _qty_on_hand(row: dict) -> int:
-    try:
-        from app.utils.inventory_quantity import read_inventory_quantity
-    except ImportError:
-        from utils.inventory_quantity import read_inventory_quantity  # type: ignore
+    from app.utils.inventory_quantity import read_inventory_quantity
     return read_inventory_quantity(row, "quantity_on_hand", "qty_on_hand", "quantity")
 
 
 def _reorder(row: dict) -> int:
-    try:
-        from app.utils.inventory_quantity import parse_inventory_quantity
-    except ImportError:
-        from utils.inventory_quantity import parse_inventory_quantity  # type: ignore
+    from app.utils.inventory_quantity import parse_inventory_quantity
     try:
         return parse_inventory_quantity(row.get("reorder_point"), allow_zero=True, field_name="Reorder point")
     except ValueError:
@@ -317,10 +266,7 @@ def _qr_scan_logging_context() -> dict[str, Any]:
 
 
 def _inventory_qr_display_value(item: dict[str, Any], *, fallback: str = "") -> str:
-    try:
-        from app.services.inventory_display_helpers import resolve_inventory_qr_value
-    except ImportError:
-        from services.inventory_display_helpers import resolve_inventory_qr_value  # type: ignore
+    from app.services.inventory_display_helpers import resolve_inventory_qr_value
     return resolve_inventory_qr_value(item) or fallback
 
 
@@ -329,10 +275,7 @@ def _asset_qr_display_value(asset: dict[str, Any], *, fallback: str = "") -> str
 
 
 def _log_qr_scan_event(**kwargs: Any) -> None:
-    try:
-        from app.services.qr_scan_event_service import record_qr_scan_event
-    except ImportError:
-        from services.qr_scan_event_service import record_qr_scan_event  # type: ignore
+    from app.services.qr_scan_event_service import record_qr_scan_event
     ctx = _qr_scan_logging_context()
     merged = {**ctx, **kwargs}
     for key in ("scanned_by_user_id", "scanned_by_name", "scanned_by_phone", "employee_id", "device_label"):
@@ -357,10 +300,7 @@ def _log_qr_scan_opened_once(
 
 def _inv_item_thumb_display(item: dict) -> None:
     """Small item photo or placeholder (scan screen)."""
-    try:
-        from app.services.inventory_images import render_inventory_item_thumbnail
-    except ImportError:
-        from services.inventory_images import render_inventory_item_thumbnail  # type: ignore
+    from app.services.inventory_images import render_inventory_item_thumbnail
     render_inventory_item_thumbnail(item, width=80)
 
 
@@ -374,11 +314,7 @@ def _item_model_line(item: dict[str, Any], sku: str) -> str:
 
 def _render_mobile_use_inventory_header() -> None:
     """Page chrome for the mobile use-inventory scan route."""
-    try:
-        from app.components.headers import render_page_brand_header
-    except ImportError:
-        from components.headers import render_page_brand_header  # type: ignore
-
+    from app.components.headers import render_page_brand_header
     render_page_brand_header(
         "Use Inventory",
         "Consumable materials — enter quantity and where used (Use on Job or Use in Shop).",
@@ -387,16 +323,8 @@ def _render_mobile_use_inventory_header() -> None:
 
 def _render_mobile_item_summary(item: dict[str, Any], *, qoh: float) -> None:
     """Item thumbnail and summary card for mobile QR use form."""
-    try:
-        from app.services.inventory_images import inventory_thumbnail_html
-    except ImportError:
-        from services.inventory_images import inventory_thumbnail_html  # type: ignore
-
-    try:
-        from app.services.catalog_stock_policy_service import derive_inventory_stock_status
-    except ImportError:
-        from services.catalog_stock_policy_service import derive_inventory_stock_status  # type: ignore
-
+    from app.services.inventory_images import inventory_thumbnail_html
+    from app.services.catalog_stock_policy_service import derive_inventory_stock_status
     name = str(item.get("name") or item.get("item_name") or "—")
     sku = str(item.get("sku") or "—")
     unit = str(item.get("unit") or "EA")
@@ -1200,12 +1128,8 @@ def _render_inventory_scan_inner() -> None:
             qrv = str(item.get("qr_code_value") or "").strip()
             if qrv:
                 st.markdown(f"QR value: `{html.escape(qrv)}`")
-                try:
-                    from app.config import settings
-                    from app.services.qr_codes import generate_qr_png_bytes, inventory_scan_link_url
-                except ImportError:
-                    from config import settings  # type: ignore
-                    from services.qr_codes import generate_qr_png_bytes, inventory_scan_link_url  # type: ignore
+                from app.config import settings
+                from app.services.qr_codes import generate_qr_png_bytes, inventory_scan_link_url
                 try:
                     subj = inventory_scan_link_url(
                         qr_code_value=qrv,
@@ -1302,10 +1226,7 @@ def _render_inventory_scan_inner() -> None:
     scan_device = str(actor.get("device_label") or "").strip()
 
     if itype == INVENTORY_USE_ON_JOB_LABEL and jid:
-        try:
-            from app.services.job_materials_service import issue_inventory_to_job
-        except ImportError:
-            from services.job_materials_service import issue_inventory_to_job  # type: ignore
+        from app.services.job_materials_service import issue_inventory_to_job
         ua_sub = request_user_agent()
         suf_sub = str(st.session_state.get("ips_inv_device_suffix") or "")
         auto_device_submit = format_device_label(device_family_from_user_agent(ua_sub), suf_sub)
@@ -1353,10 +1274,7 @@ def _render_inventory_scan_inner() -> None:
         st.success("Material consumed on job. Stock and job costing updated.")
         st.rerun()
 
-    try:
-        from app.services.inventory_service import record_shop_inventory_consumption
-    except ImportError:
-        from services.inventory_service import record_shop_inventory_consumption  # type: ignore
+    from app.services.inventory_service import record_shop_inventory_consumption
     ua_sub = request_user_agent()
     suf_sub = str(st.session_state.get("ips_inv_device_suffix") or "")
     auto_device_submit = format_device_label(device_family_from_user_agent(ua_sub), suf_sub)
@@ -1536,10 +1454,7 @@ def _scan_default_phone() -> str:
 
 
 def _load_scan_item() -> tuple[dict[str, Any] | None, str]:
-    try:
-        from app.services.inventory_service import get_inventory_item_by_qr
-    except ImportError:
-        from services.inventory_service import get_inventory_item_by_qr  # type: ignore
+    from app.services.inventory_service import get_inventory_item_by_qr
     sku = _first_query_param("sku") or str(st.session_state.get("_ips_scan_inv_sku") or "")
     token = _first_query_param("token") or str(st.session_state.get("_ips_scan_inv_token") or "")
     item_id = _first_query_param("item_id") or str(st.session_state.get("_ips_scan_inv_item_id") or "")
@@ -1648,11 +1563,7 @@ def _record_mobile_shop_use(
     allow_over: bool,
 ) -> tuple[bool, str]:
     """Use in Shop from mobile QR scan — routed through inventory_service audit."""
-    try:
-        from app.services.inventory_service import record_shop_inventory_consumption
-    except ImportError:
-        from services.inventory_service import record_shop_inventory_consumption  # type: ignore
-
+    from app.services.inventory_service import record_shop_inventory_consumption
     iid = str(item.get("id") or "")
     qv = int(qty or 0)
     if qv <= 0:
@@ -1696,11 +1607,7 @@ def _mobile_scan_qty_step(delta: int) -> None:
 
 def _mobile_scan_actor_defaults() -> tuple[str, str, str, bool]:
     """Name, normalized phone, display phone, and phone_verified from pinned scan session."""
-    try:
-        from app.utils.phone_helpers import format_phone_display, is_valid_phone, normalize_phone
-    except ImportError:
-        from utils.phone_helpers import format_phone_display, is_valid_phone, normalize_phone  # type: ignore
-
+    from app.utils.phone_helpers import format_phone_display, is_valid_phone, normalize_phone
     actor = _pin_qr_scan_actor_session()
     prof_name = str(actor.get("scanned_by_name") or "").strip() or _scan_profile_name()
     prof_phone = _scan_profile_phone()
@@ -1727,11 +1634,7 @@ def _submit_mobile_inventory_scan(
     unit: str,
 ) -> None:
     """Consume scanned inventory on the selected job or in shop (mobile QR form)."""
-    try:
-        from app.services.job_materials_service import issue_inventory_to_job
-    except ImportError:
-        from services.job_materials_service import issue_inventory_to_job  # type: ignore
-
+    from app.services.job_materials_service import issue_inventory_to_job
     action = "consume_on_job"
     iid = str(item.get("id") or "")
     qv = int(qty or 0)
@@ -1951,10 +1854,7 @@ def render_inventory_scan_page() -> None:
     """Mobile QR scan workflow — Qty + Job + Enter only (field speed). No sidebar."""
     ensure_narrow_viewport_detected()
     _pin_qr_scan_actor_session()
-    try:
-        from app.styles import inject_inventory_qr_scan_css
-    except ImportError:
-        from styles import inject_inventory_qr_scan_css  # type: ignore
+    from app.styles import inject_inventory_qr_scan_css
     inject_inventory_qr_scan_css()
     _inject_inv_scan_mobile_css()
     st.markdown('<span class="ips-inv-qr-scan-scope" aria-hidden="true"></span>', unsafe_allow_html=True)

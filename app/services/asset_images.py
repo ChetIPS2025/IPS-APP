@@ -50,10 +50,7 @@ def _linked_pricing_row(asset: dict[str, Any]) -> dict[str, Any] | None:
     pid = str(asset.get("pricing_guide_id") or asset.get("pricing_item_id") or "").strip()
     if not pid:
         return None
-    try:
-        from app.services.pricing_guide_service import cached_pricing_guide_rows
-    except ImportError:
-        from services.pricing_guide_service import cached_pricing_guide_rows  # type: ignore
+    from app.services.pricing_guide_service import cached_pricing_guide_rows
     return next((r for r in cached_pricing_guide_rows(include_inactive=True) if str(r.get("id") or "") == pid), None)
 
 
@@ -64,10 +61,7 @@ def _linked_inventory_row(asset: dict[str, Any]) -> dict[str, Any] | None:
     inv_id = str(pg_row.get("linked_inventory_id") or pg_row.get("inventory_item_id") or "").strip()
     if not inv_id:
         return None
-    try:
-        from app.services.inventory_service import get_inventory_item
-    except ImportError:
-        from services.inventory_service import get_inventory_item  # type: ignore
+    from app.services.inventory_service import get_inventory_item
     return get_inventory_item(inv_id)
 
 
@@ -144,10 +138,7 @@ def upload_asset_image(
         replace_existing = force
     if uploaded_file is None:
         return ServiceResult(ok=False, error="No file provided.")
-    try:
-        from app.services.upload_media_strategy import PHOTO_ROLE_PRIMARY, upload_asset_media
-    except ImportError:
-        from services.upload_media_strategy import PHOTO_ROLE_PRIMARY, upload_asset_media  # type: ignore
+    from app.services.upload_media_strategy import PHOTO_ROLE_PRIMARY, upload_asset_media
     return upload_asset_media(
         asset_id=asset_id,
         file_bytes=uploaded_file.getvalue(),

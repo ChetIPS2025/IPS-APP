@@ -81,35 +81,22 @@ def build_catalog_image_context(
     """Build shared name indexes used by small-tool image fallback."""
     inventory_by_name: dict[str, dict[str, Any]] = {}
     pricing_by_name: dict[str, dict[str, Any]] = {}
-    try:
-        from app.services.inventory_images import get_inventory_image_url
-    except ImportError:
-        from services.inventory_images import get_inventory_image_url  # type: ignore
+    from app.services.inventory_images import get_inventory_image_url
     if inventory_rows is None:
-        try:
-            from app.pages._core._data import load_inventory
-        except ImportError:
-            from pages._core._data import load_inventory  # type: ignore
+        from app.pages._core._data import load_inventory
         inventory_rows = load_inventory()
     for item in inventory_rows or []:
         key = _name_key(item.get("name") or item.get("item_name"))
         if key and key not in inventory_by_name and get_inventory_image_url(item):
             inventory_by_name[key] = item
-    try:
-        from app.services.pricing_guide_images import get_pricing_guide_image_url
-        from app.services.pricing_guide_service import cached_pricing_guide_rows
-    except ImportError:
-        from services.pricing_guide_images import get_pricing_guide_image_url  # type: ignore
-        from services.pricing_guide_service import cached_pricing_guide_rows  # type: ignore
+    from app.services.pricing_guide_images import get_pricing_guide_image_url
+    from app.services.pricing_guide_service import cached_pricing_guide_rows
     for row in cached_pricing_guide_rows(include_inactive=True) or []:
         key = _name_key(row.get("item_name") or row.get("name"))
         if key and key not in pricing_by_name and get_pricing_guide_image_url(row):
             pricing_by_name[key] = row
     if assets_by_id is None:
-        try:
-            from app.pages._core._data import load_assets
-        except ImportError:
-            from pages._core._data import load_assets  # type: ignore
+        from app.pages._core._data import load_assets
         assets_by_id = {
             str(a.get("id") or "").strip(): a
             for a in load_assets()
@@ -129,15 +116,9 @@ def _resolve_small_tool_image_url(
     thumbnail: bool,
     expires_in: int,
 ) -> str | None:
-    try:
-        from app.services.asset_images import get_asset_image_url, get_asset_thumbnail_url
-        from app.services.inventory_images import get_inventory_image_url
-        from app.services.pricing_guide_images import get_pricing_guide_image_url
-    except ImportError:
-        from services.asset_images import get_asset_image_url, get_asset_thumbnail_url  # type: ignore
-        from services.inventory_images import get_inventory_image_url  # type: ignore
-        from services.pricing_guide_images import get_pricing_guide_image_url  # type: ignore
-
+    from app.services.asset_images import get_asset_image_url, get_asset_thumbnail_url
+    from app.services.inventory_images import get_inventory_image_url
+    from app.services.pricing_guide_images import get_pricing_guide_image_url
     asset_url = get_asset_thumbnail_url if thumbnail else get_asset_image_url
 
     sid = _clean_text(record.get("source_asset_id"))
@@ -182,15 +163,9 @@ def get_catalog_image_url(
     resolved_kind = infer_catalog_record_kind(record) if kind == "auto" else kind
     ctx = context or CatalogImageContext()
 
-    try:
-        from app.services.asset_images import get_asset_image_url, get_asset_thumbnail_url
-        from app.services.inventory_images import get_inventory_image_url
-        from app.services.pricing_guide_images import get_pricing_guide_image_url
-    except ImportError:
-        from services.asset_images import get_asset_image_url, get_asset_thumbnail_url  # type: ignore
-        from services.inventory_images import get_inventory_image_url  # type: ignore
-        from services.pricing_guide_images import get_pricing_guide_image_url  # type: ignore
-
+    from app.services.asset_images import get_asset_image_url, get_asset_thumbnail_url
+    from app.services.inventory_images import get_inventory_image_url
+    from app.services.pricing_guide_images import get_pricing_guide_image_url
     if resolved_kind == "inventory":
         return get_inventory_image_url(record, expires_in=expires_in)
     if resolved_kind == "pricing_guide":
@@ -222,10 +197,7 @@ def catalog_thumbnail_html(
         )
     resolved_kind = infer_catalog_record_kind(record) if kind == "auto" else kind
     if resolved_kind == "inventory":
-        try:
-            from app.services.inventory_images import inventory_image_placeholder_html
-        except ImportError:
-            from services.inventory_images import inventory_image_placeholder_html  # type: ignore
+        from app.services.inventory_images import inventory_image_placeholder_html
         placeholder = inventory_image_placeholder_html()
     else:
         placeholder = f'<span class="ips-asset-thumb-placeholder">{_ASSET_PLACEHOLDER}</span>'

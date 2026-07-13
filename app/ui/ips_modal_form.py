@@ -9,12 +9,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-try:
-    from app.ips_crud_list_styles import inject_ips_modal_styles
-except ImportError:
-    from ips_crud_list_styles import inject_ips_modal_styles  # type: ignore
-
-
+from app.ips_crud_list_styles import inject_ips_modal_styles
 def ensure_modal_styles() -> None:
     """Inject global IPS modal CSS once per browser session."""
     inject_ips_modal_styles()

@@ -8,32 +8,17 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.auth import current_role, effective_role
-    from app.components.action_styles import danger_solid_button, success_solid_button
-    from app.components.modal_delete import can_admin_mutate
-    from app.pages._core._crud import is_demo_id
-    from app.services.estimate_job_workflow_service import (
-        approve_estimate_and_sync_job,
-        can_approve_estimates,
-        estimate_status_approvable,
-        estimate_visible_in_approved_view,
-    )
-    from app.services.repository import clear_data_cache_for_table
-except ImportError:
-    from auth import current_role, effective_role  # type: ignore
-    from components.action_styles import danger_solid_button, success_solid_button  # type: ignore
-    from components.modal_delete import can_admin_mutate  # type: ignore
-    from pages._core._crud import is_demo_id  # type: ignore
-    from services.estimate_job_workflow_service import (  # type: ignore
-        approve_estimate_and_sync_job,
-        can_approve_estimates,
-        estimate_status_approvable,
-        estimate_visible_in_approved_view,
-    )
-    from services.repository import clear_data_cache_for_table  # type: ignore
-
-
+from app.auth import current_role, effective_role
+from app.components.action_styles import danger_solid_button, success_solid_button
+from app.components.modal_delete import can_admin_mutate
+from app.pages._core._crud import is_demo_id
+from app.services.estimate_job_workflow_service import (
+    approve_estimate_and_sync_job,
+    can_approve_estimates,
+    estimate_status_approvable,
+    estimate_visible_in_approved_view,
+)
+from app.services.repository import clear_data_cache_for_table
 def _confirm_state_key(estimate_id: str, action: str) -> str:
     return f"confirm_{action}_estimate_{estimate_id}"
 
@@ -163,10 +148,7 @@ def _handle_approve(estimate_id: str, on_approve: Callable[[], None] | None) -> 
 
 
 def _handle_delete(estimate_id: str, on_delete: Callable[[], None] | None) -> bool:
-    try:
-        from app.services.delete_safety import delete_estimate_unlink_first
-    except ImportError:
-        from services.delete_safety import delete_estimate_unlink_first  # type: ignore
+    from app.services.delete_safety import delete_estimate_unlink_first
     try:
         delete_estimate_unlink_first(estimate_id)
         clear_data_cache_for_table("estimates")

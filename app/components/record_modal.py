@@ -8,12 +8,7 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.components.clickable_table import clear_modal_selection_state
-except ImportError:
-    from components.clickable_table import clear_modal_selection_state  # type: ignore
-
-
+from app.components.clickable_table import clear_modal_selection_state
 def safe_value(value: object, fallback: str = "—") -> str:
     if value is None:
         return fallback

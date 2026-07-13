@@ -5,30 +5,16 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
-try:
-    from app.db import fetch_table_admin
-    from app.services.employee_labor import compute_burdened_labor_cost
-    from app.services.job_weekly_timesheets import monday_of_week, week_bounds
-    from app.services.weekly_job_timesheet_service import (
-        _employees_map,
-        _fetch_job,
-        _num,
-        _parse_date,
-        _timekeeping_row_matches_job,
-    )
-except ImportError:
-    from db import fetch_table_admin  # type: ignore
-    from services.employee_labor import compute_burdened_labor_cost  # type: ignore
-    from services.job_weekly_timesheets import monday_of_week, week_bounds  # type: ignore
-    from services.weekly_job_timesheet_service import (  # type: ignore
-        _employees_map,
-        _fetch_job,
-        _num,
-        _parse_date,
-        _timekeeping_row_matches_job,
-    )
-
-
+from app.db import fetch_table_admin
+from app.services.employee_labor import compute_burdened_labor_cost
+from app.services.job_weekly_timesheets import monday_of_week, week_bounds
+from app.services.weekly_job_timesheet_service import (
+    _employees_map,
+    _fetch_job,
+    _num,
+    _parse_date,
+    _timekeeping_row_matches_job,
+)
 def _row_timestamp(row: dict[str, Any]) -> datetime | None:
     for key in ("updated_at", "approved_at", "created_at"):
         raw = str(row.get(key) or "").strip()

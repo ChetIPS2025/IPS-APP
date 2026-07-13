@@ -22,11 +22,7 @@ _TIMEZONES = ("America/Chicago", "America/New_York", "UTC")
 def load_app_settings() -> dict[str, Any]:
     """Return merged defaults plus the first ``company_settings`` row when present."""
     out = {**_DEFAULTS, "id": None, "from_db": False}
-    try:
-        from app.services.repository import fetch_rows
-    except ImportError:
-        from services.repository import fetch_rows  # type: ignore
-
+    from app.services.repository import fetch_rows
     rows, err = fetch_rows("company_settings", limit=1)
     if err or not rows:
         return out
@@ -67,11 +63,7 @@ def save_app_settings(
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    try:
-        from app.services.repository import fetch_rows, insert_row, update_row
-    except ImportError:
-        from services.repository import fetch_rows, insert_row, update_row  # type: ignore
-
+    from app.services.repository import fetch_rows, insert_row, update_row
     rows, err = fetch_rows("company_settings", limit=1)
     if err:
         return False, err

@@ -105,7 +105,7 @@ def _s_contact(v) -> str:
 
 def _pdf_prepared_by(est: dict) -> str:
     try:
-        from auth import current_profile
+        from app.auth import current_profile
 
         prof = current_profile()
         name = _s(prof.get("full_name"))
@@ -457,11 +457,7 @@ def proposal_preview_page_html(view_model=None):
 
     Pass ``None`` when no view model can be built (shows an instructional placeholder page).
     """
-    try:
-        from app.estimate.proposal_document_layout import render_proposal_preview_page_html
-    except ImportError:
-        from estimate.proposal_document_layout import render_proposal_preview_page_html  # type: ignore
-
+    from app.estimate.proposal_document_layout import render_proposal_preview_page_html
     return render_proposal_preview_page_html(view_model)
 
 
@@ -487,17 +483,10 @@ def proposal_values(
 
     Money: $X,XXX.XX. Date: full US month name. Missing fields -> empty string (or sensible default for title).
     """
-    try:
-        from app.estimate.proposal_document_layout import (
-            build_proposal_view_model,
-            proposal_placeholder_map_from_view_model,
-        )
-    except ImportError:
-        from estimate.proposal_document_layout import (  # type: ignore
-            build_proposal_view_model,
-            proposal_placeholder_map_from_view_model,
-        )
-
+    from app.estimate.proposal_document_layout import (
+        build_proposal_view_model,
+        proposal_placeholder_map_from_view_model,
+    )
     vm = build_proposal_view_model(
         est,
         totals,

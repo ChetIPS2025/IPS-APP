@@ -6,57 +6,32 @@ import html
 
 import streamlit as st
 
-try:
-    from app.auth import current_role, effective_role
-    from app.components.headers import render_page_brand_header
-    from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.table_pagination import paginate_rows, reset_table_page
-    from app.pages._core._data import load_estimates, load_jobs
-    from app.services.estimate_job_workflow_service import (
-        approve_estimate_and_sync_job,
-        can_approve_estimates,
-        estimate_status_approvable,
-    )
-    from app.services.pipeline_service import (
-        PIPELINE_VIEWS,
-        build_pipeline_rows,
-        filter_pipeline_rows,
-        pipeline_filter_options,
-        pipeline_summary,
-    )
-    from app.services.repository import clear_data_cache_for_table
-    from app.utils.formatting import fmt_currency
-except ImportError:
-    from auth import current_role, effective_role  # type: ignore
-    from components.headers import render_page_brand_header  # type: ignore
-    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.table_pagination import paginate_rows, reset_table_page  # type: ignore
-    from pages._core._data import load_estimates, load_jobs  # type: ignore
-    from services.estimate_job_workflow_service import (  # type: ignore
-        approve_estimate_and_sync_job,
-        can_approve_estimates,
-        estimate_status_approvable,
-    )
-    from services.pipeline_service import (  # type: ignore
-        PIPELINE_VIEWS,
-        build_pipeline_rows,
-        filter_pipeline_rows,
-        pipeline_filter_options,
-        pipeline_summary,
-    )
-    from services.repository import clear_data_cache_for_table  # type: ignore
-    from utils.formatting import fmt_currency  # type: ignore
-
+from app.auth import current_role, effective_role
+from app.components.headers import render_page_brand_header
+from app.components.layout import render_filter_bar as layout_filter_bar
+from app.components.table_pagination import paginate_rows, reset_table_page
+from app.pages._core._data import load_estimates, load_jobs
+from app.services.estimate_job_workflow_service import (
+    approve_estimate_and_sync_job,
+    can_approve_estimates,
+    estimate_status_approvable,
+)
+from app.services.pipeline_service import (
+    PIPELINE_VIEWS,
+    build_pipeline_rows,
+    filter_pipeline_rows,
+    pipeline_filter_options,
+    pipeline_summary,
+)
+from app.services.repository import clear_data_cache_for_table
+from app.utils.formatting import fmt_currency
 _TABLE_KEY = "pipeline_list"
 _DEFAULT_VIEW = "All Pipeline"
 _FILTER_ALL = "All"
 
 
 def _set_nav_slug(slug: str) -> None:
-    try:
-        from app.navigation import set_nav_slug
-    except ImportError:
-        from navigation import set_nav_slug  # type: ignore
+    from app.navigation import set_nav_slug
     set_nav_slug(slug)
 
 
@@ -321,13 +296,7 @@ def _render_pipeline_page() -> None:
                 "(aging sent quotes, unlinked approvals, or not-started jobs)."
             )
         with digest_col:
-            try:
-                from app.services.email_notifications import pipeline_digest_recipients, run_pipeline_attention_digest
-            except ImportError:
-                from services.email_notifications import (  # type: ignore
-                    pipeline_digest_recipients,
-                    run_pipeline_attention_digest,
-                )
+            from app.services.email_notifications import pipeline_digest_recipients, run_pipeline_attention_digest
             if pipeline_digest_recipients() and st.button(
                 "Email digest",
                 key="pipeline_email_digest",
@@ -350,10 +319,7 @@ def _render_pipeline_page() -> None:
 
 
 def render() -> None:
-    try:
-        from app.pages._core._access import begin_module
-    except ImportError:
-        from pages._core._access import begin_module  # type: ignore
+    from app.pages._core._access import begin_module
     if not begin_module("pipeline"):
         return
     _render_pipeline_page()

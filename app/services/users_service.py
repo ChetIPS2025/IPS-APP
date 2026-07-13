@@ -24,46 +24,24 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-try:
-    from app.db import (
-        delete_auth_user_admin,
-        fetch_by_match,
-        fetch_by_match_admin,
-        fetch_one,
-        resolve_auth_user_id,
-        set_login_password_admin,
-        update_rows_admin,
-    )
-    from app.services.phase2_modules_service import delete_employee as delete_employee_row, normalize_employee
-    from app.services.repository import (
-        ServiceResult,
-        clear_data_cache_for_table,
-        fetch_by_id,
-        fetch_rows,
-        filter_payload_to_table,
-        update_row,
-    )
-except ImportError:
-    from db import (  # type: ignore
-        delete_auth_user_admin,
-        fetch_by_match,
-        fetch_by_match_admin,
-        fetch_one,
-        resolve_auth_user_id,
-        set_login_password_admin,
-        update_rows_admin,
-    )
-    from services.phase2_modules_service import delete_employee as delete_employee_row, normalize_employee  # type: ignore
-    from services.repository import (  # type: ignore
-        ServiceResult,
-        clear_data_cache_for_table,
-        fetch_by_id,
-        fetch_rows,
-        filter_payload_to_table,
-        update_row,
-    )
-
-
+from app.db import (
+    delete_auth_user_admin,
+    fetch_by_match,
+    fetch_by_match_admin,
+    fetch_one,
+    resolve_auth_user_id,
+    set_login_password_admin,
+    update_rows_admin,
+)
+from app.services.phase2_modules_service import delete_employee as delete_employee_row, normalize_employee
+from app.services.repository import (
+    ServiceResult,
+    clear_data_cache_for_table,
+    fetch_by_id,
+    fetch_rows,
+    filter_payload_to_table,
+    update_row,
+)
 def get_profile_by_user_id(user_id: str) -> dict[str, Any] | None:
     """Fetch ``profiles`` row for the authenticated user (auth.users id)."""
     if not user_id:
@@ -196,10 +174,7 @@ def resolve_employee_auth_login(
     profile_exists = bool(profile)
     auth_candidate = ""
     if email and not auth_user_id:
-        try:
-            from app.db import _find_auth_user_id_by_email
-        except ImportError:
-            from db import _find_auth_user_id_by_email  # type: ignore
+        from app.db import _find_auth_user_id_by_email
         auth_candidate = _find_auth_user_id_by_email(email)
     auth_unlinked = bool(not auth_user_id and (profile_exists or auth_candidate))
     return {
@@ -366,12 +341,8 @@ def admin_reset_employee_password(
 
 def can_manage_user_actions(actor: dict[str, Any] | None = None) -> bool:
     """Admin or supervisor may activate, deactivate, or archive users."""
-    try:
-        from app.auth import current_role, effective_role
-        from app.utils.permissions import normalize_role
-    except ImportError:
-        from auth import current_role, effective_role  # type: ignore
-        from utils.permissions import normalize_role  # type: ignore
+    from app.auth import current_role, effective_role
+    from app.utils.permissions import normalize_role
     _ = actor
     role = normalize_role(effective_role())
     return role in {"admin", "supervisor"}
@@ -379,12 +350,8 @@ def can_manage_user_actions(actor: dict[str, Any] | None = None) -> bool:
 
 def can_edit_employee_profile(actor: dict[str, Any] | None = None) -> bool:
     """Roles allowed to update employee/user profile fields (including hire date)."""
-    try:
-        import app.auth as auth
-        from app.utils.permissions import normalize_role
-    except ImportError:
-        import auth as auth  # type: ignore
-        from utils.permissions import normalize_role  # type: ignore
+    import app.auth as auth
+    from app.utils.permissions import normalize_role
     _ = actor
     role = normalize_role(auth.current_role())
     return role in {"admin", "supervisor", "project manager"}

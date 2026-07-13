@@ -4,28 +4,15 @@ from __future__ import annotations
 
 from typing import Any
 
-try:
-    from app.data.employee_seed import CORE_EMPLOYEE_SEEDS
-    from app.services.repository import (
-        ServiceResult,
-        clear_all_data_caches,
-        fetch_rows,
-        insert_row,
-        table_column_names,
-        update_row,
-    )
-except ImportError:
-    from data.employee_seed import CORE_EMPLOYEE_SEEDS  # type: ignore
-    from services.repository import (  # type: ignore
-        ServiceResult,
-        clear_all_data_caches,
-        fetch_rows,
-        insert_row,
-        table_column_names,
-        update_row,
-    )
-
-
+from app.data.employee_seed import CORE_EMPLOYEE_SEEDS
+from app.services.repository import (
+    ServiceResult,
+    clear_all_data_caches,
+    fetch_rows,
+    insert_row,
+    table_column_names,
+    update_row,
+)
 def _normalize_number(val: object) -> str:
     return str(val or "").strip().upper()
 

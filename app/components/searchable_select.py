@@ -7,12 +7,7 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.services.estimate_builder_helpers import filter_pricing_option_labels
-except ImportError:
-    from services.estimate_builder_helpers import filter_pricing_option_labels  # type: ignore
-
-
+from app.services.estimate_builder_helpers import filter_pricing_option_labels
 def render_searchable_selectbox(
     label: str,
     options: list[str],

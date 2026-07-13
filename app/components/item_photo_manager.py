@@ -7,25 +7,14 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.services.item_images import (
-        ITEM_IMAGE_UPLOAD_TYPES,
-        has_stored_item_image,
-        normalize_image_status,
-        resolve_image_url_by_field_priority,
-        resolve_stored_item_image_url,
-    )
-    from app.services.repository import ServiceResult
-except ImportError:
-    from services.item_images import (  # type: ignore
-        ITEM_IMAGE_UPLOAD_TYPES,
-        has_stored_item_image,
-        normalize_image_status,
-        resolve_image_url_by_field_priority,
-        resolve_stored_item_image_url,
-    )
-    from services.repository import ServiceResult  # type: ignore
-
+from app.services.item_images import (
+    ITEM_IMAGE_UPLOAD_TYPES,
+    has_stored_item_image,
+    normalize_image_status,
+    resolve_image_url_by_field_priority,
+    resolve_stored_item_image_url,
+)
+from app.services.repository import ServiceResult
 _STATUS_LABELS = {
     "missing": "No photo",
     "needs_review": "Needs review (hidden from lists)",
@@ -67,10 +56,7 @@ def render_item_photo_manager(
 
     preview = preview_record if isinstance(preview_record, dict) else record
     image_url = None
-    try:
-        from app.services.inventory_images import get_inventory_image_url
-    except ImportError:
-        from services.inventory_images import get_inventory_image_url  # type: ignore
+    from app.services.inventory_images import get_inventory_image_url
     image_url = get_inventory_image_url(preview) or get_inventory_image_url(record)
     if not image_url:
         image_url = resolve_image_url_by_field_priority(preview) or resolve_stored_item_image_url(preview)

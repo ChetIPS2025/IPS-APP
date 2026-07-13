@@ -12,17 +12,8 @@ try:
 except ImportError:
     httpx = None  # type: ignore
 
-try:
-    from app.services import job_reference_attachments as jra
-except ImportError:
-    import services.job_reference_attachments as jra  # type: ignore
-
-try:
-    from app.db import create_signed_url
-except ImportError:
-    from db import create_signed_url  # type: ignore
-
-
+from app.services import job_reference_attachments as jra
+from app.db import create_signed_url
 _AUTOFILL_EXT = frozenset({"jpg", "jpeg", "png", "webp", "pdf"})
 
 

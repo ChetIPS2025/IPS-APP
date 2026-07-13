@@ -6,24 +6,13 @@ import html
 
 import streamlit as st
 
-try:
-    from app.auth import current_profile, current_role, effective_role
-    from app.components.headers import render_page_header
-    from app.pages._core._access import begin_module
-    from app.pages._core._data import get_employee
-    from app.services.certification_helpers import resolve_logged_in_employee_id
-    from app.styles import inject_employee_portal_css, inject_global_css
-    from app.utils.formatting import fmt_date
-except ImportError:
-    from auth import current_profile, current_role, effective_role  # type: ignore
-    from components.headers import render_page_header  # type: ignore
-    from pages._core._access import begin_module  # type: ignore
-    from pages._core._data import get_employee  # type: ignore
-    from services.certification_helpers import resolve_logged_in_employee_id  # type: ignore
-    from styles import inject_employee_portal_css, inject_global_css  # type: ignore
-    from utils.formatting import fmt_date  # type: ignore
-
-
+from app.auth import current_profile, current_role, effective_role
+from app.components.headers import render_page_header
+from app.pages._core._access import begin_module
+from app.pages._core._data import get_employee
+from app.services.certification_helpers import resolve_logged_in_employee_id
+from app.styles import inject_employee_portal_css, inject_global_css
+from app.utils.formatting import fmt_date
 def render() -> None:
     if not begin_module("employee_profile"):
         return

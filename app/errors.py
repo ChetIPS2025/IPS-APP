@@ -4,11 +4,7 @@ import logging
 
 import streamlit as st
 
-try:
-    from config import settings
-except ImportError:
-    from app.config import settings  # type: ignore
-
+from app.config import settings
 _LOG = logging.getLogger(__name__)
 
 

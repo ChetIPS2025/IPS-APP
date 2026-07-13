@@ -16,7 +16,7 @@ from typing import Any
 
 import pandas as pd
 import streamlit as st
-from branding import render_header
+from app.branding import render_header
 
 from app.auth import current_profile, current_role
 from app.db import (
@@ -33,11 +33,7 @@ from app.db import (
     update_rows_admin,
     upload_bytes,
 )
-try:
-    from services.job_service import job_number_display, job_row_select_label, sort_jobs_by_number_then_name
-except ImportError:
-    from app.services.job_service import job_number_display, job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
-
+from app.services.job_service import job_number_display, job_row_select_label, sort_jobs_by_number_then_name
 from app.utils.formatters import job_display_label
 
 from app.estimate.calculations import (
@@ -80,10 +76,7 @@ from app.estimate.equipment import (
     _equipment_core_with_picker_labels,
     _equipment_rows_core_for_editor,
 )
-try:
-    from services.estimate_materials_catalog import cached_estimate_materials_catalog_rows
-except ImportError:
-    from app.services.estimate_materials_catalog import cached_estimate_materials_catalog_rows  # type: ignore
+from app.services.estimate_materials_catalog import cached_estimate_materials_catalog_rows
 from app.estimate.job_scope import (
     bump_scope_edit_clock,
     ensure_scope_widgets_bound,
@@ -113,11 +106,7 @@ from app.estimate.proposal_preview_tab import (
     render_proposal_tab,
 )
 
-try:
-    from app.perf_debug import perf_span
-except ImportError:
-    from perf_debug import perf_span  # type: ignore
-
+from app.perf_debug import perf_span
 _LOG = logging.getLogger(__name__)
 
 
@@ -762,11 +751,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
         est.setdefault("customer_location_id", None)
         _EMPTY_LOC = "__est_no_location__"
         admin_read_loc = current_role() in {"admin", "estimator"}
-        try:
-            from services.customer_locations import fetch_locations_for_customer, location_option_label
-        except ImportError:
-            from app.services.customer_locations import fetch_locations_for_customer, location_option_label  # type: ignore
-
+        from app.services.customer_locations import fetch_locations_for_customer, location_option_label
         cid_for_loc = str(est.get("customer_id") or "").strip()
         if not cid_for_loc:
             st.caption("Select a customer first.")
@@ -846,23 +831,13 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
     est.setdefault("customer_contact_id", None)
     with row2_contact:
         if est.get("customer_id"):
-            try:
-                from services.customer_contacts import (
-                    contact_none_option_label,
-                    contact_option_label,
-                    inject_contact_picker_styles,
-                    render_contact_detail_preview,
-                    render_contact_quick_add_when_empty,
-                )
-            except ImportError:
-                from app.services.customer_contacts import (  # type: ignore
-                    contact_none_option_label,
-                    contact_option_label,
-                    inject_contact_picker_styles,
-                    render_contact_detail_preview,
-                    render_contact_quick_add_when_empty,
-                )
-
+            from app.services.customer_contacts import (
+                contact_none_option_label,
+                contact_option_label,
+                inject_contact_picker_styles,
+                render_contact_detail_preview,
+                render_contact_quick_add_when_empty,
+            )
             inject_contact_picker_styles()
             cid_key = str(est.get("customer_id") or "").strip()
             loc_scope = str(est.get("customer_location_id") or "").strip() or None
@@ -995,11 +970,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
     with row2_prep:
         _render_estimate_prepared_by_field(est, is_locked=is_locked)
 
-    try:
-        from table_actions import inject_table_action_styles
-    except ImportError:
-        from app.table_actions import inject_table_action_styles  # type: ignore
-
+    from app.table_actions import inject_table_action_styles
     inject_table_action_styles()
 
     _loaded_eid = str(st.session_state.get("loaded_estimate_id") or "").strip() or None

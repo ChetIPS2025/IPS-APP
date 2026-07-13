@@ -7,17 +7,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-try:
-    from app.config import settings
-    from app.db import create_signed_url, delete_storage_object_admin, update_rows_admin, upload_bytes_admin
-    from app.services.item_images import to_browser_image_src
-    from app.services.repository import ServiceResult, clear_data_cache_for_table
-except ImportError:
-    from config import settings  # type: ignore
-    from db import create_signed_url, delete_storage_object_admin, update_rows_admin, upload_bytes_admin  # type: ignore
-    from services.item_images import to_browser_image_src  # type: ignore
-    from services.repository import ServiceResult, clear_data_cache_for_table  # type: ignore
-
+from app.config import settings
+from app.db import create_signed_url, delete_storage_object_admin, update_rows_admin, upload_bytes_admin
+from app.services.item_images import to_browser_image_src
+from app.services.repository import ServiceResult, clear_data_cache_for_table
 BANNER_UPLOAD_TYPES: tuple[str, ...] = ("jpg", "jpeg", "png", "webp")
 _ALLOWED_EXTENSIONS = {f".{ext}" for ext in BANNER_UPLOAD_TYPES}
 _MAX_BYTES = 5 * 1024 * 1024

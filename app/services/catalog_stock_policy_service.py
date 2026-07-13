@@ -5,15 +5,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-try:
-    from app.services.inventory_service import clear_inventory_cache, get_inventory_item
-    from app.services.pricing_guide_service import clear_pricing_guide_cache
-    from app.services.repository import ServiceResult
-except ImportError:
-    from services.inventory_service import clear_inventory_cache, get_inventory_item  # type: ignore
-    from services.pricing_guide_service import clear_pricing_guide_cache  # type: ignore
-    from services.repository import ServiceResult  # type: ignore
-
+from app.services.inventory_service import clear_inventory_cache, get_inventory_item
+from app.services.pricing_guide_service import clear_pricing_guide_cache
+from app.services.repository import ServiceResult
 STOCK_POLICIES: tuple[str, ...] = ("none", "optional", "mandatory")
 STOCK_POLICY_LABELS: dict[str, str] = {
     "none": "Not stocked",
@@ -66,18 +60,12 @@ def _linked_inventory_id(row: dict[str, Any]) -> str:
 
 
 def _inventory_qty(row: dict[str, Any]) -> int:
-    try:
-        from app.utils.inventory_quantity import read_inventory_quantity
-    except ImportError:
-        from utils.inventory_quantity import read_inventory_quantity  # type: ignore
+    from app.utils.inventory_quantity import read_inventory_quantity
     return read_inventory_quantity(row, "qty_on_hand", "quantity_on_hand", "quantity")
 
 
 def _reorder_point(row: dict[str, Any]) -> int:
-    try:
-        from app.utils.inventory_quantity import parse_inventory_quantity
-    except ImportError:
-        from utils.inventory_quantity import parse_inventory_quantity  # type: ignore
+    from app.utils.inventory_quantity import parse_inventory_quantity
     try:
         return parse_inventory_quantity(
             row.get("reorder_point") if row.get("reorder_point") is not None else row.get("default_reorder_point"),
@@ -89,20 +77,13 @@ def _reorder_point(row: dict[str, Any]) -> int:
 
 
 def _parse_reorder_point(value: Any) -> tuple[int, str | None]:
-    try:
-        from app.utils.inventory_quantity import try_parse_inventory_quantity
-    except ImportError:
-        from utils.inventory_quantity import try_parse_inventory_quantity  # type: ignore
+    from app.utils.inventory_quantity import try_parse_inventory_quantity
     return try_parse_inventory_quantity(value, allow_zero=True, field_name="Reorder point")
 
 
 def pricing_guide_lookup_maps() -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
     """Return (by_inventory_id, by_pricing_id) maps for linked pricing rows."""
-    try:
-        from app.services.pricing_guide_service import cached_pricing_guide_rows
-    except ImportError:
-        from services.pricing_guide_service import cached_pricing_guide_rows  # type: ignore
-
+    from app.services.pricing_guide_service import cached_pricing_guide_rows
     by_inv: dict[str, dict[str, Any]] = {}
     by_pg: dict[str, dict[str, Any]] = {}
     for row in cached_pricing_guide_rows(include_inactive=True):
@@ -116,11 +97,7 @@ def pricing_guide_lookup_maps() -> tuple[dict[str, dict[str, Any]], dict[str, di
 
 
 def enrich_inventory_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    try:
-        from app.perf_debug import perf_span
-    except ImportError:
-        from perf_debug import perf_span  # type: ignore
-
+    from app.perf_debug import perf_span
     with perf_span("inventory.enrich_rows"):
         return _enrich_inventory_rows_impl(rows)
 
@@ -178,10 +155,7 @@ def derive_inventory_stock_status(row: dict[str, Any]) -> str:
 
 def inventory_status_fields_for_qty(row: dict[str, Any], new_qty: float | int) -> dict[str, Any]:
     """Return inventory_items fields to persist after a quantity change."""
-    try:
-        from app.utils.inventory_quantity import parse_inventory_quantity
-    except ImportError:
-        from utils.inventory_quantity import parse_inventory_quantity  # type: ignore
+    from app.utils.inventory_quantity import parse_inventory_quantity
     qty_int = parse_inventory_quantity(new_qty, allow_negative=True, allow_zero=True)
     patched = dict(row)
     patched["quantity_on_hand"] = qty_int
@@ -210,10 +184,7 @@ def apply_pricing_stock_settings_to_inventory(pg_row: dict[str, Any]) -> Service
     inv = get_inventory_item(inv_id)
     if not inv:
         return ServiceResult(ok=True, data={"skipped": True})
-    try:
-        from app.services.repository import update_row_admin
-    except ImportError:
-        from services.repository import update_row_admin  # type: ignore
+    from app.services.repository import update_row_admin
     rp, rp_err = _parse_reorder_point(pg_row.get("default_reorder_point"))
     if rp_err:
         return ServiceResult(ok=False, error=rp_err)
@@ -232,10 +203,7 @@ def sync_linked_inventory_reorder(pricing_item_id: str) -> ServiceResult:
     pid = str(pricing_item_id or "").strip()
     if not pid:
         return ServiceResult(ok=False, error="Missing pricing item id.")
-    try:
-        from app.services.pricing_guide_service import cached_pricing_guide_rows
-    except ImportError:
-        from services.pricing_guide_service import cached_pricing_guide_rows  # type: ignore
+    from app.services.pricing_guide_service import cached_pricing_guide_rows
     row = next(
         (r for r in cached_pricing_guide_rows(include_inactive=True) if str(r.get("id") or "") == pid),
         None,
@@ -273,10 +241,7 @@ def _ensure_inventory_link_for_policy(
 
     qty = 0
     if quantity_on_hand is not None:
-        try:
-            from app.utils.inventory_quantity import try_parse_inventory_quantity
-        except ImportError:
-            from utils.inventory_quantity import try_parse_inventory_quantity  # type: ignore
+        from app.utils.inventory_quantity import try_parse_inventory_quantity
         qty, qty_err = try_parse_inventory_quantity(
             quantity_on_hand,
             allow_zero=True,
@@ -288,11 +253,7 @@ def _ensure_inventory_link_for_policy(
     if not should_create:
         return fresh, messages, None
 
-    try:
-        from app.services.catalog_presence_service import apply_catalog_presence, resolve_catalog_presence
-    except ImportError:
-        from services.catalog_presence_service import apply_catalog_presence, resolve_catalog_presence  # type: ignore
-
+    from app.services.catalog_presence_service import apply_catalog_presence, resolve_catalog_presence
     presence = resolve_catalog_presence(fresh)
     result = apply_catalog_presence(
         fresh,
@@ -303,11 +264,7 @@ def _ensure_inventory_link_for_policy(
     if not result.ok:
         return fresh, messages, result
 
-    try:
-        from app.services.pricing_guide_service import cached_pricing_guide_rows
-    except ImportError:
-        from services.pricing_guide_service import cached_pricing_guide_rows  # type: ignore
-
+    from app.services.pricing_guide_service import cached_pricing_guide_rows
     pid = str(fresh.get("id") or "").strip()
     fresh = next(
         (r for r in cached_pricing_guide_rows(include_inactive=True) if str(r.get("id") or "") == pid),
@@ -340,11 +297,7 @@ def _apply_quantity_on_hand_to_inventory(
     if delta == 0:
         return [], None
 
-    try:
-        from app.services.inventory_service import record_inventory_transaction
-    except ImportError:
-        from services.inventory_service import record_inventory_transaction  # type: ignore
-
+    from app.services.inventory_service import record_inventory_transaction
     txn = record_inventory_transaction(
         {
             "inventory_id": inv_id,
@@ -356,10 +309,7 @@ def _apply_quantity_on_hand_to_inventory(
         }
     )
     if not txn.ok:
-        try:
-            from app.services.repository import update_row_admin
-        except ImportError:
-            from services.repository import update_row_admin  # type: ignore
+        from app.services.repository import update_row_admin
         res = update_row_admin(
             "inventory_items",
             {
@@ -397,11 +347,7 @@ def save_pricing_stock_settings(
     if rp_err:
         return ServiceResult(ok=False, error=rp_err)
 
-    try:
-        from app.services.repository import update_row_admin
-    except ImportError:
-        from services.repository import update_row_admin  # type: ignore
-
+    from app.services.repository import update_row_admin
     res = update_row_admin(
         "pricing_guide_items",
         {
@@ -416,10 +362,7 @@ def save_pricing_stock_settings(
 
     clear_pricing_guide_cache()
 
-    try:
-        from app.services.pricing_guide_service import cached_pricing_guide_rows
-    except ImportError:
-        from services.pricing_guide_service import cached_pricing_guide_rows  # type: ignore
+    from app.services.pricing_guide_service import cached_pricing_guide_rows
     fresh = next(
         (r for r in cached_pricing_guide_rows(include_inactive=True) if str(r.get("id") or "") == pid),
         {**pg_row, "stock_policy": policy, "default_reorder_point": rp},
@@ -429,10 +372,7 @@ def save_pricing_stock_settings(
 
     qty_value: int | None = None
     if policy in {"mandatory", "optional"} and quantity_on_hand is not None:
-        try:
-            from app.utils.inventory_quantity import try_parse_inventory_quantity
-        except ImportError:
-            from utils.inventory_quantity import try_parse_inventory_quantity  # type: ignore
+        from app.utils.inventory_quantity import try_parse_inventory_quantity
         qty_value, qty_err = try_parse_inventory_quantity(
             quantity_on_hand,
             allow_zero=True,

@@ -5,25 +5,14 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-try:
-    from app.db import (
-        delete_rows_admin,
-        fetch_by_match_admin,
-        fetch_table_admin,
-        insert_row_admin,
-        update_rows_admin,
-    )
-    from app.services.job_weekly_timesheets import monday_of_week, week_bounds
-except ImportError:
-    from db import (  # type: ignore
-        delete_rows_admin,
-        fetch_by_match_admin,
-        fetch_table_admin,
-        insert_row_admin,
-        update_rows_admin,
-    )
-    from services.job_weekly_timesheets import monday_of_week, week_bounds  # type: ignore
-
+from app.db import (
+    delete_rows_admin,
+    fetch_by_match_admin,
+    fetch_table_admin,
+    insert_row_admin,
+    update_rows_admin,
+)
+from app.services.job_weekly_timesheets import monday_of_week, week_bounds
 TABLE = "job_daily_updates"
 DAILY_UPDATES_MISSING_MSG = (
     "No job daily updates table found. Work performed can be entered manually."

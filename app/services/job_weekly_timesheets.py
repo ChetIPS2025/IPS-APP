@@ -14,21 +14,8 @@ from reportlab.lib.units import inch
 from reportlab.platypus import Image as RLImage
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-try:
-    from app.db import create_signed_url, fetch_by_match_admin, fetch_table_admin, insert_row_admin, update_rows_admin, upload_bytes_admin
-    from app.services.job_service import job_row_select_label
-except ImportError:
-    from db import (  # type: ignore
-        create_signed_url,
-        fetch_by_match_admin,
-        fetch_table_admin,
-        insert_row_admin,
-        update_rows_admin,
-        upload_bytes_admin,
-    )
-    from services.job_service import job_row_select_label  # type: ignore
-
-
+from app.db import create_signed_url, fetch_by_match_admin, fetch_table_admin, insert_row_admin, update_rows_admin, upload_bytes_admin
+from app.services.job_service import job_row_select_label
 DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 

@@ -6,12 +6,7 @@ import re
 import uuid
 from typing import Any
 
-try:
-    from app.config import settings
-except ImportError:
-    from config import settings  # type: ignore
-
-
+from app.config import settings
 def reference_bucket() -> str:
     return str(getattr(settings, "job_reference_attachments_bucket", "") or "job-reference-attachments").strip()
 

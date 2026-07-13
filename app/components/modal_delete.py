@@ -7,17 +7,9 @@ from contextlib import contextmanager
 
 import streamlit as st
 
-try:
-    from app.components.action_styles import danger_outline_button, danger_solid_button
-except ImportError:
-    from components.action_styles import danger_outline_button, danger_solid_button  # type: ignore
-
-
+from app.components.action_styles import danger_outline_button, danger_solid_button
 def can_admin_mutate() -> bool:
-    try:
-        from app.auth import current_role, effective_role
-    except ImportError:
-        from auth import current_role, effective_role  # type: ignore
+    from app.auth import current_role, effective_role
     return str(effective_role() or "").strip().lower() in {"admin", "manager", "supervisor"}
 
 

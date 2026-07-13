@@ -6,95 +6,49 @@ import html
 
 import streamlit as st
 
-try:
-    from app.auth import current_profile, current_role, effective_role
-    from app.components.clickable_table import render_clickable_table
-    from app.components.headers import render_page_brand_header
-    from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.table_filters import (
-        apply_column_filters,
-        build_filter_options,
-        clear_table_filters,
-        render_table_header_cell,
-    )
-    from app.components.record_modal import (
-        build_modal_cache,
-        clear_record_modal,
-        detail_field_html,
-        dialog_card_html,
-        get_modal_record,
-        is_edit_mode,
-        open_record_modal,
-        placeholder_html,
-        record_session_key,
-        render_edit_form_header,
-        render_missing_record,
-        render_modal_edit_button,
-        render_modal_header,
-        render_modal_meta_grid,
-        render_modal_shell,
-        render_save_cancel_actions,
-        safe_value,
-        set_view_mode,
-        show_modal_if_pending,
-    )
-    from app.pages._core._crud import apply_persist_feedback, is_demo_id
-    from app.pages._core._data import (
-        document_link_ref_options,
-        load_documents_hub,
-        lookup_options,
-        persist_document,
-    )
-    from app.pages._core._session import select_key
-    from app.styles import inject_documents_module_css
-    from app.utils.constants import DOCUMENT_LINK_MODULES
-    from app.utils.formatting import fmt_date
-    from app.utils.permissions import can_view_hr_documents, normalize_role
-except ImportError:
-    from auth import current_profile, current_role, effective_role  # type: ignore
-    from components.clickable_table import render_clickable_table  # type: ignore
-    from components.headers import render_page_brand_header  # type: ignore
-    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.table_filters import (  # type: ignore
-        apply_column_filters,
-        build_filter_options,
-        clear_table_filters,
-        render_table_header_cell,
-    )
-    from components.record_modal import (  # type: ignore
-        build_modal_cache,
-        clear_record_modal,
-        detail_field_html,
-        dialog_card_html,
-        get_modal_record,
-        is_edit_mode,
-        open_record_modal,
-        placeholder_html,
-        record_session_key,
-        render_edit_form_header,
-        render_missing_record,
-        render_modal_edit_button,
-        render_modal_header,
-        render_modal_meta_grid,
-        render_modal_shell,
-        render_save_cancel_actions,
-        safe_value,
-        set_view_mode,
-        show_modal_if_pending,
-    )
-    from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
-    from pages._core._data import (  # type: ignore
-        document_link_ref_options,
-        load_documents_hub,
-        lookup_options,
-        persist_document,
-    )
-    from pages._core._session import select_key  # type: ignore
-    from utils.constants import DOCUMENT_LINK_MODULES  # type: ignore
-    from styles import inject_documents_module_css  # type: ignore
-    from utils.formatting import fmt_date  # type: ignore
-    from utils.permissions import can_view_hr_documents, normalize_role  # type: ignore
-
+from app.auth import current_profile, current_role, effective_role
+from app.components.clickable_table import render_clickable_table
+from app.components.headers import render_page_brand_header
+from app.components.layout import render_filter_bar as layout_filter_bar
+from app.components.table_filters import (
+    apply_column_filters,
+    build_filter_options,
+    clear_table_filters,
+    render_table_header_cell,
+)
+from app.components.record_modal import (
+    build_modal_cache,
+    clear_record_modal,
+    detail_field_html,
+    dialog_card_html,
+    get_modal_record,
+    is_edit_mode,
+    open_record_modal,
+    placeholder_html,
+    record_session_key,
+    render_edit_form_header,
+    render_missing_record,
+    render_modal_edit_button,
+    render_modal_header,
+    render_modal_meta_grid,
+    render_modal_shell,
+    render_save_cancel_actions,
+    safe_value,
+    set_view_mode,
+    show_modal_if_pending,
+)
+from app.pages._core._crud import apply_persist_feedback, is_demo_id
+from app.pages._core._data import (
+    document_link_ref_options,
+    load_documents_hub,
+    lookup_options,
+    persist_document,
+)
+from app.pages._core._session import select_key
+from app.styles import inject_documents_module_css
+from app.utils.constants import DOCUMENT_LINK_MODULES
+from app.utils.formatting import fmt_date
+from app.utils.permissions import can_view_hr_documents, normalize_role
 _SEL = select_key("documents")
 _TABLE_KEY = "documents_list"
 MODULE = "documents"
@@ -440,10 +394,7 @@ def _show_document_modal() -> None:
 
 
 def render() -> None:
-    try:
-        from app.pages._core._access import begin_module
-    except ImportError:
-        from pages._core._access import begin_module  # type: ignore
+    from app.pages._core._access import begin_module
     if not begin_module("documents"):
         return
     inject_documents_module_css()

@@ -6,7 +6,7 @@ import logging
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
-from services.field_ops_util import fetch_fn, table_exists, write_fn
+from app.services.field_ops_util import fetch_fn, table_exists, write_fn
 
 _LOG = logging.getLogger(__name__)
 
@@ -147,10 +147,7 @@ def approve_batch_and_sync_time_entries(
     if not jid or not wd:
         raise RuntimeError("Batch missing job or date")
     lines = fetch_batch_lines(bid, admin=admin)
-    try:
-        from app.db import fetch_by_match_admin, insert_row_admin, update_rows_admin
-    except ImportError:
-        from db import fetch_by_match_admin, insert_row_admin, update_rows_admin  # type: ignore
+    from app.db import fetch_by_match_admin, insert_row_admin, update_rows_admin
     synced = 0
     for line in lines:
         eid = str(line.get("employee_id") or "").strip()
@@ -187,10 +184,7 @@ def approve_batch_and_sync_time_entries(
                 payload["created_by"] = approved_by
             inserted = insert_row_admin("time_entries", payload)
             entry_id = str((inserted or {}).get("id") or "")
-        try:
-            from app.services.job_cost_transaction_service import _safe_sync, sync_time_entry
-        except ImportError:
-            from services.job_cost_transaction_service import _safe_sync, sync_time_entry  # type: ignore
+        from app.services.job_cost_transaction_service import _safe_sync, sync_time_entry
         if entry_id:
             _safe_sync(sync_time_entry, entry_id)
         synced += 1
@@ -206,10 +200,7 @@ def approve_batch_and_sync_time_entries(
         },
         {"id": bid},
     )
-    try:
-        from services.job_timeline import EVENT_CREW_TIME, log_job_event
-    except ImportError:
-        from app.services.job_timeline import EVENT_CREW_TIME, log_job_event  # type: ignore
+    from app.services.job_timeline import EVENT_CREW_TIME, log_job_event
     log_job_event(
         job_id=jid,
         event_type=EVENT_CREW_TIME,

@@ -8,187 +8,95 @@ from collections.abc import Callable
 
 import streamlit as st
 
-try:
-    from app.auth import current_profile, current_role
-    from app.components.user_actions import (
-        is_user_action_confirm_open,
-        render_user_action_button_row,
-        render_user_action_confirm_panel,
-    )
-    from app.components.headers import render_page_brand_header
-    from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.table_pagination import (
-        paginate_rows,
-        render_table_pagination_footer,
-        render_table_pagination_header,
-        reset_table_page,
-    )
-    from app.components.users_list_table import (
-        USERS_TABLE_LAST_ACTION_KEY,
-        build_users_html_table,
-        render_users_table_bridge_legacy,
-        render_users_table_open_buttons,
-        user_status_pill_html,
-    )
-    from app.components.users_page_layout import (
-        close_users_filter_bar_shell,
-        inject_users_page_layout_css,
-        render_users_filter_bar_shell,
-    )
-    from app.components.table_filters import (
-        apply_column_filters,
-        build_filter_options,
-        clear_table_filters,
-        get_column_filter_values,
-        has_active_column_filters,
-        render_table_header_cell,
-        sanitize_column_filters,
-    )
-    from app.components.record_modal import (
-        build_modal_cache,
-        clear_edit_modes,
-        clear_record_modal,
-        detail_field_html,
-        dialog_card_html,
-        get_modal_record,
-        is_edit_mode,
-        open_record_modal,
-        placeholder_html,
-        record_session_key,
-        render_edit_form_header,
-        render_missing_record,
-        render_compact_modal_header,
-        render_compact_modal_meta_grid,
-        render_modal_shell,
-        render_save_cancel_actions,
-        safe_value,
-        set_view_mode,
-        show_modal_if_pending,
-        status_pill_html,
-    )
-    from app.components.tables import render_data_table
-    from app.components.status import status_pill_html as legacy_status_pill_html
-    from app.pages._core._data import (
-        ACTIVE_EMPLOYEE_KEY,
-        clear_employees_catalog_cache,
-        load_employee_documents,
-        load_employees,
-        lookup_options,
-        persist_employee,
-    )
-    from app.pages._core._crud import apply_persist_feedback, is_demo_id
-    from app.pages._core._session import select_key
-    from app.config import settings
-    from app.db import invite_auth_user, resend_invite_by_email
-    from app.services.employee_role_service import (
-        auth_role_from_permission_label,
-        billing_classification_options,
-        options_with_current,
-        permission_role_options,
-    )
-    from app.services.repository import clear_data_cache_for_table, get_last_fetch_error
-    from app.services.users_service import (
-        admin_reset_employee_password,
-        can_edit_employee_profile,
-        can_manage_user_actions,
-        get_user_delete_context,
-        resolve_employee_auth_login,
-    )
-    from app.styles import inject_users_module_css
-    from app.utils.constants import DEPARTMENTS, SESSION_NAV_KEY
-    from app.utils.formatting import fmt_date
-    from app.utils.permissions import can_view_hr_documents, normalize_role
-except ImportError:
-    from auth import current_profile, current_role  # type: ignore
-    from components.user_actions import (  # type: ignore
-        is_user_action_confirm_open,
-        render_user_action_button_row,
-        render_user_action_confirm_panel,
-    )
-    from components.headers import render_page_brand_header  # type: ignore
-    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.table_pagination import (  # type: ignore
-        paginate_rows,
-        render_table_pagination_footer,
-        render_table_pagination_header,
-        reset_table_page,
-    )
-    from components.users_list_table import (  # type: ignore
-        USERS_TABLE_LAST_ACTION_KEY,
-        build_users_html_table,
-        render_users_table_bridge_legacy,
-        render_users_table_open_buttons,
-        user_status_pill_html,
-    )
-    from components.users_page_layout import (  # type: ignore
-        close_users_filter_bar_shell,
-        inject_users_page_layout_css,
-        render_users_filter_bar_shell,
-    )
-    from components.table_filters import (  # type: ignore
-        apply_column_filters,
-        build_filter_options,
-        clear_table_filters,
-        get_column_filter_values,
-        has_active_column_filters,
-        render_table_header_cell,
-        sanitize_column_filters,
-    )
-    from components.record_modal import (  # type: ignore
-        build_modal_cache,
-        clear_edit_modes,
-        clear_record_modal,
-        detail_field_html,
-        dialog_card_html,
-        get_modal_record,
-        is_edit_mode,
-        open_record_modal,
-        placeholder_html,
-        record_session_key,
-        render_edit_form_header,
-        render_missing_record,
-        render_compact_modal_header,
-        render_compact_modal_meta_grid,
-        render_modal_shell,
-        render_save_cancel_actions,
-        safe_value,
-        set_view_mode,
-        show_modal_if_pending,
-        status_pill_html,
-    )
-    from components.tables import render_data_table  # type: ignore
-    from components.status import status_pill_html as legacy_status_pill_html  # type: ignore
-    from pages._core._data import (  # type: ignore
-        ACTIVE_EMPLOYEE_KEY,
-        clear_employees_catalog_cache,
-        load_employee_documents,
-        load_employees,
-        lookup_options,
-        persist_employee,
-    )
-    from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
-    from pages._core._session import select_key  # type: ignore
-    from config import settings  # type: ignore
-    from db import invite_auth_user, resend_invite_by_email  # type: ignore
-    from services.employee_role_service import (  # type: ignore
-        auth_role_from_permission_label,
-        billing_classification_options,
-        options_with_current,
-        permission_role_options,
-    )
-    from services.repository import clear_data_cache_for_table, get_last_fetch_error  # type: ignore
-    from services.users_service import (  # type: ignore
-        admin_reset_employee_password,
-        can_edit_employee_profile,
-        can_manage_user_actions,
-        get_user_delete_context,
-        resolve_employee_auth_login,
-    )
-    from styles import inject_users_module_css  # type: ignore
-    from utils.constants import DEPARTMENTS, SESSION_NAV_KEY  # type: ignore
-    from utils.formatting import fmt_date  # type: ignore
-    from utils.permissions import can_view_hr_documents, normalize_role  # type: ignore
-
+from app.auth import current_profile, current_role
+from app.components.user_actions import (
+    is_user_action_confirm_open,
+    render_user_action_button_row,
+    render_user_action_confirm_panel,
+)
+from app.components.headers import render_page_brand_header
+from app.components.layout import render_filter_bar as layout_filter_bar
+from app.components.table_pagination import (
+    paginate_rows,
+    render_table_pagination_footer,
+    render_table_pagination_header,
+    reset_table_page,
+)
+from app.components.users_list_table import (
+    USERS_TABLE_LAST_ACTION_KEY,
+    build_users_html_table,
+    render_users_table_bridge_legacy,
+    render_users_table_open_buttons,
+    user_status_pill_html,
+)
+from app.components.users_page_layout import (
+    close_users_filter_bar_shell,
+    inject_users_page_layout_css,
+    render_users_filter_bar_shell,
+)
+from app.components.table_filters import (
+    apply_column_filters,
+    build_filter_options,
+    clear_table_filters,
+    get_column_filter_values,
+    has_active_column_filters,
+    render_table_header_cell,
+    sanitize_column_filters,
+)
+from app.components.record_modal import (
+    build_modal_cache,
+    clear_edit_modes,
+    clear_record_modal,
+    detail_field_html,
+    dialog_card_html,
+    get_modal_record,
+    is_edit_mode,
+    open_record_modal,
+    placeholder_html,
+    record_session_key,
+    render_edit_form_header,
+    render_missing_record,
+    render_compact_modal_header,
+    render_compact_modal_meta_grid,
+    render_modal_shell,
+    render_save_cancel_actions,
+    safe_value,
+    set_view_mode,
+    show_modal_if_pending,
+    status_pill_html,
+)
+from app.components.tables import render_data_table
+from app.components.status import status_pill_html as legacy_status_pill_html
+from app.pages._core._data import (
+    ACTIVE_EMPLOYEE_KEY,
+    clear_employees_catalog_cache,
+    load_employee_documents,
+    load_employees,
+    lookup_options,
+    persist_employee,
+)
+from app.pages._core._crud import apply_persist_feedback, is_demo_id
+from app.pages._core._session import select_key
+from app.config import settings
+from app.db import invite_auth_user, resend_invite_by_email
+from app.services.employee_role_service import (
+    auth_role_from_permission_label,
+    billing_classification_options,
+    options_with_current,
+    permission_role_options,
+)
+from app.services.repository import clear_data_cache_for_table, get_last_fetch_error
+from app.services.users_service import (
+    admin_reset_employee_password,
+    can_edit_employee_profile,
+    can_manage_user_actions,
+    get_user_delete_context,
+    resolve_employee_auth_login,
+)
+from app.styles import inject_users_module_css
+from app.utils.constants import DEPARTMENTS, SESSION_NAV_KEY
+from app.utils.formatting import fmt_date
+from app.utils.permissions import can_view_hr_documents, normalize_role
 _SEL = select_key("employees")
 _TABLE_KEY = "employees_list"
 _SEARCH_KEY = "employees_list_search"
@@ -322,10 +230,7 @@ def _employee_number_edit_value(user: dict) -> str:
 
 
 def _employee_hire_date_edit_value(user: dict):
-    try:
-        from app.services.certification_helpers import coerce_date
-    except ImportError:
-        from services.certification_helpers import coerce_date  # type: ignore
+    from app.services.certification_helpers import coerce_date
     raw = user.get("hire_date")
     if raw in (None, "", "—"):
         return None
@@ -473,10 +378,7 @@ def _open_user_from_list(user: dict) -> None:
         id_fields=("id", "email"),
     )
     st.session_state[ACTIVE_EMPLOYEE_KEY] = uid
-    try:
-        from app.ui.streamlit_perf import ips_app_rerun
-    except ImportError:
-        from ui.streamlit_perf import ips_app_rerun  # type: ignore
+    from app.ui.streamlit_perf import ips_app_rerun
     ips_app_rerun()
 
 
@@ -577,10 +479,7 @@ def _render_custom_users_table(
 
 def _render_user_certifications_tab(emp: dict) -> None:
     eid = str(emp.get("id") or "").strip()
-    try:
-        from app.pages.employee_certifications import render_employee_detail_certifications_tab
-    except ImportError:
-        from pages.employee_certifications import render_employee_detail_certifications_tab  # type: ignore
+    from app.pages.employee_certifications import render_employee_detail_certifications_tab
     render_employee_detail_certifications_tab(eid, employee=emp, session_prefix="emp_cert_")
 
 
@@ -1200,10 +1099,7 @@ def render_employee_detail_dialog(emp: dict) -> None:
             ]
         )
         _render_user_login_panel(emp, rk)
-        try:
-            from app.components.install_share import render_install_share_user_details
-        except ImportError:
-            from components.install_share import render_install_share_user_details  # type: ignore
+        from app.components.install_share import render_install_share_user_details
         render_install_share_user_details()
         _render_user_actions_panel(emp, rk)
 
@@ -1227,10 +1123,7 @@ def _show_employee_modal() -> None:
 
 
 def render() -> None:
-    try:
-        from app.pages._core._access import begin_module
-    except ImportError:
-        from pages._core._access import begin_module  # type: ignore
+    from app.pages._core._access import begin_module
     if not begin_module("employees"):
         return
     inject_users_module_css()
@@ -1244,10 +1137,7 @@ def render() -> None:
         else:
             st.success(message)
     if not st.session_state.get("_ips_core_employees_seeded"):
-        try:
-            from app.services.employee_seed_service import ensure_core_employee_seed
-        except ImportError:
-            from services.employee_seed_service import ensure_core_employee_seed  # type: ignore
+        from app.services.employee_seed_service import ensure_core_employee_seed
         ensure_core_employee_seed()
         st.session_state["_ips_core_employees_seeded"] = True
         clear_employees_catalog_cache()

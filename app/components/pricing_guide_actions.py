@@ -8,18 +8,10 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.components.action_styles import danger_solid_button, warning_solid_button
-    from app.pages._core._crud import is_demo_id
-    from app.services.pricing_guide_service import clear_pricing_guide_cache, delete_pricing_item
-    from app.services.repository import update_row
-except ImportError:
-    from components.action_styles import danger_solid_button, warning_solid_button  # type: ignore
-    from pages._core._crud import is_demo_id  # type: ignore
-    from services.pricing_guide_service import clear_pricing_guide_cache, delete_pricing_item  # type: ignore
-    from services.repository import update_row  # type: ignore
-
-
+from app.components.action_styles import danger_solid_button, warning_solid_button
+from app.pages._core._crud import is_demo_id
+from app.services.pricing_guide_service import clear_pricing_guide_cache, delete_pricing_item
+from app.services.repository import update_row
 def _confirm_state_key(item_id: str, action: str) -> str:
     return f"confirm_{action}_pricing_guide_{item_id}"
 

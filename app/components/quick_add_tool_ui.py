@@ -6,59 +6,31 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.services.asset_kits_service import get_tool_trailers
-    from app.services.quick_add_tool_service import (
-        TOOL_KIND_LABELS,
-        TOOL_KINDS,
-        analyze_tool_photos,
-        attach_tool_photo,
-        attach_tool_photos_bundle,
-        attach_tool_receipt,
-        bulk_import_tools,
-        is_duplicate_serial_result,
-        lookup_existing_serialized_by_serial,
-        merge_serialized_tool_from_intake,
-        parse_bulk_import_file,
-        quick_add_tool,
-    )
-    from app.services.serialized_tool_service import MILWAUKEE_TOOL_TYPES
-    from app.services.small_hand_tool_service import HAND_TOOL_CATEGORIES, STORAGE_TYPES
-    from app.services.tool_intake_ai_service import (
-        extract_tool_from_photo,
-        load_tool_ai_config,
-        ocr_tool_receipt,
-        search_tool_by_image,
-        tool_ai_status,
-    )
-    from app.ui.ips_modal_form import ensure_modal_styles, modal_wide_marker
-except ImportError:
-    from services.asset_kits_service import get_tool_trailers  # type: ignore
-    from services.quick_add_tool_service import (  # type: ignore
-        TOOL_KIND_LABELS,
-        TOOL_KINDS,
-        analyze_tool_photos,
-        attach_tool_photo,
-        attach_tool_photos_bundle,
-        attach_tool_receipt,
-        bulk_import_tools,
-        is_duplicate_serial_result,
-        lookup_existing_serialized_by_serial,
-        merge_serialized_tool_from_intake,
-        parse_bulk_import_file,
-        quick_add_tool,
-    )
-    from services.serialized_tool_service import MILWAUKEE_TOOL_TYPES  # type: ignore
-    from services.small_hand_tool_service import HAND_TOOL_CATEGORIES, STORAGE_TYPES  # type: ignore
-    from services.tool_intake_ai_service import (  # type: ignore
-        extract_tool_from_photo,
-        load_tool_ai_config,
-        ocr_tool_receipt,
-        search_tool_by_image,
-        tool_ai_status,
-    )
-    from ui.ips_modal_form import ensure_modal_styles, modal_wide_marker  # type: ignore
-
+from app.services.asset_kits_service import get_tool_trailers
+from app.services.quick_add_tool_service import (
+    TOOL_KIND_LABELS,
+    TOOL_KINDS,
+    analyze_tool_photos,
+    attach_tool_photo,
+    attach_tool_photos_bundle,
+    attach_tool_receipt,
+    bulk_import_tools,
+    is_duplicate_serial_result,
+    lookup_existing_serialized_by_serial,
+    merge_serialized_tool_from_intake,
+    parse_bulk_import_file,
+    quick_add_tool,
+)
+from app.services.serialized_tool_service import MILWAUKEE_TOOL_TYPES
+from app.services.small_hand_tool_service import HAND_TOOL_CATEGORIES, STORAGE_TYPES
+from app.services.tool_intake_ai_service import (
+    extract_tool_from_photo,
+    load_tool_ai_config,
+    ocr_tool_receipt,
+    search_tool_by_image,
+    tool_ai_status,
+)
+from app.ui.ips_modal_form import ensure_modal_styles, modal_wide_marker
 QUICK_ADD_OPEN_KEY = "ips_quick_add_tool_open"
 
 _METHOD_TABS = ("Manual entry", "Tool photo", "Receipt", "Bulk import")
@@ -107,10 +79,7 @@ def _clean_text(value: object) -> str:
 
 
 def _clear_assets_cache_and_rerun() -> None:
-    try:
-        from app.services.assets_service import clear_assets_cache
-    except ImportError:
-        from services.assets_service import clear_assets_cache  # type: ignore
+    from app.services.assets_service import clear_assets_cache
     clear_assets_cache()
     st.rerun()
 
@@ -172,10 +141,7 @@ def _resolve_photo_primary(prefix: str, uploads: list[Any]) -> tuple[bytes | Non
     choice_id = str(st.session_state.get(f"{prefix}_{_QAT_PHOTO_PRIMARY_CHOICE_KEY}") or _PRIMARY_UPLOAD_CHOICE)
     preview_bytes, preview_filename, _ = _resolve_primary_from_analysis(analysis_data, choice_id)
     if not preview_bytes and uploads:
-        try:
-            from app.services.tool_preview_image_service import pick_best_upload_preview
-        except ImportError:
-            from services.tool_preview_image_service import pick_best_upload_preview  # type: ignore
+        from app.services.tool_preview_image_service import pick_best_upload_preview
         try:
             batch = [(u.getvalue(), u.name) for u in uploads]
             preview = pick_best_upload_preview(batch)
@@ -988,10 +954,7 @@ def _bulk_form(kind: str, *, prefix: str, trailer_id: str) -> None:
             for err in (data.get("errors") or [])[:5]:
                 st.warning(str(err))
             close_quick_add_tool_dialog()
-            try:
-                from app.services.assets_service import clear_assets_cache
-            except ImportError:
-                from services.assets_service import clear_assets_cache  # type: ignore
+            from app.services.assets_service import clear_assets_cache
             clear_assets_cache()
             st.rerun()
         else:

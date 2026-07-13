@@ -4,11 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-try:
-    from app.navigation import set_nav_slug
-except ImportError:
-    from navigation import set_nav_slug  # type: ignore
-
+from app.navigation import set_nav_slug
 SESSION_JOB_KEY = "coupling_insp_job_id"
 SESSION_EQUIPMENT_KEY = "coupling_insp_equipment_id"
 SESSION_INSPECTION_KEY = "coupling_insp_id"

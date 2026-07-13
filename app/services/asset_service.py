@@ -8,34 +8,18 @@ from typing import Any
 
 _LOG = logging.getLogger(__name__)
 
-try:
-    from db import (
-        delete_rows_admin,
-        delete_storage_object_admin,
-        fetch_by_match,
-        fetch_table,
-        fetch_one,
-        insert_row_admin,
-        update_rows_admin,
-        upload_bytes_admin,
-    )
-    from services.asset_duplicate_service import find_possible_duplicates
-    from services.asset_maintenance_service import calculate_next_service
-except ImportError:
-    from app.db import (  # type: ignore
-        delete_rows_admin,
-        delete_storage_object_admin,
-        fetch_by_match,
-        fetch_table,
-        fetch_one,
-        insert_row_admin,
-        update_rows_admin,
-        upload_bytes_admin,
-    )
-    from app.services.asset_duplicate_service import find_possible_duplicates  # type: ignore
-    from app.services.asset_maintenance_service import calculate_next_service  # type: ignore
-
-
+from app.db import (
+    delete_rows_admin,
+    delete_storage_object_admin,
+    fetch_by_match,
+    fetch_table,
+    fetch_one,
+    insert_row_admin,
+    update_rows_admin,
+    upload_bytes_admin,
+)
+from app.services.asset_duplicate_service import find_possible_duplicates
+from app.services.asset_maintenance_service import calculate_next_service
 def next_asset_id(assets: list[dict]) -> str:
     nums: list[int] = []
     for asset in assets:

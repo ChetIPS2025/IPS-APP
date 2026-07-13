@@ -7,13 +7,8 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.pages._core._data import dashboard_job_status_overview, load_recent_item_activity
-    from app.services.job_service import normalize_job_status_for_filter
-except ImportError:
-    from pages._core._data import dashboard_job_status_overview, load_recent_item_activity  # type: ignore
-    from services.job_service import normalize_job_status_for_filter  # type: ignore
-
+from app.pages._core._data import dashboard_job_status_overview, load_recent_item_activity
+from app.services.job_service import normalize_job_status_for_filter
 _STATUS_PANEL_ORDER: tuple[tuple[str, str, str], ...] = (
     ("Active", "#2563eb", "#dbeafe"),
     ("On Hold", "#d97706", "#ffedd5"),
@@ -54,10 +49,7 @@ def _jobs_by_status_counts() -> tuple[dict[str, int], bool]:
     overview, is_live = dashboard_job_status_overview()
     counts = {label: 0 for label, _, _ in _STATUS_PANEL_ORDER}
     if is_live and overview:
-        try:
-            from app.pages._core._data import load_jobs
-        except ImportError:
-            from pages._core._data import load_jobs  # type: ignore
+        from app.pages._core._data import load_jobs
         for job in load_jobs():
             if not isinstance(job, dict) or bool(job.get("is_deleted")):
                 continue

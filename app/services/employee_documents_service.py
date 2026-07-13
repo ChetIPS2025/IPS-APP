@@ -6,19 +6,11 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-try:
-    from app.auth import current_profile
-    from app.db import create_signed_url, upload_bytes_admin
-    from app.services.certification_helpers import date_to_iso
-    from app.services.phase2_modules_service import save_employee_document as _save_row
-    from app.services.repository import ServiceResult, clear_data_cache_for_table, update_row
-except ImportError:
-    from auth import current_profile  # type: ignore
-    from db import create_signed_url, upload_bytes_admin  # type: ignore
-    from services.certification_helpers import date_to_iso  # type: ignore
-    from services.phase2_modules_service import save_employee_document as _save_row  # type: ignore
-    from services.repository import ServiceResult, clear_data_cache_for_table, update_row  # type: ignore
-
+from app.auth import current_profile
+from app.db import create_signed_url, upload_bytes_admin
+from app.services.certification_helpers import date_to_iso
+from app.services.phase2_modules_service import save_employee_document as _save_row
+from app.services.repository import ServiceResult, clear_data_cache_for_table, update_row
 EMPLOYEE_DOCUMENTS_BUCKET = "employee-documents"
 _ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".pdf", ".doc", ".docx", ".xls", ".xlsx"}
 _MIME_BY_EXT = {

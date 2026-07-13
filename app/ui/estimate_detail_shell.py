@@ -360,10 +360,7 @@ def render_tab_bar(*, active_tab: str, key_prefix: str = "est_det_tab") -> str |
 def navigate_estimate_tab(tab: str) -> None:
     if tab == "Materials":
         eid = str(st.session_state.get("selected_estimate_id") or st.session_state.get("ips_sel_estimates") or "").strip()
-        try:
-            from app.navigation import ESTIMATE_DETAIL_TAB_KEY, navigate_to_estimate_detail
-        except ImportError:
-            from navigation import ESTIMATE_DETAIL_TAB_KEY, navigate_to_estimate_detail  # type: ignore
+        from app.navigation import ESTIMATE_DETAIL_TAB_KEY, navigate_to_estimate_detail
         if eid:
             navigate_to_estimate_detail(eid, tab="Materials")
         else:

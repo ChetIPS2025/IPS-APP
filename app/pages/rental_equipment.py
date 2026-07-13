@@ -7,33 +7,18 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.components.rental_equipment_inspection_launcher import open_rental_inspection
-    from app.pages._core._access import begin_module
-    from app.pages.rental_equipment_dashboard import _render_damage_report, _render_history
-    from app.services.assets_service import get_asset_image_url
-    from app.services.rental_equipment_inspection_service import (
-        create_auto_inspection,
-        get_rental_equipment_dashboard_summary,
-        inspection_type_label,
-        list_rental_equipment_assets,
-        list_rental_inspections_for_asset,
-        rental_inspection_dashboard_status,
-    )
-except ImportError:
-    from components.rental_equipment_inspection_launcher import open_rental_inspection  # type: ignore
-    from pages._core._access import begin_module  # type: ignore
-    from pages.rental_equipment_dashboard import _render_damage_report, _render_history  # type: ignore
-    from services.assets_service import get_asset_image_url  # type: ignore
-    from services.rental_equipment_inspection_service import (  # type: ignore
-        create_auto_inspection,
-        get_rental_equipment_dashboard_summary,
-        inspection_type_label,
-        list_rental_equipment_assets,
-        list_rental_inspections_for_asset,
-        rental_inspection_dashboard_status,
-    )
-
+from app.components.rental_equipment_inspection_launcher import open_rental_inspection
+from app.pages._core._access import begin_module
+from app.pages.rental_equipment_dashboard import _render_damage_report, _render_history
+from app.services.assets_service import get_asset_image_url
+from app.services.rental_equipment_inspection_service import (
+    create_auto_inspection,
+    get_rental_equipment_dashboard_summary,
+    inspection_type_label,
+    list_rental_equipment_assets,
+    list_rental_inspections_for_asset,
+    rental_inspection_dashboard_status,
+)
 _STATUS_COLORS = {
     "Checked Out": "#dbeafe",
     "Returned": "#dcfce7",
@@ -70,9 +55,6 @@ def _start_inspection(asset: dict[str, Any], inspection_type: str) -> None:
 
 def render() -> None:
     """Legacy slug — rental equipment is managed under Assets → Equipment."""
-    try:
-        from app.navigation import set_nav_slug
-    except ImportError:
-        from navigation import set_nav_slug  # type: ignore
+    from app.navigation import set_nav_slug
     set_nav_slug("assets")
     st.rerun()

@@ -133,11 +133,7 @@ def _period_delta_pct(current: float, previous: float) -> tuple[str, str]:
 
 def job_status_overview(jobs: list[dict[str, Any]]) -> dict[str, int]:
     """Job counts by normalized status for the dashboard donut chart."""
-    try:
-        from app.services.job_service import normalize_job_status_for_filter
-    except ImportError:
-        from services.job_service import normalize_job_status_for_filter  # type: ignore
-
+    from app.services.job_service import normalize_job_status_for_filter
     counts: dict[str, int] = {}
     for job in jobs:
         if not isinstance(job, dict) or bool(job.get("is_deleted")):
@@ -157,11 +153,7 @@ def compute_dashboard_kpis(
     period_end: date | None = None,
 ) -> dict[str, Any]:
     """Build dashboard KPI dict including job metrics and period comparisons."""
-    try:
-        from app.services.job_service import dashboard_job_metrics
-    except ImportError:
-        from services.job_service import dashboard_job_metrics  # type: ignore
-
+    from app.services.job_service import dashboard_job_metrics
     end = period_end or date.today()
     start = period_start or end.replace(day=1)
     prev_end = start - timedelta(days=1)

@@ -8,43 +8,23 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.auth import current_profile, current_role, effective_role, is_authenticated
-    from app.pages._core._data import load_employees, load_inventory
-    from app.services.inventory_service import get_inventory_transactions, list_inventory
-    from app.services.job_materials_service import (
-        add_manual_job_material,
-        add_pricing_guide_job_material,
-        fetch_job_materials,
-        issue_inventory_to_job,
-        job_material_line_total,
-        job_materials_total,
-        list_pricing_guide_job_options,
-        resolve_inventory_by_scan_code,
-    )
-    from app.services.tasks_service import get_tasks_by_job
-    from app.navigation import IPS_NAV_PENDING_KEY
-    from app.utils.formatting import fmt_currency, fmt_date
-    from app.utils.inventory_quantity import format_inventory_quantity, inventory_qty_input_kwargs
-except ImportError:
-    from auth import current_profile, current_role, effective_role, is_authenticated  # type: ignore
-    from pages._core._data import load_employees, load_inventory  # type: ignore
-    from services.inventory_service import get_inventory_transactions, list_inventory  # type: ignore
-    from services.job_materials_service import (  # type: ignore
-        add_manual_job_material,
-        add_pricing_guide_job_material,
-        fetch_job_materials,
-        issue_inventory_to_job,
-        job_material_line_total,
-        job_materials_total,
-        list_pricing_guide_job_options,
-        resolve_inventory_by_scan_code,
-    )
-    from services.tasks_service import get_tasks_by_job  # type: ignore
-    from app.navigation import IPS_NAV_PENDING_KEY  # type: ignore
-    from utils.formatting import fmt_currency, fmt_date  # type: ignore
-    from utils.inventory_quantity import format_inventory_quantity, inventory_qty_input_kwargs  # type: ignore
-
+from app.auth import current_profile, current_role, effective_role, is_authenticated
+from app.pages._core._data import load_employees, load_inventory
+from app.services.inventory_service import get_inventory_transactions, list_inventory
+from app.services.job_materials_service import (
+    add_manual_job_material,
+    add_pricing_guide_job_material,
+    fetch_job_materials,
+    issue_inventory_to_job,
+    job_material_line_total,
+    job_materials_total,
+    list_pricing_guide_job_options,
+    resolve_inventory_by_scan_code,
+)
+from app.services.tasks_service import get_tasks_by_job
+from app.navigation import IPS_NAV_PENDING_KEY
+from app.utils.formatting import fmt_currency, fmt_date
+from app.utils.inventory_quantity import format_inventory_quantity, inventory_qty_input_kwargs
 _USAGE_SOURCE_LABELS = {
     "pricing_guide": "Pricing Guide",
     "qr_scan": "Scan / lookup",
@@ -53,10 +33,7 @@ _USAGE_SOURCE_LABELS = {
 }
 
 def _txn_action_label(txn_type: str) -> str:
-    try:
-        from app.services.inventory_service import inventory_action_label
-    except ImportError:
-        from services.inventory_service import inventory_action_label  # type: ignore
+    from app.services.inventory_service import inventory_action_label
     return inventory_action_label(txn_type)
 
 
@@ -65,10 +42,7 @@ def _profile_employee_id() -> str | None:
     em = str(prof.get("email") or "").strip().lower()
     if not em:
         return None
-    try:
-        from app.db import fetch_table_admin
-    except ImportError:
-        from db import fetch_table_admin  # type: ignore
+    from app.db import fetch_table_admin
     try:
         rows = fetch_table_admin("employees", columns="id,email", limit=5000)
     except Exception:
@@ -212,11 +186,7 @@ def _material_row_thumbnail_html(
     inv_by_id: dict[str, dict[str, Any]],
     pg_by_id: dict[str, dict[str, Any]],
 ) -> str:
-    try:
-        from app.services.catalog_images import catalog_thumbnail_html
-    except ImportError:
-        from services.catalog_images import catalog_thumbnail_html  # type: ignore
-
+    from app.services.catalog_images import catalog_thumbnail_html
     thumb_class = "ips-inventory-thumb-img ips-job-mat-thumb"
     cell_class = "ips-inventory-thumb-cell"
     iid = str(row.get("inventory_item_id") or "").strip()
@@ -536,10 +506,7 @@ def render_job_materials_tab(job: dict, *, key_prefix: str = "job_mat") -> None:
     bc1, bc2 = st.columns([1, 1], gap="small")
     with bc2:
         if st.button("Open Job Costing", key=f"{key_prefix}_open_jc", use_container_width=True):
-            try:
-                from app.navigation import open_jobs_job_costing
-            except ImportError:
-                from navigation import open_jobs_job_costing  # type: ignore
+            from app.navigation import open_jobs_job_costing
             open_jobs_job_costing(job_id=jid)
             st.rerun()
 

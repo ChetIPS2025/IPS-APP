@@ -6,11 +6,7 @@ import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
-try:
-    from app.config import settings
-except ImportError:
-    from config import settings  # type: ignore
-
+from app.config import settings
 _LOG = logging.getLogger(__name__)
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -61,10 +57,7 @@ def _bool(v: Any, default: bool = False) -> bool:
 
 
 def _table_exists_admin(table_name: str) -> bool:
-    try:
-        from app.db import fetch_table_admin
-    except ImportError:
-        from db import fetch_table_admin  # type: ignore
+    from app.db import fetch_table_admin
     try:
         fetch_table_admin(table_name, columns="id", limit=1, order_by=None)
         return True
@@ -88,15 +81,8 @@ def upsert_job_email_settings(
     jid = str(job_id or "").strip()
     if not jid:
         raise ValueError("job_id required")
-    try:
-        from app.db import fetch_by_match_admin
-    except ImportError:
-        from db import fetch_by_match_admin  # type: ignore
-    try:
-        from app.services.repository import insert_row_admin, update_row_admin
-    except ImportError:
-        from services.repository import insert_row_admin, update_row_admin  # type: ignore
-
+    from app.db import fetch_by_match_admin
+    from app.services.repository import insert_row_admin, update_row_admin
     existing = None
     try:
         rows = fetch_by_match_admin("job_email_settings", {"job_id": jid}, limit=1)
@@ -127,10 +113,7 @@ def fetch_job_email_settings_row(job_id: str, *, admin: bool) -> dict[str, Any] 
     jid = str(job_id or "").strip()
     if not jid:
         return None
-    try:
-        from app.db import fetch_by_match, fetch_by_match_admin
-    except ImportError:
-        from db import fetch_by_match, fetch_by_match_admin  # type: ignore
+    from app.db import fetch_by_match, fetch_by_match_admin
     fn = fetch_by_match_admin if admin else fetch_by_match
     try:
         rows = fn("job_email_settings", {"job_id": jid}, limit=1)
@@ -156,10 +139,7 @@ def _log_email_notification(
     meta: dict[str, Any] | None = None,
     sent: bool = False,
 ) -> None:
-    try:
-        from app.db import insert_row_admin
-    except ImportError:
-        from db import insert_row_admin  # type: ignore
+    from app.db import insert_row_admin
     insert_row_admin(
         "email_notifications",
         {
@@ -272,10 +252,7 @@ def _send_email(
 
 
 def _delay_labels(report: dict[str, Any]) -> list[str]:
-    try:
-        from app.services.supervisor_daily_reports import delay_labels_map
-    except ImportError:
-        from services.supervisor_daily_reports import delay_labels_map  # type: ignore
+    from app.services.supervisor_daily_reports import delay_labels_map
     labels = delay_labels_map()
     out: list[str] = []
     for k, lbl in labels.items():
@@ -386,11 +363,7 @@ def run_daily_supervisor_report_emails(
     d = target_date or date.today()
     if not _table_exists_admin("job_email_settings") or not _table_exists_admin("supervisor_daily_reports"):
         return {"sent": 0, "skipped": 0, "failed": 0}
-    try:
-        from app.db import create_signed_url, fetch_by_match_admin, fetch_table_admin, get_admin_client
-    except ImportError:
-        from db import create_signed_url, fetch_by_match_admin, fetch_table_admin, get_admin_client  # type: ignore
-
+    from app.db import create_signed_url, fetch_by_match_admin, fetch_table_admin, get_admin_client
     jobs = list(fetch_table_admin("jobs", limit=8000, order_by="job_number") or [])
     settings_rows = list(fetch_table_admin("job_email_settings", limit=10000, order_by=None) or [])
     set_by_job = {str(r.get("job_id") or "").strip(): r for r in settings_rows if isinstance(r, dict)}
@@ -526,11 +499,7 @@ def run_weekly_friday_customer_updates(*, friday: date | None = None) -> dict[st
         return {"sent": 0, "skipped": 0, "failed": 0}
     if not _table_exists_admin("job_email_settings") or not _table_exists_admin("supervisor_daily_reports"):
         return {"sent": 0, "skipped": 0, "failed": 0}
-    try:
-        from app.db import fetch_table_admin, get_admin_client
-    except ImportError:
-        from db import fetch_table_admin, get_admin_client  # type: ignore
-
+    from app.db import fetch_table_admin, get_admin_client
     week_start, week_end = _week_bounds_for(f)
     s_iso = week_start.isoformat()[:10]
     e_iso = week_end.isoformat()[:10]
@@ -647,16 +616,8 @@ def pipeline_digest_recipients(*, override: list[str] | None = None) -> list[str
 
 
 def _pipeline_attention_rows() -> list[dict[str, Any]]:
-    try:
-        from app.services.pipeline_service import build_pipeline_rows, filter_pipeline_rows
-    except ImportError:
-        from services.pipeline_service import build_pipeline_rows, filter_pipeline_rows  # type: ignore
-
-    try:
-        from app.pages._core._data import load_estimates, load_jobs
-    except ImportError:
-        from pages._core._data import load_estimates, load_jobs  # type: ignore
-
+    from app.services.pipeline_service import build_pipeline_rows, filter_pipeline_rows
+    from app.pages._core._data import load_estimates, load_jobs
     rows = build_pipeline_rows(load_estimates(), load_jobs())
     return filter_pipeline_rows(rows, view="Needs Attention")
 

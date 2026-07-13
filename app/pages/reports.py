@@ -10,71 +10,37 @@ from typing import Any, Callable
 
 import streamlit as st
 
-try:
-    from app.components.headers import render_page_brand_header
-    from app.components.status import status_pill_html
-    from app.components.tables import render_data_table
-    from app.components.tabs import render_tabs
-    from app.pages._core._data import (
-        demo_report_asset_maintenance,
-        demo_report_certs_expiring,
-        demo_report_completed_jobs,
-        demo_report_inventory_value,
-        demo_report_job_profitability,
-        demo_report_labor_by_employee,
-        demo_report_labor_by_job,
-        demo_report_low_stock,
-        demo_report_open_estimates,
-        demo_report_timekeeping_summary,
-    )
-    from app.services.reports_service import (
-        ReportData,
-        live_asset_maintenance_report,
-        live_certs_expiring_report,
-        live_completed_jobs_report,
-        live_inventory_value_report,
-        live_job_profitability_report,
-        live_labor_by_employee_report,
-        live_labor_by_job_report,
-        live_low_stock_report,
-        live_open_estimates_report,
-        live_timekeeping_summary_report,
-    )
-    from app.styles import inject_global_css
-    from app.utils.formatting import fmt_currency, fmt_date, fmt_hours
-except ImportError:
-    from components.headers import render_page_brand_header  # type: ignore
-    from components.status import status_pill_html  # type: ignore
-    from components.tables import render_data_table  # type: ignore
-    from components.tabs import render_tabs  # type: ignore
-    from pages._core._data import (  # type: ignore
-        demo_report_asset_maintenance,
-        demo_report_certs_expiring,
-        demo_report_completed_jobs,
-        demo_report_inventory_value,
-        demo_report_job_profitability,
-        demo_report_labor_by_employee,
-        demo_report_labor_by_job,
-        demo_report_low_stock,
-        demo_report_open_estimates,
-        demo_report_timekeeping_summary,
-    )
-    from services.reports_service import (  # type: ignore
-        ReportData,
-        live_asset_maintenance_report,
-        live_certs_expiring_report,
-        live_completed_jobs_report,
-        live_inventory_value_report,
-        live_job_profitability_report,
-        live_labor_by_employee_report,
-        live_labor_by_job_report,
-        live_low_stock_report,
-        live_open_estimates_report,
-        live_timekeeping_summary_report,
-    )
-    from styles import inject_global_css  # type: ignore
-    from utils.formatting import fmt_currency, fmt_date, fmt_hours  # type: ignore
-
+from app.components.headers import render_page_brand_header
+from app.components.status import status_pill_html
+from app.components.tables import render_data_table
+from app.components.tabs import render_tabs
+from app.pages._core._data import (
+    demo_report_asset_maintenance,
+    demo_report_certs_expiring,
+    demo_report_completed_jobs,
+    demo_report_inventory_value,
+    demo_report_job_profitability,
+    demo_report_labor_by_employee,
+    demo_report_labor_by_job,
+    demo_report_low_stock,
+    demo_report_open_estimates,
+    demo_report_timekeeping_summary,
+)
+from app.services.reports_service import (
+    ReportData,
+    live_asset_maintenance_report,
+    live_certs_expiring_report,
+    live_completed_jobs_report,
+    live_inventory_value_report,
+    live_job_profitability_report,
+    live_labor_by_employee_report,
+    live_labor_by_job_report,
+    live_low_stock_report,
+    live_open_estimates_report,
+    live_timekeeping_summary_report,
+)
+from app.styles import inject_global_css
+from app.utils.formatting import fmt_currency, fmt_date, fmt_hours
 _TAB_KEY = "ips_reports_tab"
 
 
@@ -340,10 +306,7 @@ def _render_compliance() -> None:
 
 def render() -> None:
     inject_global_css()
-    try:
-        from app.pages._core._access import begin_module
-    except ImportError:
-        from pages._core._access import begin_module  # type: ignore
+    from app.pages._core._access import begin_module
     if not begin_module("reports", inject_css=False):
         return
     st.markdown(

@@ -8,25 +8,14 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.auth import current_role, effective_role
-    from app.pages._core._crud import is_demo_id
-    from app.services.estimate_job_workflow_service import (
-        can_approve_estimates,
-        estimate_status_approvable,
-        estimate_visible_in_approved_view,
-    )
-    from app.utils.formatting import fmt_currency, fmt_date
-except ImportError:
-    from auth import current_role, effective_role  # type: ignore
-    from pages._core._crud import is_demo_id  # type: ignore
-    from services.estimate_job_workflow_service import (  # type: ignore
-        can_approve_estimates,
-        estimate_status_approvable,
-        estimate_visible_in_approved_view,
-    )
-    from utils.formatting import fmt_currency, fmt_date  # type: ignore
-
+from app.auth import current_role, effective_role
+from app.pages._core._crud import is_demo_id
+from app.services.estimate_job_workflow_service import (
+    can_approve_estimates,
+    estimate_status_approvable,
+    estimate_visible_in_approved_view,
+)
+from app.utils.formatting import fmt_currency, fmt_date
 ESTIMATES_LIST_TABLE_HEADERS: tuple[tuple[str, str], ...] = (
     ("num", "ESTIMATE #"),
     ("desc", "PROJECT / DESCRIPTION"),
@@ -120,10 +109,7 @@ def estimate_number(row: dict[str, Any]) -> str:
 
 
 def estimate_project(row: dict[str, Any]) -> str:
-    try:
-        from app.services.phase2_modules_service import estimate_project_title
-    except ImportError:
-        from services.phase2_modules_service import estimate_project_title  # type: ignore
+    from app.services.phase2_modules_service import estimate_project_title
     return estimate_project_title(row)
 
 
@@ -604,10 +590,7 @@ def handle_estimates_table_action(
         open_estimate_fn(eid, estimates_by_id.get(eid))
         st.rerun()
         return
-    try:
-        from app.navigation import navigate_to_estimate_detail
-    except ImportError:
-        from navigation import navigate_to_estimate_detail  # type: ignore
+    from app.navigation import navigate_to_estimate_detail
     navigate_to_estimate_detail(eid)
     st.rerun()
 
@@ -645,11 +628,7 @@ def render_estimates_table_bridge(
     pending_approve_key: str = "est_pending_approve_id",
     open_estimate_fn: Callable[[str, dict[str, Any] | None], None] | None = None,
 ) -> None:
-    try:
-        from app.ui.clean_table import _components_html
-    except ImportError:
-        from ui.clean_table import _components_html  # type: ignore
-
+    from app.ui.clean_table import _components_html
     picked = _components_html(
         f"""
 <script>

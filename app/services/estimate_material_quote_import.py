@@ -8,25 +8,14 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
 
-try:
-    from app.data.handwritten_material_quote_source import (
-        HANDWRITTEN_MATERIAL_QUOTE_ID,
-        HANDWRITTEN_MATERIAL_QUOTE_LINES,
-        HANDWRITTEN_MATERIAL_QUOTE_NOTES,
-        handwritten_material_quote_source_rows,
-    )
-    from app.estimate.calculations import _D0, _dec, _q2, money_db, money_str
-    from app.services.pricing_guide_service import cached_pricing_guide_rows
-except ImportError:
-    from data.handwritten_material_quote_source import (  # type: ignore
-        HANDWRITTEN_MATERIAL_QUOTE_ID,
-        HANDWRITTEN_MATERIAL_QUOTE_LINES,
-        HANDWRITTEN_MATERIAL_QUOTE_NOTES,
-        handwritten_material_quote_source_rows,
-    )
-    from estimate.calculations import _D0, _dec, _q2, money_db, money_str  # type: ignore
-    from services.pricing_guide_service import cached_pricing_guide_rows  # type: ignore
-
+from app.data.handwritten_material_quote_source import (
+    HANDWRITTEN_MATERIAL_QUOTE_ID,
+    HANDWRITTEN_MATERIAL_QUOTE_LINES,
+    HANDWRITTEN_MATERIAL_QUOTE_NOTES,
+    handwritten_material_quote_source_rows,
+)
+from app.estimate.calculations import _D0, _dec, _q2, money_db, money_str
+from app.services.pricing_guide_service import cached_pricing_guide_rows
 _PER_FT = frozenset({"per ft", "per foot", "/ft", "ft"})
 _PER_EACH = frozenset({"each", "per ea", "ea", "/ea"})
 _PER_STICK = frozenset({"per 20 ft stick", "per stick", "stick"})
@@ -436,13 +425,8 @@ def apply_material_quote_to_estimate(
     estimate_id: str,
     bundle: MaterialQuoteImportBundle,
 ) -> tuple[bool, str, dict[str, Any]]:
-    try:
-        from app.services.estimate_costing_service import add_estimate_material_batch
-        from app.services.repository import update_row_admin
-    except ImportError:
-        from services.estimate_costing_service import add_estimate_material_batch  # type: ignore
-        from services.repository import update_row_admin  # type: ignore
-
+    from app.services.estimate_costing_service import add_estimate_material_batch
+    from app.services.repository import update_row_admin
     payloads = material_quote_lines_to_estimate_payloads(bundle)
     result = add_estimate_material_batch(estimate_id, payloads)
     if not result.ok:
@@ -461,13 +445,8 @@ def create_estimate_for_material_quote(
     *,
     quote_number: str = "",
 ) -> tuple[bool, str, str | None]:
-    try:
-        from app.db import insert_row_admin
-        from app.services.shared_sequence import ensure_quote_number_for_save
-    except ImportError:
-        from db import insert_row_admin  # type: ignore
-        from services.shared_sequence import ensure_quote_number_for_save  # type: ignore
-
+    from app.db import insert_row_admin
+    from app.services.shared_sequence import ensure_quote_number_for_save
     qn = str(quote_number or "").strip()
     if not qn:
         qn = ensure_quote_number_for_save("", year=None)

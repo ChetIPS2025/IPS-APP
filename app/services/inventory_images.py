@@ -73,10 +73,7 @@ def _linked_pricing_row(item: dict[str, Any]) -> dict[str, Any] | None:
     pid = str(item.get("pricing_guide_id") or item.get("pricing_item_id") or "").strip()
     if not pid:
         return None
-    try:
-        from app.services.pricing_guide_service import cached_pricing_guide_rows
-    except ImportError:
-        from services.pricing_guide_service import cached_pricing_guide_rows  # type: ignore
+    from app.services.pricing_guide_service import cached_pricing_guide_rows
     return next((r for r in cached_pricing_guide_rows(include_inactive=True) if str(r.get("id") or "") == pid), None)
 
 
@@ -130,10 +127,7 @@ def get_inventory_image_url(item: dict[str, Any], *, expires_in: int = 3600) -> 
         return url
     linked_pg = _linked_pricing_row(item)
     if linked_pg:
-        try:
-            from app.services.pricing_guide_images import get_pricing_guide_image_url
-        except ImportError:
-            from services.pricing_guide_images import get_pricing_guide_image_url  # type: ignore
+        from app.services.pricing_guide_images import get_pricing_guide_image_url
         return get_pricing_guide_image_url(linked_pg, expires_in=expires_in)
     return None
 

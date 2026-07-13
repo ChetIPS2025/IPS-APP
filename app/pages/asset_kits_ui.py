@@ -9,61 +9,32 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.auth import current_profile
-    from app.components.kit_audit_item_ui import clear_audit_item_photos, render_audit_item_fields
-    from app.components.action_styles import danger_outline
-    from app.components.status import status_pill_html
-    from app.pages._core._data import load_assets, load_inventory, load_jobs
-    from app.services.asset_kits_service import (
-        CONDITIONS,
-        ITEM_STATUSES,
-        ITEM_TYPES,
-        KIT_TYPES,
-        asset_is_kit,
-        convert_asset_to_kit,
-        create_asset_kit_item,
-        create_asset_kit_items_multi,
-        delete_asset_kit_item,
-        get_asset_kit_audits,
-        get_asset_kit_items,
-        get_asset_kit_summary,
-        get_asset_kit_transactions,
-        get_missing_tools_report,
-        get_overdue_kit_audits,
-        get_tool_trailers,
-        update_asset_kit_item,
-    )
-    from app.services.serialized_tool_service import audit_trailer_tools, dispatch_trailer_to_job
-    from app.utils.formatting import fmt_currency, fmt_date
-except ImportError:
-    from auth import current_profile  # type: ignore
-    from components.kit_audit_item_ui import clear_audit_item_photos, render_audit_item_fields  # type: ignore
-    from components.action_styles import danger_outline  # type: ignore
-    from components.status import status_pill_html  # type: ignore
-    from pages._core._data import load_assets, load_inventory, load_jobs  # type: ignore
-    from services.asset_kits_service import (  # type: ignore
-        CONDITIONS,
-        ITEM_STATUSES,
-        ITEM_TYPES,
-        KIT_TYPES,
-        asset_is_kit,
-        convert_asset_to_kit,
-        create_asset_kit_item,
-        create_asset_kit_items_multi,
-        delete_asset_kit_item,
-        get_asset_kit_audits,
-        get_asset_kit_items,
-        get_asset_kit_summary,
-        get_asset_kit_transactions,
-        get_missing_tools_report,
-        get_overdue_kit_audits,
-        get_tool_trailers,
-        update_asset_kit_item,
-    )
-    from services.serialized_tool_service import audit_trailer_tools, dispatch_trailer_to_job  # type: ignore
-    from utils.formatting import fmt_currency, fmt_date  # type: ignore
-
+from app.auth import current_profile
+from app.components.kit_audit_item_ui import clear_audit_item_photos, render_audit_item_fields
+from app.components.action_styles import danger_outline
+from app.components.status import status_pill_html
+from app.pages._core._data import load_assets, load_inventory, load_jobs
+from app.services.asset_kits_service import (
+    CONDITIONS,
+    ITEM_STATUSES,
+    ITEM_TYPES,
+    KIT_TYPES,
+    asset_is_kit,
+    convert_asset_to_kit,
+    create_asset_kit_item,
+    create_asset_kit_items_multi,
+    delete_asset_kit_item,
+    get_asset_kit_audits,
+    get_asset_kit_items,
+    get_asset_kit_summary,
+    get_asset_kit_transactions,
+    get_missing_tools_report,
+    get_overdue_kit_audits,
+    get_tool_trailers,
+    update_asset_kit_item,
+)
+from app.services.serialized_tool_service import audit_trailer_tools, dispatch_trailer_to_job
+from app.utils.formatting import fmt_currency, fmt_date
 _KIT_STATUS_CLASS = {
     "present": "ips-kit-status-present",
     "missing": "ips-kit-status-missing",
@@ -200,10 +171,7 @@ def render_kit_accountability_summary() -> None:
 
 
 def _employee_options() -> list[tuple[str, dict[str, Any]]]:
-    try:
-        from app.pages._core._data import load_employees
-    except ImportError:
-        from pages._core._data import load_employees  # type: ignore
+    from app.pages._core._data import load_employees
     out: list[tuple[str, dict[str, Any]]] = [("— None —", {})]
     for e in load_employees():
         name = str(e.get("name") or "").strip()

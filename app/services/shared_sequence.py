@@ -240,10 +240,7 @@ def _collect_stored_quote_job_numbers() -> list[str]:
     """Load ``QYY###`` / paired ``JYY###`` from estimates and jobs tables only."""
     quotes: list[str] = []
     jobs: list[dict[str, Any]] = []
-    try:
-        from app.db import fetch_table_admin
-    except ImportError:
-        from db import fetch_table_admin  # type: ignore
+    from app.db import fetch_table_admin
     try:
         for row in fetch_table_admin("estimates", columns="quote_number", limit=10000) or []:
             normalized = _strict_quote_job_number(str(row.get("quote_number") or ""))
@@ -324,11 +321,7 @@ def next_available_job_number(
     exclude_job_id: str | None = None,
 ) -> str:
     """Next free ``JYY###`` for ``year`` (paired quotes + in-use check)."""
-    try:
-        from app.db import job_number_in_use
-    except ImportError:
-        from db import job_number_in_use  # type: ignore
-
+    from app.db import job_number_in_use
     y = year if year is not None else datetime.now(timezone.utc)
     start = max_sequence_for_year(y) + 1
     for seq in range(start, 1000):
@@ -363,10 +356,7 @@ def peek_quote_job_number(prefix: str, year: int | date | datetime) -> str:
 
 
 def _quote_number_in_use(quote_number: str, *, exclude_estimate_id: str | None = None) -> bool:
-    try:
-        from app.db import quote_number_in_use
-    except ImportError:
-        from db import quote_number_in_use  # type: ignore
+    from app.db import quote_number_in_use
     return quote_number_in_use(quote_number, exclude_estimate_id)
 
 
@@ -401,11 +391,7 @@ def next_available_quote_job_pair(
 
     Checks both ``estimates.quote_number`` and ``jobs.job_number`` (exact match).
     """
-    try:
-        from app.db import job_number_in_use, quote_number_in_use
-    except ImportError:
-        from db import job_number_in_use, quote_number_in_use  # type: ignore
-
+    from app.db import job_number_in_use, quote_number_in_use
     y = year if year is not None else datetime.now(timezone.utc)
     start = max_sequence_for_year(y) + 1
     for seq in range(start, 1000):

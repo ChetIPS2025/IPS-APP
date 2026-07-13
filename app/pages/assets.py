@@ -9,282 +9,143 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.components.asset_actions import (
-        asset_retire_delete_action_specs,
-        is_asset_action_confirm_open,
-        open_asset_action_confirm,
-        render_asset_action_confirm_panel,
-    )
-    from app.components.asset_pricing_guide_actions import (
-        handle_pricing_guide_header_click,
-        is_asset_pricing_guide_confirm_open,
-        pricing_guide_header_action_spec,
-        render_asset_pricing_guide_actions,
-        render_asset_pricing_guide_confirm_panel,
-    )
-    from app.components.asset_documents_tab import asset_documents_count, render_asset_documents_tab
-    from app.components.item_photo_manager import render_item_photo_manager
-    from app.components.headers import render_page_brand_header
-    from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.table_filters import (
-        apply_column_filters,
-        build_filter_options,
-        clear_table_filters,
-        render_table_header_cell,
-    )
-    from app.components.table_pagination import (
-        paginate_rows,
-        render_table_pagination_footer,
-        render_table_pagination_header,
-        reset_table_page,
-    )
-    from app.components.record_modal import (
-        build_modal_cache,
-        clear_edit_modes,
-        clear_record_modal,
-        detail_field_html,
-        dialog_card_html,
-        get_modal_record,
-        is_edit_mode,
-        open_record_modal,
-        placeholder_html,
-        record_session_key,
-        render_edit_form_header,
-        render_missing_record,
-        render_modal_header,
-        render_compact_modal_header,
-        render_modal_edit_button,
-        render_modal_meta_grid,
-        render_modal_shell,
-        render_save_cancel_actions,
-        safe_value,
-        set_edit_mode,
-        set_view_mode,
-        show_modal_if_pending,
-    )
-    from app.pages._core._data import load_assets, lookup_options, persist_asset
-    from app.pages._core._crud import apply_persist_feedback, is_demo_id
-    from app.pages._core._session import select_key
-    from app.styles import inject_assets_module_css
-    from app.services.asset_images import (
-        asset_display_record,
-        asset_image_is_inherited,
-        clear_asset_image,
-        upload_asset_image as upload_asset_image_file,
-    )
-    from app.services.item_images import ITEM_IMAGE_UPLOAD_TYPES
-    from app.services.assets_service import (
-        clear_assets_cache,
-        generate_asset_qr_value,
-        rebuild_asset_qr,
-        get_asset_image_url,
-        get_asset_thumbnail_url,
-        get_asset_inspections,
-        get_asset_issues,
-        upload_asset_image,
-    )
-    from app.ui.assets_components import (
-        inject_assets_page_styles,
-        maintenance_table_html,
-        status_badge_html,
-        summary_card_html,
-    )
-    from app.utils.formatting import fmt_currency, fmt_date
-    from app.services.asset_rental_service import (
-        RENTAL_RATE_UNITS,
-        normalize_rental_rate_unit,
-        primary_rental_rate_from_asset,
-    )
-    from app.services.phase2_modules_service import asset_is_rentable
-    from app.services.asset_kits_service import asset_is_kit, list_all_kit_items_enriched
-    from app.components.serialized_tools_ui import (
-        render_serialized_tool_tracking_panel,
-        render_serialized_tools_toolbar,
-    )
-    from app.components.small_hand_tools_ui import render_hand_tools_tab
-    from app.components.asset_reclassification_ui import (
-        apply_tracking_bucket_change,
-        render_asset_reclassification_panel,
-        render_asset_tracking_bucket_select,
-        render_equipment_bulk_move_toolbar,
-        seed_tracking_form_state,
-    )
-    from app.components.asset_row_actions_ui import ASSET_OPEN_ACTIVITY_KEY, render_asset_activity_snippet
-    from app.components.assets_list_table import (
-        ASSETS_TABLE_LAST_ACTION_KEY,
-        apply_assets_table_bridge_action,
-        build_assets_html_table,
-        render_assets_table_bridge,
-        render_assets_table_open_buttons,
-    )
-    from app.components.assets_page_layout import (
-        close_assets_filter_bar_shell,
-        inject_assets_page_layout_css,
-        render_assets_filter_bar_shell,
-    )
-    from app.components.quick_add_tool_ui import (
-        QUICK_ADD_OPEN_KEY,
-        open_quick_add_tool_dialog,
-        show_quick_add_tool_dialog,
-    )
-    from app.components.small_hand_tools_import_ui import (
-        HAND_TOOL_IMPORT_OPEN_KEY,
-        hand_tool_csv_template_bytes,
-        open_hand_tool_import_dialog,
-        show_hand_tool_import_dialog,
-    )
-    from app.pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab
-    from app.services.asset_classification_service import is_equipment_tab_asset, tracking_type_label
-    from app.services.serialized_tool_service import is_serialized_tool_asset, serialized_tool_view
-    from app.utils.field_context import (
-        FIELD_EXPANDED_ASSET_KEY,
-        clear_field_expanded,
-        field_expanded_id,
-        inject_field_row_expand_css,
-        is_field_context,
-        is_field_mode,
-        render_field_scan_bar,
-        toggle_field_expanded,
-    )
-except ImportError:
-    from components.asset_actions import (  # type: ignore
-        asset_retire_delete_action_specs,
-        is_asset_action_confirm_open,
-        open_asset_action_confirm,
-        render_asset_action_confirm_panel,
-    )
-    from components.asset_pricing_guide_actions import (  # type: ignore
-        handle_pricing_guide_header_click,
-        is_asset_pricing_guide_confirm_open,
-        pricing_guide_header_action_spec,
-        render_asset_pricing_guide_actions,
-        render_asset_pricing_guide_confirm_panel,
-    )
-    from components.asset_documents_tab import asset_documents_count, render_asset_documents_tab  # type: ignore
-    from components.item_photo_manager import render_item_photo_manager  # type: ignore
-    from components.headers import render_page_brand_header  # type: ignore
-    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.table_filters import (  # type: ignore
-        apply_column_filters,
-        build_filter_options,
-        clear_table_filters,
-        render_table_header_cell,
-    )
-    from components.table_pagination import (  # type: ignore
-        paginate_rows,
-        render_table_pagination_footer,
-        render_table_pagination_header,
-        reset_table_page,
-    )
-    from components.record_modal import (  # type: ignore
-        build_modal_cache,
-        clear_edit_modes,
-        clear_record_modal,
-        detail_field_html,
-        dialog_card_html,
-        get_modal_record,
-        is_edit_mode,
-        open_record_modal,
-        placeholder_html,
-        record_session_key,
-        render_edit_form_header,
-        render_missing_record,
-        render_modal_header,
-        render_compact_modal_header,
-        render_modal_edit_button,
-        render_modal_meta_grid,
-        render_modal_shell,
-        render_save_cancel_actions,
-        safe_value,
-        set_edit_mode,
-        set_view_mode,
-        show_modal_if_pending,
-    )
-    from pages._core._data import load_assets, lookup_options, persist_asset  # type: ignore
-    from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
-    from pages._core._session import select_key  # type: ignore
-    from styles import inject_assets_module_css  # type: ignore
-    from services.asset_images import (  # type: ignore
-        asset_display_record,
-        asset_image_is_inherited,
-        clear_asset_image,
-        upload_asset_image as upload_asset_image_file,
-    )
-    from services.item_images import ITEM_IMAGE_UPLOAD_TYPES  # type: ignore
-    from services.assets_service import (  # type: ignore
-        clear_assets_cache,
-        generate_asset_qr_value,
-        get_asset_image_url,
-        get_asset_thumbnail_url,
-        get_asset_inspections,
-        get_asset_issues,
-        upload_asset_image,
-    )
-    from ui.assets_components import (  # type: ignore
-        inject_assets_page_styles,
-        maintenance_table_html,
-        status_badge_html,
-        summary_card_html,
-    )
-    from utils.formatting import fmt_currency, fmt_date  # type: ignore
-    from services.asset_rental_service import (  # type: ignore
-        RENTAL_RATE_UNITS,
-        normalize_rental_rate_unit,
-        primary_rental_rate_from_asset,
-    )
-    from services.phase2_modules_service import asset_is_rentable  # type: ignore
-    from services.asset_kits_service import asset_is_kit, list_all_kit_items_enriched  # type: ignore
-    from components.serialized_tools_ui import (  # type: ignore
-        render_serialized_tool_tracking_panel,
-        render_serialized_tools_toolbar,
-    )
-    from components.small_hand_tools_ui import render_hand_tools_tab  # type: ignore
-    from components.asset_reclassification_ui import (  # type: ignore
-        apply_tracking_bucket_change,
-        render_asset_reclassification_panel,
-        render_asset_tracking_bucket_select,
-        render_equipment_bulk_move_toolbar,
-        seed_tracking_form_state,
-    )
-    from components.asset_row_actions_ui import ASSET_OPEN_ACTIVITY_KEY, render_asset_activity_snippet  # type: ignore
-    from components.assets_list_table import (  # type: ignore
-        ASSETS_TABLE_LAST_ACTION_KEY,
-        apply_assets_table_bridge_action,
-        build_assets_html_table,
-        render_assets_table_bridge,
-        render_assets_table_open_buttons,
-    )
-    from components.assets_page_layout import (  # type: ignore
-        close_assets_filter_bar_shell,
-        inject_assets_page_layout_css,
-        render_assets_filter_bar_shell,
-    )
-    from components.quick_add_tool_ui import (  # type: ignore
-        QUICK_ADD_OPEN_KEY,
-        open_quick_add_tool_dialog,
-        show_quick_add_tool_dialog,
-    )
-    from components.small_hand_tools_import_ui import (  # type: ignore
-        HAND_TOOL_IMPORT_OPEN_KEY,
-        hand_tool_csv_template_bytes,
-        open_hand_tool_import_dialog,
-        show_hand_tool_import_dialog,
-    )
-    from pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab  # type: ignore
-    from services.asset_classification_service import is_equipment_tab_asset, tracking_type_label  # type: ignore
-    from services.serialized_tool_service import is_serialized_tool_asset, serialized_tool_view  # type: ignore
-    from utils.field_context import (  # type: ignore
-        FIELD_EXPANDED_ASSET_KEY,
-        clear_field_expanded,
-        field_expanded_id,
-        inject_field_row_expand_css,
-        is_field_context,
-        is_field_mode,
-        render_field_scan_bar,
-        toggle_field_expanded,
-    )
-
+from app.components.asset_actions import (
+    asset_retire_delete_action_specs,
+    is_asset_action_confirm_open,
+    open_asset_action_confirm,
+    render_asset_action_confirm_panel,
+)
+from app.components.asset_pricing_guide_actions import (
+    handle_pricing_guide_header_click,
+    is_asset_pricing_guide_confirm_open,
+    pricing_guide_header_action_spec,
+    render_asset_pricing_guide_actions,
+    render_asset_pricing_guide_confirm_panel,
+)
+from app.components.asset_documents_tab import asset_documents_count, render_asset_documents_tab
+from app.components.item_photo_manager import render_item_photo_manager
+from app.components.headers import render_page_brand_header
+from app.components.layout import render_filter_bar as layout_filter_bar
+from app.components.table_filters import (
+    apply_column_filters,
+    build_filter_options,
+    clear_table_filters,
+    render_table_header_cell,
+)
+from app.components.table_pagination import (
+    paginate_rows,
+    render_table_pagination_footer,
+    render_table_pagination_header,
+    reset_table_page,
+)
+from app.components.record_modal import (
+    build_modal_cache,
+    clear_edit_modes,
+    clear_record_modal,
+    detail_field_html,
+    dialog_card_html,
+    get_modal_record,
+    is_edit_mode,
+    open_record_modal,
+    placeholder_html,
+    record_session_key,
+    render_edit_form_header,
+    render_missing_record,
+    render_modal_header,
+    render_compact_modal_header,
+    render_modal_edit_button,
+    render_modal_meta_grid,
+    render_modal_shell,
+    render_save_cancel_actions,
+    safe_value,
+    set_edit_mode,
+    set_view_mode,
+    show_modal_if_pending,
+)
+from app.pages._core._data import load_assets, lookup_options, persist_asset
+from app.pages._core._crud import apply_persist_feedback, is_demo_id
+from app.pages._core._session import select_key
+from app.styles import inject_assets_module_css
+from app.services.asset_images import (
+    asset_display_record,
+    asset_image_is_inherited,
+    clear_asset_image,
+    upload_asset_image as upload_asset_image_file,
+)
+from app.services.item_images import ITEM_IMAGE_UPLOAD_TYPES
+from app.services.assets_service import (
+    clear_assets_cache,
+    generate_asset_qr_value,
+    rebuild_asset_qr,
+    get_asset_image_url,
+    get_asset_thumbnail_url,
+    get_asset_inspections,
+    get_asset_issues,
+    upload_asset_image,
+)
+from app.ui.assets_components import (
+    inject_assets_page_styles,
+    maintenance_table_html,
+    status_badge_html,
+    summary_card_html,
+)
+from app.utils.formatting import fmt_currency, fmt_date
+from app.services.asset_rental_service import (
+    RENTAL_RATE_UNITS,
+    normalize_rental_rate_unit,
+    primary_rental_rate_from_asset,
+)
+from app.services.phase2_modules_service import asset_is_rentable
+from app.services.asset_kits_service import asset_is_kit, list_all_kit_items_enriched
+from app.components.serialized_tools_ui import (
+    render_serialized_tool_tracking_panel,
+    render_serialized_tools_toolbar,
+)
+from app.components.small_hand_tools_ui import render_hand_tools_tab
+from app.components.asset_reclassification_ui import (
+    apply_tracking_bucket_change,
+    render_asset_reclassification_panel,
+    render_asset_tracking_bucket_select,
+    render_equipment_bulk_move_toolbar,
+    seed_tracking_form_state,
+)
+from app.components.asset_row_actions_ui import ASSET_OPEN_ACTIVITY_KEY, render_asset_activity_snippet
+from app.components.assets_list_table import (
+    ASSETS_TABLE_LAST_ACTION_KEY,
+    apply_assets_table_bridge_action,
+    build_assets_html_table,
+    render_assets_table_bridge,
+    render_assets_table_open_buttons,
+)
+from app.components.assets_page_layout import (
+    close_assets_filter_bar_shell,
+    inject_assets_page_layout_css,
+    render_assets_filter_bar_shell,
+)
+from app.components.quick_add_tool_ui import (
+    QUICK_ADD_OPEN_KEY,
+    open_quick_add_tool_dialog,
+    show_quick_add_tool_dialog,
+)
+from app.components.small_hand_tools_import_ui import (
+    HAND_TOOL_IMPORT_OPEN_KEY,
+    hand_tool_csv_template_bytes,
+    open_hand_tool_import_dialog,
+    show_hand_tool_import_dialog,
+)
+from app.pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab
+from app.services.asset_classification_service import is_equipment_tab_asset, tracking_type_label
+from app.services.serialized_tool_service import is_serialized_tool_asset, serialized_tool_view
+from app.utils.field_context import (
+    FIELD_EXPANDED_ASSET_KEY,
+    clear_field_expanded,
+    field_expanded_id,
+    inject_field_row_expand_css,
+    is_field_context,
+    is_field_mode,
+    render_field_scan_bar,
+    toggle_field_expanded,
+)
 _SEL = select_key("assets")
 _MOD = "assets"
 _ASSETS_MODAL_KEY = "ips_assets_detail_modal_id"
@@ -343,10 +204,7 @@ _ASSET_TABS = [
 
 
 def _normalize_asset_status(raw: object) -> str:
-    try:
-        from app.services.status_maps import normalize_asset_status
-    except ImportError:
-        from services.status_maps import normalize_asset_status  # type: ignore
+    from app.services.status_maps import normalize_asset_status
     return normalize_asset_status(raw)
 
 
@@ -385,10 +243,7 @@ def _small_tool_context_maps(rows: list[dict]) -> tuple[dict[str, dict], dict[st
     assets_by_id = {
         str(a.get("id") or "").strip(): a for a in rows if str(a.get("id") or "").strip()
     }
-    try:
-        from app.pages._core._data import load_employees, load_jobs
-    except ImportError:
-        from pages._core._data import load_employees, load_jobs  # type: ignore
+    from app.pages._core._data import load_employees, load_jobs
     employees_by_id = {
         str(e.get("id") or "").strip(): e for e in load_employees() if str(e.get("id") or "").strip()
     }
@@ -741,10 +596,7 @@ def _asset_status_pill_html(status: str) -> str:
 
 def _asset_image_src(asset: dict) -> str | None:
     """Resolve a browser-safe thumbnail URL via the unified catalog image resolver."""
-    try:
-        from app.services.catalog_images import get_catalog_image_url
-    except ImportError:
-        from services.catalog_images import get_catalog_image_url  # type: ignore
+    from app.services.catalog_images import get_catalog_image_url
     return get_catalog_image_url(asset, kind="asset")
 
 
@@ -778,10 +630,7 @@ def _render_asset_thumbnail(asset: dict) -> None:
 
 
 def _current_user_id() -> str | None:
-    try:
-        from app.auth import current_profile
-    except ImportError:
-        from auth import current_profile  # type: ignore
+    from app.auth import current_profile
     uid = str((current_profile() or {}).get("id") or "").strip()
     return uid or None
 
@@ -1408,25 +1257,14 @@ def _asset_for_qr(asset: dict) -> dict:
 
 
 def _render_asset_qr_block(asset: dict, aid: str) -> None:
-    try:
-        from app.components.qr_label_toolbar import render_qr_label_png_buttons
-        from app.services.asset_qr import (
-            qr_embed_subject,
-            qr_label_download_basename,
-            qr_label_png_bytes,
-            qr_payload,
-            qr_png_bytes,
-        )
-    except ImportError:
-        from components.qr_label_toolbar import render_qr_label_png_buttons  # type: ignore
-        from services.asset_qr import (  # type: ignore
-            qr_embed_subject,
-            qr_label_download_basename,
-            qr_label_png_bytes,
-            qr_payload,
-            qr_png_bytes,
-        )
-
+    from app.components.qr_label_toolbar import render_qr_label_png_buttons
+    from app.services.asset_qr import (
+        qr_embed_subject,
+        qr_label_download_basename,
+        qr_label_png_bytes,
+        qr_payload,
+        qr_png_bytes,
+    )
     qr_asset = _asset_for_qr(asset)
     token = qr_payload(qr_asset)
     if not token:
@@ -1487,10 +1325,7 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
 
 
 def _render_asset_documents_tab(asset: dict) -> None:
-    try:
-        from app.auth import current_role, effective_role, is_authenticated
-    except ImportError:
-        from auth import current_role, effective_role, is_authenticated  # type: ignore
+    from app.auth import current_role, effective_role, is_authenticated
     include_restricted = is_authenticated() and str(effective_role() or "").lower() in {
         "admin",
         "supervisor",
@@ -1506,11 +1341,7 @@ def _render_asset_documents_tab(asset: dict) -> None:
 
 def _render_asset_maintenance_tab(asset: dict) -> None:
     aid = str(asset.get("id") or "")
-    try:
-        from app.components.coupling_inspection_launcher import render_coupling_inspection_launcher
-    except ImportError:
-        from components.coupling_inspection_launcher import render_coupling_inspection_launcher  # type: ignore
-
+    from app.components.coupling_inspection_launcher import render_coupling_inspection_launcher
     job_id = str(asset.get("assigned_job_id") or asset.get("job_id") or "").strip() or None
     render_coupling_inspection_launcher(
         job_id=job_id,
@@ -1789,10 +1620,7 @@ def _render_asset_edit_form(asset: dict) -> None:
 
     st.markdown("##### Tracking tab")
     bucket = render_asset_tracking_bucket_select(asset, prefix="ast_edit")
-    try:
-        from app.components.asset_reclassification_ui import render_tracking_bucket_extra_fields
-    except ImportError:
-        from components.asset_reclassification_ui import render_tracking_bucket_extra_fields  # type: ignore
+    from app.components.asset_reclassification_ui import render_tracking_bucket_extra_fields
     render_tracking_bucket_extra_fields(asset, bucket, prefix="ast_edit")
 
     st.markdown("##### Usage")
@@ -2144,10 +1972,7 @@ def _focus_asset_detail_tab_if_requested() -> None:
     if not focus:
         return
     focus_lower = focus.lower()
-    try:
-        from app.ui.clean_table import _components_html
-    except ImportError:
-        from ui.clean_table import _components_html  # type: ignore
+    from app.ui.clean_table import _components_html
     label_js = focus_lower.replace("\\", "\\\\").replace("'", "\\'")
     _components_html(
         f"""
@@ -2194,27 +2019,15 @@ def _show_assets_detail_modal() -> None:
 
 
 def render() -> None:
-    try:
-        from app.pages._core._access import begin_module
-    except ImportError:
-        from pages._core._access import begin_module  # type: ignore
+    from app.pages._core._access import begin_module
     if not begin_module("assets"):
         return
-    try:
-        from app.navigation import ASSET_SCAN_EMBED_KEY
-    except ImportError:
-        from navigation import ASSET_SCAN_EMBED_KEY  # type: ignore
+    from app.navigation import ASSET_SCAN_EMBED_KEY
     if st.session_state.pop(ASSET_SCAN_EMBED_KEY, False):
-        try:
-            from app.pages.asset_scan import render_asset_scan_page
-        except ImportError:
-            from pages.asset_scan import render_asset_scan_page  # type: ignore
+        from app.pages.asset_scan import render_asset_scan_page
         render_asset_scan_page()
         return
-    try:
-        from app.services.asset_qr import apply_pending_asset_deeplink
-    except ImportError:
-        from services.asset_qr import apply_pending_asset_deeplink  # type: ignore
+    from app.services.asset_qr import apply_pending_asset_deeplink
     apply_pending_asset_deeplink()
     inject_assets_page_styles()
     inject_assets_module_css()
@@ -2294,10 +2107,7 @@ def render() -> None:
                 st.session_state[_SHOW_NEW_ASSET_FORM_KEY] = False
                 st.rerun()
             if save_clicked:
-                try:
-                    from app.services.assets_service import save_asset
-                except ImportError:
-                    from services.assets_service import save_asset  # type: ignore
+                from app.services.assets_service import save_asset
                 result = save_asset(
                     {
                         "asset_number": st.session_state.get("ast_new_num"),

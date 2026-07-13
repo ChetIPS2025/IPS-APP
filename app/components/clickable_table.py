@@ -89,10 +89,7 @@ def get_modal_record(
     session_select_key: str,
 ) -> dict[str, Any] | None:
     """Resolve the selected record for a detail modal."""
-    try:
-        from app.components.record_modal import get_modal_record as _get_modal_record
-    except ImportError:
-        from components.record_modal import get_modal_record as _get_modal_record  # type: ignore
+    from app.components.record_modal import get_modal_record as _get_modal_record
     return _get_modal_record(
         cache_key=cache_key,
         modal_key=modal_key,

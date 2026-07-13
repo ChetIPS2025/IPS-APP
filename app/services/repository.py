@@ -155,11 +155,7 @@ class ServiceResult:
 
 def clear_all_data_caches() -> None:
     """Invalidate Streamlit/db read caches after mutations."""
-    try:
-        from app.perf_debug import perf_span
-    except ImportError:
-        from perf_debug import perf_span  # type: ignore
-
+    from app.perf_debug import perf_span
     with perf_span("repo.clear_all_data_caches"):
         _clear_all_data_caches_impl()
 
@@ -171,7 +167,7 @@ def _clear_db_read_caches() -> None:
         clear_streamlit_db_read_cache()
     except Exception:
         try:
-            from db import clear_streamlit_db_read_cache  # type: ignore
+            from app.db import clear_streamlit_db_read_cache  # type: ignore
 
             clear_streamlit_db_read_cache()
         except Exception:
@@ -182,7 +178,7 @@ def _clear_db_read_caches() -> None:
         clear_session_table_cache()
     except Exception:
         try:
-            from data_cache import clear_session_table_cache  # type: ignore
+            from app.data_cache import clear_session_table_cache  # type: ignore
 
             clear_session_table_cache()
         except Exception:
@@ -191,13 +187,7 @@ def _clear_db_read_caches() -> None:
 
 def _clear_all_data_caches_impl() -> None:
     _clear_db_read_caches()
-    try:
-        from app.pages._core._data import clear_all_catalog_list_caches
-    except ImportError:
-        try:
-            from pages._core._data import clear_all_catalog_list_caches  # type: ignore
-        except ImportError:
-            clear_all_catalog_list_caches = None  # type: ignore
+    from app.pages._core._data import clear_all_catalog_list_caches
     if clear_all_catalog_list_caches:
         try:
             clear_all_catalog_list_caches()
@@ -207,43 +197,23 @@ def _clear_all_data_caches_impl() -> None:
 
 def clear_data_cache_for_table(table: str) -> None:
     """Invalidate caches affected by a single-table write (narrower than clear_all)."""
-    try:
-        from app.perf_debug import perf_span
-    except ImportError:
-        from perf_debug import perf_span  # type: ignore
-
+    from app.perf_debug import perf_span
     name = str(table or "").strip().lower()
     with perf_span(f"repo.clear_data_cache:{name or 'unknown'}"):
         _clear_db_read_caches()
-        try:
-            from app.pages._core._data import (
-                clear_all_catalog_list_caches,
-                clear_assets_catalog_cache,
-                clear_customers_catalog_cache,
-                clear_employees_catalog_cache,
-                clear_estimates_catalog_cache,
-                clear_inventory_catalog_cache,
-                clear_jobs_catalog_cache,
-                clear_labor_rates_catalog_cache,
-                clear_pricing_guide_catalog_cache,
-                clear_tasks_catalog_cache,
-                clear_timekeeping_catalog_cache,
-            )
-        except ImportError:
-            from pages._core._data import (  # type: ignore
-                clear_all_catalog_list_caches,
-                clear_assets_catalog_cache,
-                clear_customers_catalog_cache,
-                clear_employees_catalog_cache,
-                clear_estimates_catalog_cache,
-                clear_inventory_catalog_cache,
-                clear_jobs_catalog_cache,
-                clear_labor_rates_catalog_cache,
-                clear_pricing_guide_catalog_cache,
-                clear_tasks_catalog_cache,
-                clear_timekeeping_catalog_cache,
-            )
-
+        from app.pages._core._data import (
+            clear_all_catalog_list_caches,
+            clear_assets_catalog_cache,
+            clear_customers_catalog_cache,
+            clear_employees_catalog_cache,
+            clear_estimates_catalog_cache,
+            clear_inventory_catalog_cache,
+            clear_jobs_catalog_cache,
+            clear_labor_rates_catalog_cache,
+            clear_pricing_guide_catalog_cache,
+            clear_tasks_catalog_cache,
+            clear_timekeeping_catalog_cache,
+        )
         _handlers: dict[str, object] = {
             "jobs": clear_jobs_catalog_cache,
             "estimates": clear_estimates_catalog_cache,
@@ -284,10 +254,7 @@ def clear_data_cache_for_table(table: str) -> None:
 
 
 def _db():
-    try:
-        import app.db as db
-    except ImportError:
-        import db  # type: ignore
+    import app.db as db
     return db
 
 
@@ -407,11 +374,7 @@ def fetch_by_id(
 
 def table_column_names(table: str) -> frozenset[str]:
     """Best-effort column set from one sample row (handles legacy schemas)."""
-    try:
-        from app.perf_debug import perf_span
-    except ImportError:
-        from perf_debug import perf_span  # type: ignore
-
+    from app.perf_debug import perf_span
     with perf_span(f"repo.table_column_names:{table}"):
         rows, err = fetch_rows(table, limit=1)
         if err or not rows:
@@ -439,10 +402,7 @@ def filter_payload_to_table(table: str, payload: dict[str, Any]) -> dict[str, An
 
 
 def _friendly_repo_error(exc: Exception, *, table: str, action: str) -> str:
-    try:
-        from app.auth import friendly_auth_error_message, is_jwt_expired_error
-    except ImportError:
-        from auth import friendly_auth_error_message, is_jwt_expired_error  # type: ignore
+    from app.auth import friendly_auth_error_message, is_jwt_expired_error
     if is_jwt_expired_error(exc):
         return friendly_auth_error_message(exc, operation=f"{action} {table}")
     low = str(exc or "").casefold()
@@ -538,11 +498,7 @@ def _insert_with_optional_columns(
 
 
 def insert_row(table: str, payload: dict[str, Any]) -> ServiceResult:
-    try:
-        from app.perf_debug import perf_span
-    except ImportError:
-        from perf_debug import perf_span  # type: ignore
-
+    from app.perf_debug import perf_span
     with perf_span(f"repo.insert_row:{table}"):
         return _insert_with_optional_columns(table, payload, use_admin=False, action="save to")
 
@@ -600,11 +556,7 @@ def _update_with_optional_columns(
 
 
 def update_row(table: str, payload: dict[str, Any], match: dict[str, Any]) -> ServiceResult:
-    try:
-        from app.perf_debug import perf_span
-    except ImportError:
-        from perf_debug import perf_span  # type: ignore
-
+    from app.perf_debug import perf_span
     with perf_span(f"repo.update_row:{table}"):
         return _update_with_optional_columns(table, payload, match, use_admin=False, action="update")
 
@@ -644,10 +596,7 @@ def user_facing_error(result: ServiceResult, *, demo_ok_message: str | None = No
     err = str(result.error or "").strip()
     if not err:
         return "An unexpected error occurred."
-    try:
-        from app.auth import is_jwt_expired_error, SESSION_EXPIRED_USER_MESSAGE
-    except ImportError:
-        from auth import is_jwt_expired_error, SESSION_EXPIRED_USER_MESSAGE  # type: ignore
+    from app.auth import is_jwt_expired_error, SESSION_EXPIRED_USER_MESSAGE
     if is_jwt_expired_error(RuntimeError(err)):
         return SESSION_EXPIRED_USER_MESSAGE
     return err

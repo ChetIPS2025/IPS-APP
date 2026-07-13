@@ -12,10 +12,7 @@ def _fetch_estimate_row(estimate_id: str) -> dict[str, Any]:
     eid = str(estimate_id or "").strip()
     if not eid:
         return {}
-    try:
-        from app.pages._core._data import get_estimate
-    except ImportError:
-        from pages._core._data import get_estimate  # type: ignore
+    from app.pages._core._data import get_estimate
     return get_estimate(eid) or {}
 
 
@@ -29,10 +26,7 @@ def linked_estimate_for_job(job: dict[str, Any]) -> dict[str, Any]:
     jid = str(job.get("id") or "").strip()
     if not jid:
         return {}
-    try:
-        from app.db import fetch_by_match_admin
-    except ImportError:
-        from db import fetch_by_match_admin  # type: ignore
+    from app.db import fetch_by_match_admin
     try:
         rows = fetch_by_match_admin("estimates", {"job_id": jid}, limit=1)
         if rows:
@@ -60,10 +54,7 @@ def po_fields_from_estimate(estimate: dict[str, Any]) -> dict[str, Any]:
 
 def job_po_locked_by_estimate(job: dict[str, Any]) -> bool:
     """PO fields sync from approved estimate workflow (same gate as financial lock)."""
-    try:
-        from app.services.job_financial_ui import job_financials_locked_by_approved_estimate
-    except ImportError:
-        from services.job_financial_ui import job_financials_locked_by_approved_estimate  # type: ignore
+    from app.services.job_financial_ui import job_financials_locked_by_approved_estimate
     return job_financials_locked_by_approved_estimate(job)
 
 
@@ -128,10 +119,7 @@ def _fetch_estimate_po_attachments(estimate_id: str) -> list[dict[str, Any]]:
     eid = str(estimate_id or "").strip()
     if not eid:
         return []
-    try:
-        from app.db import fetch_by_match_admin
-    except ImportError:
-        from db import fetch_by_match_admin  # type: ignore
+    from app.db import fetch_by_match_admin
     try:
         rows = fetch_by_match_admin("attachments", {"estimate_id": eid}, limit=50)
     except Exception:
@@ -147,10 +135,7 @@ def _download_storage_bytes(storage_path: str) -> bytes | None:
     path = str(storage_path or "").strip()
     if not path:
         return None
-    try:
-        from app.db import create_signed_url
-    except ImportError:
-        from db import create_signed_url  # type: ignore
+    from app.db import create_signed_url
     try:
         url = create_signed_url(path, expires_in=300)
     except Exception:
@@ -179,11 +164,7 @@ def ensure_customer_po_document_from_estimate(
     eid = str(estimate_id or "").strip()
     if not jid or not eid:
         return False
-    try:
-        from app.services.job_documents import fetch_customer_po_document, upload_customer_po_document
-    except ImportError:
-        from services.job_documents import fetch_customer_po_document, upload_customer_po_document  # type: ignore
-
+    from app.services.job_documents import fetch_customer_po_document, upload_customer_po_document
     if fetch_customer_po_document(jid, admin=admin):
         return False
     atts = _fetch_estimate_po_attachments(eid)
@@ -227,10 +208,7 @@ def sync_job_po_from_estimate(
         return {"ok": False, "error": "job_id required"}
     job_row = dict(job or {})
     if not job_row.get("id"):
-        try:
-            from app.db import fetch_one
-        except ImportError:
-            from db import fetch_one  # type: ignore
+        from app.db import fetch_one
         job_row = fetch_one("jobs", {"id": jid}) or {}
     est = dict(estimate or linked_estimate_for_job(job_row))
     if not est:
@@ -238,10 +216,7 @@ def sync_job_po_from_estimate(
     patch = apply_po_fields_to_job_payload(job_row, est, overwrite=True)
     copied = False
     if patch:
-        try:
-            from app.services.repository import filter_payload_to_table, update_row
-        except ImportError:
-            from services.repository import filter_payload_to_table, update_row  # type: ignore
+        from app.services.repository import filter_payload_to_table, update_row
         filtered = filter_payload_to_table("jobs", patch)
         if filtered:
             result = update_row("jobs", filtered, {"id": jid})
@@ -254,9 +229,6 @@ def sync_job_po_from_estimate(
             uploaded_by=uploaded_by,
             admin=admin,
         )
-    try:
-        from app.pages._core._data import clear_all_catalog_list_caches
-    except ImportError:
-        from pages._core._data import clear_all_catalog_list_caches  # type: ignore
+    from app.pages._core._data import clear_all_catalog_list_caches
     clear_all_catalog_list_caches()
     return {"ok": True, "patch": patch, "attachment_copied": copied}

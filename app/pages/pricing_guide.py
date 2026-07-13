@@ -7,195 +7,99 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.auth import current_role, effective_role
-    from app.components.catalog_presence_panel import render_catalog_presence_panel
-    from app.components.catalog_stock_policy_panel import render_catalog_stock_policy_panel
-    from app.components.pricing_guide_actions import render_pricing_guide_action_buttons
-    from app.components.pricing_guide_list_table import (
-        build_pricing_guide_html_table,
-        render_pricing_guide_table_bridge_legacy,
-        render_pricing_guide_table_open_buttons,
-    )
-    from app.components.pricing_guide_page_layout import (
-        close_pricing_guide_filter_bar_shell,
-        inject_pricing_guide_page_layout_css,
-        render_pricing_guide_filter_bar_shell,
-    )
-    from app.components.headers import render_page_brand_header
-    from app.components.item_photo_manager import render_item_photo_manager
-    from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.table_filters import (
-        apply_column_filters,
-        build_filter_options,
-        clear_table_filters,
-        render_table_header_cell,
-    )
-    from app.components.table_pagination import (
-        paginate_rows,
-        render_table_pagination_footer,
-        render_table_pagination_header,
-        reset_table_page,
-    )
-    from app.components.record_modal import (
-        build_modal_cache,
-        clear_edit_modes,
-        clear_record_modal,
-        detail_field_html,
-        dialog_card_html,
-        get_modal_record,
-        is_edit_mode,
-        open_record_modal,
-        placeholder_html,
-        record_session_key,
-        render_edit_form_header,
-        render_missing_record,
-        render_modal_edit_button,
-        render_modal_header,
-        render_modal_meta_grid,
-        render_modal_shell,
-        render_save_cancel_actions,
-        safe_value,
-        set_edit_mode,
-        set_view_mode,
-        status_pill_html as modal_status_pill_html,
-    )
-    from app.components.labor_rates_panel import render_labor_rates_panel
-    from app.components.tabs import render_tabs
-    from app.db import fetch_table, fetch_table_admin
-    from app.pages._core._crud import apply_persist_feedback, is_demo_id
-    from app.pages._core._data import load_assets, load_inventory
-    from app.pages._core._session import select_key
-    from app.services.pricing_guide_service import (
-        PRICING_ITEM_CLASSES,
-        PRICING_ITEM_TYPES,
-        calc_sell_price,
-        cached_pricing_guide_rows,
-        class_pill_html,
-        clear_pricing_guide_cache,
-        fetch_price_history,
-        fetch_pricing_guide_catalog,
-        normalize_pricing_row,
-        pricing_guide_fetch_status,
-        save_pricing_item,
-        search_pricing_rows,
-        pricing_guide_summary,
-        type_pill_html,
-    )
-    from app.services.catalog_import_service import parse_catalog_csv
-    from app.services.catalog_image_review_service import (
-        DECISION_APPROVE,
-        DECISION_PENDING,
-        DECISION_REPLACE,
-        DECISION_SKIP,
-        ImportImageReviewRow,
-        build_import_image_review,
-        import_catalog_with_review,
-    )
-    from app.services.pricing_guide_images import (
-        clear_pricing_guide_image,
-        pricing_guide_display_record,
-        pricing_guide_image_is_inherited,
-        upload_pricing_guide_image,
-    )
-    from app.services.item_images import ITEM_IMAGE_UPLOAD_TYPES
-    from app.styles import inject_pricing_guide_module_css
-    from app.utils.formatting import fmt_currency
-except ImportError:
-    from auth import current_role, effective_role  # type: ignore
-    from components.catalog_presence_panel import render_catalog_presence_panel  # type: ignore
-    from components.catalog_stock_policy_panel import render_catalog_stock_policy_panel  # type: ignore
-    from components.pricing_guide_actions import render_pricing_guide_action_buttons  # type: ignore
-    from components.pricing_guide_list_table import (  # type: ignore
-        build_pricing_guide_html_table,
-        render_pricing_guide_table_bridge_legacy,
-        render_pricing_guide_table_open_buttons,
-    )
-    from components.pricing_guide_page_layout import (  # type: ignore
-        close_pricing_guide_filter_bar_shell,
-        inject_pricing_guide_page_layout_css,
-        render_pricing_guide_filter_bar_shell,
-    )
-    from components.headers import render_page_brand_header  # type: ignore
-    from components.item_photo_manager import render_item_photo_manager  # type: ignore
-    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.table_filters import (  # type: ignore
-        apply_column_filters,
-        build_filter_options,
-        clear_table_filters,
-        render_table_header_cell,
-    )
-    from components.table_pagination import (  # type: ignore
-        paginate_rows,
-        render_table_pagination_footer,
-        render_table_pagination_header,
-        reset_table_page,
-    )
-    from components.record_modal import (  # type: ignore
-        build_modal_cache,
-        clear_edit_modes,
-        clear_record_modal,
-        detail_field_html,
-        dialog_card_html,
-        get_modal_record,
-        is_edit_mode,
-        open_record_modal,
-        placeholder_html,
-        record_session_key,
-        render_edit_form_header,
-        render_missing_record,
-        render_modal_edit_button,
-        render_modal_header,
-        render_modal_meta_grid,
-        render_modal_shell,
-        render_save_cancel_actions,
-        safe_value,
-        set_edit_mode,
-        set_view_mode,
-        status_pill_html as modal_status_pill_html,
-    )
-    from components.labor_rates_panel import render_labor_rates_panel  # type: ignore
-    from components.tabs import render_tabs  # type: ignore
-    from db import fetch_table, fetch_table_admin  # type: ignore
-    from pages._core._crud import apply_persist_feedback, is_demo_id  # type: ignore
-    from pages._core._data import load_assets, load_inventory  # type: ignore
-    from pages._core._session import select_key  # type: ignore
-    from services.pricing_guide_service import (  # type: ignore
-        PRICING_ITEM_CLASSES,
-        PRICING_ITEM_TYPES,
-        calc_sell_price,
-        cached_pricing_guide_rows,
-        class_pill_html,
-        clear_pricing_guide_cache,
-        fetch_price_history,
-        fetch_pricing_guide_catalog,
-        normalize_pricing_row,
-        pricing_guide_fetch_status,
-        save_pricing_item,
-        search_pricing_rows,
-        pricing_guide_summary,
-        type_pill_html,
-    )
-    from services.catalog_import_service import parse_catalog_csv  # type: ignore
-    from services.catalog_image_review_service import (  # type: ignore
-        DECISION_APPROVE,
-        DECISION_PENDING,
-        DECISION_REPLACE,
-        DECISION_SKIP,
-        ImportImageReviewRow,
-        build_import_image_review,
-        import_catalog_with_review,
-    )
-    from services.pricing_guide_images import (  # type: ignore
-        clear_pricing_guide_image,
-        pricing_guide_display_record,
-        pricing_guide_image_is_inherited,
-        upload_pricing_guide_image,
-    )
-    from services.item_images import ITEM_IMAGE_UPLOAD_TYPES  # type: ignore
-    from styles import inject_pricing_guide_module_css  # type: ignore
-    from utils.formatting import fmt_currency  # type: ignore
-
+from app.auth import current_role, effective_role
+from app.components.catalog_presence_panel import render_catalog_presence_panel
+from app.components.catalog_stock_policy_panel import render_catalog_stock_policy_panel
+from app.components.pricing_guide_actions import render_pricing_guide_action_buttons
+from app.components.pricing_guide_list_table import (
+    build_pricing_guide_html_table,
+    render_pricing_guide_table_bridge_legacy,
+    render_pricing_guide_table_open_buttons,
+)
+from app.components.pricing_guide_page_layout import (
+    close_pricing_guide_filter_bar_shell,
+    inject_pricing_guide_page_layout_css,
+    render_pricing_guide_filter_bar_shell,
+)
+from app.components.headers import render_page_brand_header
+from app.components.item_photo_manager import render_item_photo_manager
+from app.components.layout import render_filter_bar as layout_filter_bar
+from app.components.table_filters import (
+    apply_column_filters,
+    build_filter_options,
+    clear_table_filters,
+    render_table_header_cell,
+)
+from app.components.table_pagination import (
+    paginate_rows,
+    render_table_pagination_footer,
+    render_table_pagination_header,
+    reset_table_page,
+)
+from app.components.record_modal import (
+    build_modal_cache,
+    clear_edit_modes,
+    clear_record_modal,
+    detail_field_html,
+    dialog_card_html,
+    get_modal_record,
+    is_edit_mode,
+    open_record_modal,
+    placeholder_html,
+    record_session_key,
+    render_edit_form_header,
+    render_missing_record,
+    render_modal_edit_button,
+    render_modal_header,
+    render_modal_meta_grid,
+    render_modal_shell,
+    render_save_cancel_actions,
+    safe_value,
+    set_edit_mode,
+    set_view_mode,
+    status_pill_html as modal_status_pill_html,
+)
+from app.components.labor_rates_panel import render_labor_rates_panel
+from app.components.tabs import render_tabs
+from app.db import fetch_table, fetch_table_admin
+from app.pages._core._crud import apply_persist_feedback, is_demo_id
+from app.pages._core._data import load_assets, load_inventory
+from app.pages._core._session import select_key
+from app.services.pricing_guide_service import (
+    PRICING_ITEM_CLASSES,
+    PRICING_ITEM_TYPES,
+    calc_sell_price,
+    cached_pricing_guide_rows,
+    class_pill_html,
+    clear_pricing_guide_cache,
+    fetch_price_history,
+    fetch_pricing_guide_catalog,
+    normalize_pricing_row,
+    pricing_guide_fetch_status,
+    save_pricing_item,
+    search_pricing_rows,
+    pricing_guide_summary,
+    type_pill_html,
+)
+from app.services.catalog_import_service import parse_catalog_csv
+from app.services.catalog_image_review_service import (
+    DECISION_APPROVE,
+    DECISION_PENDING,
+    DECISION_REPLACE,
+    DECISION_SKIP,
+    ImportImageReviewRow,
+    build_import_image_review,
+    import_catalog_with_review,
+)
+from app.services.pricing_guide_images import (
+    clear_pricing_guide_image,
+    pricing_guide_display_record,
+    pricing_guide_image_is_inherited,
+    upload_pricing_guide_image,
+)
+from app.services.item_images import ITEM_IMAGE_UPLOAD_TYPES
+from app.styles import inject_pricing_guide_module_css
+from app.utils.formatting import fmt_currency
 _SEL = select_key("pricing_guide")
 _MODULE = "pricing_guide"
 _TABLE_KEY = "pg_list"
@@ -999,10 +903,7 @@ def _show_detail_modal() -> None:
 
 
 def render() -> None:
-    try:
-        from app.pages._core._access import begin_module
-    except ImportError:
-        from pages._core._access import begin_module  # type: ignore
+    from app.pages._core._access import begin_module
     if not begin_module("pricing_guide"):
         return
 

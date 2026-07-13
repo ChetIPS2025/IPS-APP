@@ -159,10 +159,7 @@ def resolve_logged_in_employee_id(profile: dict[str, Any] | None = None) -> str:
     email = str(prof.get("email") or "").strip().lower()
     if not email:
         return ""
-    try:
-        from app.pages._core._data import load_employees
-    except ImportError:
-        from pages._core._data import load_employees  # type: ignore
+    from app.pages._core._data import load_employees
     for emp in load_employees():
         if str(emp.get("email") or "").strip().lower() == email:
             return str(emp.get("id") or "").strip()
@@ -171,19 +168,13 @@ def resolve_logged_in_employee_id(profile: dict[str, Any] | None = None) -> str:
 
 def can_manage_employee_certifications(role: str) -> bool:
     """Admin/supervisor/PM may view and edit all employee certifications."""
-    try:
-        from app.utils.permissions import can_view_field_certifications
-    except ImportError:
-        from utils.permissions import can_view_field_certifications  # type: ignore
+    from app.utils.permissions import can_view_field_certifications
     return can_view_field_certifications(role)
 
 
 def can_delete_employee_certifications(role: str) -> bool:
     """Only administrators may delete employee certification records."""
-    try:
-        from app.utils.permissions import normalize_role
-    except ImportError:
-        from utils.permissions import normalize_role  # type: ignore
+    from app.utils.permissions import normalize_role
     return normalize_role(role) == "admin"
 
 
@@ -208,11 +199,7 @@ def can_view_certification_attachment(
     current_employee_id: str = "",
 ) -> bool:
     """Gate attachment view/download by role until storage RLS is fully enforced."""
-    try:
-        from app.utils.permissions import can_view_field_certifications, normalize_role
-    except ImportError:
-        from utils.permissions import can_view_field_certifications, normalize_role  # type: ignore
-
+    from app.utils.permissions import can_view_field_certifications, normalize_role
     norm = normalize_role(role)
     if norm == "admin":
         return True

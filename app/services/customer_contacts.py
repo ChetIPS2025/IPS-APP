@@ -8,30 +8,16 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from db import (
-        delete_rows,
-        delete_rows_admin,
-        fetch_by_match,
-        fetch_by_match_admin,
-        insert_row,
-        insert_row_admin,
-        update_rows,
-        update_rows_admin,
-    )
-except ImportError:
-    from app.db import (  # type: ignore
-        delete_rows,
-        delete_rows_admin,
-        fetch_by_match,
-        fetch_by_match_admin,
-        insert_row,
-        insert_row_admin,
-        update_rows,
-        update_rows_admin,
-    )
-
-
+from app.db import (
+    delete_rows,
+    delete_rows_admin,
+    fetch_by_match,
+    fetch_by_match_admin,
+    insert_row,
+    insert_row_admin,
+    update_rows,
+    update_rows_admin,
+)
 def fetch_contacts_for_customer(customer_id: str, *, include_inactive: bool = False) -> list[dict[str, Any]]:
     """Fetch contacts for a customer. Default: active only, primary first."""
     cid = str(customer_id or "").strip()

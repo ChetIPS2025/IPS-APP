@@ -7,57 +7,30 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.auth import current_profile
-    from app.components.kit_audit_item_ui import clear_audit_item_photos, render_audit_item_fields
-    from app.pages._core._data import load_jobs
-    from app.services.asset_kits_service import get_asset_kit_items
-    from app.services.assets_service import get_asset_image_url, upload_asset_image
-    from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
-    from app.services.trailer_dashboard_service import (
-        INSPECTION_CHECKLIST,
-        REQUEST_PRIORITIES,
-        add_tool_to_trailer,
-        complete_spot_audit,
-        create_trailer_tool_request,
-        get_trailer_dashboard_summary,
-        get_trailer_history,
-        get_trailer_inventory_items,
-        list_trailer_photos,
-        remove_tool_from_trailer,
-        report_broken_trailer_tool,
-        save_trailer_inspection,
-        select_spot_audit_items,
-        transfer_trailer,
-        upload_trailer_photo,
-    )
-    from app.utils.formatting import fmt_date
-except ImportError:
-    from auth import current_profile  # type: ignore
-    from components.kit_audit_item_ui import clear_audit_item_photos, render_audit_item_fields  # type: ignore
-    from pages._core._data import load_jobs  # type: ignore
-    from services.asset_kits_service import get_asset_kit_items  # type: ignore
-    from services.assets_service import get_asset_image_url, upload_asset_image  # type: ignore
-    from services.job_service import job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
-    from services.trailer_dashboard_service import (  # type: ignore
-        INSPECTION_CHECKLIST,
-        REQUEST_PRIORITIES,
-        add_tool_to_trailer,
-        complete_spot_audit,
-        create_trailer_tool_request,
-        get_trailer_dashboard_summary,
-        get_trailer_history,
-        get_trailer_inventory_items,
-        list_trailer_photos,
-        remove_tool_from_trailer,
-        report_broken_trailer_tool,
-        save_trailer_inspection,
-        select_spot_audit_items,
-        transfer_trailer,
-        upload_trailer_photo,
-    )
-    from utils.formatting import fmt_date  # type: ignore
-
+from app.auth import current_profile
+from app.components.kit_audit_item_ui import clear_audit_item_photos, render_audit_item_fields
+from app.pages._core._data import load_jobs
+from app.services.asset_kits_service import get_asset_kit_items
+from app.services.assets_service import get_asset_image_url, upload_asset_image
+from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
+from app.services.trailer_dashboard_service import (
+    INSPECTION_CHECKLIST,
+    REQUEST_PRIORITIES,
+    add_tool_to_trailer,
+    complete_spot_audit,
+    create_trailer_tool_request,
+    get_trailer_dashboard_summary,
+    get_trailer_history,
+    get_trailer_inventory_items,
+    list_trailer_photos,
+    remove_tool_from_trailer,
+    report_broken_trailer_tool,
+    save_trailer_inspection,
+    select_spot_audit_items,
+    transfer_trailer,
+    upload_trailer_photo,
+)
+from app.utils.formatting import fmt_date
 _VIEW_KEY = "_trailer_dash_view"
 _AUDIT_SAMPLE_KEY = "_trailer_audit_sample"
 
@@ -570,11 +543,7 @@ def _render_transfer(trailer_id: str) -> None:
 
 def render_trailer_dashboard(asset: dict[str, Any]) -> None:
     """Render the field-optimized tool trailer dashboard for a scanned kit/trailer asset."""
-    try:
-        from app.styles import inject_trailer_dashboard_css
-    except ImportError:
-        from styles import inject_trailer_dashboard_css  # type: ignore
-
+    from app.styles import inject_trailer_dashboard_css
     inject_trailer_dashboard_css()
     st.markdown('<span class="ips-trailer-dash-scope" aria-hidden="true"></span>', unsafe_allow_html=True)
 

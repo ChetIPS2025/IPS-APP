@@ -6,83 +6,43 @@ import logging
 
 import streamlit as st
 
-try:
-    from app.auth import current_role, effective_role
-    from app.pages import (
-        admin,
-        assets,
-        company_updates,
-        coupling_inspection,
-        customers,
-        dashboard,
-        documents,
-        employee_certifications,
-        employee_documents,
-        employee_portal,
-        employee_profile,
-        employee_qr_scan,
-        employee_resources,
-        employees,
-        estimate_materials,
-        pricing_guide,
-        estimates,
-        field_crew_time,
-        field_daily_reports,
-        field_dashboard,
-        field_day,
-        inventory,
-        jobs,
-        pipeline,
-        rental_equipment,
-        rental_equipment_inspection,
-        reports,
-        settings,
-        tasks,
-        timekeeping,
-        weekly_timesheets,
-    )
-    from app.pages._core._session import clear_all_module_selections, nav_slug
-    from app.utils.constants import SESSION_NAV_KEY
-    from app.utils.permissions import role_can_access_page
-except ImportError:
-    from auth import current_role, effective_role  # type: ignore
-    from pages import (  # type: ignore
-        admin,
-        assets,
-        company_updates,
-        coupling_inspection,
-        customers,
-        dashboard,
-        documents,
-        employee_certifications,
-        employee_documents,
-        employee_portal,
-        employee_profile,
-        employee_qr_scan,
-        employee_resources,
-        employees,
-        estimate_materials,
-        pricing_guide,
-        estimates,
-        field_crew_time,
-        field_daily_reports,
-        field_dashboard,
-        field_day,
-        inventory,
-        jobs,
-        pipeline,
-        rental_equipment,
-        rental_equipment_inspection,
-        reports,
-        settings,
-        tasks,
-        timekeeping,
-        weekly_timesheets,
-    )
-    from pages._core._session import clear_all_module_selections, nav_slug  # type: ignore
-    from utils.constants import SESSION_NAV_KEY  # type: ignore
-    from utils.permissions import role_can_access_page  # type: ignore
-
+from app.auth import current_role, effective_role
+from app.pages import (
+    admin,
+    assets,
+    company_updates,
+    coupling_inspection,
+    customers,
+    dashboard,
+    documents,
+    employee_certifications,
+    employee_documents,
+    employee_portal,
+    employee_profile,
+    employee_qr_scan,
+    employee_resources,
+    employees,
+    estimate_materials,
+    pricing_guide,
+    estimates,
+    field_crew_time,
+    field_daily_reports,
+    field_dashboard,
+    field_day,
+    inventory,
+    jobs,
+    pipeline,
+    rental_equipment,
+    rental_equipment_inspection,
+    reports,
+    settings,
+    tasks,
+    timekeeping,
+    weekly_timesheets,
+)
+from app.pages._core._session import clear_all_module_selections, nav_slug
+from app.utils.constants import SESSION_NAV_KEY
+from app.utils.permissions import role_can_access_page
 BUILT_MODULES: dict[str, object] = {
     "dashboard": dashboard.render,
     "jobs": jobs.render,
@@ -120,10 +80,7 @@ BUILT_MODULES: dict[str, object] = {
 
 
 def ensure_nav_defaults() -> None:
-    try:
-        from app.utils.permissions import role_default_nav_slug
-    except ImportError:
-        from utils.permissions import role_default_nav_slug  # type: ignore
+    from app.utils.permissions import role_default_nav_slug
     default = role_default_nav_slug(
         effective_role(),
         field_mode=bool(st.session_state.get("ips_field_mode")),
@@ -137,18 +94,11 @@ def on_nav_change(prev_slug: str, new_slug: str) -> None:
 
 
 def render_module(slug: str | None = None) -> None:
-    try:
-        from app.navigation import normalize_nav_slug
-    except ImportError:
-        from navigation import normalize_nav_slug  # type: ignore
-
+    from app.navigation import normalize_nav_slug
     active = normalize_nav_slug(slug or nav_slug() or "dashboard")
     role = effective_role()
     if not role_can_access_page(role, active):
-        try:
-            from app.navigation import default_nav_slug, set_nav_slug
-        except ImportError:
-            from navigation import default_nav_slug, set_nav_slug  # type: ignore
+        from app.navigation import default_nav_slug, set_nav_slug
         fallback = default_nav_slug()
         if active != fallback and role_can_access_page(role, fallback):
             set_nav_slug(fallback)
@@ -157,27 +107,15 @@ def render_module(slug: str | None = None) -> None:
         st.error("You do not have access to this page.")
         return
 
-    try:
-        from app.pages._core._access import clear_demo_flag, end_module, show_demo_banner_if_needed
-    except ImportError:
-        from pages._core._access import clear_demo_flag, end_module, show_demo_banner_if_needed  # type: ignore
-
+    from app.pages._core._access import clear_demo_flag, end_module, show_demo_banner_if_needed
     clear_demo_flag()
     fn = BUILT_MODULES.get(active)
     if fn:
         try:
-            try:
-                from app.perf_debug import perf_span
-            except ImportError:
-                from perf_debug import perf_span  # type: ignore
-            try:
-                from app.auth import current_role
-                from app.utils.permissions import normalize_role
-                from app.utils.view_as import is_view_as_active, render_view_as_page_shell
-            except ImportError:
-                from auth import current_role  # type: ignore
-                from utils.permissions import normalize_role  # type: ignore
-                from utils.view_as import is_view_as_active, render_view_as_page_shell  # type: ignore
+            from app.perf_debug import perf_span
+            from app.auth import current_role
+            from app.utils.permissions import normalize_role
+            from app.utils.view_as import is_view_as_active, render_view_as_page_shell
             def _render_module() -> None:
                 with perf_span(f"module.render:{active}"):
                     fn()  # type: ignore[operator]
@@ -194,12 +132,7 @@ def render_module(slug: str | None = None) -> None:
         show_demo_banner_if_needed()
         return
 
-    try:
-        from app.components.headers import render_page_header
-        from app.styles import inject_global_css
-    except ImportError:
-        from components.headers import render_page_header  # type: ignore
-        from styles import inject_global_css  # type: ignore
-
+    from app.components.headers import render_page_header
+    from app.styles import inject_global_css
     inject_global_css()
     st.markdown('<p class="ips-module-placeholder">Module not found.</p>', unsafe_allow_html=True)

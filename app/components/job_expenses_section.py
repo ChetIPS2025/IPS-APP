@@ -7,29 +7,15 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.services.job_expense_service import (
-        EXPENSE_CATEGORIES,
-        EXPENSE_STATUSES,
-        delete_job_expense,
-        list_job_expenses,
-        save_job_expense,
-    )
-except ImportError:
-    from services.job_expense_service import (  # type: ignore
-        EXPENSE_CATEGORIES,
-        EXPENSE_STATUSES,
-        delete_job_expense,
-        list_job_expenses,
-        save_job_expense,
-    )
-
-
+from app.services.job_expense_service import (
+    EXPENSE_CATEGORIES,
+    EXPENSE_STATUSES,
+    delete_job_expense,
+    list_job_expenses,
+    save_job_expense,
+)
 def _current_user_id() -> str | None:
-    try:
-        from app.auth import current_profile
-    except ImportError:
-        from auth import current_profile  # type: ignore
+    from app.auth import current_profile
     pid = str(current_profile().get("id") or "").strip()
     return pid or None
 
@@ -87,10 +73,7 @@ def render_job_expenses_section(job: dict[str, Any], *, key_prefix: str) -> None
                     entered_by=_current_user_id(),
                 )
                 if ok:
-                    try:
-                        from app.services.job_cost_transaction_service import invalidate_job_cost_session
-                    except ImportError:
-                        from services.job_cost_transaction_service import invalidate_job_cost_session  # type: ignore
+                    from app.services.job_cost_transaction_service import invalidate_job_cost_session
                     invalidate_job_cost_session(jid)
                     st.success(msg)
                     st.rerun()
@@ -180,10 +163,7 @@ def render_job_expenses_section(job: dict[str, Any], *, key_prefix: str) -> None
                         entered_by=_current_user_id(),
                     )
                     if ok:
-                        try:
-                            from app.services.job_cost_transaction_service import invalidate_job_cost_session
-                        except ImportError:
-                            from services.job_cost_transaction_service import invalidate_job_cost_session  # type: ignore
+                        from app.services.job_cost_transaction_service import invalidate_job_cost_session
                         invalidate_job_cost_session(jid)
                         st.success(msg)
                         st.rerun()
@@ -192,10 +172,7 @@ def render_job_expenses_section(job: dict[str, Any], *, key_prefix: str) -> None
                 if deleted:
                     ok, msg = delete_job_expense(xid)
                     if ok:
-                        try:
-                            from app.services.job_cost_transaction_service import invalidate_job_cost_session
-                        except ImportError:
-                            from services.job_cost_transaction_service import invalidate_job_cost_session  # type: ignore
+                        from app.services.job_cost_transaction_service import invalidate_job_cost_session
                         invalidate_job_cost_session(jid)
                         st.success(msg)
                         st.rerun()

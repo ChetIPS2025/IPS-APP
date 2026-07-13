@@ -8,65 +8,31 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-try:
-    from app.components.job_cost_summary_cards import (
-        render_job_cost_breakdown,
-        render_job_cost_detail_metrics,
-        render_job_cost_summary_cards,
-    )
-except ImportError:
-    from components.job_cost_summary_cards import (  # type: ignore
-        render_job_cost_breakdown,
-        render_job_cost_detail_metrics,
-        render_job_cost_summary_cards,
-    )
-
-try:
-    from app.components.job_expenses_section import render_job_expenses_section
-except ImportError:
-    from components.job_expenses_section import render_job_expenses_section  # type: ignore
-
-try:
-    from app.services.job_cost_transaction_service import (
-        COST_EQUIPMENT,
-        COST_LABOR,
-        COST_MATERIAL,
-        COST_OTHER,
-        COST_RENTAL,
-        COST_SUBCONTRACT,
-        SOURCE_MANUAL_ADJUSTMENT,
-        build_job_cost_summary,
-        cached_job_cost_summary,
-        can_manage_manual_cost_adjustments,
-        create_manual_cost_adjustment,
-        delete_manual_cost_adjustment,
-        fetch_job_cost_transactions,
-        invalidate_job_cost_session,
-        transaction_display_source,
-        transaction_employee_name,
-        update_manual_cost_adjustment,
-    )
-except ImportError:
-    from services.job_cost_transaction_service import (  # type: ignore
-        COST_EQUIPMENT,
-        COST_LABOR,
-        COST_MATERIAL,
-        COST_OTHER,
-        COST_RENTAL,
-        COST_SUBCONTRACT,
-        SOURCE_MANUAL_ADJUSTMENT,
-        build_job_cost_summary,
-        cached_job_cost_summary,
-        can_manage_manual_cost_adjustments,
-        create_manual_cost_adjustment,
-        delete_manual_cost_adjustment,
-        fetch_job_cost_transactions,
-        invalidate_job_cost_session,
-        transaction_display_source,
-        transaction_employee_name,
-        update_manual_cost_adjustment,
-    )
-
+from app.components.job_cost_summary_cards import (
+    render_job_cost_breakdown,
+    render_job_cost_detail_metrics,
+    render_job_cost_summary_cards,
+)
+from app.components.job_expenses_section import render_job_expenses_section
+from app.services.job_cost_transaction_service import (
+    COST_EQUIPMENT,
+    COST_LABOR,
+    COST_MATERIAL,
+    COST_OTHER,
+    COST_RENTAL,
+    COST_SUBCONTRACT,
+    SOURCE_MANUAL_ADJUSTMENT,
+    build_job_cost_summary,
+    cached_job_cost_summary,
+    can_manage_manual_cost_adjustments,
+    create_manual_cost_adjustment,
+    delete_manual_cost_adjustment,
+    fetch_job_cost_transactions,
+    invalidate_job_cost_session,
+    transaction_display_source,
+    transaction_employee_name,
+    update_manual_cost_adjustment,
+)
 _CATEGORY_OPTIONS = [
     COST_LABOR,
     COST_MATERIAL,
@@ -88,10 +54,7 @@ _SOURCE_FILTER_OPTIONS = [
 
 
 def _load_employees() -> dict[str, dict[str, Any]]:
-    try:
-        from app.db import fetch_table
-    except ImportError:
-        from db import fetch_table  # type: ignore
+    from app.db import fetch_table
     try:
         rows = fetch_table("employees", limit=5000, order_by="name") or []
     except Exception:
@@ -100,10 +63,7 @@ def _load_employees() -> dict[str, dict[str, Any]]:
 
 
 def _current_user_id() -> str | None:
-    try:
-        from app.auth import current_profile
-    except ImportError:
-        from auth import current_profile  # type: ignore
+    from app.auth import current_profile
     pid = str(current_profile().get("id") or "").strip()
     return pid or None
 

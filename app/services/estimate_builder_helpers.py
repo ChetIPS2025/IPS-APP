@@ -4,35 +4,19 @@ from __future__ import annotations
 
 from typing import Any
 
-try:
-    from app.pages._core._data import load_assets, load_inventory
-    from app.services.asset_rental_service import (
-        normalize_rental_rate_unit,
-        primary_rental_rate_from_asset,
-    )
-    from app.services.phase2_modules_service import asset_is_rentable
-    from app.services.repository import fetch_rows
-    from app.utils.estimate_calculations import (
-        calc_equipment_line,
-        calc_labor_line,
-        calc_material_line,
-        calc_simple_line,
-    )
-except ImportError:
-    from pages._core._data import load_assets, load_inventory  # type: ignore
-    from services.asset_rental_service import (  # type: ignore
-        normalize_rental_rate_unit,
-        primary_rental_rate_from_asset,
-    )
-    from services.phase2_modules_service import asset_is_rentable  # type: ignore
-    from services.repository import fetch_rows  # type: ignore
-    from utils.estimate_calculations import (  # type: ignore
-        calc_equipment_line,
-        calc_labor_line,
-        calc_material_line,
-        calc_simple_line,
-    )
-
+from app.pages._core._data import load_assets, load_inventory
+from app.services.asset_rental_service import (
+    normalize_rental_rate_unit,
+    primary_rental_rate_from_asset,
+)
+from app.services.phase2_modules_service import asset_is_rentable
+from app.services.repository import fetch_rows
+from app.utils.estimate_calculations import (
+    calc_equipment_line,
+    calc_labor_line,
+    calc_material_line,
+    calc_simple_line,
+)
 DEFAULT_LABOR_RATES: dict[str, float] = {
     "Superintendent": 75.0,
     "Supervisor": 65.0,
@@ -177,16 +161,10 @@ def get_pricing_guide_options_for_estimate() -> list[dict[str, Any]]:
 
 def get_unified_pricing_options_for_estimate() -> list[dict[str, Any]]:
     """All active pricing guide items for estimate builder (DESCRIPTION — TYPE labels)."""
-    try:
-        from app.services.pricing_guide_service import (
-            cached_pricing_guide_rows,
-            pricing_item_to_estimate_option,
-        )
-    except ImportError:
-        from services.pricing_guide_service import (  # type: ignore
-            cached_pricing_guide_rows,
-            pricing_item_to_estimate_option,
-        )
+    from app.services.pricing_guide_service import (
+        cached_pricing_guide_rows,
+        pricing_item_to_estimate_option,
+    )
     seen: dict[str, int] = {}
     out: list[dict[str, Any]] = []
     for row in cached_pricing_guide_rows(include_inactive=False):
@@ -197,10 +175,7 @@ def get_unified_pricing_options_for_estimate() -> list[dict[str, Any]]:
     if out:
         return out
 
-    try:
-        from app.services.estimate_materials_catalog import cached_estimate_materials_catalog_rows
-    except ImportError:
-        from services.estimate_materials_catalog import cached_estimate_materials_catalog_rows  # type: ignore
+    from app.services.estimate_materials_catalog import cached_estimate_materials_catalog_rows
     for row in cached_estimate_materials_catalog_rows():
         opt = _catalog_row_to_option(row)
         suffix = opt["category"] if opt["category"] and opt["category"] != "—" else "Pricing Guide"

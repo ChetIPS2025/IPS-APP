@@ -9,11 +9,7 @@ from typing import Any
 import streamlit as st
 import streamlit.components.v1 as components
 
-try:
-    from app.config import APP_VERSION
-except ImportError:
-    from config import APP_VERSION  # type: ignore
-
+from app.config import APP_VERSION
 _PWA_INJECTED_KEY = "ips_pwa_support_injected"
 _IPS_TRIGGER_INSTALL_KEY = "ips_trigger_install"
 
@@ -49,10 +45,7 @@ def _start_url() -> str:
 
 def install_page_url() -> str:
     """Public share link for the Install IPS App page (``?install=1`` on the app root)."""
-    try:
-        from app.config import settings
-    except ImportError:
-        from config import settings  # type: ignore
+    from app.config import settings
     base = str(getattr(settings, "app_base_url", "") or "").strip().rstrip("/")
     prefix = _streamlit_base_path()
     path = f"{prefix}/" if prefix else "/"

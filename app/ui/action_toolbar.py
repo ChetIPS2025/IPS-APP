@@ -6,11 +6,7 @@ from collections.abc import Callable
 
 import streamlit as st
 
-try:
-    from app.components.layout import render_filter_bar
-except ImportError:
-    from components.layout import render_filter_bar  # type: ignore
-
+from app.components.layout import render_filter_bar
 _ActionFn = Callable[[], None]
 
 

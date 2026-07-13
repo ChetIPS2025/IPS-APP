@@ -7,23 +7,13 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.services.trailer_dashboard_service import (
-        AUDIT_ITEM_CONDITIONS,
-        AUDIT_ITEM_STATUSES,
-        audit_item_requires_missing_note,
-        audit_item_requires_photo,
-        upload_audit_item_photo,
-    )
-except ImportError:
-    from services.trailer_dashboard_service import (  # type: ignore
-        AUDIT_ITEM_CONDITIONS,
-        AUDIT_ITEM_STATUSES,
-        audit_item_requires_missing_note,
-        audit_item_requires_photo,
-        upload_audit_item_photo,
-    )
-
+from app.services.trailer_dashboard_service import (
+    AUDIT_ITEM_CONDITIONS,
+    AUDIT_ITEM_STATUSES,
+    audit_item_requires_missing_note,
+    audit_item_requires_photo,
+    upload_audit_item_photo,
+)
 _PHOTO_STATE_PREFIX = "_kit_audit_photo"
 
 

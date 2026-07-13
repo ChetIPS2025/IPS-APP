@@ -6,87 +6,45 @@ import html
 
 import streamlit as st
 
-try:
-    from app.auth import current_role, effective_role
-    from app.components.action_styles import success_solid_button
-    from app.components.clickable_table import render_clickable_table
-    from app.components.headers import render_page_brand_header
-    from app.components.layout import render_filter_bar as layout_filter_bar
-    from app.components.record_modal import (
-        build_modal_cache,
-        clear_record_modal,
-        detail_field_html,
-        dialog_card_html,
-        edit_mode_key,
-        get_modal_record,
-        is_edit_mode,
-        open_record_modal,
-        placeholder_html,
-        record_session_key,
-        render_edit_form_header,
-        render_modal_edit_button,
-        render_modal_header,
-        render_modal_meta_grid,
-        render_modal_shell,
-        render_missing_record,
-        render_save_cancel_actions,
-        set_view_mode,
-        show_modal_if_pending,
-    )
-    from app.pages._core._crud import is_demo_id
-    from app.pages._core._data import (
-        ACTIVE_EMPLOYEE_KEY,
-        get_employee,
-        load_employee_documents,
-        load_employees,
-        persist_employee_document,
-    )
-    from app.services.employee_documents_service import get_employee_document_url
-    from app.utils.constants import DOCUMENT_TYPES
-    from app.utils.formatting import fmt_date
-    from app.utils.permissions import can_view_hr_documents, normalize_role
-    from app.pages._core._session import select_key
-except ImportError:
-    from auth import current_role, effective_role  # type: ignore
-    from components.action_styles import success_solid_button  # type: ignore
-    from components.clickable_table import render_clickable_table  # type: ignore
-    from components.headers import render_page_brand_header  # type: ignore
-    from components.layout import render_filter_bar as layout_filter_bar  # type: ignore
-    from components.record_modal import (  # type: ignore
-        build_modal_cache,
-        clear_record_modal,
-        detail_field_html,
-        dialog_card_html,
-        edit_mode_key,
-        get_modal_record,
-        is_edit_mode,
-        open_record_modal,
-        placeholder_html,
-        record_session_key,
-        render_edit_form_header,
-        render_modal_edit_button,
-        render_modal_header,
-        render_modal_meta_grid,
-        render_modal_shell,
-        render_missing_record,
-        render_save_cancel_actions,
-        set_view_mode,
-        show_modal_if_pending,
-    )
-    from pages._core._crud import is_demo_id  # type: ignore
-    from pages._core._data import (  # type: ignore
-        ACTIVE_EMPLOYEE_KEY,
-        get_employee,
-        load_employee_documents,
-        load_employees,
-        persist_employee_document,
-    )
-    from services.employee_documents_service import get_employee_document_url  # type: ignore
-    from utils.constants import DOCUMENT_TYPES  # type: ignore
-    from utils.formatting import fmt_date  # type: ignore
-    from utils.permissions import can_view_hr_documents, normalize_role  # type: ignore
-    from pages._core._session import select_key  # type: ignore
-
+from app.auth import current_role, effective_role
+from app.components.action_styles import success_solid_button
+from app.components.clickable_table import render_clickable_table
+from app.components.headers import render_page_brand_header
+from app.components.layout import render_filter_bar as layout_filter_bar
+from app.components.record_modal import (
+    build_modal_cache,
+    clear_record_modal,
+    detail_field_html,
+    dialog_card_html,
+    edit_mode_key,
+    get_modal_record,
+    is_edit_mode,
+    open_record_modal,
+    placeholder_html,
+    record_session_key,
+    render_edit_form_header,
+    render_modal_edit_button,
+    render_modal_header,
+    render_modal_meta_grid,
+    render_modal_shell,
+    render_missing_record,
+    render_save_cancel_actions,
+    set_view_mode,
+    show_modal_if_pending,
+)
+from app.pages._core._crud import is_demo_id
+from app.pages._core._data import (
+    ACTIVE_EMPLOYEE_KEY,
+    get_employee,
+    load_employee_documents,
+    load_employees,
+    persist_employee_document,
+)
+from app.services.employee_documents_service import get_employee_document_url
+from app.utils.constants import DOCUMENT_TYPES
+from app.utils.formatting import fmt_date
+from app.utils.permissions import can_view_hr_documents, normalize_role
+from app.pages._core._session import select_key
 _SEL = select_key("employee_documents")
 _MODULE = "employee_documents"
 _TABLE_KEY = "doc_list"
@@ -268,10 +226,7 @@ def _doc_display_cell(field: str, row: dict) -> str:
 
 
 def render() -> None:
-    try:
-        from app.pages._core._access import begin_module
-    except ImportError:
-        from pages._core._access import begin_module  # type: ignore
+    from app.pages._core._access import begin_module
     if not begin_module("employee_documents"):
         return
     role_norm = normalize_role(effective_role())
@@ -341,10 +296,7 @@ def render() -> None:
                 elif uploaded is None:
                     st.error("Choose a file to upload.")
                 else:
-                    try:
-                        from app.auth import current_profile
-                    except ImportError:
-                        from auth import current_profile  # type: ignore
+                    from app.auth import current_profile
                     prof = current_profile() or {}
                     ok, msg = persist_employee_document(
                         {

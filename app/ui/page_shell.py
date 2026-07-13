@@ -396,10 +396,7 @@ def render_filter_row(
 ) -> dict[str, Any]:
     """Horizontal filters; optional Clear button as last column."""
     inject_ips_dashboard_layout()
-    try:
-        from app.ui.compact_forms import field_marker
-    except ImportError:
-        from ui.compact_forms import field_marker  # type: ignore
+    from app.ui.compact_forms import field_marker
     if clear_key:
         weights = [float(s.get("width", 1)) for s in specs] + [0.45]
         cols = st.columns(weights, gap=gap)
@@ -460,17 +457,11 @@ def render_table(
 
 def ensure_modal_styles() -> None:
     """Delegate to IPS modal styling (dialogs)."""
-    try:
-        from app.ui.modal import ensure_modal_styles as _ems
-    except ImportError:
-        from ui.modal import ensure_modal_styles as _ems  # type: ignore
+    from app.ui.modal import ensure_modal_styles as _ems
     _ems()
 
 
 def apply_global_css() -> None:
     """Design-system entry: theme tokens, layout, tables, density."""
-    try:
-        from app.ui.theme import apply_global_css as _apply
-    except ImportError:
-        from ui.theme import apply_global_css as _apply  # type: ignore
+    from app.ui.theme import apply_global_css as _apply
     _apply()

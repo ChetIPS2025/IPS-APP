@@ -6,31 +6,17 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.services.asset_classification_service import (
-        TRACKING_TAB_LABELS,
-        TRACKING_TYPES,
-        reclassify_asset,
-        reclassify_assets_bulk,
-        resolve_tracking_type,
-        tracking_type_label,
-        validate_serial_numbers_for_bulk,
-    )
-    from app.services.asset_kits_service import asset_is_kit
-    from app.services.small_hand_tool_service import STORAGE_TYPES
-except ImportError:
-    from services.asset_classification_service import (  # type: ignore
-        TRACKING_TAB_LABELS,
-        TRACKING_TYPES,
-        reclassify_asset,
-        reclassify_assets_bulk,
-        resolve_tracking_type,
-        tracking_type_label,
-        validate_serial_numbers_for_bulk,
-    )
-    from services.asset_kits_service import asset_is_kit  # type: ignore
-    from services.small_hand_tool_service import STORAGE_TYPES  # type: ignore
-
+from app.services.asset_classification_service import (
+    TRACKING_TAB_LABELS,
+    TRACKING_TYPES,
+    reclassify_asset,
+    reclassify_assets_bulk,
+    resolve_tracking_type,
+    tracking_type_label,
+    validate_serial_numbers_for_bulk,
+)
+from app.services.asset_kits_service import asset_is_kit
+from app.services.small_hand_tool_service import STORAGE_TYPES
 _BULK_MOVE_TARGET_KEY = "ast_bulk_move_target"
 _BULK_MOVE_CONFIRM_KEY = "ast_bulk_move_confirm"
 _BULK_SERIAL_PREFIX = "ast_bulk_serial_"
@@ -246,11 +232,7 @@ def render_equipment_bulk_move_toolbar(
 
 
 def _linked_hand_tool_qty(asset_id: str) -> tuple[float, float]:
-    try:
-        from app.services.asset_classification_service import _find_hand_tool_by_source
-    except ImportError:
-        from services.asset_classification_service import _find_hand_tool_by_source  # type: ignore
-
+    from app.services.asset_classification_service import _find_hand_tool_by_source
     row = _find_hand_tool_by_source(asset_id) or {}
     on_hand = float(row.get("quantity_on_hand") or 1)
     expected = float(row.get("quantity_expected") or on_hand)
@@ -398,11 +380,7 @@ def render_asset_reclassification_panel(asset: dict[str, Any]) -> None:
     if not aid:
         return
 
-    try:
-        from app.pages._core._crud import is_demo_id
-    except ImportError:
-        from pages._core._crud import is_demo_id  # type: ignore
-
+    from app.pages._core._crud import is_demo_id
     if is_demo_id(aid):
         return
 

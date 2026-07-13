@@ -83,17 +83,10 @@ def render_clickable_table(
     When ``html_rows`` is False (default), each row gets an invisible Streamlit button overlay
     so clicks reliably open details. Set ``html_rows=True`` for read-only nested tables.
     """
-    try:
-        from app.ui.clean_table import (
-            apply_clean_table_row_selection,
-            render_clean_table_click_bridge,
-        )
-    except ImportError:
-        from ui.clean_table import (  # type: ignore
-            apply_clean_table_row_selection,
-            render_clean_table_click_bridge,
-        )
-
+    from app.ui.clean_table import (
+        apply_clean_table_row_selection,
+        render_clean_table_click_bridge,
+    )
     # Table row CSS is injected globally via styles.inject_global_css()
 
     sel_key = session_select_key or key

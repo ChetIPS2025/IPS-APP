@@ -79,10 +79,7 @@ def effective_expiration_iso(row: dict[str, Any]) -> str:
 def _format_date_display(value: date | object | None) -> str:
     if not value:
         return "—"
-    try:
-        from app.utils.formatting import fmt_date
-    except ImportError:
-        from utils.formatting import fmt_date  # type: ignore
+    from app.utils.formatting import fmt_date
     return fmt_date(value)
 
 
@@ -139,11 +136,7 @@ def ensure_estimate_expiration_persisted(estimate_id: str) -> bool:
     eid = str(estimate_id or "").strip()
     if not eid:
         return False
-    try:
-        from app.services.repository import fetch_by_id, update_row
-    except ImportError:
-        from services.repository import fetch_by_id, update_row  # type: ignore
-
+    from app.services.repository import fetch_by_id, update_row
     row = fetch_by_id("estimates", eid)
     if not row:
         return False

@@ -33,10 +33,7 @@ def pricing_guide_fetch_status() -> PricingGuideFetchResult | None:
 
 
 def _allow_legacy_pricing_fallback() -> bool:
-    try:
-        from app.config import settings
-    except ImportError:
-        from config import settings  # type: ignore
+    from app.config import settings
     return not settings.is_production
 
 
@@ -255,10 +252,7 @@ def normalize_pricing_row(
 
     active = row.get("is_active") is not False
     live_cost = resolve_live_unit_cost(row, inv_costs=inventory_costs, asset_costs=asset_costs)
-    try:
-        from app.services.catalog_stock_policy_service import normalize_stock_policy, stock_policy_label
-    except ImportError:
-        from services.catalog_stock_policy_service import normalize_stock_policy, stock_policy_label  # type: ignore
+    from app.services.catalog_stock_policy_service import normalize_stock_policy, stock_policy_label
     policy = normalize_stock_policy(row.get("stock_policy"))
     return {
         **row,
@@ -311,11 +305,7 @@ def _fetch_lookup_maps_from_db() -> tuple[
     inventory_costs: dict[str, float] = {}
     asset_flags: dict[str, bool] = {}
     asset_costs: dict[str, float] = {}
-    try:
-        from app.db import fetch_table, fetch_table_admin
-    except ImportError:
-        from db import fetch_table, fetch_table_admin  # type: ignore
-
+    from app.db import fetch_table, fetch_table_admin
     fetcher = fetch_table_admin or fetch_table
     for table, target, name_fields in (
         ("vendors", vendor_names, ("vendor_name", "name")),
@@ -427,10 +417,7 @@ def fetch_pricing_guide_catalog(
     global _last_pricing_guide_fetch
 
     if fetch_table is None or fetch_table_admin is None:
-        try:
-            from app.db import fetch_table as _ft, fetch_table_admin as _fta
-        except ImportError:
-            from db import fetch_table as _ft, fetch_table_admin as _fta  # type: ignore
+        from app.db import fetch_table as _ft, fetch_table_admin as _fta
         fetch_table = _ft
         fetch_table_admin = _fta
 
@@ -669,10 +656,7 @@ def resolve_live_unit_cost(
             cached = inv_costs.get(inv_id)
             if cached and cached > 0:
                 return cached
-        try:
-            from app.pages._core._data import load_inventory
-        except ImportError:
-            from pages._core._data import load_inventory  # type: ignore
+        from app.pages._core._data import load_inventory
         inv = next((r for r in load_inventory() if str(r.get("id")) == inv_id), None)
         if inv:
             cost = _inventory_cost_from_row(inv)
@@ -683,10 +667,7 @@ def resolve_live_unit_cost(
             cached = asset_costs.get(ast_id)
             if cached and cached > 0:
                 return cached
-        try:
-            from app.pages._core._data import load_assets
-        except ImportError:
-            from pages._core._data import load_assets  # type: ignore
+        from app.pages._core._data import load_assets
         asset = next((r for r in load_assets() if str(r.get("id")) == ast_id), None)
         if asset:
             cost = _asset_cost_from_row(asset)
@@ -701,13 +682,8 @@ def save_pricing_item(
     row_id: str | None = None,
     changed_by: str = "",
 ) -> tuple[bool, str]:
-    try:
-        from app.db import fetch_by_match_admin, insert_row_admin, update_rows_admin
-        from app.pages._core._crud import is_demo_id
-    except ImportError:
-        from db import fetch_by_match_admin, insert_row_admin, update_rows_admin  # type: ignore
-        from pages._core._crud import is_demo_id  # type: ignore
-
+    from app.db import fetch_by_match_admin, insert_row_admin, update_rows_admin
+    from app.pages._core._crud import is_demo_id
     cost = float(data.get("default_cost") or data.get("purchase_price") or 0)
     markup = float(data.get("default_markup_percent") or data.get("markup_pct") or 0)
     sell = data.get("default_sell_price") or data.get("sell_price") or data.get("customer_price")
@@ -776,33 +752,21 @@ def save_pricing_item(
         "notes": str(data.get("notes") or "").strip(),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
-    try:
-        from app.data.pricing_guide_fittings import FITTING_CATALOG_FIELD_NAMES
-    except ImportError:
-        from data.pricing_guide_fittings import FITTING_CATALOG_FIELD_NAMES  # type: ignore
+    from app.data.pricing_guide_fittings import FITTING_CATALOG_FIELD_NAMES
     for key in FITTING_CATALOG_FIELD_NAMES:
         if key in data:
             payload[key] = str(data.get(key) or "").strip()[:200]
-    try:
-        from app.services.catalog_stock_policy_service import normalize_stock_policy
-    except ImportError:
-        from services.catalog_stock_policy_service import normalize_stock_policy  # type: ignore
+    from app.services.catalog_stock_policy_service import normalize_stock_policy
     if "stock_policy" in data:
         payload["stock_policy"] = normalize_stock_policy(data.get("stock_policy"))
     if "default_reorder_point" in data:
-        try:
-            from app.utils.inventory_quantity import parse_inventory_quantity
-        except ImportError:
-            from utils.inventory_quantity import parse_inventory_quantity  # type: ignore
+        from app.utils.inventory_quantity import parse_inventory_quantity
         payload["default_reorder_point"] = max(
             parse_inventory_quantity(data.get("default_reorder_point"), allow_zero=True, field_name="Reorder point"),
             0,
         )
     if "default_reorder_quantity" in data:
-        try:
-            from app.utils.inventory_quantity import parse_inventory_quantity
-        except ImportError:
-            from utils.inventory_quantity import parse_inventory_quantity  # type: ignore
+        from app.utils.inventory_quantity import parse_inventory_quantity
         payload["default_reorder_quantity"] = max(
             parse_inventory_quantity(data.get("default_reorder_quantity"), allow_zero=True, field_name="Reorder quantity"),
             0,
@@ -873,13 +837,8 @@ def _save_legacy_estimate_material(
     exc: str,
 ) -> tuple[bool, str]:
     """Fallback when pricing_guide_items table is not migrated yet."""
-    try:
-        from app.db import insert_row_admin, update_rows_admin
-        from app.pages._core._crud import is_demo_id
-    except ImportError:
-        from db import insert_row_admin, update_rows_admin  # type: ignore
-        from pages._core._crud import is_demo_id  # type: ignore
-
+    from app.db import insert_row_admin, update_rows_admin
+    from app.pages._core._crud import is_demo_id
     purchase = float(data.get("default_cost") or data.get("purchase_price") or 0)
     markup = float(data.get("default_markup_percent") or data.get("markup_pct") or 0)
     sell = data.get("default_sell_price") or calc_sell_price(purchase, markup)
@@ -911,10 +870,7 @@ def fetch_price_history(pricing_item_id: str) -> list[dict[str, Any]]:
     pid = str(pricing_item_id or "").strip()
     if not pid:
         return []
-    try:
-        from app.db import fetch_table_admin
-    except ImportError:
-        from db import fetch_table_admin  # type: ignore
+    from app.db import fetch_table_admin
     try:
         rows = list(
             fetch_table_admin("pricing_guide_price_history", limit=5000, order_by="changed_at")
@@ -1013,11 +969,7 @@ def link_inventory_to_pricing_item(
     *,
     sync_cost: bool = False,
 ) -> tuple[bool, str]:
-    try:
-        from app.db import update_rows_admin
-    except ImportError:
-        from db import update_rows_admin  # type: ignore
-
+    from app.db import update_rows_admin
     iid = str(inventory_id or "").strip()
     pid = str(pricing_item_id or "").strip()
     if not iid or not pid:
@@ -1040,10 +992,7 @@ def link_inventory_to_pricing_item(
             {"id": pid},
         )
         if sync_cost:
-            try:
-                from app.pages._core._data import load_inventory
-            except ImportError:
-                from pages._core._data import load_inventory  # type: ignore
+            from app.pages._core._data import load_inventory
             inv = next((r for r in load_inventory() if str(r.get("id")) == iid), None)
             if inv:
                 unit_cost = float(inv.get("unit_cost") or 0)
@@ -1069,11 +1018,7 @@ def link_inventory_to_pricing_item(
 
 
 def link_asset_to_pricing_item(asset_id: str, pricing_item_id: str) -> tuple[bool, str]:
-    try:
-        from app.db import update_rows_admin
-    except ImportError:
-        from db import update_rows_admin  # type: ignore
-
+    from app.db import update_rows_admin
     aid = str(asset_id or "").strip()
     pid = str(pricing_item_id or "").strip()
     if not aid or not pid:
@@ -1195,12 +1140,8 @@ def delete_pricing_item(row_id: str) -> tuple[bool, str]:
     rid = str(row_id or "").strip()
     if not rid:
         return False, "Missing item id."
-    try:
-        from app.pages._core._crud import is_demo_id
-        from app.services.repository import delete_row
-    except ImportError:
-        from pages._core._crud import is_demo_id  # type: ignore
-        from services.repository import delete_row  # type: ignore
+    from app.pages._core._crud import is_demo_id
+    from app.services.repository import delete_row
     if is_demo_id(rid):
         return False, "Demo records cannot be deleted."
     result = delete_row("pricing_guide_items", {"id": rid})

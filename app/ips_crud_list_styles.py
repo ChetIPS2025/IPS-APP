@@ -297,8 +297,5 @@ def inject_ips_crud_list_styles() -> None:
 
 def render_crud_list_subtitle(text: str) -> None:
     """One-line section description (prefer :func:`page_shell.render_page_header` subtitle instead)."""
-    try:
-        from app.ui.page_shell import render_section_desc_only
-    except ImportError:
-        from ui.page_shell import render_section_desc_only  # type: ignore
+    from app.ui.page_shell import render_section_desc_only
     render_section_desc_only(text)

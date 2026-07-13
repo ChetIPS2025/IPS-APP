@@ -7,34 +7,18 @@ from datetime import date, timedelta
 
 import streamlit as st
 
-try:
-    from app.auth import current_profile, current_user_display_name, effective_role
-    from app.components.dashboard_ops_panels import render_dashboard_ops_panels
-    from app.components.quote_job_number_autofill import clear_new_job_number_state
-    from app.navigation import set_nav_slug
-    from app.pages._core._data import (
-        load_dashboard_kpis,
-        load_tasks,
-        load_timekeeping_summaries,
-    )
-    from app.styles import inject_ops_dashboard_css
-    from app.ui.kit import inject_ips_ui_styles, render_metric_row, render_page_header
-    from app.utils.formatting import fmt_currency
-except ImportError:
-    from auth import current_profile, current_user_display_name, effective_role  # type: ignore
-    from components.dashboard_ops_panels import render_dashboard_ops_panels  # type: ignore
-    from components.quote_job_number_autofill import clear_new_job_number_state  # type: ignore
-    from navigation import set_nav_slug  # type: ignore
-    from pages._core._data import (  # type: ignore
-        load_dashboard_kpis,
-        load_tasks,
-        load_timekeeping_summaries,
-    )
-    from styles import inject_ops_dashboard_css  # type: ignore
-    from ui.kit import inject_ips_ui_styles, render_metric_row, render_page_header  # type: ignore
-    from utils.formatting import fmt_currency  # type: ignore
-
-
+from app.auth import current_profile, current_user_display_name, effective_role
+from app.components.dashboard_ops_panels import render_dashboard_ops_panels
+from app.components.quote_job_number_autofill import clear_new_job_number_state
+from app.navigation import set_nav_slug
+from app.pages._core._data import (
+    load_dashboard_kpis,
+    load_tasks,
+    load_timekeeping_summaries,
+)
+from app.styles import inject_ops_dashboard_css
+from app.ui.kit import inject_ips_ui_styles, render_metric_row, render_page_header
+from app.utils.formatting import fmt_currency
 def _welcome_name() -> str:
     return current_user_display_name()
 
@@ -55,10 +39,7 @@ def _date_range_state() -> tuple[date, date]:
 
 
 def _my_todo_count() -> int:
-    try:
-        from app.services.management_reminders_service import filter_dashboard_reminders
-    except ImportError:
-        from services.management_reminders_service import filter_dashboard_reminders  # type: ignore
+    from app.services.management_reminders_service import filter_dashboard_reminders
     return len(
         filter_dashboard_reminders(
             load_tasks(),
@@ -117,10 +98,7 @@ def _ops_welcome_html(*, employees: int, active_jobs: int) -> str:
 def render() -> None:
     inject_ips_ui_styles()
     inject_ops_dashboard_css()
-    try:
-        from app.pages._core._access import begin_module
-    except ImportError:
-        from pages._core._access import begin_module  # type: ignore
+    from app.pages._core._access import begin_module
     if not begin_module("dashboard", inject_css=False):
         return
 

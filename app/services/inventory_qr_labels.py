@@ -10,22 +10,12 @@ import zipfile
 from datetime import date
 from typing import Any
 
-try:
-    from app.services.inventory_display_helpers import (
-        inventory_qr_embed_subject,
-        resolve_inventory_qr_value,
-        resolve_inventory_sku,
-    )
-    from app.services.qr_codes import generate_qr_png_bytes
-except ImportError:
-    from services.inventory_display_helpers import (  # type: ignore
-        inventory_qr_embed_subject,
-        resolve_inventory_qr_value,
-        resolve_inventory_sku,
-    )
-    from services.qr_codes import generate_qr_png_bytes  # type: ignore
-
-
+from app.services.inventory_display_helpers import (
+    inventory_qr_embed_subject,
+    resolve_inventory_qr_value,
+    resolve_inventory_sku,
+)
+from app.services.qr_codes import generate_qr_png_bytes
 def inventory_item_description(item: dict[str, Any]) -> str:
     for key in ("description", "item_name", "name"):
         val = str(item.get(key) or "").strip()
@@ -51,10 +41,7 @@ LABEL_PNG_SIZE_CHOICES: tuple[tuple[str, str], ...] = (
 
 
 def label_company_name() -> str:
-    try:
-        from app.services.company_settings_service import load_app_settings
-    except ImportError:
-        from services.company_settings_service import load_app_settings  # type: ignore
+    from app.services.company_settings_service import load_app_settings
     return str(load_app_settings().get("company_name") or "Industrial Plant Solutions").strip()
 
 
@@ -78,10 +65,7 @@ def label_png_download_filename(base: str, size: str | None) -> str:
 
 
 def inventory_qr_subject(item: dict[str, Any]) -> str:
-    try:
-        from app.services.inventory_service import generate_inventory_qr_value
-    except ImportError:
-        from services.inventory_service import generate_inventory_qr_value  # type: ignore
+    from app.services.inventory_service import generate_inventory_qr_value
     url = str(generate_inventory_qr_value(item) or "").strip()
     if url.startswith("http"):
         return url
@@ -90,26 +74,16 @@ def inventory_qr_subject(item: dict[str, Any]) -> str:
 
 def inventory_item_has_thumbnail(item: dict[str, Any]) -> bool:
     """True when item has a stored image path (no network/local read)."""
-    try:
-        from app.services.inventory_images import inventory_display_record
-        from app.services.item_images import has_stored_item_image
-    except ImportError:
-        from services.inventory_images import inventory_display_record  # type: ignore
-        from services.item_images import has_stored_item_image  # type: ignore
+    from app.services.inventory_images import inventory_display_record
+    from app.services.item_images import has_stored_item_image
     return has_stored_item_image(inventory_display_record(item))
 
 
 def load_inventory_thumbnail_bytes(item: dict[str, Any]) -> bytes | None:
     """Load stored thumbnail bytes for label rendering."""
-    try:
-        from app.db import _local_file_path_for_storage, _storage_is_local, create_signed_url
-        from app.services.inventory_images import inventory_display_record
-        from app.services.item_images import _bucket_for_image_path, has_stored_item_image
-    except ImportError:
-        from db import _local_file_path_for_storage, _storage_is_local, create_signed_url  # type: ignore
-        from services.inventory_images import inventory_display_record  # type: ignore
-        from services.item_images import _bucket_for_image_path, has_stored_item_image  # type: ignore
-
+    from app.db import _local_file_path_for_storage, _storage_is_local, create_signed_url
+    from app.services.inventory_images import inventory_display_record
+    from app.services.item_images import _bucket_for_image_path, has_stored_item_image
     display = inventory_display_record(item)
     if not has_stored_item_image(display):
         return None

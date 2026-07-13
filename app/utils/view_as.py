@@ -7,17 +7,10 @@ from collections.abc import Callable
 
 import streamlit as st
 
-try:
-    from app.auth import current_role
-    from app.mobile_ui import IPS_VIEWPORT_NARROW_KEY
-    from app.utils.constants import EMPLOYEE_NAV_PAGES
-    from app.utils.permissions import normalize_role, role_default_nav_slug
-except ImportError:
-    from auth import current_role  # type: ignore
-    from mobile_ui import IPS_VIEWPORT_NARROW_KEY  # type: ignore
-    from utils.constants import EMPLOYEE_NAV_PAGES  # type: ignore
-    from utils.permissions import normalize_role, role_default_nav_slug  # type: ignore
-
+from app.auth import current_role
+from app.mobile_ui import IPS_VIEWPORT_NARROW_KEY
+from app.utils.constants import EMPLOYEE_NAV_PAGES
+from app.utils.permissions import normalize_role, role_default_nav_slug
 IPS_VIEW_AS_ACTIVE_KEY = "ips_view_as_active"
 IPS_VIEW_AS_MODE_KEY = "ips_view_as_mode"
 IPS_VIEW_AS_ROLE_KEY = "ips_view_as_role"
@@ -101,12 +94,8 @@ def ensure_view_as_navigation() -> None:
     """Keep admins on pages allowed by the active preview role."""
     if not is_view_as_active():
         return
-    try:
-        from app.navigation import current_nav_slug, default_nav_slug, set_nav_slug
-        from app.utils.permissions import role_can_access_page
-    except ImportError:
-        from navigation import current_nav_slug, default_nav_slug, set_nav_slug  # type: ignore
-        from utils.permissions import role_can_access_page  # type: ignore
+    from app.navigation import current_nav_slug, default_nav_slug, set_nav_slug
+    from app.utils.permissions import role_can_access_page
     slug = current_nav_slug()
     role = ui_role()
     if role_can_access_page(role, slug):
@@ -124,10 +113,7 @@ def set_view_as(mode: str) -> None:
     picked = str(mode or "admin").strip().lower()
     if picked in {"", "admin"}:
         clear_view_as()
-        try:
-            from app.navigation import set_nav_slug
-        except ImportError:
-            from navigation import set_nav_slug  # type: ignore
+        from app.navigation import set_nav_slug
         set_nav_slug("dashboard")
         _clear_view_as_picker_widgets()
         return
@@ -150,10 +136,7 @@ def set_view_as(mode: str) -> None:
         clear_view_as()
         return
 
-    try:
-        from app.navigation import set_nav_slug
-    except ImportError:
-        from navigation import set_nav_slug  # type: ignore
+    from app.navigation import set_nav_slug
     set_nav_slug(_landing_slug_for_mode(picked))
     _clear_view_as_picker_widgets()
 
@@ -694,10 +677,7 @@ def render_view_as_active_toolbar(*, styles_already_injected: bool = False) -> N
                 use_container_width=True,
             ):
                 clear_view_as()
-                try:
-                    from app.navigation import set_nav_slug
-                except ImportError:
-                    from navigation import set_nav_slug  # type: ignore
+                from app.navigation import set_nav_slug
                 set_nav_slug("dashboard")
                 st.rerun()
         return
@@ -722,10 +702,7 @@ def render_view_as_active_toolbar(*, styles_already_injected: bool = False) -> N
             use_container_width=True,
         ):
             clear_view_as()
-            try:
-                from app.navigation import set_nav_slug
-            except ImportError:
-                from navigation import set_nav_slug  # type: ignore
+            from app.navigation import set_nav_slug
             set_nav_slug("dashboard")
             st.rerun()
 
@@ -802,18 +779,11 @@ def render_view_as_mobile_bottom_nav(active_slug: str) -> None:
     picked = st.session_state.get("ips_view_as_mobile_nav_pick")
     if picked and str(picked) != active_slug:
         st.session_state.pop("ips_view_as_mobile_nav_pick", None)
-        try:
-            from app.navigation import set_nav_slug
-        except ImportError:
-            from navigation import set_nav_slug  # type: ignore
+        from app.navigation import set_nav_slug
         set_nav_slug(str(picked))
         st.rerun()
 
-    try:
-        from app.ui.clean_table import _components_html
-    except ImportError:
-        from ui.clean_table import _components_html  # type: ignore
-
+    from app.ui.clean_table import _components_html
     nav_pick = _components_html(
         """
 <script>

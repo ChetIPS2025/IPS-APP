@@ -4,57 +4,30 @@ from __future__ import annotations
 
 import streamlit as st
 
-try:
-    from app.components.clickable_table import render_clickable_table
-    from app.components.headers import render_page_header
-    from app.components.record_modal import (
-        build_modal_cache,
-        clear_record_modal,
-        detail_field_html,
-        dialog_card_html,
-        edit_mode_key,
-        get_modal_record,
-        is_edit_mode,
-        open_record_modal,
-        record_session_key,
-        render_edit_form_header,
-        render_modal_edit_button,
-        render_modal_header,
-        render_modal_shell,
-        render_missing_record,
-        set_view_mode,
-        show_modal_if_pending,
-    )
-    from app.components.tabs import render_tabs
-    from app.pages._core._crud import apply_persist_feedback
-    from app.pages._core._session import nav_slug, select_key
-    from app.utils.constants import LOOKUP_TABLES
-except ImportError:
-    from components.clickable_table import render_clickable_table  # type: ignore
-    from components.headers import render_page_header  # type: ignore
-    from components.record_modal import (  # type: ignore
-        build_modal_cache,
-        clear_record_modal,
-        detail_field_html,
-        dialog_card_html,
-        edit_mode_key,
-        get_modal_record,
-        is_edit_mode,
-        open_record_modal,
-        record_session_key,
-        render_edit_form_header,
-        render_modal_edit_button,
-        render_modal_header,
-        render_modal_shell,
-        render_missing_record,
-        set_view_mode,
-        show_modal_if_pending,
-    )
-    from components.tabs import render_tabs  # type: ignore
-    from pages._core._crud import apply_persist_feedback  # type: ignore
-    from pages._core._session import nav_slug, select_key  # type: ignore
-    from utils.constants import LOOKUP_TABLES  # type: ignore
-
+from app.components.clickable_table import render_clickable_table
+from app.components.headers import render_page_header
+from app.components.record_modal import (
+    build_modal_cache,
+    clear_record_modal,
+    detail_field_html,
+    dialog_card_html,
+    edit_mode_key,
+    get_modal_record,
+    is_edit_mode,
+    open_record_modal,
+    record_session_key,
+    render_edit_form_header,
+    render_modal_edit_button,
+    render_modal_header,
+    render_modal_shell,
+    render_missing_record,
+    set_view_mode,
+    show_modal_if_pending,
+)
+from app.components.tabs import render_tabs
+from app.pages._core._crud import apply_persist_feedback
+from app.pages._core._session import nav_slug, select_key
+from app.utils.constants import LOOKUP_TABLES
 _ADMIN_TAB = "ips_admin_main_tab"
 _LOOKUP_TAB = "ips_admin_lookup_table"
 _SEL = select_key("admin_lookup")
@@ -80,23 +53,14 @@ def _lookup_source_key(table_name: str) -> str:
 
 
 def _load_lookup_entries_from_service(table_name: str) -> tuple[list[dict], str]:
-    try:
-        from app.services.lookup_service import load_lookup_entries_for_label
-    except ImportError:
-        from services.lookup_service import load_lookup_entries_for_label  # type: ignore
+    from app.services.lookup_service import load_lookup_entries_for_label
     try:
         return load_lookup_entries_for_label(table_name)
     except Exception:
-        try:
-            from app.services.lookup_service import (
-                constants_fallback_for_label,
-                supabase_is_configured,
-            )
-        except ImportError:
-            from services.lookup_service import (  # type: ignore
-                constants_fallback_for_label,
-                supabase_is_configured,
-            )
+        from app.services.lookup_service import (
+            constants_fallback_for_label,
+            supabase_is_configured,
+        )
         if not supabase_is_configured():
             vals = constants_fallback_for_label(table_name)
             return [{"id": f"local-{i}", "value": v, "from_db": False} for i, v in enumerate(vals)], "constants"
@@ -268,10 +232,7 @@ def _render_lookup_editor() -> None:
     source = str(st.session_state.get(_lookup_source_key(table)) or "unknown")
     if source == "empty":
         if st.button("Seed from app defaults", key=f"{key}_seed"):
-            try:
-                from app.services.lookup_service import seed_lookup_from_constants
-            except ImportError:
-                from services.lookup_service import seed_lookup_from_constants  # type: ignore
+            from app.services.lookup_service import seed_lookup_from_constants
             ok, msg = seed_lookup_from_constants(table)
             if apply_persist_feedback(ok, msg):
                 _clear_lookup_session(table)
@@ -296,20 +257,14 @@ def _render_lookup_editor() -> None:
     with nc2:
         if st.button("Add", key=f"{key}_add", use_container_width=True) and new_val.strip():
             entries = _get_lookup_entries(table)
-            try:
-                from app.services.lookup_service import _new_local_id
-            except ImportError:
-                from services.lookup_service import _new_local_id  # type: ignore
+            from app.services.lookup_service import _new_local_id
             entries.append({"id": _new_local_id(), "value": new_val.strip(), "from_db": False})
             _set_lookup_entries(table, entries)
             st.session_state[f"{key}_new"] = ""
             st.rerun()
 
     if st.button("Save lookup table", key=f"{key}_save", type="primary"):
-        try:
-            from app.services.lookup_service import sync_lookup_for_label
-        except ImportError:
-            from services.lookup_service import sync_lookup_for_label  # type: ignore
+        from app.services.lookup_service import sync_lookup_for_label
         ok, msg = sync_lookup_for_label(table, _get_lookup_entries(table))
         if apply_persist_feedback(ok, msg):
             _clear_lookup_session(table)
@@ -321,10 +276,7 @@ def _hydrate_app_settings_widgets(key_prefix: str) -> None:
     flag = f"{key_prefix}_hydrated"
     if st.session_state.get(flag):
         return
-    try:
-        from app.services.company_settings_service import load_app_settings
-    except ImportError:
-        from services.company_settings_service import load_app_settings  # type: ignore
+    from app.services.company_settings_service import load_app_settings
     row = load_app_settings()
     st.session_state[f"{key_prefix}_landing"] = str(row.get("default_landing_page") or "Dashboard")
     st.session_state[f"{key_prefix}_date_fmt"] = str(row.get("date_format") or "MM/DD/YYYY")
@@ -340,10 +292,7 @@ def _render_app_settings(*, key_prefix: str) -> None:
     _hydrate_app_settings_widgets(key_prefix)
     st.markdown("**Application Settings**")
     if not st.session_state.get(f"{key_prefix}_from_db_notified"):
-        try:
-            from app.services.company_settings_service import load_app_settings
-        except ImportError:
-            from services.company_settings_service import load_app_settings  # type: ignore
+        from app.services.company_settings_service import load_app_settings
         if load_app_settings().get("from_db"):
             st.caption("Loaded from **company_settings** in Supabase.")
         else:
@@ -385,10 +334,7 @@ def _render_app_settings(*, key_prefix: str) -> None:
         ),
     )
     if st.button("Save settings", key=f"{key_prefix}_save", type="primary"):
-        try:
-            from app.services.company_settings_service import save_app_settings
-        except ImportError:
-            from services.company_settings_service import save_app_settings  # type: ignore
+        from app.services.company_settings_service import save_app_settings
         ok, msg = save_app_settings(
             default_landing_page=str(st.session_state.get(f"{key_prefix}_landing") or "Dashboard"),
             date_format=str(st.session_state.get(f"{key_prefix}_date_fmt") or "MM/DD/YYYY"),
@@ -400,31 +346,21 @@ def _render_app_settings(*, key_prefix: str) -> None:
         )
         apply_persist_feedback(ok, msg)
     st.markdown("---")
-    try:
-        from app.components.install_share import render_install_share_settings
-    except ImportError:
-        from components.install_share import render_install_share_settings  # type: ignore
+    from app.components.install_share import render_install_share_settings
     render_install_share_settings()
 
 
 def render_settings_page() -> None:
     """Application preferences — available to supervisors and admins."""
-    try:
-        from app.pages._core._access import begin_module
-    except ImportError:
-        from pages._core._access import begin_module  # type: ignore
+    from app.pages._core._access import begin_module
     if not begin_module("settings"):
         return
     render_page_header(
         "Settings",
         "Application preferences, notifications, and install options.",
     )
-    try:
-        from app.auth import current_role
-        from app.utils.permissions import normalize_role
-    except ImportError:
-        from auth import current_role  # type: ignore
-        from utils.permissions import normalize_role  # type: ignore
+    from app.auth import current_role
+    from app.utils.permissions import normalize_role
     if normalize_role(current_role()) == "admin":
         st.caption("Lookup tables and **View As** role preview are on the **Admin** page.")
     _render_app_settings(key_prefix="ips_app_settings_settings")
@@ -432,25 +368,16 @@ def render_settings_page() -> None:
 
 def render_admin_page() -> None:
     """System administration — lookup tables and role preview."""
-    try:
-        from app.pages._core._access import begin_module
-    except ImportError:
-        from pages._core._access import begin_module  # type: ignore
+    from app.pages._core._access import begin_module
     if not begin_module("admin"):
         return
     render_page_header(
         "Admin",
         "Manage lookup tables, system configuration, and preview other roles.",
     )
-    try:
-        from app.auth import render_auth_identity_debug_panel
-    except ImportError:
-        from auth import render_auth_identity_debug_panel  # type: ignore
+    from app.auth import render_auth_identity_debug_panel
     render_auth_identity_debug_panel()
-    try:
-        from app.utils.view_as import render_view_as_admin_panel
-    except ImportError:
-        from utils.view_as import render_view_as_admin_panel  # type: ignore
+    from app.utils.view_as import render_view_as_admin_panel
     render_view_as_admin_panel()
 
     main_tab = render_tabs(

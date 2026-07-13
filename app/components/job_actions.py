@@ -8,24 +8,13 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.components.action_styles import danger_solid_button, success_solid_button, warning_solid_button
-    from app.services.jobs_service import (
-        cancel_job,
-        can_manage_job_actions,
-        complete_job,
-        soft_delete_job,
-    )
-except ImportError:
-    from components.action_styles import danger_solid_button, success_solid_button, warning_solid_button  # type: ignore
-    from services.jobs_service import (  # type: ignore
-        cancel_job,
-        can_manage_job_actions,
-        complete_job,
-        soft_delete_job,
-    )
-
-
+from app.components.action_styles import danger_solid_button, success_solid_button, warning_solid_button
+from app.services.jobs_service import (
+    cancel_job,
+    can_manage_job_actions,
+    complete_job,
+    soft_delete_job,
+)
 def _confirm_state_key(job_id: str, action: str) -> str:
     return f"confirm_{action}_job_{job_id}"
 

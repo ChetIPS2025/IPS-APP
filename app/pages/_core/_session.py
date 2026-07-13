@@ -4,12 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-try:
-    from app.utils.constants import SESSION_DETAIL_TAB_PREFIX, SESSION_NAV_KEY, SESSION_SELECTED_PREFIX
-except ImportError:
-    from utils.constants import SESSION_DETAIL_TAB_PREFIX, SESSION_NAV_KEY, SESSION_SELECTED_PREFIX  # type: ignore
-
-
+from app.utils.constants import SESSION_DETAIL_TAB_PREFIX, SESSION_NAV_KEY, SESSION_SELECTED_PREFIX
 def nav_slug() -> str:
     return str(st.session_state.get(SESSION_NAV_KEY) or "dashboard")
 

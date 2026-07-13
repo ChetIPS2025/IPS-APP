@@ -4,27 +4,13 @@ from __future__ import annotations
 
 import streamlit as st
 
-try:
-    from app.components.coupling_inspection_launcher import open_coupling_inspection
-    from app.components.record_modal import detail_field_html, dialog_card_html, status_pill_html
-    from app.services.coupling_inspection_service import (
-        coupling_inspection_status_label,
-        list_coupling_inspections,
-    )
-    from app.services.tasks_service import get_tasks_by_job
-except ImportError:
-    from components.coupling_inspection_launcher import open_coupling_inspection  # type: ignore
-    from components.record_modal import (  # type: ignore
-        detail_field_html,
-        dialog_card_html,
-        status_pill_html,
-    )
-    from services.coupling_inspection_service import (  # type: ignore
-        coupling_inspection_status_label,
-        list_coupling_inspections,
-    )
-    from services.tasks_service import get_tasks_by_job  # type: ignore
-
+from app.components.coupling_inspection_launcher import open_coupling_inspection
+from app.components.record_modal import detail_field_html, dialog_card_html, status_pill_html
+from app.services.coupling_inspection_service import (
+    coupling_inspection_status_label,
+    list_coupling_inspections,
+)
+from app.services.tasks_service import get_tasks_by_job
 IPS_FORM_TYPES: tuple[dict[str, str], ...] = (
     {
         "id": "coupling_inspection",

@@ -9,127 +9,65 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.components.headers import render_page_brand_header
-    from app.components.table_filters import (
-        apply_column_filters,
-        build_filter_options,
-        render_table_header_cell,
-    )
-    from app.components.table_pagination import (
-        paginate_rows,
-        render_table_pagination_footer,
-        render_table_pagination_header,
-        reset_table_page,
-    )
-    from app.components.timekeeping_allocation import (
-        AllocationRenderDeps,
-        DayAllocationCardContext,
-        allocation_panel_scope_key,
-        render_allocation_days_panel,
-        render_allocation_panel_intro,
-        render_day_allocation_card,
-    )
-    from app.components.record_modal import (
-        build_modal_cache,
-        clear_record_modal,
-        detail_field_html,
-        dialog_card_html,
-        placeholder_html,
-        record_session_key,
-        render_modal_header,
-        render_modal_meta_grid,
-        render_modal_shell,
-        render_missing_record,
-        show_modal_if_pending,
-    )
-    from app.pages._core._data import (
-        build_timekeeping_grid_from_day_rows,
-        default_weekly_grid,
-        load_jobs,
-        load_timekeeping_grid,
-        load_timekeeping_summaries,
-        persist_timekeeping_approve,
-        persist_timekeeping_days,
-        persist_timekeeping_day_approve,
-        persist_timekeeping_day_approve_for_date,
-        persist_timekeeping_day_reject,
-        persist_timekeeping_day_reject_for_date,
-        persist_timekeeping_day_submit,
-        persist_timekeeping_day_submit_for_date,
-        persist_timekeeping_reject,
-        persist_timekeeping_submit,
-        persist_timekeeping_week,
-    )
-    from app.pages._core._session import select_key
-    from app.styles import (
-        _inject_timekeeping_daily_hour_focus_script,
-        inject_timekeeping_module_css,
-    )
-    from app.utils.dates import week_dates, week_end, week_start
-    from app.utils.field_context import get_field_job_id, is_field_context, is_field_mode, render_field_job_bar
-    from app.utils.formatting import fmt_date
-except ImportError:
-    from components.timekeeping_allocation import (  # type: ignore
-        AllocationRenderDeps,
-        DayAllocationCardContext,
-        allocation_panel_scope_key,
-        render_allocation_days_panel,
-        render_allocation_panel_intro,
-        render_day_allocation_card,
-    )
-    from components.headers import render_page_brand_header  # type: ignore
-    from components.table_filters import (  # type: ignore
-        apply_column_filters,
-        build_filter_options,
-        render_table_header_cell,
-    )
-    from components.table_pagination import (  # type: ignore
-        paginate_rows,
-        render_table_pagination_footer,
-        render_table_pagination_header,
-        reset_table_page,
-    )
-    from components.record_modal import (  # type: ignore
-        build_modal_cache,
-        clear_record_modal,
-        detail_field_html,
-        dialog_card_html,
-        placeholder_html,
-        record_session_key,
-        render_modal_header,
-        render_modal_meta_grid,
-        render_modal_shell,
-        render_missing_record,
-        show_modal_if_pending,
-    )
-    from pages._core._data import (  # type: ignore
-        build_timekeeping_grid_from_day_rows,
-        default_weekly_grid,
-        load_jobs,
-        load_timekeeping_grid,
-        load_timekeeping_summaries,
-        persist_timekeeping_approve,
-        persist_timekeeping_days,
-        persist_timekeeping_day_approve,
-        persist_timekeeping_day_approve_for_date,
-        persist_timekeeping_day_reject,
-        persist_timekeeping_day_reject_for_date,
-        persist_timekeeping_day_submit,
-        persist_timekeeping_day_submit_for_date,
-        persist_timekeeping_reject,
-        persist_timekeeping_submit,
-        persist_timekeeping_week,
-    )
-    from pages._core._session import select_key  # type: ignore
-    from styles import (  # type: ignore
-        _inject_timekeeping_daily_hour_focus_script,
-        inject_timekeeping_module_css,
-    )
-    from utils.dates import week_dates, week_end, week_start  # type: ignore
-    from utils.field_context import get_field_job_id, is_field_context, is_field_mode, render_field_job_bar  # type: ignore
-    from utils.formatting import fmt_date  # type: ignore
-
+from app.components.headers import render_page_brand_header
+from app.components.table_filters import (
+    apply_column_filters,
+    build_filter_options,
+    render_table_header_cell,
+)
+from app.components.table_pagination import (
+    paginate_rows,
+    render_table_pagination_footer,
+    render_table_pagination_header,
+    reset_table_page,
+)
+from app.components.timekeeping_allocation import (
+    AllocationRenderDeps,
+    DayAllocationCardContext,
+    allocation_panel_scope_key,
+    render_allocation_days_panel,
+    render_allocation_panel_intro,
+    render_day_allocation_card,
+)
+from app.components.record_modal import (
+    build_modal_cache,
+    clear_record_modal,
+    detail_field_html,
+    dialog_card_html,
+    placeholder_html,
+    record_session_key,
+    render_modal_header,
+    render_modal_meta_grid,
+    render_modal_shell,
+    render_missing_record,
+    show_modal_if_pending,
+)
+from app.pages._core._data import (
+    build_timekeeping_grid_from_day_rows,
+    default_weekly_grid,
+    load_jobs,
+    load_timekeeping_grid,
+    load_timekeeping_summaries,
+    persist_timekeeping_approve,
+    persist_timekeeping_days,
+    persist_timekeeping_day_approve,
+    persist_timekeeping_day_approve_for_date,
+    persist_timekeeping_day_reject,
+    persist_timekeeping_day_reject_for_date,
+    persist_timekeeping_day_submit,
+    persist_timekeeping_day_submit_for_date,
+    persist_timekeeping_reject,
+    persist_timekeeping_submit,
+    persist_timekeeping_week,
+)
+from app.pages._core._session import select_key
+from app.styles import (
+    _inject_timekeeping_daily_hour_focus_script,
+    inject_timekeeping_module_css,
+)
+from app.utils.dates import week_dates, week_end, week_start
+from app.utils.field_context import get_field_job_id, is_field_context, is_field_mode, render_field_job_bar
+from app.utils.formatting import fmt_date
 from app.ui.streamlit_perf import (
     fragment,
     inject_scroll_preserve,
@@ -187,10 +125,7 @@ _WEEKLY_TS_LIST_ROW_COLS = [
 
 
 def _is_narrow_viewport() -> bool:
-    try:
-        from app.mobile_ui import IPS_VIEWPORT_NARROW_KEY
-    except ImportError:
-        from mobile_ui import IPS_VIEWPORT_NARROW_KEY  # type: ignore
+    from app.mobile_ui import IPS_VIEWPORT_NARROW_KEY
     return bool(st.session_state.get(IPS_VIEWPORT_NARROW_KEY))
 
 
@@ -375,19 +310,13 @@ _ASSIGNMENT_EXCLUDED_JOB_STATUSES = frozenset(
 
 
 def _normalize_assignable_job_status(raw: object) -> str:
-    try:
-        from app.services.jobs_service import normalize_job_status
-    except ImportError:
-        from services.jobs_service import normalize_job_status  # type: ignore
+    from app.services.jobs_service import normalize_job_status
     return normalize_job_status(raw)
 
 
 def _job_row_assignable_for_timekeeping(job: dict[str, Any]) -> bool:
     """Match Jobs list Active view: real rows only, not deleted/archived/closed-out."""
-    try:
-        from app.services.job_service import is_job_assignable_for_field_picker
-    except ImportError:
-        from services.job_service import is_job_assignable_for_field_picker  # type: ignore
+    from app.services.job_service import is_job_assignable_for_field_picker
     return is_job_assignable_for_field_picker(job)
 
 
@@ -401,11 +330,7 @@ def _job_assignment_label(job: dict[str, Any]) -> str:
 
 def _build_assignment_options_for_timekeeping() -> list[str]:
     """Build assignable job/subjob labels (uncached)."""
-    try:
-        from app.services.tasks_service import get_tasks_by_job
-    except ImportError:
-        from services.tasks_service import get_tasks_by_job  # type: ignore
-
+    from app.services.tasks_service import get_tasks_by_job
     opts: list[str] = ["— No assignment —"]
     seen: set[str] = {opts[0].casefold()}
 
@@ -479,10 +404,7 @@ def _ensure_week_days_by_employee(week_start_d: date) -> dict[str, list[dict[str
         cached = st.session_state.get(_TK_WEEK_DAYS_KEY)
         if isinstance(cached, dict):
             return cached
-    try:
-        from app.services.timekeeping_service import list_timekeeping_days_for_week
-    except ImportError:
-        from services.timekeeping_service import list_timekeeping_days_for_week  # type: ignore
+    from app.services.timekeeping_service import list_timekeeping_days_for_week
     rows = list_timekeeping_days_for_week(week_start_d)
     by_eid: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
@@ -555,10 +477,7 @@ def _active_field_job_label() -> str | None:
     jid = get_field_job_id()
     if not jid:
         return None
-    try:
-        from app.services.jobs_service import get_job_options
-    except ImportError:
-        from services.jobs_service import get_job_options  # type: ignore
+    from app.services.jobs_service import get_job_options
     for opt in get_job_options(include_all=True):
         if str(opt.get("id") or "").strip() == jid:
             label = str(opt.get("label") or "").strip()
@@ -700,12 +619,8 @@ def _render_horizontal_week_grid(
 
 def _filter_summaries_for_current_user(summaries: list[dict]) -> list[dict]:
     """Supervisors see all crew; employees see only their own timecard."""
-    try:
-        from app.auth import current_profile, current_role, effective_role
-        from app.utils.permissions import can_submit_timekeeping
-    except ImportError:
-        from auth import current_profile, current_role, effective_role  # type: ignore
-        from utils.permissions import can_submit_timekeeping  # type: ignore
+    from app.auth import current_profile, current_role, effective_role
+    from app.utils.permissions import can_submit_timekeeping
     if can_submit_timekeeping(effective_role()):
         return summaries
 
@@ -758,23 +673,15 @@ def _day_is_editable(status: str) -> bool:
 
 
 def _can_admin_edit_approved_timekeeping() -> bool:
-    try:
-        from app.auth import current_role, effective_role
-        from app.utils.permissions import can_admin_edit_approved_timekeeping
-    except ImportError:
-        from auth import current_role, effective_role  # type: ignore
-        from utils.permissions import can_admin_edit_approved_timekeeping  # type: ignore
+    from app.auth import current_role, effective_role
+    from app.utils.permissions import can_admin_edit_approved_timekeeping
     return can_admin_edit_approved_timekeeping(effective_role())
 
 
 def _can_override_overtime_allocation() -> bool:
     """Only administrators may manually change calculated S/T vs O/T."""
-    try:
-        from app.auth import effective_role
-        from app.utils.permissions import normalize_role
-    except ImportError:
-        from auth import effective_role  # type: ignore
-        from utils.permissions import normalize_role  # type: ignore
+    from app.auth import effective_role
+    from app.utils.permissions import normalize_role
     return normalize_role(effective_role()) == "admin"
 
 
@@ -879,40 +786,26 @@ def _db_status_for_save(status: str) -> str:
 
 
 def _current_user_id() -> str | None:
-    try:
-        from app.auth import current_profile
-    except ImportError:
-        from auth import current_profile  # type: ignore
+    from app.auth import current_profile
     uid = str(current_profile().get("id") or "").strip()
     return uid or None
 
 
 def _current_user_name() -> str:
-    try:
-        from app.auth import current_profile
-    except ImportError:
-        from auth import current_profile  # type: ignore
+    from app.auth import current_profile
     profile = current_profile()
     return str(profile.get("name") or profile.get("email") or "User").strip() or "User"
 
 
 def _can_approve_timekeeping() -> bool:
-    try:
-        from app.auth import current_role, effective_role
-        from app.utils.permissions import can_approve_timekeeping
-    except ImportError:
-        from auth import current_role, effective_role  # type: ignore
-        from utils.permissions import can_approve_timekeeping  # type: ignore
+    from app.auth import current_role, effective_role
+    from app.utils.permissions import can_approve_timekeeping
     return can_approve_timekeeping(effective_role())
 
 
 def _can_submit_timekeeping() -> bool:
-    try:
-        from app.auth import current_role, effective_role
-        from app.utils.permissions import can_submit_timekeeping
-    except ImportError:
-        from auth import current_role, effective_role  # type: ignore
-        from utils.permissions import can_submit_timekeeping  # type: ignore
+    from app.auth import current_role, effective_role
+    from app.utils.permissions import can_submit_timekeeping
     return can_submit_timekeeping(effective_role())
 
 
@@ -1158,10 +1051,7 @@ def _alloc_time_type_hint_html(line: dict[str, Any], iso: str) -> str:
     if selected != "AUTO":
         return ""
     calculated = _normalize_alloc_hour_type(line.get("calculated_time_type") or "ST")
-    try:
-        from app.services.timekeeping_overtime_service import time_type_calculation_reason
-    except ImportError:
-        from services.timekeeping_overtime_service import time_type_calculation_reason  # type: ignore
+    from app.services.timekeeping_overtime_service import time_type_calculation_reason
     try:
         work_date = date.fromisoformat(str(iso)[:10])
     except ValueError:
@@ -1180,10 +1070,7 @@ def _alloc_time_type_hint_html(line: dict[str, Any], iso: str) -> str:
 
 
 def _weekend_counts_toward_40() -> bool:
-    try:
-        from app.services.company_settings_service import load_app_settings
-    except ImportError:
-        from services.company_settings_service import load_app_settings  # type: ignore
+    from app.services.company_settings_service import load_app_settings
     settings = load_app_settings()
     return bool(settings.get("timekeeping_weekend_counts_toward_40"))
 
@@ -1204,10 +1091,7 @@ def _overtime_meta_from_db_row(row: dict[str, Any]) -> dict[str, Any]:
 
 
 def _new_allocation_line(**extra: Any) -> dict[str, Any]:
-    try:
-        from app.services.timekeeping_overtime_service import new_allocation_line_defaults
-    except ImportError:
-        from services.timekeeping_overtime_service import new_allocation_line_defaults  # type: ignore
+    from app.services.timekeeping_overtime_service import new_allocation_line_defaults
     return new_allocation_line_defaults(**extra)
 
 
@@ -1215,10 +1099,7 @@ def _recalculate_week_overtime(
     by_date: dict[str, list[dict[str, Any]]],
     week_start_d: date,
 ) -> dict[str, list[dict[str, Any]]]:
-    try:
-        from app.services.timekeeping_overtime_service import recalculate_week_allocations
-    except ImportError:
-        from services.timekeeping_overtime_service import recalculate_week_allocations  # type: ignore
+    from app.services.timekeeping_overtime_service import recalculate_week_allocations
     return recalculate_week_allocations(
         by_date,
         week_start_d,
@@ -1229,18 +1110,12 @@ def _recalculate_week_overtime(
 
 
 def _overtime_policy_note() -> str:
-    try:
-        from app.services.timekeeping_overtime_service import overtime_policy_note
-    except ImportError:
-        from services.timekeeping_overtime_service import overtime_policy_note  # type: ignore
+    from app.services.timekeeping_overtime_service import overtime_policy_note
     return overtime_policy_note(weekend_counts_toward_40=_weekend_counts_toward_40())
 
 
 def _summarize_week_allocation_hours(by_date: dict[str, list[dict[str, Any]]]) -> dict[str, float]:
-    try:
-        from app.services.timekeeping_overtime_service import summarize_week_hours
-    except ImportError:
-        from services.timekeeping_overtime_service import summarize_week_hours  # type: ignore
+    from app.services.timekeeping_overtime_service import summarize_week_hours
     return summarize_week_hours(by_date)
 
 
@@ -2007,10 +1882,7 @@ def _resolve_saved_allocation_line_id(
     if hrs <= _ALLOC_TOLERANCE:
         return ""
     hour_type = _normalize_alloc_hour_type(line.get("hour_type"))
-    try:
-        from app.services.timekeeping_service import list_timekeeping_days
-    except ImportError:
-        from services.timekeeping_service import list_timekeeping_days  # type: ignore
+    from app.services.timekeeping_service import list_timekeeping_days
     for row in list_timekeeping_days(employee_id, week_start_d):
         if str(row.get("work_date") or "")[:10] != wd:
             continue
@@ -2333,10 +2205,7 @@ def _refresh_grid_day_id_from_db(
 ) -> None:
     if day_ix < 0 or day_ix >= len(grid):
         return
-    try:
-        from app.services.timekeeping_service import list_timekeeping_days
-    except ImportError:
-        from services.timekeeping_service import list_timekeeping_days  # type: ignore
+    from app.services.timekeeping_service import list_timekeeping_days
     for saved in list_timekeeping_days(eid, week_start_d):
         if str(saved.get("work_date") or "")[:10] == work_date:
             grid[day_ix]["day_id"] = str(saved.get("id") or grid[day_ix].get("day_id") or "")
@@ -3316,18 +3185,12 @@ def _timecard_status_pill_html(status: str, *, compact: bool = False) -> str:
 
 
 def _day_fully_approved_and_allocated(alloc_state: str, day_status: str) -> bool:
-    try:
-        from app.services.timekeeping_day_ui import day_fully_approved_and_allocated
-    except ImportError:
-        from services.timekeeping_day_ui import day_fully_approved_and_allocated  # type: ignore
+    from app.services.timekeeping_day_ui import day_fully_approved_and_allocated
     return day_fully_approved_and_allocated(alloc_state, day_status)
 
 
 def _day_approval_marker_class(day_status: str, *, has_hours: bool, alloc_state: str = "") -> str:
-    try:
-        from app.services.timekeeping_day_ui import day_approval_marker_class
-    except ImportError:
-        from services.timekeeping_day_ui import day_approval_marker_class  # type: ignore
+    from app.services.timekeeping_day_ui import day_approval_marker_class
     return day_approval_marker_class(day_status, has_hours=has_hours, alloc_state=alloc_state)
 
 
@@ -3337,10 +3200,7 @@ def _list_day_box_marker_classes(
     alloc_state: str,
     has_hours: bool,
 ) -> str:
-    try:
-        from app.services.timekeeping_day_ui import list_day_box_marker_classes
-    except ImportError:
-        from services.timekeeping_day_ui import list_day_box_marker_classes  # type: ignore
+    from app.services.timekeeping_day_ui import list_day_box_marker_classes
     return list_day_box_marker_classes(
         day_status=day_status,
         alloc_state=alloc_state,
@@ -3349,10 +3209,7 @@ def _list_day_box_marker_classes(
 
 
 def _list_day_status_badge_html(day_status: str, alloc_state: str) -> str:
-    try:
-        from app.services.timekeeping_day_ui import list_day_status_badge_html
-    except ImportError:
-        from services.timekeeping_day_ui import list_day_status_badge_html  # type: ignore
+    from app.services.timekeeping_day_ui import list_day_status_badge_html
     return list_day_status_badge_html(day_status, alloc_state)
 
 
@@ -5032,29 +4889,20 @@ def _render_custom_timekeeping_table(
 
 
 def render() -> None:
-    try:
-        from app.pages._core._access import begin_module
-    except ImportError:
-        from pages._core._access import begin_module  # type: ignore
+    from app.pages._core._access import begin_module
     if not begin_module("timekeeping"):
         return
 
     inject_timekeeping_module_css()
     inject_scroll_preserve("timekeeping")
-    try:
-        from app.mobile_ui import ensure_narrow_viewport_detected
-    except ImportError:
-        from mobile_ui import ensure_narrow_viewport_detected  # type: ignore
+    from app.mobile_ui import ensure_narrow_viewport_detected
     ensure_narrow_viewport_detected()
     st.markdown(
         '<span class="ips-timekeeping-page ips-page-shell-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
 
-    try:
-        from app.navigation import TK_PREFILL_WEEK_KEY
-    except ImportError:
-        from navigation import TK_PREFILL_WEEK_KEY  # type: ignore
+    from app.navigation import TK_PREFILL_WEEK_KEY
     pre_week_raw = str(st.session_state.pop(TK_PREFILL_WEEK_KEY, "") or "").strip()[:10]
     if pre_week_raw:
         try:
@@ -5112,16 +4960,10 @@ def render() -> None:
         )
 
     active_job_id = ""
-    try:
-        from app.utils.field_context import get_field_job_id
-    except ImportError:
-        from utils.field_context import get_field_job_id  # type: ignore
+    from app.utils.field_context import get_field_job_id
     active_job_id = str(get_field_job_id() or "").strip()
     if active_job_id:
-        try:
-            from app.db import fetch_by_match_admin
-        except ImportError:
-            from db import fetch_by_match_admin  # type: ignore
+        from app.db import fetch_by_match_admin
         job_rows = fetch_by_match_admin("jobs", {"id": active_job_id}, limit=1) or []
         if job_rows:
             j = job_rows[0]
@@ -5129,16 +4971,9 @@ def render() -> None:
             st.caption(f"Active job filter: **{label}** · week {fmt_date(ws)} – {fmt_date(we)}")
 
     if is_field_context():
-        try:
-            from app.db import fetch_jobs_with_order_fallback
-            from app.services.job_service import sort_jobs_by_number_then_name
-        except ImportError:
-            from db import fetch_jobs_with_order_fallback  # type: ignore
-            from services.job_service import sort_jobs_by_number_then_name  # type: ignore
-        try:
-            from app.auth import current_role, effective_role as _tk_role
-        except ImportError:
-            from auth import current_role, effective_role as _tk_role  # type: ignore
+        from app.db import fetch_jobs_with_order_fallback
+        from app.services.job_service import sort_jobs_by_number_then_name
+        from app.auth import current_role, effective_role as _tk_role
         if _tk_role() in {"admin", "manager", "supervisor", "project manager", "pm"}:
             jobs = sort_jobs_by_number_then_name(
                 list(fetch_jobs_with_order_fallback(limit=3000, use_admin=True) or [])
@@ -5187,21 +5022,14 @@ def render() -> None:
 
     show_modal_if_pending(SHOW_TIMEKEEPING_DAY_MODAL_KEY, _show_day_time_dialog)
 
-    try:
-        from app.auth import current_role, effective_role
-        from app.utils.permissions import role_can_access_page
-    except ImportError:
-        from auth import current_role, effective_role  # type: ignore
-        from utils.permissions import role_can_access_page  # type: ignore
+    from app.auth import current_role, effective_role
+    from app.utils.permissions import role_can_access_page
     if role_can_access_page(effective_role(), "jobs"):
         st.divider()
         st.markdown("**Weekly customer timesheets**")
         st.caption("Generate and send weekly timesheets from the job's **Weekly Timesheets** tab in Job Detail.")
         if st.button("Open Job Weekly Timesheets", key="tk_open_weekly_ts", use_container_width=False):
-            try:
-                from app.navigation import navigate_to_weekly_timesheet
-            except ImportError:
-                from navigation import navigate_to_weekly_timesheet  # type: ignore
+            from app.navigation import navigate_to_weekly_timesheet
             prefill_job = ""
             tc_id = str(st.session_state.get(SELECTED_TIMECARD_KEY) or "").strip()
             if tc_id:
@@ -5210,10 +5038,7 @@ def render() -> None:
                         prefill_job = str(row.get("primary_job_id") or row.get("job_id") or "").strip()
                         break
             if not prefill_job:
-                try:
-                    from app.utils.field_context import get_field_job_id
-                except ImportError:
-                    from utils.field_context import get_field_job_id  # type: ignore
+                from app.utils.field_context import get_field_job_id
                 prefill_job = str(get_field_job_id() or "").strip()
             navigate_to_weekly_timesheet(
                 job_id=prefill_job,

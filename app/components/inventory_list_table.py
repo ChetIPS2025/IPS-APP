@@ -8,15 +8,9 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.services.inventory_images import inventory_thumbnail_html
-    from app.utils.formatting import fmt_currency
-    from app.utils.inventory_quantity import format_inventory_quantity
-except ImportError:
-    from services.inventory_images import inventory_thumbnail_html  # type: ignore
-    from utils.formatting import fmt_currency  # type: ignore
-    from utils.inventory_quantity import format_inventory_quantity  # type: ignore
-
+from app.services.inventory_images import inventory_thumbnail_html
+from app.utils.formatting import fmt_currency
+from app.utils.inventory_quantity import format_inventory_quantity
 INVENTORY_TABLE_LAST_ACTION_KEY = "inventory_list_last_action"
 
 
@@ -381,11 +375,7 @@ def render_inventory_table_bridge(
     hook_key: str = "ipsInvList::action",
     field_mode: bool = False,
 ) -> str | None:
-    try:
-        from app.ui.clean_table import _components_html
-    except ImportError:
-        from ui.clean_table import _components_html  # type: ignore
-
+    from app.ui.clean_table import _components_html
     field_mode_js = "true" if field_mode else "false"
     return _components_html(
         f"""

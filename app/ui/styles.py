@@ -13,10 +13,7 @@ def inject_ips_ui_styles() -> None:
         return
     st.session_state[IPS_UI_STYLES_KEY] = True
 
-    try:
-        from app.styles import inject_global_css
-    except ImportError:
-        from styles import inject_global_css  # type: ignore
+    from app.styles import inject_global_css
     inject_global_css()
 
     st.markdown(

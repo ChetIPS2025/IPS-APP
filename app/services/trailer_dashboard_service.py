@@ -7,37 +7,20 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-try:
-    from app.services.asset_kits_service import (
-        assign_asset_kit,
-        create_asset_kit_item,
-        create_asset_kit_transaction,
-        delete_asset_kit_item,
-        get_asset_kit_audits,
-        get_asset_kit_items,
-        get_asset_kit_summary,
-        get_asset_kit_transactions,
-        update_asset_kit_item,
-    )
-    from app.services.assets_service import create_asset_issue, get_asset, upload_asset_image
-    from app.services.repository import ServiceResult, fetch_rows, insert_row
-    from app.services.serialized_tool_service import audit_trailer_tools
-except ImportError:
-    from services.asset_kits_service import (  # type: ignore
-        assign_asset_kit,
-        create_asset_kit_item,
-        create_asset_kit_transaction,
-        delete_asset_kit_item,
-        get_asset_kit_audits,
-        get_asset_kit_items,
-        get_asset_kit_summary,
-        get_asset_kit_transactions,
-        update_asset_kit_item,
-    )
-    from services.assets_service import create_asset_issue, get_asset, upload_asset_image  # type: ignore
-    from services.repository import ServiceResult, fetch_rows, insert_row  # type: ignore
-    from services.serialized_tool_service import audit_trailer_tools  # type: ignore
-
+from app.services.asset_kits_service import (
+    assign_asset_kit,
+    create_asset_kit_item,
+    create_asset_kit_transaction,
+    delete_asset_kit_item,
+    get_asset_kit_audits,
+    get_asset_kit_items,
+    get_asset_kit_summary,
+    get_asset_kit_transactions,
+    update_asset_kit_item,
+)
+from app.services.assets_service import create_asset_issue, get_asset, upload_asset_image
+from app.services.repository import ServiceResult, fetch_rows, insert_row
+from app.services.serialized_tool_service import audit_trailer_tools
 _TRAILER_REQUESTS = "trailer_tool_requests"
 _TRAILER_BROKEN = "trailer_broken_tool_reports"
 _TRAILER_INSPECTIONS = "trailer_inspections"
@@ -79,10 +62,7 @@ def _job_label(job_id: object) -> str:
     jid = _clean(job_id)
     if not jid:
         return "—"
-    try:
-        from app.pages._core._data import load_jobs
-    except ImportError:
-        from pages._core._data import load_jobs  # type: ignore
+    from app.pages._core._data import load_jobs
     for job in load_jobs():
         if _clean(job.get("id")) == jid:
             num = _clean(job.get("job_number"))
@@ -162,15 +142,9 @@ def upload_audit_item_photo(
     kid = _clean(kit_item_id)
     if not pid or not kid or uploaded_file is None:
         return "", ""
-    try:
-        from app.config import settings
-        from app.db import _storage_is_local, create_signed_url, upload_bytes, upload_bytes_admin
-        from app.services.item_images import ASSET_IMAGE_BUCKET, resize_item_image_bytes
-    except ImportError:
-        from config import settings  # type: ignore
-        from db import _storage_is_local, create_signed_url, upload_bytes, upload_bytes_admin  # type: ignore
-        from services.item_images import ASSET_IMAGE_BUCKET, resize_item_image_bytes  # type: ignore
-
+    from app.config import settings
+    from app.db import _storage_is_local, create_signed_url, upload_bytes, upload_bytes_admin
+    from app.services.item_images import ASSET_IMAGE_BUCKET, resize_item_image_bytes
     raw = uploaded_file.getvalue() if hasattr(uploaded_file, "getvalue") else b""
     if not raw:
         return "", ""

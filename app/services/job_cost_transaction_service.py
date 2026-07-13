@@ -32,10 +32,7 @@ SOURCE_ESTIMATE = "estimate"
 
 
 def _db():
-    try:
-        import app.db as db
-    except ImportError:
-        import db  # type: ignore
+    import app.db as db
     return db
 
 
@@ -52,10 +49,7 @@ def _job_number_for(job_id: str) -> str:
     jid = str(job_id or "").strip()
     if not jid:
         return ""
-    try:
-        from app.services.job_service import job_display_primary
-    except ImportError:
-        from services.job_service import job_display_primary  # type: ignore
+    from app.services.job_service import job_display_primary
     try:
         rows = _db().fetch_by_match("jobs", {"id": jid}, limit=1) or []
     except Exception:
@@ -125,13 +119,7 @@ def equipment_internal_rate(asset: dict[str, Any] | None) -> tuple[float, str, f
 
 def _invalidate_jobs_list_cache() -> None:
     """Drop cached jobs catalog rows after actual_cost rollup changes."""
-    try:
-        from app.pages._core._data import _cached_jobs_rows, clear_catalog_session_datasets
-    except ImportError:
-        try:
-            from pages._core._data import _cached_jobs_rows, clear_catalog_session_datasets  # type: ignore
-        except ImportError:
-            return
+    from app.pages._core._data import _cached_jobs_rows, clear_catalog_session_datasets
     try:
         _cached_jobs_rows.clear()
     except Exception:
@@ -157,10 +145,7 @@ def refresh_job_actual_cost(job_id: str) -> None:
     if not jid:
         return
     actual = sum_actual_cost_for_job(jid)
-    try:
-        from app.services.phase2_modules_service import table_column_names
-    except ImportError:
-        from services.phase2_modules_service import table_column_names  # type: ignore
+    from app.services.phase2_modules_service import table_column_names
     cols = table_column_names("jobs")
     if cols and "actual_cost" not in cols:
         return
@@ -277,10 +262,7 @@ def sync_time_entry(entry: dict[str, Any] | str) -> None:
         delete_job_cost_transaction(SOURCE_TIME_ENTRY, eid)
         return
     emp = _employee_by_id(str(entry.get("employee_id") or ""))
-    try:
-        from app.services.employee_labor import time_entry_burdened_cost
-    except ImportError:
-        from services.employee_labor import time_entry_burdened_cost  # type: ignore
+    from app.services.employee_labor import time_entry_burdened_cost
     unit_cost, total = time_entry_burdened_cost(entry, emp)
     upsert_job_cost_transaction(
         {
@@ -325,10 +307,7 @@ def sync_timekeeping_day(row: dict[str, Any] | str) -> None:
         delete_job_cost_transaction(SOURCE_TIMEKEEPING_DAY, day_id)
         return
     emp = _employee_by_id(str(row.get("employee_id") or ""))
-    try:
-        from app.services.employee_labor import compute_burdened_labor_cost
-    except ImportError:
-        from services.employee_labor import compute_burdened_labor_cost  # type: ignore
+    from app.services.employee_labor import compute_burdened_labor_cost
     total = compute_burdened_labor_cost(emp, st_h, ot_h, dt_h)
     unit_cost = total / total_hours if total_hours > 0 else 0.0
     upsert_job_cost_transaction(
@@ -525,10 +504,7 @@ def sync_asset_assignment_to_job(
         _db().insert_row("job_equipment", payload)
     except Exception as exc:
         _LOG.debug("job_equipment auto-line skipped: %s", exc)
-    try:
-        from app.services.rental_equipment_inspection_hooks import notify_rental_equipment_assigned
-    except ImportError:
-        from services.rental_equipment_inspection_hooks import notify_rental_equipment_assigned  # type: ignore
+    from app.services.rental_equipment_inspection_hooks import notify_rental_equipment_assigned
     try:
         notify_rental_equipment_assigned(asset, job_id=jid)
     except Exception as exc:
@@ -538,12 +514,8 @@ def sync_asset_assignment_to_job(
 def void_asset_assignment_cost(assignment_id: str) -> None:
     """Remove ledger cost when equipment is checked in or assignment voided."""
     delete_job_cost_transaction(SOURCE_ASSET_ASSIGNMENT, str(assignment_id or "").strip())
-    try:
-        from app.services.repository import fetch_by_id
-        from app.services.rental_equipment_inspection_hooks import notify_rental_equipment_returned
-    except ImportError:
-        from services.repository import fetch_by_id  # type: ignore
-        from services.rental_equipment_inspection_hooks import notify_rental_equipment_returned  # type: ignore
+    from app.services.repository import fetch_by_id
+    from app.services.rental_equipment_inspection_hooks import notify_rental_equipment_returned
     try:
         rows = _db().fetch_by_match("asset_assignments", {"id": str(assignment_id or "").strip()}, limit=1) or []
         if rows:
@@ -811,10 +783,7 @@ def _live_estimate_totals(estimate: dict[str, Any]) -> dict[str, float]:
     eid = str(estimate.get("id") or "").strip()
     if not eid:
         return {}
-    try:
-        from app.services.estimate_costing_service import calculate_estimate_totals
-    except ImportError:
-        from services.estimate_costing_service import calculate_estimate_totals  # type: ignore
+    from app.services.estimate_costing_service import calculate_estimate_totals
     try:
         return calculate_estimate_totals(eid)
     except Exception:
@@ -877,10 +846,7 @@ def _estimated_cost(job: dict[str, Any], estimate: dict[str, Any] | None = None)
 
 def can_manage_manual_cost_adjustments() -> bool:
     """Only admin users may add/edit/delete manual cost adjustments."""
-    try:
-        from app.auth import effective_role
-    except ImportError:
-        from auth import effective_role  # type: ignore
+    from app.auth import effective_role
     return str(effective_role() or "").strip().lower() == "admin"
 
 

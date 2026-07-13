@@ -87,10 +87,7 @@ def _parse_estimate_json(raw: Any) -> dict[str, Any] | None:
 
 def job_status_needs_daily_report(status: Any) -> bool:
     """Active field jobs: expect a daily supervisor report when work is ongoing."""
-    try:
-        from app.services.jobs_service import normalize_job_status
-    except ImportError:
-        from services.jobs_service import normalize_job_status  # type: ignore
+    from app.services.jobs_service import normalize_job_status
     return normalize_job_status(status) in {"Active", "On Hold"}
 
 
@@ -115,34 +112,19 @@ def collect_delay_reason_counts(reports: list[dict[str, Any]]) -> list[tuple[str
 
 
 def _fetch_fn(*, admin: bool):
-    try:
-        from app.db import fetch_by_match, fetch_by_match_admin
-    except ImportError:
-        from db import fetch_by_match, fetch_by_match_admin  # type: ignore
-
+    from app.db import fetch_by_match, fetch_by_match_admin
     return fetch_by_match_admin if admin else fetch_by_match
 
 
 def _write_fn(*, admin: bool):
-    try:
-        from app.db import (
-            delete_rows,
-            delete_rows_admin,
-            insert_row,
-            insert_row_admin,
-            update_rows,
-            update_rows_admin,
-        )
-    except ImportError:
-        from db import (  # type: ignore
-            delete_rows,
-            delete_rows_admin,
-            insert_row,
-            insert_row_admin,
-            update_rows,
-            update_rows_admin,
-        )
-
+    from app.db import (
+        delete_rows,
+        delete_rows_admin,
+        insert_row,
+        insert_row_admin,
+        update_rows,
+        update_rows_admin,
+    )
     if admin:
         return insert_row_admin, update_rows_admin, delete_rows_admin
     return insert_row, update_rows, delete_rows
@@ -268,11 +250,7 @@ def append_report_photos(
     admin: bool,
 ) -> None:
     """Each tuple: (bytes, content_type, file_name). Storage keys use ``report_id``."""
-    try:
-        from app.db import insert_row, insert_row_admin, upload_bytes, upload_bytes_admin
-    except ImportError:
-        from db import insert_row, insert_row_admin, upload_bytes, upload_bytes_admin  # type: ignore
-
+    from app.db import insert_row, insert_row_admin, upload_bytes, upload_bytes_admin
     insert_fn = insert_row_admin if admin else insert_row
     upload_fn = upload_bytes_admin if admin else upload_bytes
     rid = str(report_id or "").strip()
@@ -313,10 +291,7 @@ def submit_daily_report(report_id: str, *, admin: bool = False) -> None:
     rows = fetch_row("supervisor_daily_reports", {"id": rid}, limit=1)
     if rows:
         r = rows[0]
-        try:
-            from services.job_timeline import EVENT_DAILY_REPORT, log_job_event
-        except ImportError:
-            from app.services.job_timeline import EVENT_DAILY_REPORT, log_job_event  # type: ignore
+        from app.services.job_timeline import EVENT_DAILY_REPORT, log_job_event
         log_job_event(
             job_id=str(r.get("job_id") or ""),
             event_type=EVENT_DAILY_REPORT,
@@ -497,11 +472,7 @@ def jobs_over_estimated_labor_hours(
             continue
         act = float(hours_by_job.get(jid, 0.0))
         if act > bid_h + 0.01:
-            try:
-                from app.services.job_service import job_row_select_label
-            except ImportError:
-                from services.job_service import job_row_select_label  # type: ignore
-
+            from app.services.job_service import job_row_select_label
             label = job_row_select_label(j)
             over.append((jid, label, bid_h, act))
     over.sort(key=lambda x: -(x[3] - x[2]))
@@ -536,11 +507,7 @@ def dashboard_daily_report_snapshot(
         if jid and jid not in reported_job_ids_today:
             missing += 1
             if len(missing_labels) < 8:
-                try:
-                    from app.services.job_service import job_row_select_label
-                except ImportError:
-                    from services.job_service import job_row_select_label  # type: ignore
-
+                from app.services.job_service import job_row_select_label
                 label = job_row_select_label(j)
                 missing_labels.append(label)
                 missing_jobs.append({"id": jid, "label": label})

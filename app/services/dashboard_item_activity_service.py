@@ -10,23 +10,13 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-try:
-    from app.services.inventory_service import normalize_inventory
-    from app.services.job_service import job_row_select_label
-    from app.services.repository import fetch_rows
-    from app.services.tracking_terminology import (
-        inventory_action_label,
-        serialized_tool_action_label,
-    )
-except ImportError:
-    from services.inventory_service import normalize_inventory  # type: ignore
-    from services.job_service import job_row_select_label  # type: ignore
-    from services.repository import fetch_rows  # type: ignore
-    from services.tracking_terminology import (  # type: ignore
-        inventory_action_label,
-        serialized_tool_action_label,
-    )
-
+from app.services.inventory_service import normalize_inventory
+from app.services.job_service import job_row_select_label
+from app.services.repository import fetch_rows
+from app.services.tracking_terminology import (
+    inventory_action_label,
+    serialized_tool_action_label,
+)
 _INV_TXN = "inventory_transactions"
 _TOOL_TXN = "tool_transactions"
 _INV_ITEMS = "inventory_items"

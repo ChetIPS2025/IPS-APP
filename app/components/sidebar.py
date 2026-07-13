@@ -6,61 +6,33 @@ import html
 
 import streamlit as st
 
-try:
-    from app.auth import current_role, current_user_display_name, effective_role, sign_out
-    from app.components.sidebar_nav_icons import nav_icon_for_slug
-    from app.components.sidebar_shell import (
-        IPS_SIDEBAR_COLLAPSED_LOGO_PX,
-        IPS_SIDEBAR_EXPANDED_LOGO_PX,
-        apply_pending_sidebar_collapse,
-        request_sidebar_collapse_after_nav,
-        request_sidebar_toggle,
-        set_sidebar_collapsed,
-        store_sidebar_nav_fallback,
-    )
-    from app.config import APP_VERSION
-    from app.navigation import set_nav_slug
-    from app.utils.constants import EMPLOYEE_NAV_PAGES, FIELD_NAV_PAGES, NAV_PAGES
-    from app.utils.permissions import (
-        filter_employee_nav_for_role,
-        filter_field_nav_for_role,
-        filter_nav_for_role,
-        normalize_role,
-        role_can_access_page,
-    )
-    from app.utils.view_as import is_view_as_active
-except ImportError:
-    from auth import current_role, current_user_display_name, effective_role, sign_out  # type: ignore
-    from components.sidebar_nav_icons import nav_icon_for_slug  # type: ignore
-    from components.sidebar_shell import (  # type: ignore
-        IPS_SIDEBAR_COLLAPSED_LOGO_PX,
-        IPS_SIDEBAR_EXPANDED_LOGO_PX,
-        apply_pending_sidebar_collapse,
-        request_sidebar_collapse_after_nav,
-        request_sidebar_toggle,
-        set_sidebar_collapsed,
-        store_sidebar_nav_fallback,
-    )
-    from config import APP_VERSION  # type: ignore
-    from navigation import set_nav_slug  # type: ignore
-    from utils.constants import EMPLOYEE_NAV_PAGES, FIELD_NAV_PAGES, NAV_PAGES  # type: ignore
-    from utils.permissions import (  # type: ignore
-        filter_employee_nav_for_role,
-        filter_field_nav_for_role,
-        filter_nav_for_role,
-        normalize_role,
-        role_can_access_page,
-    )
-    from utils.view_as import is_view_as_active  # type: ignore
-
+from app.auth import current_role, current_user_display_name, effective_role, sign_out
+from app.components.sidebar_nav_icons import nav_icon_for_slug
+from app.components.sidebar_shell import (
+    IPS_SIDEBAR_COLLAPSED_LOGO_PX,
+    IPS_SIDEBAR_EXPANDED_LOGO_PX,
+    apply_pending_sidebar_collapse,
+    request_sidebar_collapse_after_nav,
+    request_sidebar_toggle,
+    set_sidebar_collapsed,
+    store_sidebar_nav_fallback,
+)
+from app.config import APP_VERSION
+from app.navigation import set_nav_slug
+from app.utils.constants import EMPLOYEE_NAV_PAGES, FIELD_NAV_PAGES, NAV_PAGES
+from app.utils.permissions import (
+    filter_employee_nav_for_role,
+    filter_field_nav_for_role,
+    filter_nav_for_role,
+    normalize_role,
+    role_can_access_page,
+)
+from app.utils.view_as import is_view_as_active
 _OT, _CT = "d" + "iv", "/" + "d" + "iv"
 
 
 def _sidebar_round_logo_html(*, size_px: int, css_class: str) -> str:
-    try:
-        from app.branding import sidebar_round_logo_html
-    except ImportError:
-        from branding import sidebar_round_logo_html  # type: ignore
+    from app.branding import sidebar_round_logo_html
     return sidebar_round_logo_html(size_px=size_px, css_class=css_class)
 
 

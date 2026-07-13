@@ -11,47 +11,22 @@ import pandas as pd
 import streamlit as st
 
 from app.auth import current_profile, current_role, effective_role
-try:
-    from app.ui.page_shell import render_page_header
-except ImportError:
-    from ui.page_shell import render_page_header  # type: ignore
-from branding import render_header
+from app.ui.page_shell import render_page_header
+from app.branding import render_header
 
-try:
-    from app.db import create_signed_url, fetch_jobs_with_order_fallback
-except ImportError:
-    from db import create_signed_url, fetch_jobs_with_order_fallback  # type: ignore
-
-try:
-    from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
-except ImportError:
-    from services.job_service import job_row_select_label, sort_jobs_by_number_then_name  # type: ignore
-
-try:
-    from app.services.supervisor_daily_reports import (
-        delay_labels_map,
-        fetch_crew_lines,
-        fetch_photos_for_report,
-        fetch_report_for_job_date,
-        fetch_reports_for_job,
-        review_daily_report,
-        submit_daily_report,
-        upsert_supervisor_daily_report,
-    )
-    from app.ui.components.badges import render_badge
-except ImportError:
-    from services.supervisor_daily_reports import (  # type: ignore
-        delay_labels_map,
-        fetch_crew_lines,
-        fetch_photos_for_report,
-        fetch_report_for_job_date,
-        fetch_reports_for_job,
-        review_daily_report,
-        submit_daily_report,
-        upsert_supervisor_daily_report,
-    )
-    from ui.components.badges import render_badge  # type: ignore
-
+from app.db import create_signed_url, fetch_jobs_with_order_fallback
+from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
+from app.services.supervisor_daily_reports import (
+    delay_labels_map,
+    fetch_crew_lines,
+    fetch_photos_for_report,
+    fetch_report_for_job_date,
+    fetch_reports_for_job,
+    review_daily_report,
+    submit_daily_report,
+    upsert_supervisor_daily_report,
+)
+from app.ui.components.badges import render_badge
 _LOG = logging.getLogger(__name__)
 
 _PHOTO_EXT = re.compile(r"\.(jpe?g|png|gif|webp)$", re.IGNORECASE)
@@ -72,11 +47,7 @@ def _prefill_key(job_id: str) -> str:
 
 
 def _render_sdr_wizard_nav(job_id: str, step: int) -> None:
-    try:
-        from app.utils.field_context import inject_field_day_shell_css, set_sdr_wizard_step
-    except ImportError:
-        from utils.field_context import inject_field_day_shell_css, set_sdr_wizard_step  # type: ignore
-
+    from app.utils.field_context import inject_field_day_shell_css, set_sdr_wizard_step
     inject_field_day_shell_css()
     labels = ["Check-in & basics", "Crew & work", "Photos & submit"]
     pills = ""
@@ -181,10 +152,7 @@ def render_daily_reports_for_job(
     title = "Daily Reports" if show_title else "Daily reports (this job)"
     section_open = expand_sections
     if wizard:
-        try:
-            from app.utils.field_context import sdr_wizard_step
-        except ImportError:
-            from utils.field_context import sdr_wizard_step  # type: ignore
+        from app.utils.field_context import sdr_wizard_step
         wiz_step = sdr_wizard_step(jid)
     else:
         wiz_step = -1

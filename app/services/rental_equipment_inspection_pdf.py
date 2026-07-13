@@ -14,36 +14,19 @@ from reportlab.lib.units import inch
 from reportlab.platypus import Image as RLImage
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-try:
-    from app.branding import get_header_logo_path
-    from app.services.rental_equipment_inspection_service import (
-        get_rental_equipment_dashboard_summary,
-        inspection_type_label,
-        photo_view_url,
-    )
-    from app.services.repository import fetch_by_id
-    from app.services.rental_equipment_inspection_specs import (
-        CHECKLIST_ITEMS,
-        PHOTO_SLOT_LABELS,
-        SIGNATURE_ROLE_LABELS,
-        SIGNATURE_ROLES,
-    )
-except ImportError:
-    from branding import get_header_logo_path  # type: ignore
-    from services.rental_equipment_inspection_service import (  # type: ignore
-        get_rental_equipment_dashboard_summary,
-        inspection_type_label,
-        photo_view_url,
-    )
-    from services.repository import fetch_by_id  # type: ignore
-    from services.rental_equipment_inspection_specs import (  # type: ignore
-        CHECKLIST_ITEMS,
-        PHOTO_SLOT_LABELS,
-        SIGNATURE_ROLE_LABELS,
-        SIGNATURE_ROLES,
-    )
-
-
+from app.branding import get_header_logo_path
+from app.services.rental_equipment_inspection_service import (
+    get_rental_equipment_dashboard_summary,
+    inspection_type_label,
+    photo_view_url,
+)
+from app.services.repository import fetch_by_id
+from app.services.rental_equipment_inspection_specs import (
+    CHECKLIST_ITEMS,
+    PHOTO_SLOT_LABELS,
+    SIGNATURE_ROLE_LABELS,
+    SIGNATURE_ROLES,
+)
 def _sig_png_bytes(signature_data: str) -> bytes | None:
     s = str(signature_data or "").strip()
     if not s:

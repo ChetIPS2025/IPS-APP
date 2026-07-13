@@ -15,33 +15,16 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any, FrozenSet
 
-try:
-    from db import (
-        fetch_by_match,
-        fetch_by_match_admin,
-        fetch_one,
-        fetch_table,
-        insert_row_admin,
-        update_rows_admin,
-    )
-except ImportError:
-    from app.db import (  # type: ignore
-        fetch_by_match,
-        fetch_by_match_admin,
-        fetch_one,
-        fetch_table,
-        insert_row_admin,
-        update_rows_admin,
-    )
-
-try:
-    from services.job_schema import fetch_jobs_for_job_database
-    from services.job_service import job_number_display, next_job_number
-except ImportError:
-    from app.services.job_schema import fetch_jobs_for_job_database  # type: ignore
-    from app.services.job_service import job_number_display, next_job_number  # type: ignore
-
-
+from app.db import (
+    fetch_by_match,
+    fetch_by_match_admin,
+    fetch_one,
+    fetch_table,
+    insert_row_admin,
+    update_rows_admin,
+)
+from app.services.job_schema import fetch_jobs_for_job_database
+from app.services.job_service import job_number_display, next_job_number
 # --- Status gate (workflow rule) ---
 # Estimates should stay on the Estimates page until accepted by the customer.
 # Only allow job creation once the estimate is customer-approved / accepted.
@@ -112,11 +95,7 @@ def _location_text_from_customer_location(location_id: str | None) -> str:
         loc_row = None
     if not loc_row:
         return ""
-    try:
-        from services.customer_locations import location_display_name_city_state
-    except ImportError:
-        from app.services.customer_locations import location_display_name_city_state  # type: ignore
-
+    from app.services.customer_locations import location_display_name_city_state
     label = location_display_name_city_state(loc_row)
     if label:
         return label[:2000]
@@ -135,7 +114,7 @@ def _fetch_estimate_row_for_create(estimate_id: str) -> dict[str, Any] | None:
     if not eid:
         return None
     try:
-        from auth import current_role
+        from app.auth import current_role
 
         admin_read = current_role() in {"admin", "estimator"}
     except Exception:
@@ -161,14 +140,8 @@ def _patch_estimate_row(estimate_id: str, payload: dict[str, Any]) -> None:
     eid = str(estimate_id or "").strip()
     if not eid or not payload:
         return
-    try:
-        from app.services.repository import filter_payload_to_table
-
-        filtered = filter_payload_to_table("estimates", payload)
-    except ImportError:
-        from services.repository import filter_payload_to_table  # type: ignore
-
-        filtered = filter_payload_to_table("estimates", payload)
+    from app.services.repository import filter_payload_to_table
+    filtered = filter_payload_to_table("estimates", payload)
     if not filtered:
         return
     filtered["updated_at"] = datetime.utcnow().isoformat()
@@ -269,10 +242,7 @@ def estimate_quote_to_job_number(quote_number: str) -> str:
     Does not consume a new sequence slot — only swaps the ``Q`` prefix for ``J``.
     Standalone jobs use :func:`~app.services.job_service.next_job_number` instead.
     """
-    try:
-        from app.services.shared_sequence import quote_number_to_job_number
-    except ImportError:
-        from services.shared_sequence import quote_number_to_job_number  # type: ignore
+    from app.services.shared_sequence import quote_number_to_job_number
     return quote_number_to_job_number(quote_number)
 
 
@@ -508,14 +478,7 @@ def renumber_estimate_quote_for_job_collision(
     eid = str(estimate_id or "").strip()
     if not eid:
         return None
-    try:
-        from app.services.shared_sequence import next_available_quote_job_pair, parse_number_parts
-    except ImportError:
-        from services.shared_sequence import (  # type: ignore
-            next_available_quote_job_pair,
-            parse_number_parts,
-        )
-
+    from app.services.shared_sequence import next_available_quote_job_pair, parse_number_parts
     qref = str(quote_number or "").strip()
     parts = parse_number_parts(qref)
     if parts:
@@ -666,7 +629,7 @@ def create_job_from_estimate(
 
     cust_row = None
     try:
-        from auth import current_role as _cust_role
+        from app.auth import current_role as _cust_role
 
         if _cust_role() in {"admin", "estimator"}:
             crows = fetch_by_match_admin("customers", {"id": customer_id}, columns="customer_name", limit=1)
@@ -690,10 +653,7 @@ def create_job_from_estimate(
     site_loc = _location_text_from_customer_location(customer_location_id) if customer_location_id else ""
     merged_location = site_loc or _safe_location(ej)
 
-    try:
-        from app.services.job_po_service import po_fields_from_estimate
-    except ImportError:
-        from services.job_po_service import po_fields_from_estimate  # type: ignore
+    from app.services.job_po_service import po_fields_from_estimate
     po_fields = po_fields_from_estimate(row)
 
     # source_type omitted until jobs schema includes that column (sql/022); estimate_id marks estimate-linked jobs.

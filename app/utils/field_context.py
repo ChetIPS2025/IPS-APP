@@ -6,11 +6,7 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.services.job_service import job_row_select_label
-except ImportError:
-    from services.job_service import job_row_select_label  # type: ignore
-
+from app.services.job_service import job_row_select_label
 FIELD_JOB_SESSION_KEY = "ips_field_job_id"
 FIELD_EXPANDED_JOB_KEY = "ips_field_expanded_job_id"
 FIELD_EXPANDED_TASK_KEY = "ips_field_expanded_task_id"
@@ -61,10 +57,7 @@ def is_field_mode() -> bool:
 def _active_nav_slug(slug: str | None = None) -> str:
     if slug:
         return str(slug).strip()
-    try:
-        from app.pages._core._session import nav_slug
-    except ImportError:
-        from pages._core._session import nav_slug  # type: ignore
+    from app.pages._core._session import nav_slug
     return str(nav_slug() or st.session_state.get("ips_nav_page") or "").strip()
 
 
@@ -188,11 +181,7 @@ def render_field_checkin_block(
     jid = str(job_id or "").strip()
     if not jid:
         return
-    try:
-        from app.services.job_checkins import check_in, check_out, fetch_open_checkin
-    except ImportError:
-        from services.job_checkins import check_in, check_out, fetch_open_checkin  # type: ignore
-
+    from app.services.job_checkins import check_in, check_out, fetch_open_checkin
     open_ci = fetch_open_checkin(job_id=jid, user_id=user_id, admin=admin)
     with st.expander("Site check-in / check-out", expanded=open_ci is None):
         if open_ci:
@@ -277,10 +266,7 @@ def render_field_job_bar(
 def navigate_to_field_page(slug: str, *, job_id: str | None = None) -> None:
     if job_id:
         set_field_job_id(job_id)
-    try:
-        from app.navigation import set_nav_slug
-    except ImportError:
-        from navigation import set_nav_slug  # type: ignore
+    from app.navigation import set_nav_slug
     set_nav_slug(slug)
 
 
@@ -358,10 +344,7 @@ def open_job_detail(job_id: str) -> None:
     if not jid:
         return
     set_field_job_id(jid)
-    try:
-        from app.pages._core._session import select_key
-    except ImportError:
-        from pages._core._session import select_key  # type: ignore
+    from app.pages._core._session import select_key
     st.session_state["selected_job_id"] = jid
     st.session_state["show_job_detail_modal"] = True
     st.session_state["ips_jobs_detail_modal_id"] = jid

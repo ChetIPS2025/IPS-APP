@@ -5,13 +5,8 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-try:
-    from app.services.task_display_helpers import normalize_task_status
-    from app.services.tasks_service import _resolve_task_job_id
-except ImportError:
-    from services.task_display_helpers import normalize_task_status  # type: ignore
-    from services.tasks_service import _resolve_task_job_id  # type: ignore
-
+from app.services.task_display_helpers import normalize_task_status
+from app.services.tasks_service import _resolve_task_job_id
 _OFFICE_REMINDER_CREATE_ROLES = frozenset({"admin", "project manager", "supervisor", "employee"})
 
 __all__ = [
@@ -194,11 +189,7 @@ def create_management_reminder(
     if not assignee or assignee in {"—", "— Select —"}:
         return False, "Choose an assignee."
 
-    try:
-        from app.pages._core._data import persist_task
-    except ImportError:
-        from pages._core._data import persist_task  # type: ignore
-
+    from app.pages._core._data import persist_task
     ok, msg = persist_task(
         {
             "title": title_clean,
@@ -213,10 +204,7 @@ def create_management_reminder(
         }
     )
     if ok:
-        try:
-            from app.services.tasks_service import clear_tasks_cache
-        except ImportError:
-            from services.tasks_service import clear_tasks_cache  # type: ignore
+        from app.services.tasks_service import clear_tasks_cache
         clear_tasks_cache()
     return ok, msg if not ok else "Reminder saved."
 
@@ -225,20 +213,12 @@ def complete_management_reminder(task_id: str) -> tuple[bool, str]:
     tid = str(task_id or "").strip()
     if not tid:
         return False, "Missing reminder id."
-    try:
-        from app.pages._core._crud import is_demo_id
-    except ImportError:
-        from pages._core._crud import is_demo_id  # type: ignore
+    from app.pages._core._crud import is_demo_id
     if is_demo_id(tid):
         return False, "Demo reminders cannot be saved."
 
-    try:
-        from app.services.tasks_service import clear_tasks_cache, update_task
-        from app.services.repository import user_facing_error
-    except ImportError:
-        from services.tasks_service import clear_tasks_cache, update_task  # type: ignore
-        from services.repository import user_facing_error  # type: ignore
-
+    from app.services.tasks_service import clear_tasks_cache, update_task
+    from app.services.repository import user_facing_error
     result = update_task(tid, {"status": "Complete"})
     err = user_facing_error(result)
     if err:

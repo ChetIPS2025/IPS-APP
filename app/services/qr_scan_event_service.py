@@ -33,11 +33,7 @@ def qr_scan_summary_line(
     item_name: object,
 ) -> str:
     """Display: ``Amanda • 2026-07-08 17:05 • J26101 — I/E Labor``."""
-    try:
-        from app.utils.formatting import fmt_datetime
-    except ImportError:
-        from utils.formatting import fmt_datetime  # type: ignore
-
+    from app.utils.formatting import fmt_datetime
     who = _clean(scanned_by_name) or "—"
     when = fmt_datetime(scanned_at, compact=True)
     job = _clean(job_shop)
@@ -108,21 +104,14 @@ def record_qr_scan_event(
     if tool_transaction_id:
         payload["tool_transaction_id"] = tool_transaction_id
     if quantity is not None:
-        try:
-            from app.utils.inventory_quantity import parse_inventory_quantity
-        except ImportError:
-            from utils.inventory_quantity import parse_inventory_quantity  # type: ignore
+        from app.utils.inventory_quantity import parse_inventory_quantity
         payload["quantity"] = parse_inventory_quantity(quantity, allow_zero=False, field_name="Quantity")
     if unit:
         payload["unit"] = _clean(unit)[:20]
 
     try:
-        try:
-            from app.db import insert_row_admin
-            from app.services.repository import filter_payload_to_table
-        except ImportError:
-            from db import insert_row_admin  # type: ignore
-            from services.repository import filter_payload_to_table  # type: ignore
+        from app.db import insert_row_admin
+        from app.services.repository import filter_payload_to_table
         filtered = filter_payload_to_table(_TABLE, payload)
         insert_row_admin(_TABLE, filtered)
         return True
@@ -137,13 +126,8 @@ def list_qr_scan_events(
     inventory_item_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """Read recent QR scan events for dashboard / inventory history."""
-    try:
-        from app.services.job_service import job_row_select_label
-        from app.services.repository import fetch_rows
-    except ImportError:
-        from services.job_service import job_row_select_label  # type: ignore
-        from services.repository import fetch_rows  # type: ignore
-
+    from app.services.job_service import job_row_select_label
+    from app.services.repository import fetch_rows
     rows, err = fetch_rows(_TABLE, limit=max(limit, 50), order_by="created_at")
     if err or not rows:
         return []

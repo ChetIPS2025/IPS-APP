@@ -7,33 +7,18 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.components.record_modal import (
-        build_modal_cache,
-        clear_record_modal,
-        get_modal_record,
-        open_record_modal,
-        render_missing_record,
-        render_modal_header,
-        render_modal_meta_grid,
-        render_modal_shell,
-        show_modal_if_pending,
-    )
-    from app.ui.ips_modal_form import ensure_modal_styles
-except ImportError:
-    from components.record_modal import (  # type: ignore
-        build_modal_cache,
-        clear_record_modal,
-        get_modal_record,
-        open_record_modal,
-        render_missing_record,
-        render_modal_header,
-        render_modal_meta_grid,
-        render_modal_shell,
-        show_modal_if_pending,
-    )
-    from ui.ips_modal_form import ensure_modal_styles  # type: ignore
-
+from app.components.record_modal import (
+    build_modal_cache,
+    clear_record_modal,
+    get_modal_record,
+    open_record_modal,
+    render_missing_record,
+    render_modal_header,
+    render_modal_meta_grid,
+    render_modal_shell,
+    show_modal_if_pending,
+)
+from app.ui.ips_modal_form import ensure_modal_styles
 _ActionFn = Callable[[], None]
 
 

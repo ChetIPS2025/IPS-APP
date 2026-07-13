@@ -7,14 +7,8 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.services.job_cost_transaction_service import fetch_job_cost_transactions
-    from app.services.jobs_service import can_manage_job_actions
-except ImportError:
-    from services.job_cost_transaction_service import fetch_job_cost_transactions  # type: ignore
-    from services.jobs_service import can_manage_job_actions  # type: ignore
-
-
+from app.services.job_cost_transaction_service import fetch_job_cost_transactions
+from app.services.jobs_service import can_manage_job_actions
 def inject_job_detail_layout_css() -> None:
     st.markdown(
         """
@@ -509,10 +503,7 @@ def gather_job_detail_stats(job: dict[str, Any], cost_summary: dict[str, Any]) -
         except Exception:
             labor_hours = 0.0
 
-        try:
-            from app.services.tasks_service import get_tasks_by_job
-        except ImportError:
-            from services.tasks_service import get_tasks_by_job  # type: ignore
+        from app.services.tasks_service import get_tasks_by_job
         try:
             closed = {"complete", "completed", "closed", "cancelled", "canceled", "duplicate"}
             for task in get_tasks_by_job(jid, include_closed=True):
@@ -521,28 +512,19 @@ def gather_job_detail_stats(job: dict[str, Any], cost_summary: dict[str, Any]) -
         except Exception:
             open_subjobs = 0
 
-        try:
-            from app.services.job_documents import fetch_job_documents
-        except ImportError:
-            from services.job_documents import fetch_job_documents  # type: ignore
+        from app.services.job_documents import fetch_job_documents
         try:
             document_count = len(fetch_job_documents(jid, admin=False, limit=500) or [])
         except Exception:
             document_count = 0
 
-        try:
-            from app.services.job_photos import fetch_job_photos
-        except ImportError:
-            from services.job_photos import fetch_job_photos  # type: ignore
+        from app.services.job_photos import fetch_job_photos
         try:
             photo_count = len(fetch_job_photos(jid, admin=False, limit=500) or [])
         except Exception:
             photo_count = 0
 
-        try:
-            from app.services.weekly_job_timesheet_service import list_timesheets_for_job
-        except ImportError:
-            from services.weekly_job_timesheet_service import list_timesheets_for_job  # type: ignore
+        from app.services.weekly_job_timesheet_service import list_timesheets_for_job
         try:
             weekly_ts_count = len(list_timesheets_for_job(jid) or [])
         except Exception:
@@ -568,10 +550,7 @@ def build_job_detail_tab_labels(job: dict[str, Any]) -> list[str]:
     photo_count = 0
 
     if jid:
-        try:
-            from app.services.tasks_service import get_tasks_by_job
-        except ImportError:
-            from services.tasks_service import get_tasks_by_job  # type: ignore
+        from app.services.tasks_service import get_tasks_by_job
         try:
             closed = {"complete", "completed", "closed", "cancelled", "canceled", "duplicate"}
             open_subjobs = sum(

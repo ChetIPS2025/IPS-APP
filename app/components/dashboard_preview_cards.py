@@ -7,34 +7,19 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.auth import current_profile, current_role, effective_role
-    from app.components.qr_scan_history_ui import inject_qr_scan_history_css
-    from app.pages._core._data import load_recent_qr_scans, load_tasks
-    from app.services.management_reminders_service import due_date_badge, filter_dashboard_reminders
-    from app.utils.formatting import fmt_date, fmt_datetime
-except ImportError:
-    from auth import current_profile, current_role, effective_role  # type: ignore
-    from components.qr_scan_history_ui import inject_qr_scan_history_css  # type: ignore
-    from pages._core._data import load_recent_qr_scans, load_tasks  # type: ignore
-    from services.management_reminders_service import due_date_badge, filter_dashboard_reminders  # type: ignore
-    from utils.formatting import fmt_date, fmt_datetime  # type: ignore
-
-
+from app.auth import current_profile, current_role, effective_role
+from app.components.qr_scan_history_ui import inject_qr_scan_history_css
+from app.pages._core._data import load_recent_qr_scans, load_tasks
+from app.services.management_reminders_service import due_date_badge, filter_dashboard_reminders
+from app.utils.formatting import fmt_date, fmt_datetime
 def _nav_slug(slug: str) -> None:
-    try:
-        from app.navigation import set_nav_slug
-    except ImportError:
-        from navigation import set_nav_slug  # type: ignore
+    from app.navigation import set_nav_slug
     set_nav_slug(slug)
     st.rerun()
 
 
 def _nav_job_costing() -> None:
-    try:
-        from app.navigation import open_jobs_job_costing
-    except ImportError:
-        from navigation import open_jobs_job_costing  # type: ignore
+    from app.navigation import open_jobs_job_costing
     open_jobs_job_costing()
     st.rerun()
 
@@ -176,11 +161,7 @@ def _handle_analytics_nav(action: str) -> None:
 
 
 def _render_analytics_reports_nav_bridge() -> str | None:
-    try:
-        from app.ui.clean_table import _components_html
-    except ImportError:
-        from ui.clean_table import _components_html  # type: ignore
-
+    from app.ui.clean_table import _components_html
     picked = _components_html(
         """
 <script>

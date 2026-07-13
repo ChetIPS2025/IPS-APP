@@ -8,39 +8,21 @@ from datetime import date, datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-try:
-    from app.auth import current_profile
-    from app.db import create_signed_url, upload_bytes_admin
-    from app.services.rental_equipment_inspection_specs import (
-        CHECKLIST_ITEMS,
-        GENERAL_CONDITIONS,
-        INSPECTION_TYPE_LABELS,
-        PHOTO_SLOT_LABELS,
-        SIGNATURE_ROLE_LABELS,
-        SIGNATURE_ROLES,
-        default_checklist,
-        normalize_checklist,
-        required_photo_slots_for_checklist,
-    )
-    from app.services.repository import ServiceResult, fetch_by_id, fetch_rows
-    from app.services.task_photos import compress_image_bytes
-except ImportError:
-    from auth import current_profile  # type: ignore
-    from db import create_signed_url, upload_bytes_admin  # type: ignore
-    from services.rental_equipment_inspection_specs import (  # type: ignore
-        CHECKLIST_ITEMS,
-        GENERAL_CONDITIONS,
-        INSPECTION_TYPE_LABELS,
-        PHOTO_SLOT_LABELS,
-        SIGNATURE_ROLE_LABELS,
-        SIGNATURE_ROLES,
-        default_checklist,
-        normalize_checklist,
-        required_photo_slots_for_checklist,
-    )
-    from services.repository import ServiceResult, fetch_by_id, fetch_rows  # type: ignore
-    from services.task_photos import compress_image_bytes  # type: ignore
-
+from app.auth import current_profile
+from app.db import create_signed_url, upload_bytes_admin
+from app.services.rental_equipment_inspection_specs import (
+    CHECKLIST_ITEMS,
+    GENERAL_CONDITIONS,
+    INSPECTION_TYPE_LABELS,
+    PHOTO_SLOT_LABELS,
+    SIGNATURE_ROLE_LABELS,
+    SIGNATURE_ROLES,
+    default_checklist,
+    normalize_checklist,
+    required_photo_slots_for_checklist,
+)
+from app.services.repository import ServiceResult, fetch_by_id, fetch_rows
+from app.services.task_photos import compress_image_bytes
 _LOG = logging.getLogger(__name__)
 
 TABLE = "rental_equipment_inspections"
@@ -71,10 +53,7 @@ def is_rental_equipment(asset: dict[str, Any] | None) -> bool:
     cat = str(asset.get("category") or asset.get("asset_category") or "").strip().casefold()
     if "rental equipment" in cat or cat in {"rental", "rentals"}:
         return True
-    try:
-        from app.services.phase2_modules_service import asset_is_rentable
-    except ImportError:
-        from services.phase2_modules_service import asset_is_rentable  # type: ignore
+    from app.services.phase2_modules_service import asset_is_rentable
     return asset_is_rentable(asset)
 
 
@@ -120,10 +99,7 @@ def _hydrate_inspection(row: dict[str, Any]) -> dict[str, Any]:
     photos: list[dict[str, Any]] = []
     signatures = {role: {"signer_name": "", "signature_data": "", "signed_at": ""} for role in SIGNATURE_ROLES}
     if iid:
-        try:
-            from app.db import fetch_by_match_admin
-        except ImportError:
-            from db import fetch_by_match_admin  # type: ignore
+        from app.db import fetch_by_match_admin
         try:
             for p in fetch_by_match_admin(PHOTOS_TABLE, {"inspection_id": iid}, limit=50) or []:
                 slot = str(p.get("slot_key") or "").strip()
@@ -246,12 +222,8 @@ def upload_inspection_photo(
     url = photo_view_url(storage_path)
     prof = current_profile() or {}
     uid = uploaded_by or str(prof.get("id") or "").strip() or None
-    try:
-        from app.services.repository import delete_row_admin, insert_row_admin
-        from app.db import fetch_by_match_admin
-    except ImportError:
-        from db import fetch_by_match_admin  # type: ignore
-        from services.repository import delete_row_admin, insert_row_admin  # type: ignore
+    from app.services.repository import delete_row_admin, insert_row_admin
+    from app.db import fetch_by_match_admin
     try:
         existing = fetch_by_match_admin(PHOTOS_TABLE, {"inspection_id": iid, "slot_key": slot}, limit=5) or []
         for row in existing:
@@ -325,10 +297,7 @@ def validate_for_complete(data: dict[str, Any]) -> list[str]:
 
 
 def _sync_child_records(inspection_id: str, data: dict[str, Any]) -> None:
-    try:
-        from app.services.repository import delete_row_admin, insert_row_admin
-    except ImportError:
-        from services.repository import delete_row_admin, insert_row_admin  # type: ignore
+    from app.services.repository import delete_row_admin, insert_row_admin
     sigs = _as_dict(data.get("signatures"))
     delete_row_admin(SIGNATURES_TABLE, {"inspection_id": inspection_id})
     for role in SIGNATURE_ROLES:
@@ -381,11 +350,7 @@ def save_rental_inspection(
         payload["status"] = "draft"
 
     rid = str(inspection_id or data.get("id") or "").strip()
-    try:
-        from app.services.repository import insert_row_admin, update_row_admin
-    except ImportError:
-        from services.repository import insert_row_admin, update_row_admin  # type: ignore
-
+    from app.services.repository import insert_row_admin, update_row_admin
     try:
         if rid:
             result = update_row_admin(TABLE, payload, {"id": rid})

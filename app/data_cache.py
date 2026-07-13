@@ -4,11 +4,7 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from config import settings
-except ImportError:
-    from app.config import settings  # type: ignore
-
+from app.config import settings
 _ttl = max(30, int(settings.reference_cache_ttl_seconds))
 
 
@@ -21,7 +17,7 @@ def _fetch_table_cached(
     _session_key: str,
 ) -> list[dict[str, Any]]:
     """Cache key includes _session_key so RLS-scoped reads are not shared across users."""
-    from db import fetch_table
+    from app.db import fetch_table
 
     return fetch_table(table_name, columns=columns, limit=limit, order_by=order_by)
 
@@ -35,7 +31,7 @@ def _fetch_table_cached_admin(
     _session_key: str,
 ) -> list[dict[str, Any]]:
     """Service-role read for internal roles (Dashboard, etc.); falls back to anon if admin key missing."""
-    from db import fetch_table, fetch_table_admin
+    from app.db import fetch_table, fetch_table_admin
 
     try:
         return fetch_table_admin(table_name, columns=columns, limit=limit, order_by=order_by)
@@ -52,13 +48,7 @@ def clear_session_table_cache() -> None:
         fetch_table_cached.clear()
     except Exception:
         pass
-    try:
-        from app.pages.dashboard.services import clear_dashboard_data_cache
-    except ImportError:
-        try:
-            from pages.dashboard.services import clear_dashboard_data_cache  # type: ignore
-        except ImportError:
-            clear_dashboard_data_cache = None  # type: ignore
+    from app.pages.dashboard.services import clear_dashboard_data_cache
     if clear_dashboard_data_cache:
         try:
             clear_dashboard_data_cache()
@@ -76,7 +66,7 @@ def fetch_table_admin_cached(
     cache_version: int = 0,
 ) -> list[dict[str, Any]]:
     """Cached service-role list read; bump ``cache_version`` after writes."""
-    from db import fetch_table_admin
+    from app.db import fetch_table_admin
 
     return fetch_table_admin(table_name, columns=columns, limit=limit, order_by=order_by)
 
@@ -91,7 +81,7 @@ def fetch_table_cached(
     cache_version: int = 0,
 ) -> list[dict[str, Any]]:
     """Cached anon/RLS list read; bump ``cache_version`` after writes."""
-    from db import fetch_table
+    from app.db import fetch_table
 
     return fetch_table(table_name, columns=columns, limit=limit, order_by=order_by)
 

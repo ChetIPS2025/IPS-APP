@@ -269,10 +269,7 @@ def find_matching_asset_item(
 
 
 def _admin():
-    try:
-        from app.db import fetch_table_admin, insert_row_admin, update_rows_admin
-    except ImportError:
-        from db import fetch_table_admin, insert_row_admin, update_rows_admin  # type: ignore
+    from app.db import fetch_table_admin, insert_row_admin, update_rows_admin
     return fetch_table_admin, insert_row_admin, update_rows_admin
 
 
@@ -361,11 +358,7 @@ def _upsert_pricing_guide(
     *,
     changed_by: str = "",
 ) -> tuple[bool, str, str | None, bool]:
-    try:
-        from app.services.pricing_guide_service import calc_sell_price, save_pricing_item, slug_item_code
-    except ImportError:
-        from services.pricing_guide_service import calc_sell_price, save_pricing_item, slug_item_code  # type: ignore
-
+    from app.services.pricing_guide_service import calc_sell_price, save_pricing_item, slug_item_code
     cost = _num(row.get("unit_cost"))
     item_class = normalize_item_class(row.get("item_class"))
     markup = _num(row.get("markup_percent"))
@@ -399,10 +392,7 @@ def _upsert_pricing_guide(
         "asset_recommended": _bool(row.get("asset_recommended")),
         "is_active": True,
     }
-    try:
-        from app.data.pricing_guide_fittings import FITTING_CATALOG_FIELD_NAMES
-    except ImportError:
-        from data.pricing_guide_fittings import FITTING_CATALOG_FIELD_NAMES  # type: ignore
+    from app.data.pricing_guide_fittings import FITTING_CATALOG_FIELD_NAMES
     for key in FITTING_CATALOG_FIELD_NAMES:
         if key in row and row.get(key) not in (None, ""):
             payload[key] = _str(row.get(key))
@@ -413,10 +403,7 @@ def _upsert_pricing_guide(
 
     pid = row_id
     if not pid:
-        try:
-            from app.services.pricing_guide_service import cached_pricing_guide_rows
-        except ImportError:
-            from services.pricing_guide_service import cached_pricing_guide_rows  # type: ignore
+        from app.services.pricing_guide_service import cached_pricing_guide_rows
         for pg in cached_pricing_guide_rows(include_inactive=True):
             if _str(pg.get("item_code")) == item_code:
                 pid = str(pg.get("id") or "")
@@ -521,10 +508,7 @@ def _upsert_asset(
 
 
 def slug_asset_number(text: str) -> str:
-    try:
-        from app.services.pricing_guide_service import slug_item_code
-    except ImportError:
-        from services.pricing_guide_service import slug_item_code  # type: ignore
+    from app.services.pricing_guide_service import slug_item_code
     return slug_item_code(text, prefix="AST")
 
 
@@ -533,11 +517,7 @@ def _build_import_image_index(
     *,
     include_local_folder: bool = True,
 ) -> dict[str, tuple[str, bytes]]:
-    try:
-        from app.services.item_images import build_uploaded_image_index, load_local_item_image_index
-    except ImportError:
-        from services.item_images import build_uploaded_image_index, load_local_item_image_index  # type: ignore
-
+    from app.services.item_images import build_uploaded_image_index, load_local_item_image_index
     index = build_uploaded_image_index(image_files or [])
     if include_local_folder:
         for key, val in load_local_item_image_index().items():
@@ -558,11 +538,7 @@ def _attach_import_image(
 ) -> None:
     if not record_id:
         return
-    try:
-        from app.services.item_images import find_image_match_for_row, persist_item_image
-    except ImportError:
-        from services.item_images import find_image_match_for_row, persist_item_image  # type: ignore
-
+    from app.services.item_images import find_image_match_for_row, persist_item_image
     match = find_image_match_for_row(row, image_index)
     if not match:
         return
@@ -593,13 +569,8 @@ def _ensure_import_qr_codes(
 ) -> int:
     """Generate QR tokens for imported inventory/asset rows missing them."""
     generated = 0
-    try:
-        from app.services.assets_service import ensure_asset_qr_tokens, get_asset
-        from app.services.inventory_service import ensure_inventory_qr_tokens, get_inventory_item
-    except ImportError:
-        from services.assets_service import ensure_asset_qr_tokens, get_asset  # type: ignore
-        from services.inventory_service import ensure_inventory_qr_tokens, get_inventory_item  # type: ignore
-
+    from app.services.assets_service import ensure_asset_qr_tokens, get_asset
+    from app.services.inventory_service import ensure_inventory_qr_tokens, get_inventory_item
     inv_rows = [get_inventory_item(iid) for iid in inventory_ids if get_inventory_item(iid)]
     if inv_rows:
         inv_result = ensure_inventory_qr_tokens(inv_rows)
@@ -767,10 +738,7 @@ def import_catalog_csv(
         else:
             pricing_rows.append(pg_row)
 
-    try:
-        from app.services.pricing_guide_service import clear_pricing_guide_cache
-    except ImportError:
-        from services.pricing_guide_service import clear_pricing_guide_cache  # type: ignore
+    from app.services.pricing_guide_service import clear_pricing_guide_cache
     clear_pricing_guide_cache()
     result.qr_tokens_generated = _ensure_import_qr_codes(touched_inventory_ids, touched_asset_ids)
 

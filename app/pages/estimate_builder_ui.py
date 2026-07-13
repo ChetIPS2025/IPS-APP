@@ -8,113 +8,58 @@ from uuid import uuid4
 
 import streamlit as st
 
-try:
-    from app.auth import current_role
-    from app.components.record_modal import detail_field_html, dialog_card_html, safe_value
-    from app.components.searchable_select import render_searchable_selectbox
-    from app.pages._core._crud import is_demo_id
-    from app.services.estimate_costing_service import (
-        DURATION_UNITS,
-        LABOR_ROLE_TYPES,
-        add_estimate_equipment,
-        add_estimate_equipment_batch,
-        add_estimate_labor,
-        add_estimate_labor_batch,
-        add_estimate_material,
-        add_estimate_material_batch,
-        add_estimate_other_cost,
-        add_estimate_other_cost_batch,
-        add_estimate_subcontractor,
-        add_estimate_subcontractor_batch,
-        add_estimate_travel,
-        add_estimate_travel_batch,
-        calculate_estimate_totals,
-        delete_estimate_equipment,
-        delete_estimate_labor,
-        delete_estimate_material,
-        delete_estimate_other_cost,
-        delete_estimate_subcontractor,
-        delete_estimate_travel,
-        get_estimate_bundle,
-        get_estimate_labor,
-        recalculate_and_save_estimate_totals,
-        resolve_global_markup_pct,
-        resolve_category_markup_defaults,
-        save_category_markup_settings,
-        save_global_markup_settings,
-        update_estimate_labor,
-        update_estimate_labor_batch,
-    )
-    from app.services.labor_rates_service import save_default_rates_from_lines
-    from app.ui.streamlit_perf import fragment, ips_app_rerun
-    from app.utils.estimate_calculations import TRAVEL_TYPES, calc_travel_line, calc_travel_total
-    from app.services.proposal_pdf_service import build_customer_quote_bundle
-    from app.services.pricing_guide_service import create_pricing_item_from_estimate_line
-    from app.services.estimate_builder_helpers import (
-        equipment_line_totals,
-        labor_line_totals,
-        labor_options_as_select,
-        material_line_totals,
-        resolve_equipment_cost_rate,
-        simple_line_totals,
-        travel_defaults,
-    )
-    from app.utils.estimate_calculations import margin_warning_class
-    from app.utils.formatting import fmt_currency, fmt_date
-except ImportError:
-    from auth import current_role  # type: ignore
-    from components.record_modal import detail_field_html, dialog_card_html, safe_value  # type: ignore
-    from components.searchable_select import render_searchable_selectbox  # type: ignore
-    from pages._core._crud import is_demo_id  # type: ignore
-    from services.estimate_costing_service import (  # type: ignore
-        DURATION_UNITS,
-        LABOR_ROLE_TYPES,
-        add_estimate_equipment,
-        add_estimate_equipment_batch,
-        add_estimate_labor,
-        add_estimate_labor_batch,
-        add_estimate_material,
-        add_estimate_material_batch,
-        add_estimate_other_cost,
-        add_estimate_other_cost_batch,
-        add_estimate_subcontractor,
-        add_estimate_subcontractor_batch,
-        add_estimate_travel,
-        add_estimate_travel_batch,
-        calculate_estimate_totals,
-        delete_estimate_equipment,
-        delete_estimate_labor,
-        delete_estimate_material,
-        delete_estimate_other_cost,
-        delete_estimate_subcontractor,
-        delete_estimate_travel,
-        get_estimate_bundle,
-        get_estimate_labor,
-        recalculate_and_save_estimate_totals,
-        resolve_global_markup_pct,
-        resolve_category_markup_defaults,
-        save_category_markup_settings,
-        save_global_markup_settings,
-        update_estimate_labor,
-        update_estimate_labor_batch,
-    )
-    from services.labor_rates_service import save_default_rates_from_lines  # type: ignore
-    from ui.streamlit_perf import fragment, ips_app_rerun  # type: ignore
-    from utils.estimate_calculations import TRAVEL_TYPES, calc_travel_line, calc_travel_total, margin_warning_class  # type: ignore
-    from services.estimate_builder_helpers import (  # type: ignore
-        equipment_line_totals,
-        labor_line_totals,
-        labor_options_as_select,
-        material_line_totals,
-        resolve_equipment_cost_rate,
-        simple_line_totals,
-        travel_defaults,
-    )
-    from utils.formatting import fmt_currency, fmt_date  # type: ignore
-    from services.proposal_pdf_service import build_customer_quote_bundle  # type: ignore
-    from services.pricing_guide_service import create_pricing_item_from_estimate_line  # type: ignore
-
-
+from app.auth import current_role
+from app.components.record_modal import detail_field_html, dialog_card_html, safe_value
+from app.components.searchable_select import render_searchable_selectbox
+from app.pages._core._crud import is_demo_id
+from app.services.estimate_costing_service import (
+    DURATION_UNITS,
+    LABOR_ROLE_TYPES,
+    add_estimate_equipment,
+    add_estimate_equipment_batch,
+    add_estimate_labor,
+    add_estimate_labor_batch,
+    add_estimate_material,
+    add_estimate_material_batch,
+    add_estimate_other_cost,
+    add_estimate_other_cost_batch,
+    add_estimate_subcontractor,
+    add_estimate_subcontractor_batch,
+    add_estimate_travel,
+    add_estimate_travel_batch,
+    calculate_estimate_totals,
+    delete_estimate_equipment,
+    delete_estimate_labor,
+    delete_estimate_material,
+    delete_estimate_other_cost,
+    delete_estimate_subcontractor,
+    delete_estimate_travel,
+    get_estimate_bundle,
+    get_estimate_labor,
+    recalculate_and_save_estimate_totals,
+    resolve_global_markup_pct,
+    resolve_category_markup_defaults,
+    save_category_markup_settings,
+    save_global_markup_settings,
+    update_estimate_labor,
+    update_estimate_labor_batch,
+)
+from app.services.labor_rates_service import save_default_rates_from_lines
+from app.ui.streamlit_perf import fragment, ips_app_rerun
+from app.utils.estimate_calculations import TRAVEL_TYPES, calc_travel_line, calc_travel_total
+from app.services.proposal_pdf_service import build_customer_quote_bundle
+from app.services.pricing_guide_service import create_pricing_item_from_estimate_line
+from app.services.estimate_builder_helpers import (
+    equipment_line_totals,
+    labor_line_totals,
+    labor_options_as_select,
+    material_line_totals,
+    resolve_equipment_cost_rate,
+    simple_line_totals,
+    travel_defaults,
+)
+from app.utils.estimate_calculations import margin_warning_class
+from app.utils.formatting import fmt_currency, fmt_date
 def _estimate_tax_rate(est: dict[str, Any]) -> float:
     return float(est.get("tax_rate") or 0)
 
@@ -3129,10 +3074,7 @@ def render_proposal_preview_tab(est: dict[str, Any]) -> None:
         return
 
     totals = calculate_estimate_totals(eid) if eid else {}
-    try:
-        from app.services.proposal_pdf_service import merge_proposal_totals
-    except ImportError:
-        from services.proposal_pdf_service import merge_proposal_totals  # type: ignore
+    from app.services.proposal_pdf_service import merge_proposal_totals
     totals = merge_proposal_totals(totals, est)
 
     try:
@@ -3145,11 +3087,7 @@ def render_proposal_preview_tab(est: dict[str, Any]) -> None:
         st.error(word_err)
         return
 
-    try:
-        from app.estimate.proposal_exports import _inject_proposal_preview_styles
-    except ImportError:
-        from estimate.proposal_exports import _inject_proposal_preview_styles  # type: ignore
-
+    from app.estimate.proposal_exports import _inject_proposal_preview_styles
     _inject_proposal_preview_styles()
     st.markdown(page_html, unsafe_allow_html=True)
 
@@ -3180,10 +3118,7 @@ def render_proposal_preview_tab(est: dict[str, Any]) -> None:
         st.caption(pdf_note)
 
     if st.button("Mark as Sent", key=f"pp_sent_{eid}"):
-        try:
-            from app.pages._core._data import persist_estimate, get_estimate as _get_est
-        except ImportError:
-            from pages._core._data import persist_estimate, get_estimate as _get_est  # type: ignore
+        from app.pages._core._data import persist_estimate, get_estimate as _get_est
         cur = _get_est(eid) or est
         ok, msg = persist_estimate(
             {

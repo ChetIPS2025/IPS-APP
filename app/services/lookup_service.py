@@ -52,10 +52,7 @@ _LOOKUP_LABEL_TO_SLUG: dict[str, str] = {
 
 
 def _constants_fallback(slug: str) -> list[str]:
-    try:
-        from app.utils import constants as c
-    except ImportError:
-        from utils import constants as c  # type: ignore
+    from app.utils import constants as c
     attr = _LOOKUP_SLUGS.get(slug, "")
     tup = getattr(c, attr, None) if attr else None
     if tup:
@@ -65,10 +62,7 @@ def _constants_fallback(slug: str) -> list[str]:
 
 def supabase_is_configured() -> bool:
     """True when public Supabase URL/key are present (runtime DB expected)."""
-    try:
-        from app.config import validate_supabase_public_config
-    except ImportError:
-        from config import validate_supabase_public_config  # type: ignore
+    from app.config import validate_supabase_public_config
     return validate_supabase_public_config() is None
 
 
@@ -83,20 +77,13 @@ def slug_for_label(label: str) -> str:
 
 def clear_lookup_cache() -> None:
     """Invalidate DB read caches and admin session mirrors for lookup tables."""
-    try:
-        from app.services.repository import clear_data_cache_for_table
-    except ImportError:
-        from services.repository import clear_data_cache_for_table  # type: ignore
+    from app.services.repository import clear_data_cache_for_table
     clear_data_cache_for_table("ips_lookup_values")
     clear_data_cache_for_table("ips_lookup_tables")
 
 
 def _resolve_table_id(slug: str, label: str) -> tuple[str | None, str | None]:
-    try:
-        from app.services.repository import ServiceResult, fetch_rows, insert_row
-    except ImportError:
-        from services.repository import ServiceResult, fetch_rows, insert_row  # type: ignore
-
+    from app.services.repository import ServiceResult, fetch_rows, insert_row
     tables, err = fetch_rows("ips_lookup_tables", limit=200, order_by="sort_order")
     if err or not tables:
         return None, err or "Lookup tables not available."
@@ -126,11 +113,7 @@ def load_lookup_entries(slug: str) -> tuple[list[dict[str, Any]], str]:
     if not slug:
         return [], "empty"
 
-    try:
-        from app.services.repository import fetch_rows
-    except ImportError:
-        from services.repository import fetch_rows  # type: ignore
-
+    from app.services.repository import fetch_rows
     tables, _ = fetch_rows("ips_lookup_tables", limit=200, order_by="sort_order")
     table_id = None
     for t in tables or []:
@@ -237,11 +220,7 @@ def sync_lookup_for_label(label: str, entries: list[dict[str, Any]]) -> tuple[bo
     if not clean:
         return False, "Add at least one value."
 
-    try:
-        from app.services.repository import ServiceResult, fetch_rows, insert_row, update_row
-    except ImportError:
-        from services.repository import ServiceResult, fetch_rows, insert_row, update_row  # type: ignore
-
+    from app.services.repository import ServiceResult, fetch_rows, insert_row, update_row
     table_id, err = _resolve_table_id(slug, label)
     if not table_id:
         return False, f"{err or 'Lookup tables not available.'} Values kept in this session only."

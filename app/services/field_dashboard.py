@@ -5,22 +5,13 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Any
 
-try:
-    from app.services.supervisor_daily_reports import (
-        dashboard_daily_report_snapshot,
-        fetch_all_reports_since,
-        job_status_needs_daily_report,
-        labor_hours_actual_by_job_on_date,
-    )
-except ImportError:
-    from services.supervisor_daily_reports import (  # type: ignore
-        dashboard_daily_report_snapshot,
-        fetch_all_reports_since,
-        job_status_needs_daily_report,
-        labor_hours_actual_by_job_on_date,
-    )
-
-from services.field_ops_util import fetch_fn, table_exists
+from app.services.supervisor_daily_reports import (
+    dashboard_daily_report_snapshot,
+    fetch_all_reports_since,
+    job_status_needs_daily_report,
+    labor_hours_actual_by_job_on_date,
+)
+from app.services.field_ops_util import fetch_fn, table_exists
 
 
 def field_dashboard_snapshot(
@@ -64,10 +55,7 @@ def field_dashboard_snapshot(
     for j in active_jobs[:30]:
         jid = str(j.get("id") or "").strip()
         if jid and float(hours_by_job.get(jid, 0.0)) <= 0.01:
-            try:
-                from app.services.job_service import job_row_select_label
-            except ImportError:
-                from services.job_service import job_row_select_label  # type: ignore
+            from app.services.job_service import job_row_select_label
             jobs_missing_time.append(job_row_select_label(j))
 
     drafts_today = sum(

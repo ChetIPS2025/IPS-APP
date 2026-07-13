@@ -8,42 +8,22 @@ import streamlit as st
 
 from app.auth import current_profile, current_role, effective_role
 
-try:
-    from app.components.headers import render_page_brand_header
-    from app.data_cache import fetch_table_for_session
-    from app.db import fetch_jobs_with_order_fallback
-    from app.mobile_ui import ensure_narrow_viewport_detected
-    from app.services.field_crew_time import (
-        TIME_TYPES,
-        approve_batch_and_sync_time_entries,
-        copy_yesterday_lines,
-        fetch_batch_for_job_date,
-        fetch_batch_lines,
-        overtime_warnings,
-        submit_batch,
-        upsert_crew_time_batch,
-    )
-    from app.services.job_service import sort_jobs_by_number_then_name
-    from app.utils.field_context import render_field_job_bar
-except ImportError:
-    from components.headers import render_page_brand_header  # type: ignore
-    from data_cache import fetch_table_for_session  # type: ignore
-    from db import fetch_jobs_with_order_fallback  # type: ignore
-    from mobile_ui import ensure_narrow_viewport_detected  # type: ignore
-    from services.field_crew_time import (  # type: ignore
-        TIME_TYPES,
-        approve_batch_and_sync_time_entries,
-        copy_yesterday_lines,
-        fetch_batch_for_job_date,
-        fetch_batch_lines,
-        overtime_warnings,
-        submit_batch,
-        upsert_crew_time_batch,
-    )
-    from services.job_service import sort_jobs_by_number_then_name  # type: ignore
-    from utils.field_context import render_field_job_bar  # type: ignore
-
-
+from app.components.headers import render_page_brand_header
+from app.data_cache import fetch_table_for_session
+from app.db import fetch_jobs_with_order_fallback
+from app.mobile_ui import ensure_narrow_viewport_detected
+from app.services.field_crew_time import (
+    TIME_TYPES,
+    approve_batch_and_sync_time_entries,
+    copy_yesterday_lines,
+    fetch_batch_for_job_date,
+    fetch_batch_lines,
+    overtime_warnings,
+    submit_batch,
+    upsert_crew_time_batch,
+)
+from app.services.job_service import sort_jobs_by_number_then_name
+from app.utils.field_context import render_field_job_bar
 def _admin() -> bool:
     return effective_role() in {"admin", "manager"}
 
@@ -211,10 +191,7 @@ def render_crew_time_for_job(
 
 
 def render() -> None:
-    try:
-        from app.pages._core._access import begin_module
-    except ImportError:
-        from pages._core._access import begin_module  # type: ignore
+    from app.pages._core._access import begin_module
     if not begin_module("field_crew_time"):
         return
 
@@ -224,11 +201,7 @@ def render() -> None:
         unsafe_allow_html=True,
     )
 
-    try:
-        from app.utils.permissions import can_submit_timekeeping
-    except ImportError:
-        from utils.permissions import can_submit_timekeeping  # type: ignore
-
+    from app.utils.permissions import can_submit_timekeeping
     if not can_submit_timekeeping(effective_role()):
         render_page_brand_header(
             "Crew Time",
@@ -239,10 +212,7 @@ def render() -> None:
             "Your supervisor enters hours for the crew; you can view your own time there."
         )
         if st.button("Open Timekeeping", type="primary", key="fct_go_tk"):
-            try:
-                from app.navigation import navigate_to_timekeeping
-            except ImportError:
-                from navigation import navigate_to_timekeeping  # type: ignore
+            from app.navigation import navigate_to_timekeeping
             navigate_to_timekeeping()
             st.rerun()
         return
@@ -256,15 +226,9 @@ def render() -> None:
         "This page is retained for reference only."
     )
     if st.button("Open Timekeeping", type="primary", key="fct_go_tk_super"):
-        try:
-            from app.navigation import navigate_to_timekeeping
-        except ImportError:
-            from navigation import navigate_to_timekeeping  # type: ignore
+        from app.navigation import navigate_to_timekeeping
         jid = ""
-        try:
-            from app.utils.field_context import get_field_job_id
-        except ImportError:
-            from utils.field_context import get_field_job_id  # type: ignore
+        from app.utils.field_context import get_field_job_id
         jid = str(get_field_job_id() or "").strip()
         navigate_to_timekeeping(job_id=jid)
         st.rerun()

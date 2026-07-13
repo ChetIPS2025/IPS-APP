@@ -196,11 +196,7 @@ def normalize_resource(row: dict[str, Any]) -> dict[str, Any]:
 def resource_visible_to_role(row: dict[str, Any], role: str) -> bool:
     if not row.get("is_active", True):
         return False
-    try:
-        from app.utils.permissions import normalize_role
-    except ImportError:
-        from utils.permissions import normalize_role  # type: ignore
-
+    from app.utils.permissions import normalize_role
     norm = normalize_role(role)
     allowed = _parse_roles(row.get("visible_to_roles"))
     if norm == "admin":
@@ -209,11 +205,7 @@ def resource_visible_to_role(row: dict[str, Any], role: str) -> bool:
 
 
 def list_all_employee_resources_admin() -> tuple[list[dict[str, Any]], bool]:
-    try:
-        from app.services.repository import fetch_list
-    except ImportError:
-        from services.repository import fetch_list  # type: ignore
-
+    from app.services.repository import fetch_list
     rows, used_demo = fetch_list(
         "employee_toolbox_links",
         order_by="sort_order",
@@ -225,11 +217,7 @@ def list_all_employee_resources_admin() -> tuple[list[dict[str, Any]], bool]:
 
 
 def list_employee_resources(*, role: str) -> tuple[list[dict[str, Any]], bool]:
-    try:
-        from app.services.repository import fetch_list
-    except ImportError:
-        from services.repository import fetch_list  # type: ignore
-
+    from app.services.repository import fetch_list
     rows, used_demo = fetch_list(
         "employee_toolbox_links",
         order_by="sort_order",
@@ -242,11 +230,7 @@ def list_employee_resources(*, role: str) -> tuple[list[dict[str, Any]], bool]:
 
 
 def save_employee_resource(payload: dict[str, Any], *, row_id: str | None = None):
-    try:
-        from app.services.repository import insert_row, update_row, clear_data_cache_for_table
-    except ImportError:
-        from services.repository import insert_row, update_row, clear_data_cache_for_table  # type: ignore
-
+    from app.services.repository import insert_row, update_row, clear_data_cache_for_table
     data = dict(payload or {})
     if row_id:
         result = update_row("employee_toolbox_links", data, {"id": str(row_id).strip()})
@@ -258,11 +242,7 @@ def save_employee_resource(payload: dict[str, Any], *, row_id: str | None = None
 
 
 def delete_employee_resource(row_id: str):
-    try:
-        from app.services.repository import delete_row, clear_data_cache_for_table
-    except ImportError:
-        from services.repository import delete_row, clear_data_cache_for_table  # type: ignore
-
+    from app.services.repository import delete_row, clear_data_cache_for_table
     result = delete_row("employee_toolbox_links", {"id": str(row_id or "").strip()})
     if result.ok:
         clear_data_cache_for_table("employee_toolbox_links")
@@ -276,10 +256,7 @@ def resource_open_url(row: dict[str, Any]) -> str | None:
     path = str(row.get("file_path") or "").strip()
     if not path:
         return None
-    try:
-        from app.db import create_signed_url
-    except ImportError:
-        from db import create_signed_url  # type: ignore
+    from app.db import create_signed_url
     try:
         return create_signed_url(path, expires_in=3600)
     except Exception:

@@ -5,7 +5,7 @@ import re
 import streamlit as st
 
 from app.db import fetch_one
-from proposal import (
+from app.proposal import (
     build_proposal_docx,
     proposal_preview_page_html,
     try_convert_proposal_docx_to_pdf,

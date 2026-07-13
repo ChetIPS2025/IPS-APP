@@ -5,27 +5,15 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-try:
-    from app.services.asset_kits_service import asset_is_kit, get_asset_kit_items, list_all_kit_items_enriched
-    from app.services.repository import (
-        ServiceResult,
-        delete_row,
-        fetch_rows,
-        insert_row,
-        insert_row_admin,
-        update_row,
-    )
-except ImportError:
-    from services.asset_kits_service import asset_is_kit, get_asset_kit_items, list_all_kit_items_enriched  # type: ignore
-    from services.repository import (  # type: ignore
-        ServiceResult,
-        delete_row,
-        fetch_rows,
-        insert_row,
-        insert_row_admin,
-        update_row,
-    )
-
+from app.services.asset_kits_service import asset_is_kit, get_asset_kit_items, list_all_kit_items_enriched
+from app.services.repository import (
+    ServiceResult,
+    delete_row,
+    fetch_rows,
+    insert_row,
+    insert_row_admin,
+    update_row,
+)
 _TABLE = "small_hand_tools"
 
 HAND_TOOL_CATEGORIES = (
@@ -144,20 +132,14 @@ def list_hand_tools(
 ) -> list[dict[str, Any]]:
     """All quantity small tools from DB plus non-serialized kit lines in trailers."""
     if assets_by_id is None:
-        try:
-            from app.services.phase2_modules_service import list_assets, normalize_asset
-        except ImportError:
-            from services.phase2_modules_service import list_assets, normalize_asset  # type: ignore
+        from app.services.phase2_modules_service import list_assets, normalize_asset
         assets_by_id = {
             str(a.get("id") or "").strip(): normalize_asset(a)
             for a in list_assets()
             if str(a.get("id") or "").strip()
         }
     if jobs_by_id is None:
-        try:
-            from app.pages._core._data import load_jobs
-        except ImportError:
-            from pages._core._data import load_jobs  # type: ignore
+        from app.pages._core._data import load_jobs
         jobs_by_id = {
             str(j.get("id") or "").strip(): j for j in load_jobs() if str(j.get("id") or "").strip()
         }
@@ -218,10 +200,7 @@ def _hand_tool_payload_from_ui(ui: dict[str, Any], *, row_id: str | None = None)
     container_id = _clean_text(ui.get("container_asset_id"))
     if storage == "Tool Trailer" and container_id:
         parent = None
-        try:
-            from app.services.repository import fetch_by_id
-        except ImportError:
-            from services.repository import fetch_by_id  # type: ignore
+        from app.services.repository import fetch_by_id
         parent = fetch_by_id("assets", container_id) or {}
         if parent and not asset_is_kit(parent):
             return ServiceResult(ok=False, error="Selected container is not a Tool Trailer / kit.")
@@ -300,11 +279,7 @@ def _sync_kit_item_for_hand_tool(
     row_id: str | None,
 ) -> None:
     """Mirror quantity hand tool into trailer kit inventory for audits."""
-    try:
-        from app.services.asset_kits_service import create_asset_kit_item, update_asset_kit_item
-    except ImportError:
-        from services.asset_kits_service import create_asset_kit_item, update_asset_kit_item  # type: ignore
-
+    from app.services.asset_kits_service import create_asset_kit_item, update_asset_kit_item
     name = _clean_text(tool_row.get("tool_name"))
     qty = _f(tool_row.get("quantity_on_hand") or 1, 1.0)
     hand_id = _clean_text(row_id or tool_row.get("id"))
@@ -341,10 +316,7 @@ def adjust_hand_tool_quantity(tool_id: str, delta: float, *, notes: str = "") ->
         return ServiceResult(ok=False, error="Tool id is required.")
     rows, _ = fetch_rows(_TABLE, limit=1)
     _ = rows
-    try:
-        from app.services.repository import fetch_by_id
-    except ImportError:
-        from services.repository import fetch_by_id  # type: ignore
+    from app.services.repository import fetch_by_id
     row = fetch_by_id(_TABLE, tid)
     if not row:
         return ServiceResult(ok=False, error="Hand tool not found.")

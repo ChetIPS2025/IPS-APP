@@ -46,10 +46,7 @@ _CLOSED_SUBJOB_STATUSES = frozenset(
 
 def get_tasks() -> list[dict[str, Any]]:
     """Load tasks for the Tasks page (demo fallback included)."""
-    try:
-        from app.pages._core._data import load_tasks
-    except ImportError:
-        from pages._core._data import load_tasks  # type: ignore
+    from app.pages._core._data import load_tasks
     return load_tasks()
 
 
@@ -77,10 +74,7 @@ def _resolve_task_job_id(task: dict[str, Any]) -> str | None:
     label = str(task.get("linked_job") or task.get("job_label") or "").strip()
     if not label or label in {"— None —", "None", "—", "-"}:
         return None
-    try:
-        from app.services.jobs_service import resolve_job_id_from_label
-    except ImportError:
-        from services.jobs_service import resolve_job_id_from_label  # type: ignore
+    from app.services.jobs_service import resolve_job_id_from_label
     return resolve_job_id_from_label(label)
 
 
@@ -131,10 +125,7 @@ def clear_tasks_cache() -> None:
     import streamlit as st
 
     st.session_state.pop("_ips_tasks_by_job_index", None)
-    try:
-        from app.services.repository import clear_data_cache_for_table
-    except ImportError:
-        from services.repository import clear_data_cache_for_table  # type: ignore
+    from app.services.repository import clear_data_cache_for_table
     clear_data_cache_for_table("todos")
 
 
@@ -145,30 +136,18 @@ def delete_job_subjob(task_id: str, *, job_id: str | None = None) -> ServiceResu
         return ServiceResult(ok=False, error="Missing subjob id.")
     jid = str(job_id or "").strip() or None
 
-    try:
-        from app.services.coupling_inspection_service import (
-            list_coupling_inspections,
-            unlink_coupling_inspection_from_task,
-        )
-    except ImportError:
-        from services.coupling_inspection_service import (  # type: ignore
-            list_coupling_inspections,
-            unlink_coupling_inspection_from_task,
-        )
-
+    from app.services.coupling_inspection_service import (
+        list_coupling_inspections,
+        unlink_coupling_inspection_from_task,
+    )
     for insp in list_coupling_inspections(job_id=jid, task_id=tid):
         iid = str(insp.get("id") or "").strip()
         if iid:
             unlink_coupling_inspection_from_task(iid)
 
     if jid:
-        try:
-            from app.services.job_photos import fetch_job_photos, unlink_job_photo_from_task
-            from app.services.job_documents import fetch_job_documents, unlink_job_document_from_task
-        except ImportError:
-            from services.job_photos import fetch_job_photos, unlink_job_photo_from_task  # type: ignore
-            from services.job_documents import fetch_job_documents, unlink_job_document_from_task  # type: ignore
-
+        from app.services.job_photos import fetch_job_photos, unlink_job_photo_from_task
+        from app.services.job_documents import fetch_job_documents, unlink_job_document_from_task
         for photo in fetch_job_photos(jid, task_id=tid, admin=True):
             pid = str(photo.get("id") or "").strip()
             if pid:

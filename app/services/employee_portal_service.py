@@ -78,11 +78,7 @@ def _normalize_audience(raw: object) -> str:
 
 def update_visible_to_role(row: dict[str, Any], role: str) -> bool:
     """True when a published update should appear for the given role."""
-    try:
-        from app.utils.permissions import normalize_role
-    except ImportError:
-        from utils.permissions import normalize_role  # type: ignore
-
+    from app.utils.permissions import normalize_role
     if not str(row.get("title") or "").strip():
         return False
     status = str(row.get("status") or "").strip().lower().replace("_", " ")
@@ -116,13 +112,8 @@ def update_visible_to_role(row: dict[str, Any], role: str) -> bool:
 
 
 def list_employee_portal_updates(*, role: str) -> list[dict[str, Any]]:
-    try:
-        from app.components.company_updates_feed import dashboard_update_visible, sort_dashboard_updates
-        from app.pages._core._data import load_company_updates
-    except ImportError:
-        from components.company_updates_feed import dashboard_update_visible, sort_dashboard_updates  # type: ignore
-        from pages._core._data import load_company_updates  # type: ignore
-
+    from app.components.company_updates_feed import dashboard_update_visible, sort_dashboard_updates
+    from app.pages._core._data import load_company_updates
     rows = [
         u
         for u in load_company_updates()
@@ -132,11 +123,7 @@ def list_employee_portal_updates(*, role: str) -> list[dict[str, Any]]:
 
 
 def list_active_jobs_for_employee() -> list[dict[str, Any]]:
-    try:
-        from app.pages._core._data import load_jobs
-    except ImportError:
-        from pages._core._data import load_jobs  # type: ignore
-
+    from app.pages._core._data import load_jobs
     out: list[dict[str, Any]] = []
     for row in load_jobs():
         if row.get("is_deleted"):
@@ -150,11 +137,7 @@ def list_active_jobs_for_employee() -> list[dict[str, Any]]:
 
 
 def list_bidding_estimates_for_employee() -> list[dict[str, Any]]:
-    try:
-        from app.pages._core._data import load_estimates
-    except ImportError:
-        from pages._core._data import load_estimates  # type: ignore
-
+    from app.pages._core._data import load_estimates
     out: list[dict[str, Any]] = []
     for row in load_estimates():
         status = str(row.get("status") or "").strip().lower()
@@ -171,19 +154,11 @@ def list_my_certifications_for_portal(employee_id: str) -> list[dict[str, Any]]:
     eid = str(employee_id or "").strip()
     if not eid:
         return []
-    try:
-        from app.pages._core._data import load_certifications
-        from app.services.certification_helpers import (
-            certification_visible_to_user,
-            compute_certification_status,
-        )
-    except ImportError:
-        from pages._core._data import load_certifications  # type: ignore
-        from services.certification_helpers import (  # type: ignore
-            certification_visible_to_user,
-            compute_certification_status,
-        )
-
+    from app.pages._core._data import load_certifications
+    from app.services.certification_helpers import (
+        certification_visible_to_user,
+        compute_certification_status,
+    )
     rows = load_certifications(eid)
     out: list[dict[str, Any]] = []
     for cert in rows:
@@ -312,10 +287,7 @@ def portal_employee_title(
 
 
 def _load_time_entries() -> list[dict[str, Any]]:
-    try:
-        from app.pages._core._data import _fetch_table
-    except ImportError:
-        from pages._core._data import _fetch_table  # type: ignore
+    from app.pages._core._data import _fetch_table
     return list(_fetch_table("time_entries", limit=5000, order_by="work_date") or [])
 
 
@@ -355,10 +327,7 @@ def list_portal_dashboard_jobs(employee_id: str, *, limit: int = 4) -> list[dict
     active_by_id = {str(j.get("id") or ""): j for j in active_jobs}
 
     all_by_id: dict[str, dict[str, Any]] = dict(active_by_id)
-    try:
-        from app.pages._core._data import load_jobs
-    except ImportError:
-        from pages._core._data import load_jobs  # type: ignore
+    from app.pages._core._data import load_jobs
     for row in load_jobs():
         if row.get("is_deleted"):
             continue

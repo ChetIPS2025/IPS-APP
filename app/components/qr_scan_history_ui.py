@@ -7,16 +7,8 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.components.tables import data_table_html
-except ImportError:
-    from components.tables import data_table_html  # type: ignore
-
-try:
-    from app.utils.formatting import fmt_datetime
-except ImportError:
-    from utils.formatting import fmt_datetime  # type: ignore
-
+from app.components.tables import data_table_html
+from app.utils.formatting import fmt_datetime
 _FULL_COLS = (
     ("summary", "Scan"),
     ("scanned_at", "Scanned At"),
