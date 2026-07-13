@@ -380,13 +380,13 @@ def can_manage_user_actions(actor: dict[str, Any] | None = None) -> bool:
 def can_edit_employee_profile(actor: dict[str, Any] | None = None) -> bool:
     """Roles allowed to update employee/user profile fields (including hire date)."""
     try:
-        from app.auth import current_role, effective_role
+        import app.auth as auth
         from app.utils.permissions import normalize_role
     except ImportError:
-        from auth import current_role, effective_role  # type: ignore
+        import auth as auth  # type: ignore
         from utils.permissions import normalize_role  # type: ignore
     _ = actor
-    role = normalize_role(effective_role())
+    role = normalize_role(auth.current_role())
     return role in {"admin", "supervisor", "project manager"}
 
 
