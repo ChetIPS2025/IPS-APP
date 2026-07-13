@@ -318,6 +318,14 @@ def _clear_stale_user_identity() -> None:
     clear_streamlit_db_read_cache()
 
 
+def _bind_auth_session_from_client(client: Any) -> None:
+    """Persist JWT + auth session on Streamlit state before profile lookups."""
+    _sync_auth_session_from_client(client)
+    toks = _auth_session_tokens(client)
+    if toks:
+        _persist_auth_tokens(toks[0], toks[1])
+
+
 def _live_auth_user_from_client() -> Any | None:
     client = _try_get_client()
     if client is None:
@@ -479,9 +487,6 @@ def _apply_user_and_profile_from_auth_user(user: Any, *, email_hint: str = "", p
             profile = fetch_one("profiles", {"phone_number": ph})
         if not profile:
             raise RuntimeError("No profile row found for this user. Ask an admin to invite you.")
-        raise RuntimeError(
-            "This login is not linked to a profile id yet. Ask an admin to link it (profiles.id must match the Auth user id)."
-        )
     if not _profile_matches_auth_user(profile, uid):
         raise RuntimeError(
             "This login is not linked to a profile id yet. Ask an admin to link it (profiles.id must match the Auth user id)."
@@ -768,6 +773,8 @@ def sign_in(email: str, password: str, *, remember_device: bool = False) -> None
             ) from exc
         raise RuntimeError(f"Sign in failed: {exc!r}") from exc
 
+    _clear_stale_user_identity()
+
     try:
         resp = client.auth.sign_in_with_password({"email": email, "password": password})
     except Exception as exc:
@@ -797,7 +804,7 @@ def sign_in(email: str, password: str, *, remember_device: bool = False) -> None
     if not user:
         raise RuntimeError("Login failed: no user returned from Supabase.")
 
-    _clear_stale_user_identity()
+    _bind_auth_session_from_client(client)
     _apply_user_and_profile_from_auth_user(user, email_hint=email)
 
     from app.db import clear_streamlit_db_read_cache
@@ -841,6 +848,7 @@ def verify_phone_otp(*, phone_number: str, code: str, remember_device: bool = Fa
     if len(tok) < 4:
         raise RuntimeError("Enter the verification code.")
     client = get_client()
+    _clear_stale_user_identity()
     try:
         fn = getattr(client.auth, "verify_otp", None)
         if fn is None:
@@ -870,7 +878,7 @@ def verify_phone_otp(*, phone_number: str, code: str, remember_device: bool = Fa
     if not user:
         raise RuntimeError("Login failed: no user returned from Supabase.")
 
-    _clear_stale_user_identity()
+    _bind_auth_session_from_client(client)
     _apply_user_and_profile_from_auth_user(user, phone_hint=ph)
 
     from app.db import clear_streamlit_db_read_cache

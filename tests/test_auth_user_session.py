@@ -145,6 +145,43 @@ class TestAuthUserSession(unittest.TestCase):
         self.assertEqual(st.session_state[AUTH_ACCESS_TOKEN_KEY], "access-1")
         self.assertEqual(st.session_state[AUTH_REFRESH_TOKEN_KEY], "refresh-1")
 
+    @patch("app.auth._apply_user_and_profile_from_auth_user")
+    @patch("app.auth._auth_session_tokens", return_value=("access-1", "refresh-1"))
+    @patch("app.auth._sync_auth_session_from_client")
+    @patch("app.auth._clear_stale_user_identity")
+    @patch("app.auth.get_client")
+    @patch("app.config.validate_supabase_public_config", return_value=None)
+    def test_sign_in_binds_auth_session_before_profile_lookup(
+        self,
+        _cfg_mock,
+        get_client_mock,
+        clear_identity_mock,
+        sync_session_mock,
+        tokens_mock,
+        apply_profile_mock,
+    ) -> None:
+        from app.auth import sign_in
+
+        user = SimpleNamespace(id="auth-chet", email="chet@example.com")
+        client = SimpleNamespace(
+            auth=SimpleNamespace(
+                sign_in_with_password=Mock(return_value=SimpleNamespace(user=user)),
+            ),
+        )
+        get_client_mock.return_value = client
+        call_order: list[str] = []
+        clear_identity_mock.side_effect = lambda: call_order.append("clear")
+        sync_session_mock.side_effect = lambda _client: call_order.append("bind")
+        apply_profile_mock.side_effect = lambda *_a, **_k: call_order.append("profile")
+
+        sign_in("chet@example.com", "secret", remember_device=False)
+
+        self.assertEqual(call_order, ["clear", "bind", "profile"])
+        sync_session_mock.assert_called_once_with(client)
+        apply_profile_mock.assert_called_once()
+        self.assertEqual(st.session_state[AUTH_ACCESS_TOKEN_KEY], "access-1")
+        self.assertEqual(st.session_state[AUTH_REFRESH_TOKEN_KEY], "refresh-1")
+
     @patch("app.auth.st.stop")
     @patch("app.auth.ensure_authenticated_user_identity")
     @patch("app.auth._live_auth_user_from_client")
