@@ -27,15 +27,17 @@ class PageHeaderSourceTests(unittest.TestCase):
         src = inspect.getsource(headers.render_page_brand_header)
         self.assertIn("render_page_header", src)
 
-    def test_render_page_header_uses_three_column_grid_layout(self) -> None:
+    def test_render_page_header_uses_four_column_layout(self) -> None:
         from app.ui import page_header as ui_page_header
 
-        src = inspect.getsource(ui_page_header.render_page_header)
-        self.assertIn("ips-ph-left", src)
-        self.assertIn("ips-ph-center", src)
-        self.assertIn("ips-ph-right", src)
-        self.assertIn("height=48", src)
-        self.assertIn("ips_app_page_header", src)
+        src = inspect.getsource(ui_page_header)
+        render_src = inspect.getsource(ui_page_header.render_page_header)
+        self.assertIn("back_col, logo_col, title_col, actions_col", render_src)
+        self.assertIn("header_primary_action", render_src)
+        self.assertIn("header_date_range", src)
+        self.assertIn("height=46", render_src)
+        self.assertIn("ips_page_header", render_src)
+        self.assertIn('format="MM/DD/YYYY"', src)
         self.assertNotIn('format="MMM D, YYYY"', src)
         for slug in (
             "dashboard",
@@ -54,6 +56,16 @@ class PageHeaderSourceTests(unittest.TestCase):
 
         src = inspect.getsource(headers.render_page_header)
         self.assertIn("app.ui.page_header", src)
+
+    def test_page_header_styles_are_scoped(self) -> None:
+        from app.ui.page_header_styles import inject_page_header_styles
+
+        src = inspect.getsource(inject_page_header_styles)
+        self.assertIn("ips-page-header-styles-v2", src)
+        self.assertIn(".st-key-ips_page_header", src)
+        self.assertIn(".st-key-header_primary_action", src)
+        self.assertNotIn("position: absolute", src)
+        self.assertNotIn("width: 100vw", src)
 
     def test_full_page_detail_skips_duplicate_modal_header(self) -> None:
         from app.pages import customers as customers_page
@@ -84,8 +96,7 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.styles import inject_global_css
 
         src = inspect.getsource(inject_global_css)
-        self.assertIn("ips-global-styles-v15", src)
-        self.assertIn("grid-template-columns: minmax(160px, auto) minmax(220px, 1fr) minmax(340px, auto)", src)
+        self.assertIn("ips-global-styles-v16", src)
         self.assertNotIn("margin-left: -22px", src)
         self.assertNotIn("margin-right: -22px", src)
 

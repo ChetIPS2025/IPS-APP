@@ -26,8 +26,8 @@ class UiLibraryTests(unittest.TestCase):
 
     def test_page_header_is_self_contained(self) -> None:
         src = inspect.getsource(ui_page_header.render_page_header)
-        self.assertIn("ips-ph-left", src)
-        self.assertIn("inject_ips_ui_styles", src)
+        self.assertIn("back_col, logo_col, title_col, actions_col", src)
+        self.assertIn("inject_page_header_styles", src)
         self.assertIn("show_date_range", src)
         self.assertIn("show_refresh", src)
         self.assertNotIn('format="MMM D, YYYY"', src)

@@ -12311,7 +12311,7 @@ def inject_global_css() -> None:
     """Inject global IPS SaaS styles on every render."""
     st.markdown(
         f"""
-<style id="ips-global-styles-v15">
+<style id="ips-global-styles-v16">
 :root {{
   --ips-bg: {APP_BG};
   --ips-sidebar: {SIDEBAR_BG};
@@ -12424,435 +12424,16 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVertic
   margin-bottom: 0 !important;
 }}
 
-/* IPS page header v13 — three-column grid */
-.st-key-ips_app_page_header,
-.st-key-ips_app_page_header [data-testid="stVerticalBlockBorderWrapper"] {{
-  width: 100% !important;
-  margin: 0 0 16px 0 !important;
-  padding: 10px 20px !important;
-  background: #ffffff !important;
-  border: 1px solid #e5e7eb !important;
-  border-bottom: 2px solid #3158e6 !important;
-  border-radius: 0 !important;
-  min-height: 76px !important;
-  max-height: none !important;
-  box-sizing: border-box !important;
-  position: static !important;
+/* IPS shared page header - authoritative styles live in app/ui/page_header_styles.py */
+.st-key-ips_page_header,
+.st-key-ips_page_header [data-testid="stVerticalBlockBorderWrapper"] {{
+  margin: 0 0 14px 0 !important;
 }}
-section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-ips_app_page_header,
-section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-ips_app_page_header [data-testid="stVerticalBlockBorderWrapper"] {{
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-ips_page_header,
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-ips_page_header [data-testid="stVerticalBlockBorderWrapper"] {{
   margin-top: 0 !important;
 }}
-section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"]:has(.ips-page-shell-marker):not(:has(.ips-app-page-header-marker)) {{
-  display: none !important;
-  height: 0 !important;
-  min-height: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-}}
-.st-key-ips_app_page_header [data-testid="stElementContainer"]:has(.ips-ph-root) {{
-  height: 0 !important;
-  min-height: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-}}
-.st-key-ips_app_page_header [data-testid="stHorizontalBlock"]:has(.ips-ph-left):has(.ips-ph-center):has(.ips-ph-right),
-.st-key-ips_app_page_header [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stHorizontalBlock"]:has(.ips-ph-left):has(.ips-ph-center):has(.ips-ph-right) {{
-  display: grid !important;
-  grid-template-columns: minmax(160px, auto) minmax(220px, 1fr) minmax(340px, auto) !important;
-  align-items: center !important;
-  gap: 12px !important;
-  width: 100% !important;
-  min-height: 56px !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-left) {{
-  width: auto !important;
-  min-width: 0 !important;
-  flex: none !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-left) > [data-testid="stHorizontalBlock"] {{
-  display: flex !important;
-  align-items: center !important;
-  gap: 16px !important;
-  flex-wrap: nowrap !important;
-  width: auto !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-center) {{
-  min-width: 0 !important;
-  flex: 1 1 auto !important;
-  overflow: hidden !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-right) {{
-  width: auto !important;
-  min-width: 0 !important;
-  flex: none !important;
-  max-width: 72% !important;
-}}
-.stApp:has(.ips-desktop-nav-rail) .st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-menu) {{
-  display: none !important;
-  width: 0 !important;
-  min-width: 0 !important;
-  max-width: 0 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  overflow: hidden !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-right) > [data-testid="stHorizontalBlock"] {{
-  display: flex !important;
-  align-items: center !important;
-  justify-content: flex-end !important;
-  gap: 8px !important;
-  flex-wrap: wrap !important;
-  width: 100% !important;
-  max-width: 100% !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-refresh-marker) {{
-  flex: 0 0 40px !important;
-  width: 40px !important;
-  min-width: 40px !important;
-  max-width: 40px !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-refresh-marker) .stButton > button {{
-  min-width: 40px !important;
-  width: 40px !important;
-  padding: 0 !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-right) [data-testid="column"] {{
-  flex: 0 0 auto !important;
-  width: auto !important;
-  min-width: 0 !important;
-  max-width: none !important;
-  padding-left: 0 !important;
-  padding-right: 0 !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-right) [data-testid="column"] .stButton,
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-right) [data-testid="column"] [data-testid="stPopover"] {{
-  width: auto !important;
-  min-width: 0 !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-right) [data-testid="column"] .stButton > button {{
-  width: auto !important;
-  min-width: 0 !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-action-slot) [data-testid="stButton"] > button[kind="primary"],
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-action-slot) .stButton > button[data-testid="stBaseButton-primary"] {{
-  min-width: 118px !important;
-  width: auto !important;
-  padding: 0 0.9rem !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-primary-action-marker) {{
-  flex: 0 0 auto !important;
-  width: auto !important;
-  min-width: 118px !important;
-  max-width: none !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-primary-action-marker) .stButton {{
-  width: auto !important;
-  min-width: 118px !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-primary-action-marker) .stButton > button {{
-  width: auto !important;
-  min-width: 118px !important;
-  overflow: visible !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-date-marker) {{
-  position: relative !important;
-  min-width: 0 !important;
-  max-width: 240px !important;
-  flex: 0 1 240px !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-date-marker) [data-testid="stPopover"] > button {{
-  max-width: 240px !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
-}}
-.ips-ph-back-spacer {{
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
-}}
-.ips-ph-refresh-marker {{
-  display: none !important;
-}}
-.ips-ph-logo {{
-  height: 48px !important;
-  width: auto !important;
-  min-width: 160px !important;
-  max-width: 280px !important;
-  object-fit: contain !important;
-  display: block !important;
-  background: transparent !important;
-}}
-.ips-ph-title-block {{
-  display: flex !important;
-  align-items: center !important;
-  gap: 14px !important;
-  min-width: 0 !important;
-}}
-.ips-ph-icon-wrap {{
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: 28px !important;
-  height: 28px !important;
-  flex: 0 0 auto !important;
-}}
-.ips-ph-icon-wrap .ips-app-header-icon-svg {{
-  display: block !important;
-  width: 22px !important;
-  height: 22px !important;
-}}
-.ips-ph-text {{
-  display: flex !important;
-  flex-direction: column !important;
-  min-width: 0 !important;
-}}
-.ips-ph-title {{
-  margin: 0 !important;
-  font-size: 26px !important;
-  line-height: 1.1 !important;
-  font-weight: 700 !important;
-  color: #111827 !important;
-  letter-spacing: -0.02em !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-}}
-.ips-ph-subtitle {{
-  margin: 2px 0 0 0 !important;
-  font-size: 13px !important;
-  color: #64748b !important;
-  line-height: 1.25 !important;
-  font-weight: 500 !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-}}
-.ips-ph-avatar-lg {{
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: 28px !important;
-  height: 28px !important;
-  border-radius: 999px !important;
-  background: #ede9fe !important;
-  color: #4f46e5 !important;
-  font-size: 11px !important;
-  font-weight: 800 !important;
-  margin-right: 6px !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-back) .stButton > button {{
-  min-height: 40px !important;
-  height: 40px !important;
-  min-width: 92px !important;
-  font-size: 0.875rem !important;
-  font-weight: 600 !important;
-  border: 1px solid #d1d5db !important;
-  background: #ffffff !important;
-  color: #374151 !important;
-  border-radius: 8px !important;
-  padding: 0 0.85rem !important;
-  white-space: nowrap !important;
-  box-shadow: none !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-menu) .stButton > button {{
-  display: none !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-util-bell) {{
-  position: relative !important;
-}}
-.st-key-ips_app_page_header .ips-ph-badge {{
-  position: absolute !important;
-  top: 2px !important;
-  right: 2px !important;
-  z-index: 1 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  min-width: 16px !important;
-  height: 16px !important;
-  padding: 0 4px !important;
-  border-radius: 999px !important;
-  background: #2563eb !important;
-  color: #ffffff !important;
-  font-size: 10px !important;
-  font-weight: 800 !important;
-  line-height: 1 !important;
-  pointer-events: none !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-util-bell) .stButton > button,
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-util-settings) .stButton > button {{
-  min-width: 38px !important;
-  width: 38px !important;
-  height: 38px !important;
-  min-height: 38px !important;
-  padding: 0 !important;
-  border: 1px solid #e5e7eb !important;
-  background: #ffffff !important;
-  color: transparent !important;
-  border-radius: 999px !important;
-  box-shadow: none !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-util-bell) .stButton > button p,
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-util-settings) .stButton > button p {{
-  display: none !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-util-bell) .stButton > button::before {{
-  content: "" !important;
-  display: block !important;
-  width: 18px !important;
-  height: 18px !important;
-  margin: 0 auto !important;
-  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9'/%3E%3Cpath d='M13.73 21a2 2 0 0 1-3.46 0'/%3E%3C/svg%3E") !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-util-settings) .stButton > button::before {{
-  content: "" !important;
-  display: block !important;
-  width: 18px !important;
-  height: 18px !important;
-  margin: 0 auto !important;
-  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3Cpath d='M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42'/%3E%3C/svg%3E") !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-util-help) [data-testid="stPopover"] > button {{
-  min-width: 38px !important;
-  width: 38px !important;
-  height: 38px !important;
-  min-height: 38px !important;
-  padding: 0 !important;
-  border: 1px solid #e5e7eb !important;
-  background: #ffffff !important;
-  color: transparent !important;
-  border-radius: 999px !important;
-  box-shadow: none !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-util-help) [data-testid="stPopover"] > button::before {{
-  content: "?" !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: 100% !important;
-  height: 100% !important;
-  color: #64748b !important;
-  font-size: 15px !important;
-  font-weight: 700 !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-util-help) [data-testid="stPopover"] > button p {{
-  display: none !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-util-user) [data-testid="stPopover"] > button {{
-  min-width: 52px !important;
-  width: auto !important;
-  min-height: 38px !important;
-  height: 38px !important;
-  padding: 0 8px 0 4px !important;
-  border: 1px solid #e5e7eb !important;
-  background: #ffffff !important;
-  color: #4f46e5 !important;
-  border-radius: 999px !important;
-  box-shadow: none !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 4px !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-util-user) [data-testid="stPopover"] > button::after {{
-  content: "▾" !important;
-  display: inline-block !important;
-  color: #64748b !important;
-  font-size: 11px !important;
-  line-height: 1 !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-util-user) [data-testid="stPopover"] > button p {{
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: 28px !important;
-  height: 28px !important;
-  min-width: 28px !important;
-  border-radius: 999px !important;
-  background: #ede9fe !important;
-  color: #4f46e5 !important;
-  font-size: 11px !important;
-  font-weight: 800 !important;
-  letter-spacing: 0.02em !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  line-height: 1 !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-action-slot) [data-testid="stButton"] > button[kind="primary"],
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-action-slot) .stButton > button[data-testid="stBaseButton-primary"] {{
-  background: #3158e6 !important;
-  border: 1px solid #3158e6 !important;
-  color: #ffffff !important;
-  font-weight: 600 !important;
-  border-radius: 8px !important;
-  box-shadow: none !important;
-  min-height: 40px !important;
-  height: 40px !important;
-  padding: 0 0.9rem !important;
-  white-space: nowrap !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-action-slot) [data-testid="stButton"] > button[kind="secondary"],
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-action-slot) .stButton > button:not([data-testid="stBaseButton-primary"]) {{
-  background: #ffffff !important;
-  border: 1px solid #d1d5db !important;
-  color: #374151 !important;
-  font-weight: 600 !important;
-  border-radius: 8px !important;
-  box-shadow: none !important;
-  min-height: 40px !important;
-  height: 40px !important;
-  padding: 0 0.85rem !important;
-  white-space: nowrap !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-date-marker) [data-testid="stPopover"] > button {{
-  min-height: 40px !important;
-  height: 40px !important;
-  border-radius: 8px !important;
-  border: 1px solid #d1d5db !important;
-  background: #ffffff !important;
-  color: #0f172a !important;
-  font-size: 0.875rem !important;
-  font-weight: 600 !important;
-  padding: 0 0.85rem 0 2rem !important;
-  box-shadow: none !important;
-  position: relative !important;
-  width: auto !important;
-  max-width: 240px !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-date-marker) [data-testid="stPopover"] > button::before {{
-  content: "📅" !important;
-  position: absolute !important;
-  left: 0.65rem !important;
-  top: 50% !important;
-  transform: translateY(-50%) !important;
-  font-size: 0.95rem !important;
-  line-height: 1 !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-date-marker) {{
-  position: relative !important;
-  min-width: 0 !important;
-  max-width: 240px !important;
-  flex: 0 1 240px !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-date-marker) [data-testid="stPopover"] {{
-  width: auto !important;
-  max-width: 240px !important;
-}}
-.ips-ph-date-marker {{
-  display: none !important;
-}}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-action-slot) [data-testid="stDateInput"] {{
-  min-height: 40px !important;
-  height: 40px !important;
-  border-radius: 8px !important;
-  border-color: #d1d5db !important;
-  font-size: 0.875rem !important;
-}}
-.ips-page-shell-marker,
-.ips-ph-root {{
+.ips-header-root {{
   display: none !important;
   height: 0 !important;
   width: 0 !important;
@@ -12860,33 +12441,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stEle
   margin: 0 !important;
   padding: 0 !important;
 }}
-.ips-page-content {{
-  padding: 16px 22px 28px 22px;
-}}
-@media (max-width: 899px) {{
-  .st-key-ips_app_page_header [data-testid="stHorizontalBlock"]:has(.ips-ph-left):has(.ips-ph-center):has(.ips-ph-right) {{
-    grid-template-columns: 1fr !important;
-    row-gap: 10px !important;
-  }}
-  .st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-left),
-  .st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-center),
-  .st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-right) {{
-    width: 100% !important;
-  }}
-  .ips-ph-logo {{
-    min-width: 180px !important;
-    height: 40px !important;
-  }}
-  .ips-ph-title {{
-    font-size: 20px !important;
-  }}
-  .ips-ph-subtitle {{
-    font-size: 12px !important;
-  }}
-  .st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-menu) .stButton > button {{
-    display: inline-flex !important;
-  }}
-}}
+
 /* Filter bar */
 .ips-filter-bar-marker {{
   display: none !important;
@@ -15778,7 +15333,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stEle
   overflow: hidden !important;
 }
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"]:has(style#ips-ops-dashboard-v31),
-section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"]:has(style#ips-global-styles-v15),
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"]:has(style#ips-global-styles-v16),
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"]:has(style#ips-ui-library-v1) {
   display: none !important;
   height: 0 !important;
@@ -15800,12 +15355,8 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stEle
   padding: 0 !important;
   margin: 0 !important;
 }
-section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-ph-title {
-  font-size: 22px !important;
-}
-section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-ph-subtitle {
-  display: block !important;
-  font-size: 12px !important;
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-ips_page_header {
+  margin-top: 0 !important;
 }
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .block-container {
   width: 100% !important;
@@ -15827,9 +15378,6 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stVer
   padding-right: 20px !important;
   padding-top: 0 !important;
   box-sizing: border-box !important;
-}
-section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-ips_app_page_header {
-  margin-top: 0 !important;
 }
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"] {
   margin-bottom: 0 !important;

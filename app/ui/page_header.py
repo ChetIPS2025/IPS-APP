@@ -1,4 +1,4 @@
-"""Shared IPS page header — three-column grid layout."""
+"""Shared IPS page header — four-column layout with nested action row."""
 
 from __future__ import annotations
 
@@ -15,15 +15,19 @@ from app.components.headers import (
     _PAGE_HEADER_ICON_SVGS,
     _initials,
 )
-from app.ui.styles import inject_ips_ui_styles
+from app.ui.page_header_styles import inject_page_header_styles
 
 _ActionFn = Callable[[], None]
+
+_MAIN_COLS = [0.55, 3.1, 4.2, 6.2]
+_ACTION_COLS = [2.25, 0.58, 1.25, 0.58, 0.58, 0.58, 0.82]
 
 
 def _resolve_icon(icon: str | None) -> str:
     if icon and str(icon).strip().startswith("<svg"):
         return str(icon).strip()
     from app.navigation import current_nav_slug
+
     slug = current_nav_slug()
     if icon:
         return str(icon).strip()
@@ -34,28 +38,33 @@ def _resolve_subtitle(title: str, subtitle: str | None) -> str | None:
     if subtitle:
         return str(subtitle).strip() or None
     from app.navigation import current_nav_slug
+
     return DEFAULT_PAGE_SUBTITLES.get(current_nav_slug())
 
 
 def _can_navigate_back() -> bool:
     from app.navigation import IPS_NAV_HISTORY_KEY
+
     history = st.session_state.get(IPS_NAV_HISTORY_KEY) or []
     return bool(history)
 
 
 def _navigate_back() -> None:
     from app.navigation import navigate_back
+
     navigate_back()
 
 
 def _request_sidebar_toggle() -> None:
     from app.components.sidebar_shell import IPS_SIDEBAR_TOGGLE_REQUEST_KEY
+
     st.session_state[IPS_SIDEBAR_TOGGLE_REQUEST_KEY] = True
     st.rerun()
 
 
 def _unread_notification_count() -> int:
     from app.services.field_dashboard import load_field_dashboard_snapshot
+
     try:
         snap = load_field_dashboard_snapshot()
         return int(snap.get("unread_notifications", 0) or 0)
@@ -65,12 +74,13 @@ def _unread_notification_count() -> int:
 
 def _coerce_date_range_value(
     value: tuple[date, date] | date | None,
-) -> tuple[date, date] | date:
+) -> tuple[date, date]:
     if isinstance(value, tuple) and len(value) == 2:
         return (value[0], value[1])
     if isinstance(value, date):
-        return value
-    return date.today()
+        return (value, value)
+    today = date.today()
+    return (today, today)
 
 
 def _format_date_range_label(start: date, end: date) -> str:
@@ -87,6 +97,15 @@ def _format_date_range_label(start: date, end: date) -> str:
     return f"{_part(start, include_year=True)} – {_part(end, include_year=True)}"
 
 
+def _header_auth_context() -> tuple[str, str, str, Callable[[], None]]:
+    from app.auth import current_user_display_name, effective_role, sign_out
+
+    role = effective_role()
+    display = current_user_display_name()
+    initials = _initials(display)
+    return role, display, initials, sign_out
+
+
 def _render_date_range(
     *,
     key: str,
@@ -94,99 +113,100 @@ def _render_date_range(
     on_change: Callable[[tuple[date, date]], None] | None,
 ) -> None:
     coerced = _coerce_date_range_value(value)
-    if isinstance(coerced, tuple):
-        label = _format_date_range_label(coerced[0], coerced[1])
-    else:
-        label = _format_date_range_label(coerced, coerced)
-    st.markdown('<span class="ips-ph-date-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
-    with st.popover(label, help="Select date range"):
+    with st.container(key="header_date_range"):
         picked = st.date_input(
             "Date range",
             value=coerced,
+            format="MM/DD/YYYY",
             key=key,
             label_visibility="collapsed",
         )
     if on_change and isinstance(picked, tuple) and len(picked) == 2:
-        on_change((picked[0], picked[1]))
+        state_key = f"{key}__applied"
+        current = (picked[0], picked[1])
+        if st.session_state.get(state_key) != current:
+            st.session_state[state_key] = current
+            on_change(current)
+
+
+def _render_back(*, header_key: str, can_back: bool, on_back: Callable[[], None] | None) -> None:
+    with st.container(key="header_back"):
+        if can_back:
+            if st.button(
+                "←",
+                key=f"{header_key}_back",
+                help="Return to previous page",
+                use_container_width=True,
+            ):
+                if on_back is not None:
+                    on_back()
+                else:
+                    _navigate_back()
+
+
+def _render_menu(*, header_key: str) -> None:
+    with st.container(key="header_menu"):
+        if st.button("☰", key=f"{header_key}_menu", help="Open menu", use_container_width=True):
+            _request_sidebar_toggle()
 
 
 def _render_refresh(*, key: str) -> None:
-    st.markdown('<span class="ips-ph-refresh-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
-    if st.button("↻", key=key, help="Refresh"):
-        st.rerun()
-
-
-_RIGHT_SLOT_RATIOS: dict[str, float] = {
-    "date": 2.0,
-    "refresh": 0.48,
-    "primary": 1.9,
-    "secondary": 1.0,
-    "action": 1.0,
-}
-_RIGHT_UTIL_RATIO = 0.4
-
-
-def _header_auth_context() -> tuple[str, str, str, Callable[[], None]]:
-    from app.auth import current_user_display_name, effective_role, sign_out
-    from app.navigation import set_nav_slug
-    from app.utils.permissions import role_can_access_page
-    role = effective_role()
-    display = current_user_display_name()
-    initials = _initials(display)
-    return role, display, initials, sign_out
+    with st.container(key="header_refresh"):
+        if st.button("↻", key=key, help="Refresh", use_container_width=True):
+            st.rerun()
 
 
 def _render_bell(*, header_key: str, role: str) -> None:
     from app.navigation import set_nav_slug
     from app.utils.permissions import role_can_access_page
-    st.markdown('<span class="ips-ph-util-bell" aria-hidden="true"></span>', unsafe_allow_html=True)
+
     unread = _unread_notification_count()
+    label = "🔔"
     if unread > 0:
-        st.markdown(
-            f'<span class="ips-ph-badge">{int(unread)}</span>',
-            unsafe_allow_html=True,
-        )
-    if role_can_access_page(role, "company_updates"):
-        if st.button(" ", key=f"{header_key}_bell", help="Notifications"):
-            set_nav_slug("company_updates")
-            st.rerun()
-    else:
-        st.button(" ", key=f"{header_key}_bell", help="Notifications", disabled=True)
+        label = f"🔔 {int(unread)}"
+    with st.container(key="header_notifications"):
+        if role_can_access_page(role, "company_updates"):
+            if st.button(label, key=f"{header_key}_bell", help="Notifications", use_container_width=True):
+                set_nav_slug("company_updates")
+                st.rerun()
+        else:
+            st.button(label, key=f"{header_key}_bell", help="Notifications", disabled=True, use_container_width=True)
 
 
-def _render_help() -> None:
-    st.markdown('<span class="ips-ph-util-help" aria-hidden="true"></span>', unsafe_allow_html=True)
-    with st.popover(" ", help="Help"):
-        st.markdown("**Help**")
-        st.caption("Use the sidebar to switch modules. Contact your administrator for access changes.")
+def _render_help(*, header_key: str) -> None:
+    with st.container(key="header_help"):
+        with st.popover("?", help="Help"):
+            st.markdown("**Help**")
+            st.caption("Use the sidebar to switch modules. Contact your administrator for access changes.")
 
 
 def _render_settings(*, header_key: str, role: str) -> None:
     from app.navigation import set_nav_slug
     from app.utils.permissions import role_can_access_page
-    st.markdown('<span class="ips-ph-util-settings" aria-hidden="true"></span>', unsafe_allow_html=True)
-    if role_can_access_page(role, "settings"):
-        if st.button(" ", key=f"{header_key}_settings", help="Settings"):
-            set_nav_slug("settings")
-            st.rerun()
-    else:
-        st.button(" ", key=f"{header_key}_settings", help="Settings", disabled=True)
+
+    with st.container(key="header_settings"):
+        if role_can_access_page(role, "settings"):
+            if st.button("⚙", key=f"{header_key}_settings", help="Settings", use_container_width=True):
+                set_nav_slug("settings")
+                st.rerun()
+        else:
+            st.button("⚙", key=f"{header_key}_settings", help="Settings", disabled=True, use_container_width=True)
 
 
-def _render_user_menu(*, header_key: str, role: str, display: str, initials: str, sign_out: Callable[[], None]) -> None:
-    st.markdown(
-        f'<span class="ips-ph-util-user" data-initials="{html.escape(initials)}" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
-    with st.popover(initials, help=display):
-        st.markdown(
-            f'<span class="ips-ph-avatar-lg">{html.escape(initials)}</span> '
-            f"**{html.escape(display)}**",
-            unsafe_allow_html=True,
-        )
-        st.caption(role.replace("_", " ").title())
-        if st.button("Log out", key=f"{header_key}_logout", use_container_width=True):
-            sign_out()
+def _render_user_menu(
+    *,
+    header_key: str,
+    role: str,
+    display: str,
+    initials: str,
+    sign_out: Callable[[], None],
+) -> None:
+    with st.container(key="header_avatar"):
+        with st.popover(initials, help=display):
+            st.markdown(f"**{html.escape(display)}**")
+            st.caption(role.replace("_", " ").title())
+            if st.button("Log out", key=f"{header_key}_logout", use_container_width=True):
+                sign_out()
 
 
 def render_page_header(
@@ -213,14 +233,15 @@ def render_page_header(
     """
     Standard IPS page header.
 
-    Layout: [Back + Logo] | [Icon + Title + Subtitle] | [Actions + Utilities]
+    Layout: [Back] [Logo] | [Icon + Title + Subtitle] | [Date] [Refresh] [Primary] [Bell] [Help] [Settings] [Avatar]
     """
-    _ = (notification_count, user_initials)
+    _ = (notification_count, user_initials, _format_date_range_label)
 
-    inject_ips_ui_styles()
+    inject_page_header_styles()
 
     from app.branding import wording_logo_html
     from app.navigation import current_nav_slug
+
     resolved_subtitle = _resolve_subtitle(title, subtitle)
     resolved_icon = _resolve_icon(icon)
     slug = current_nav_slug()
@@ -228,54 +249,32 @@ def render_page_header(
     can_back = show_back and (on_back is not None or _can_navigate_back())
 
     sub_html = (
-        f'<p class="ips-ph-subtitle">{html.escape(resolved_subtitle)}</p>'
+        f'<p class="ips-header-subtitle">{html.escape(resolved_subtitle)}</p>'
         if resolved_subtitle
         else ""
     )
     icon_html = (
-        f'<span class="ips-ph-icon-wrap" aria-hidden="true">{resolved_icon}</span>'
+        f'<span class="ips-header-icon-wrap" aria-hidden="true">{resolved_icon}</span>'
         if resolved_icon
         else ""
     )
     title_html = (
-        f'<div class="ips-ph-title-block">'
+        f'<div class="ips-header-title-block">'
         f"{icon_html}"
-        f'<div class="ips-ph-text">'
-        f'<h1 class="ips-ph-title">{html.escape(str(title or "").strip())}</h1>'
+        f'<div class="ips-header-text">'
+        f'<h1 class="ips-header-title">{html.escape(str(title or "").strip())}</h1>'
         f"{sub_html}"
         f"</div></div>"
     )
 
-    right_slots: list[tuple[str, Callable[[], None]]] = []
-    if show_date_range:
-        right_slots.append(
-            (
-                "date",
-                lambda: _render_date_range(
-                    key=date_range_key,
-                    value=date_range_value,
-                    on_change=on_date_range_change,
-                ),
-            )
-        )
-    if show_refresh:
-        right_slots.append(
-            (
-                "refresh",
-                lambda rk=refresh_key: _render_refresh(key=rk),
-            )
-        )
+    extra_actions: list[_ActionFn] = []
     if secondary_actions:
-        for idx, action in enumerate(secondary_actions):
-            right_slots.append((f"secondary_{idx}", action))
-    if primary_action:
-        right_slots.append(("primary", primary_action))
+        extra_actions.extend(secondary_actions)
     if actions:
-        for idx, action in enumerate(actions):
-            right_slots.append((f"action_{idx}", action))
+        extra_actions.extend(actions)
 
-    with st.container(key="ips_app_page_header"):
-        marker_classes = "ips-page-shell-marker ips-ph-root ips-page-header ips-app-page-header-marker"
+    with st.container(key="ips_page_header"):
+        marker_classes = "ips-page-shell-marker ips-header-root ips-page-header ips-app-page-header-marker"
         if str(layout_marker or "").strip():
             marker_classes += f" {html.escape(str(layout_marker).strip())}"
         st.markdown(
@@ -283,76 +282,77 @@ def render_page_header(
             unsafe_allow_html=True,
         )
 
-        left_col, center_col, right_col = st.columns(
-            [0.2, 1.15, 0.72],
+        back_col, logo_col, title_col, actions_col = st.columns(
+            _MAIN_COLS,
             gap="small",
             vertical_alignment="center",
         )
 
-        with left_col:
-            st.markdown('<span class="ips-ph-left" aria-hidden="true"></span>', unsafe_allow_html=True)
-            left_slots: list[float] = []
+        with back_col:
             if can_back:
-                left_slots.append(0.38)
-            left_slots.append(0.22)
-            if show_logo:
-                left_slots.append(1.0)
-            left_inner = st.columns(left_slots, gap="small", vertical_alignment="center")
-            slot_idx = 0
-            if can_back:
-                with left_inner[slot_idx]:
-                    st.markdown('<span class="ips-ph-back" aria-hidden="true"></span>', unsafe_allow_html=True)
-                    if st.button("← Back", key=f"{header_key}_back", help="Go back"):
-                        if on_back is not None:
-                            on_back()
-                        else:
-                            _navigate_back()
-                slot_idx += 1
-            with left_inner[slot_idx]:
-                st.markdown('<span class="ips-ph-menu" aria-hidden="true"></span>', unsafe_allow_html=True)
-                if st.button(" ", key=f"{header_key}_menu", help="Open menu"):
-                    _request_sidebar_toggle()
-            slot_idx += 1
-            if show_logo:
-                with left_inner[slot_idx]:
-                    st.markdown(
-                        wording_logo_html(height=48, css_class="ips-ph-logo"),
-                        unsafe_allow_html=True,
-                    )
-                    st.markdown('<span class="ips-ph-logo-slot" aria-hidden="true"></span>', unsafe_allow_html=True)
+                _render_back(header_key=header_key, can_back=True, on_back=on_back)
+            else:
+                _render_menu(header_key=header_key)
 
-        with center_col:
-            st.markdown('<span class="ips-ph-center" aria-hidden="true"></span>', unsafe_allow_html=True)
+        with logo_col:
+            if show_logo:
+                st.markdown(
+                    wording_logo_html(height=46, css_class="ips-header-logo"),
+                    unsafe_allow_html=True,
+                )
+
+        with title_col:
             st.markdown(title_html, unsafe_allow_html=True)
 
-        with right_col:
-            st.markdown('<span class="ips-ph-right" aria-hidden="true"></span>', unsafe_allow_html=True)
-            role, display, initials, sign_out_fn = _header_auth_context()
-            util_count = 4
-            ratios: list[float] = []
-            for kind, _widget in right_slots:
-                base_kind = kind.split("_", 1)[0]
-                ratios.append(_RIGHT_SLOT_RATIOS.get(kind, _RIGHT_SLOT_RATIOS.get(base_kind, 1.0)))
-            ratios.extend([_RIGHT_UTIL_RATIO] * util_count)
-            cols = st.columns(ratios, gap="small")
-            for idx, (kind, widget) in enumerate(right_slots):
-                with cols[idx]:
-                    slot_class = "ips-ph-action-slot"
-                    if kind == "primary":
-                        slot_class += " ips-ph-primary-action-marker"
-                    st.markdown(
-                        f'<span class="{slot_class}" aria-hidden="true"></span>',
-                        unsafe_allow_html=True,
+        with actions_col:
+            (
+                date_col,
+                refresh_col,
+                primary_col,
+                notification_col,
+                help_col,
+                settings_col,
+                avatar_col,
+            ) = st.columns(
+                _ACTION_COLS,
+                gap="small",
+                vertical_alignment="center",
+            )
+
+            with date_col:
+                if show_date_range:
+                    _render_date_range(
+                        key=date_range_key,
+                        value=date_range_value,
+                        on_change=on_date_range_change,
                     )
-                    widget()
-            util_start = len(right_slots)
-            with cols[util_start]:
+
+            with refresh_col:
+                if show_refresh:
+                    _render_refresh(key=refresh_key)
+
+            with primary_col:
+                if extra_actions:
+                    extra_cols = st.columns([1.0] * len(extra_actions), gap="small")
+                    for col, action in zip(extra_cols, extra_actions):
+                        with col:
+                            action()
+                if primary_action:
+                    with st.container(key="header_primary_action"):
+                        primary_action()
+
+            role, display, initials, sign_out_fn = _header_auth_context()
+
+            with notification_col:
                 _render_bell(header_key=header_key, role=role)
-            with cols[util_start + 1]:
-                _render_help()
-            with cols[util_start + 2]:
+
+            with help_col:
+                _render_help(header_key=header_key)
+
+            with settings_col:
                 _render_settings(header_key=header_key, role=role)
-            with cols[util_start + 3]:
+
+            with avatar_col:
                 _render_user_menu(
                     header_key=header_key,
                     role=role,
@@ -371,4 +371,4 @@ def render_page_brand_header(
     render_page_header(title, subtitle, **kwargs)
 
 
-__all__ = ["render_page_header", "render_page_brand_header"]
+__all__ = ["render_page_header", "render_page_brand_header", "_format_date_range_label"]
