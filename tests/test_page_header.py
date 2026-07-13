@@ -27,12 +27,15 @@ class PageHeaderSourceTests(unittest.TestCase):
         src = inspect.getsource(headers.render_page_brand_header)
         self.assertIn("render_page_header", src)
 
-    def test_render_page_header_uses_compact_left_layout(self) -> None:
+    def test_render_page_header_uses_clean_single_row_layout(self) -> None:
         src = inspect.getsource(headers.render_page_header)
-        self.assertIn("ips-header-left-marker", src)
-        self.assertIn("ips-app-header-page-info", src)
-        self.assertIn("height=46", src)
-        self.assertIn("ips-app-header-back-active", src)
+        self.assertIn("ips-app-header-left-marker", src)
+        self.assertIn("ips-app-header-right-marker", src)
+        self.assertIn("ips-app-header-divider", src)
+        self.assertIn("height=44", src)
+        self.assertIn("ips_app_page_header", src)
+        self.assertNotIn("ips-header-left-marker", src)
+        self.assertNotIn("height=46", src)
         for slug in (
             "dashboard",
             "jobs",
@@ -44,6 +47,15 @@ class PageHeaderSourceTests(unittest.TestCase):
             "employees",
         ):
             self.assertIn(slug, headers.DEFAULT_PAGE_SUBTITLES)
+
+    def test_global_header_css_avoids_negative_margins(self) -> None:
+        from app.styles import inject_global_css
+
+        src = inspect.getsource(inject_global_css)
+        self.assertIn("ips-global-styles-v12", src)
+        self.assertIn("justify-content: space-between", src)
+        self.assertNotIn("margin-left: -22px", src)
+        self.assertNotIn("margin-right: -22px", src)
 
 
 class NavHistoryTests(unittest.TestCase):

@@ -221,29 +221,21 @@ def _unread_notification_count() -> int:
         return 0
 
 
-def _render_page_actions(actions: list[_ActionFn]) -> None:
+def _render_page_actions(actions: list[_ActionFn], *, header_key: str) -> None:
+    """Render page action widgets in a single horizontal group."""
+    st.markdown(
+        '<span class="ips-app-header-actions-marker ips-header-actions-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
     n = len(actions)
     if n == 1:
         actions[0]()
-    elif n == 2:
-        bc1, bc2 = st.columns([1.72, 0.88], gap="small")
-        with bc1:
-            actions[0]()
-        with bc2:
-            actions[1]()
-    elif n == 3:
-        bc1, bc2, bc3 = st.columns([1.05, 1.45, 0.95], gap="small")
-        with bc1:
-            actions[0]()
-        with bc2:
-            actions[1]()
-        with bc3:
-            actions[2]()
-    else:
-        cols = st.columns(min(n, 4), gap="small")
-        for i, widget in enumerate(actions):
-            with cols[i % len(cols)]:
-                widget()
+        return
+    ratios = [1.0] * n
+    cols = st.columns(ratios, gap="small")
+    for col, widget in zip(cols, actions):
+        with col:
+            widget()
 
 
 def _render_header_utilities(*, header_key: str) -> None:
@@ -261,7 +253,7 @@ def _render_header_utilities(*, header_key: str) -> None:
     display = current_user_display_name()
     initials = _initials(display)
 
-    u1, u2, u3, u4 = st.columns([1, 1, 1, 1.2], gap="small")
+    u1, u2, u3, u4 = st.columns([1, 1, 1, 1.15], gap="small")
     with u1:
         st.markdown('<span class="ips-app-header-util-bell-slot" aria-hidden="true"></span>', unsafe_allow_html=True)
         badge_html = (
@@ -339,8 +331,6 @@ def render_page_header(
 
     slug = current_nav_slug()
     header_key = f"ips_hdr_{slug}"
-    shell_marker = '<span class="ips-page-shell-marker" aria-hidden="true"></span>'
-    header_marker = '<span class="ips-app-page-header-marker" aria-hidden="true"></span>'
     can_back = show_back and (on_back is not None or _can_navigate_back())
 
     sub_html = (
@@ -354,38 +344,26 @@ def render_page_header(
         else ""
     )
     title_html = (
-        f'<div class="ips-app-header-page-info">'
-        f'<span class="ips-app-header-divider" aria-hidden="true"></span>'
         f'<div class="ips-app-header-title-block">'
         f"{icon_html}"
         f'<div class="ips-app-header-text">'
         f'<h1 class="ips-app-header-title">{html.escape(str(title or "").strip())}</h1>'
         f"{sub_html}"
-        f"</div></div></div>"
+        f"</div></div>"
     )
 
-    st.markdown(f"{shell_marker}{header_marker}", unsafe_allow_html=True)
-
     with st.container(key="ips_app_page_header"):
-        st.markdown('<span class="ips-page-header ips-page-header-shell" aria-hidden="true"></span>', unsafe_allow_html=True)
-        if merged_actions:
-            left_col, actions_col, util_col = st.columns(
-                [3.35, 1.55, 0.82],
-                gap="small",
-                vertical_alignment="center",
-            )
-        else:
-            left_col, util_col = st.columns(
-                [4.35, 0.82],
-                gap="small",
-                vertical_alignment="center",
-            )
-            actions_col = None
+        st.markdown(
+            '<span class="ips-page-shell-marker ips-app-page-header-marker ips-app-page-header-root '
+            'ips-page-header" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        left_col, right_col = st.columns([1, 0.001], gap="small", vertical_alignment="center")
 
         with left_col:
-            st.markdown('<span class="ips-header-left-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
-            back_col, logo_col, title_col = st.columns(
-                [0.48, 0.72, 2.55],
+            st.markdown('<span class="ips-app-header-left-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
+            back_col, logo_col, divider_col, title_col = st.columns(
+                [0.42, 0.95, 0.04, 2.2],
                 gap="small",
                 vertical_alignment="center",
             )
@@ -407,27 +385,34 @@ def render_page_header(
                 if st.button(" ", key=f"{header_key}_menu", help="Open menu"):
                     _request_sidebar_toggle()
             with logo_col:
-                st.markdown(
-                    wording_logo_html(height=46, css_class="ips-app-header-logo ips-header-logo"),
-                    unsafe_allow_html=True,
-                )
+                if show_logo:
+                    st.markdown(
+                        wording_logo_html(height=44, css_class="ips-app-header-logo"),
+                        unsafe_allow_html=True,
+                    )
+            with divider_col:
+                st.markdown('<span class="ips-app-header-divider" aria-hidden="true"></span>', unsafe_allow_html=True)
             with title_col:
                 st.markdown(title_html, unsafe_allow_html=True)
 
-        if merged_actions and actions_col is not None:
-            with actions_col:
+        with right_col:
+            st.markdown('<span class="ips-app-header-right-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
+            if merged_actions:
+                actions_col, util_col = st.columns([1.35, 0.72], gap="small", vertical_alignment="center")
+                with actions_col:
+                    _render_page_actions(merged_actions, header_key=header_key)
+                with util_col:
+                    st.markdown(
+                        '<span class="ips-app-header-utils-marker ips-header-utils-marker" aria-hidden="true"></span>',
+                        unsafe_allow_html=True,
+                    )
+                    _render_header_utilities(header_key=header_key)
+            else:
                 st.markdown(
-                    '<span class="ips-page-actions-marker ips-app-header-actions-marker ips-header-actions-marker" aria-hidden="true"></span>',
+                    '<span class="ips-app-header-utils-marker ips-header-utils-marker" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
-                _render_page_actions(merged_actions)
-
-        with util_col:
-            st.markdown(
-                '<span class="ips-app-header-utils-marker ips-header-utils-marker" aria-hidden="true"></span>',
-                unsafe_allow_html=True,
-            )
-            _render_header_utilities(header_key=header_key)
+                _render_header_utilities(header_key=header_key)
 
 
 def render_page_brand_header(
