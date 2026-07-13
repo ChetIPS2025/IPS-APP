@@ -16,8 +16,9 @@ from app.pages._core._data import (
     load_tasks,
     load_timekeeping_summaries,
 )
-from app.styles import inject_ops_dashboard_css
-from app.ui.kit import render_metric_row, render_page_header
+from app.components.cards import render_ops_kpi_grid, render_ops_value_grid
+from app.ui.ops_dashboard_styles import inject_ops_dashboard_styles
+from app.ui.kit import render_page_header
 from app.utils.formatting import fmt_currency
 def _welcome_name() -> str:
     return current_user_display_name()
@@ -80,17 +81,19 @@ def _today_display_label() -> str:
     return d.strftime("%A, %B %d").replace(" 0", " ")
 
 
-def _ops_welcome_html(*, employees: int, active_jobs: int) -> str:
+def _ops_dashboard_header_html(*, employees: int, active_jobs: int) -> str:
     ot = "d" + "iv"
     name = html.escape(_welcome_name())
     greet = html.escape(_time_greeting())
     today = html.escape(_today_display_label())
     return (
-        f'<{ot} class="ips-ops-welcome">'
-        f'<p class="ips-ops-welcome-greet">{greet}, {name} 👋</p>'
-        f'<p class="ips-ops-welcome-meta">'
+        f'<{ot} class="dashboard-header">'
+        f'<{ot} class="dashboard-header-left">'
+        f'<h2 class="dashboard-header-greet">{greet}, {name} 👋</h2>'
+        f'<p class="dashboard-header-meta">'
         f"Today is {today} · {employees:,} employees working · {active_jobs:,} active jobs"
         f"</p>"
+        f"</{ot}>"
         f"</{ot}>"
     )
 
@@ -126,16 +129,21 @@ def render() -> None:
         primary_action=_dash_new_job,
         layout_marker="ips-ops-dashboard-marker",
     )
-    inject_ops_dashboard_css()
+    inject_ops_dashboard_styles()
 
-    with st.container(key="dashboard_ops_shell"):
+    with st.container(key="dashboard_root"):
         kpis = load_dashboard_kpis(period_start=start, period_end=end)
         employees_today = _employees_working_today()
         active_jobs_count = int(kpis.get("active_jobs", 0))
-        st.markdown(
-            _ops_welcome_html(employees=employees_today, active_jobs=active_jobs_count),
-            unsafe_allow_html=True,
-        )
+
+        with st.container(key="dashboard_header"):
+            st.markdown(
+                _ops_dashboard_header_html(
+                    employees=employees_today,
+                    active_jobs=active_jobs_count,
+                ),
+                unsafe_allow_html=True,
+            )
 
         kpis_live = bool(kpis.get("is_live"))
         if not kpis_live:
@@ -144,17 +152,23 @@ def render() -> None:
                 unsafe_allow_html=True,
             )
 
-        with st.container(key="dashboard_ops_kpis"):
-            kpi_items = [
-                ("Active Jobs", str(kpis.get("active_jobs", 0)), "💼", "#ffedd5"),
-                ("Estimates Pending", str(kpis.get("open_estimates", 0)), "📋", "#f3e8ff"),
-                ("Employees Working Today", str(employees_today), "👷", "#dcfce7"),
-                ("My To-Do", str(_my_todo_count()), "✅", "#e0f2fe"),
-                ("Open Invoices", fmt_currency(kpis.get("open_invoices", 0)), "🧾", "#dbeafe"),
-                ("Revenue This Month", fmt_currency(kpis.get("total_sales", 0)), "💵", "#fef3c7"),
-                ("Inventory Value", fmt_currency(kpis.get("total_inventory_value", 0)), "📦", "#ede9fe"),
-                ("Asset Value", fmt_currency(kpis.get("total_asset_value", 0)), "🚛", "#fce7f3"),
-            ]
-            render_metric_row(kpi_items)
+        primary_kpis = [
+            ("Active Jobs", str(kpis.get("active_jobs", 0)), "💼", "#ffedd5"),
+            ("Estimates Pending", str(kpis.get("open_estimates", 0)), "📋", "#f3e8ff"),
+            ("Employees Working Today", str(employees_today), "👷", "#dcfce7"),
+            ("My To-Do", str(_my_todo_count()), "✅", "#e0f2fe"),
+            ("Open Invoices", fmt_currency(kpis.get("open_invoices", 0)), "🧾", "#dbeafe"),
+            ("Revenue This Month", fmt_currency(kpis.get("total_sales", 0)), "💵", "#fef3c7"),
+        ]
+        value_kpis = [
+            ("Inventory Value", fmt_currency(kpis.get("total_inventory_value", 0)), "📦", "#ede9fe"),
+            ("Asset Value", fmt_currency(kpis.get("total_asset_value", 0)), "🚛", "#fce7f3"),
+        ]
+
+        with st.container(key="dashboard_kpis"):
+            render_ops_kpi_grid(primary_kpis)
+
+        with st.container(key="dashboard_value_cards"):
+            render_ops_value_grid(value_kpis)
 
         render_dashboard_ops_panels()

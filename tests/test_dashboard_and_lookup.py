@@ -173,14 +173,15 @@ def test_sync_lookup_deactivates_removed_values(monkeypatch):
 def test_ops_dashboard_css_uses_compact_vertical_spacing():
     import inspect
 
-    from app.styles import inject_ops_dashboard_css
+    from app.ui.ops_dashboard_styles import inject_ops_dashboard_styles
 
-    source = inspect.getsource(inject_ops_dashboard_css)
-    assert "ips-ops-dashboard-v31" in source
-    assert "gap: 14px !important" in source
+    source = inspect.getsource(inject_ops_dashboard_styles)
+    assert "ips-ops-dashboard-v32" in source
+    assert "st-key-dashboard_root" in source
+    assert "dashboard-kpi-grid" in source
+    assert "dashboard-value-grid" in source
+    assert "dashboard-main-grid" in source
     assert "margin: 0 !important" in source
-    assert "ips-dash-ops-panel" in source
-    assert "dashboard_ops_panels" in source
 
 
 def test_ops_dashboard_renders_mockup_panels():
@@ -189,6 +190,9 @@ def test_ops_dashboard_renders_mockup_panels():
     from app.pages import dashboard as dash
 
     source = inspect.getsource(dash.render)
+    assert "dashboard_root" in source
+    assert "dashboard_kpis" in source
+    assert "dashboard_value_cards" in source
     assert "render_dashboard_ops_panels" in source
     assert "primary_action" in source
     assert "render_dashboard_company_updates_section" not in source

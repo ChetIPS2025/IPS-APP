@@ -101,7 +101,7 @@ def _jobs_by_status_html(counts: dict[str, int]) -> str:
     )
     ot = "d" + "iv"
     return (
-        f'<{ot} class="ips-dash-ops-panel ips-dash-ops-panel--status">'
+        f'<{ot} class="dashboard-main-card ips-dash-ops-panel ips-dash-ops-panel--status">'
         f'<h3 class="ips-dash-ops-panel-title">Jobs by Status</h3>'
         f'<{ot} class="ips-dash-status-list">{rows}</{ot}>'
         f'<a class="ips-dash-ops-panel-link" href="?ips_nav=jobs" target="_top" rel="noopener noreferrer">'
@@ -150,7 +150,7 @@ def _recent_activity_html(items: list[dict[str, str]]) -> str:
     )
     ot = "d" + "iv"
     return (
-        f'<{ot} class="ips-dash-ops-panel ips-dash-ops-panel--activity">'
+        f'<{ot} class="dashboard-main-card ips-dash-ops-panel ips-dash-ops-panel--activity">'
         f'<h3 class="ips-dash-ops-panel-title">Recent Activity</h3>'
         f'<{ot} class="ips-dash-activity-list">{body}</{ot}>'
         f'<a class="ips-dash-ops-panel-link" href="?ips_nav=company_updates" target="_top" rel="noopener noreferrer">'
@@ -165,12 +165,15 @@ def render_dashboard_ops_panels(*, activity_limit: int = 8) -> None:
     activity_rows, _ = load_recent_item_activity(limit=activity_limit)
     activity_rows = [_normalize_activity_row(row) for row in activity_rows]
 
-    with st.container(key="dashboard_ops_panels"):
-        status_col, activity_col = st.columns(2, gap="medium")
-        with status_col:
-            st.markdown(_jobs_by_status_html(status_counts), unsafe_allow_html=True)
-        with activity_col:
-            st.markdown(_recent_activity_html(activity_rows), unsafe_allow_html=True)
+    with st.container(key="dashboard_main"):
+        ot = "d" + "iv"
+        st.markdown(
+            f'<{ot} class="dashboard-main-grid">'
+            f"{_jobs_by_status_html(status_counts)}"
+            f"{_recent_activity_html(activity_rows)}"
+            f"</{ot}>",
+            unsafe_allow_html=True,
+        )
 
 
 __all__ = ["render_dashboard_ops_panels"]

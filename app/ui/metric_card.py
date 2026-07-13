@@ -7,7 +7,10 @@ import html
 import streamlit as st
 
 from app.components.cards import render_kpi_card as _legacy_kpi_card
-from app.components.cards import render_ops_kpi_row as _legacy_ops_kpi_row
+from app.components.cards import (
+    render_ops_kpi_row as _legacy_ops_kpi_row,
+    render_ops_value_grid as _legacy_ops_value_grid,
+)
 _TONE_ACCENTS = {
     "default": "#e2e8f0",
     "primary": "#3158e6",
@@ -67,4 +70,9 @@ def render_metric_row(items: list[tuple[str, str, str, str]]) -> None:
     _legacy_ops_kpi_row(items)
 
 
-__all__ = ["render_metric_card", "render_metric_row"]
+def render_value_row(items: list[tuple[str, str, str, str]]) -> None:
+    """Render inventory/asset value cards in their own row."""
+    _legacy_ops_value_grid(items)
+
+
+__all__ = ["render_metric_card", "render_metric_row", "render_value_row"]
