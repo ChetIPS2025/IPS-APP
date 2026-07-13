@@ -101,6 +101,13 @@ class PageHeaderSourceTests(unittest.TestCase):
         self.assertNotIn("margin-left: -22px", src)
         self.assertNotIn("margin-right: -22px", src)
 
+    def test_app_shell_script_uses_st_html_for_inline_js(self) -> None:
+        from app.ui.app_shell_styles import inject_app_shell_script
+
+        src = inspect.getsource(inject_app_shell_script)
+        self.assertIn("st.html", src)
+        self.assertIn("unsafe_allow_javascript=True", src)
+
     def test_app_shell_layout_styles_reset_main_top_gap(self) -> None:
         from app.ui.app_shell_styles import inject_app_shell_layout_styles
 

@@ -117,19 +117,21 @@ def test_inject_sidebar_navigation_script_only_collapses_on_desktop():
     assert "DESKTOP_MIN" in source
     assert "desktop && collapsedFlag" in source or 'desktop && collapsedFlag === "1"' in source
     assert "ipsNavSplit" in source
-    assert "components.html" in source
+    assert "inject_app_shell_script" in source
 
 
-def test_inject_sidebar_shell_uses_components_html_for_navigation():
+def test_inject_sidebar_shell_uses_sidebar_context_for_scripts():
     import inspect
 
     from app.components.sidebar_shell import inject_sidebar_shell
 
     source = inspect.getsource(inject_sidebar_shell)
+    assert "with st.sidebar:" in source
     assert "inject_sidebar_navigation_script" in source
     assert "inject_sidebar_nav_align" not in source
     assert "inject_sidebar_layout_state" not in source
     assert "inject_sidebar_menu_wire" not in source
+    assert "inject_mobile_nav_menu_button" in source
 
 
 def test_inject_sidebar_shell_injects_layout_on_every_render():

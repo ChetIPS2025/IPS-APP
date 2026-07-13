@@ -179,7 +179,7 @@ def main() -> None:
     init_session()
     bootstrap_auth_at_startup()
     inject_global_css()
-    from app.mobile_ui import inject_ips_global_mobile_css, inject_sidebar_mobile_auto_collapse_once
+    from app.mobile_ui import inject_ips_global_mobile_css
     inject_ips_global_mobile_css()
 
     from app.pages.inventory_scan import capture_inventory_scan_from_query, inventory_scan_route_active
@@ -239,7 +239,6 @@ def main() -> None:
     inject_authenticated_shell_css()
     from app.auth import render_auth_identity_debug_panel, verify_identity_binding_or_stop
     verify_identity_binding_or_stop()
-    inject_sidebar_mobile_auto_collapse_once()
     log_auth_state("app_authenticated")
 
     from app.components.sidebar_shell import (

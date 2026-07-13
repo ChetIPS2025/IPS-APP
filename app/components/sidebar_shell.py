@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Any
 
 import streamlit as st
-import streamlit.components.v1 as components
 
+from app.mobile_ui import inject_sidebar_mobile_auto_collapse_once
 from app.ui.app_shell_styles import inject_app_shell_script
 
 IPS_SIDEBAR_SHELL_KEY = "_ips_sidebar_shell_injected"
@@ -467,18 +467,19 @@ def inject_mobile_nav_menu_button() -> None:
 def inject_sidebar_shell() -> None:
     """Inject sidebar layout CSS/JS on every authenticated render."""
     collapsed = True
-    inject_sidebar_nav_override_css()
-    st.markdown(_shell_css(), unsafe_allow_html=True)
-
     nav_json = _fallback_nav_json()
-    inject_app_shell_script(_shell_script(nav_json))
+    toggle_requested = bool(st.session_state.pop(IPS_SIDEBAR_TOGGLE_REQUEST_KEY, False))
+
+    with st.sidebar:
+        inject_sidebar_nav_override_css()
+        st.markdown(_shell_css(), unsafe_allow_html=True)
+        inject_sidebar_mobile_auto_collapse_once()
+        inject_app_shell_script(_shell_script(nav_json))
+        inject_sidebar_navigation_script(collapsed)
+        if toggle_requested:
+            inject_app_shell_script(_toggle_script(collapsed=collapsed, after_nav=True))
 
     inject_mobile_nav_menu_button()
-    inject_sidebar_navigation_script(collapsed)
-
-    if st.session_state.pop(IPS_SIDEBAR_TOGGLE_REQUEST_KEY, False):
-        inject_app_shell_script(_toggle_script(collapsed=collapsed, after_nav=True))
-
     st.session_state[IPS_SIDEBAR_SHELL_KEY] = True
 
 
@@ -923,10 +924,10 @@ section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):n
 
 
 def inject_sidebar_navigation_script(collapsed: bool = True) -> None:
-    """Split sidebar nav labels and sync collapsed layout via zero-height iframe."""
+    """Split sidebar nav labels and sync collapsed layout."""
     flag = "1" if collapsed else "0"
     desktop_min = IPS_SIDEBAR_DESKTOP_MIN_PX
-    components.html(
+    inject_app_shell_script(
         f"""
         <script>
         (() => {{
@@ -1032,9 +1033,7 @@ def inject_sidebar_navigation_script(collapsed: bool = True) -> None:
           window.setTimeout(run, 180);
         }})();
         </script>
-        """,
-        height=0,
-        scrolling=False,
+        """
     )
 
 

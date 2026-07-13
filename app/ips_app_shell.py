@@ -102,6 +102,10 @@ def inject_ips_app_shell_styles() -> None:
             gap: 0.35rem !important;
         }
         /* Collapse zero-height shell iframes (Streamlit 1.56 stIFrame / legacy components). */
+        body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has([data-testid="stIFrame"]),
+        body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(iframe.stIFrame),
+        body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has([data-testid="stCustomComponentV1"]),
+        body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(iframe[title="streamlit_components_v1.iframe"]),
         body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has([data-testid="stIFrame"][height="0"]),
         body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(iframe.stIFrame[height="0"]),
         body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has([data-testid="stCustomComponentV1"][height="0"]) {
