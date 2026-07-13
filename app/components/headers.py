@@ -226,13 +226,13 @@ def _render_page_actions(actions: list[_ActionFn]) -> None:
     if n == 1:
         actions[0]()
     elif n == 2:
-        bc1, bc2 = st.columns([0.78, 1.22], gap="small")
+        bc1, bc2 = st.columns([1.72, 0.88], gap="small")
         with bc1:
             actions[0]()
         with bc2:
             actions[1]()
     elif n == 3:
-        bc1, bc2, bc3 = st.columns([0.95, 1.55, 1.1], gap="small")
+        bc1, bc2, bc3 = st.columns([1.05, 1.45, 0.95], gap="small")
         with bc1:
             actions[0]()
         with bc2:
@@ -261,7 +261,7 @@ def _render_header_utilities(*, header_key: str) -> None:
     display = current_user_display_name()
     initials = _initials(display)
 
-    u1, u2, u3, u4 = st.columns([1, 1, 1, 1.35], gap="small")
+    u1, u2, u3, u4 = st.columns([1, 1, 1, 1.2], gap="small")
     with u1:
         st.markdown('<span class="ips-app-header-util-bell-slot" aria-hidden="true"></span>', unsafe_allow_html=True)
         badge_html = (
@@ -272,27 +272,30 @@ def _render_header_utilities(*, header_key: str) -> None:
         if badge_html:
             st.markdown(badge_html, unsafe_allow_html=True)
         if role_can_access_page(role, "company_updates"):
-            if st.button("Notifications", key=f"{header_key}_bell", help="Company updates"):
+            if st.button(" ", key=f"{header_key}_bell", help="Notifications"):
                 set_nav_slug("company_updates")
                 st.rerun()
         else:
-            st.button("Notifications", key=f"{header_key}_bell", help="Notifications", disabled=True)
+            st.button(" ", key=f"{header_key}_bell", help="Notifications", disabled=True)
     with u2:
         st.markdown('<span class="ips-app-header-util-help-slot" aria-hidden="true"></span>', unsafe_allow_html=True)
-        with st.popover("Help", use_container_width=True):
+        with st.popover(" ", help="Help"):
             st.markdown("**Help**")
             st.caption("Use the sidebar to switch modules. Contact your administrator for access changes.")
     with u3:
         st.markdown('<span class="ips-app-header-util-settings-slot" aria-hidden="true"></span>', unsafe_allow_html=True)
         if role_can_access_page(role, "settings"):
-            if st.button("Settings", key=f"{header_key}_settings", help="Settings"):
+            if st.button(" ", key=f"{header_key}_settings", help="Settings"):
                 set_nav_slug("settings")
                 st.rerun()
         else:
-            st.button("Settings", key=f"{header_key}_settings", help="Settings", disabled=True)
+            st.button(" ", key=f"{header_key}_settings", help="Settings", disabled=True)
     with u4:
-        st.markdown('<span class="ips-app-header-util-user-slot" aria-hidden="true"></span>', unsafe_allow_html=True)
-        with st.popover(f"{initials}  ▾", use_container_width=True):
+        st.markdown(
+            f'<span class="ips-app-header-util-user-slot" data-initials="{html.escape(initials)}" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        with st.popover(initials, help=display):
             st.markdown(
                 f'<span class="ips-app-header-avatar-lg">{html.escape(initials)}</span> '
                 f"**{html.escape(display)}**",
@@ -338,6 +341,7 @@ def render_page_header(
     header_key = f"ips_hdr_{slug}"
     shell_marker = '<span class="ips-page-shell-marker" aria-hidden="true"></span>'
     header_marker = '<span class="ips-app-page-header-marker" aria-hidden="true"></span>'
+    can_back = show_back and (on_back is not None or _can_navigate_back())
 
     sub_html = (
         f'<p class="ips-app-header-subtitle">{html.escape(resolved_subtitle)}</p>'
@@ -350,7 +354,7 @@ def render_page_header(
         else ""
     )
     title_html = (
-        f'<div class="ips-app-header-identity-wrap">'
+        f'<div class="ips-app-header-page-info">'
         f'<span class="ips-app-header-divider" aria-hidden="true"></span>'
         f'<div class="ips-app-header-title-block">'
         f"{icon_html}"
@@ -363,58 +367,64 @@ def render_page_header(
     st.markdown(f"{shell_marker}{header_marker}", unsafe_allow_html=True)
 
     with st.container(key="ips_app_page_header"):
+        st.markdown('<span class="ips-page-header ips-page-header-shell" aria-hidden="true"></span>', unsafe_allow_html=True)
         if merged_actions:
-            nav_col, identity_col, act_col, util_col = st.columns(
-                [1.05, 2.35, 1.55, 1.0],
+            left_col, actions_col, util_col = st.columns(
+                [3.35, 1.55, 0.82],
                 gap="small",
                 vertical_alignment="center",
             )
         else:
-            nav_col, identity_col, util_col = st.columns(
-                [1.05, 4.0, 1.0],
+            left_col, util_col = st.columns(
+                [4.35, 0.82],
                 gap="small",
                 vertical_alignment="center",
             )
-            act_col = None
+            actions_col = None
 
-        with nav_col:
-            back_slot, logo_slot = st.columns([0.38, 0.62], gap="small", vertical_alignment="center")
-            with back_slot:
+        with left_col:
+            st.markdown('<span class="ips-header-left-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
+            back_col, logo_col, title_col = st.columns(
+                [0.48, 0.72, 2.55],
+                gap="small",
+                vertical_alignment="center",
+            )
+            with back_col:
                 st.markdown('<span class="ips-app-header-back-slot" aria-hidden="true"></span>', unsafe_allow_html=True)
-                if show_back and (on_back is not None or _can_navigate_back()):
-                    if st.button("←  Back", key=f"{header_key}_back", help="Go back"):
+                if can_back:
+                    st.markdown('<span class="ips-app-header-back-active" aria-hidden="true"></span>', unsafe_allow_html=True)
+                    if st.button("← Back", key=f"{header_key}_back", help="Go back"):
                         if on_back is not None:
                             on_back()
                         else:
                             _navigate_back()
-                elif show_back:
+                else:
                     st.markdown(
                         '<span class="ips-app-header-back-spacer" aria-hidden="true"></span>',
                         unsafe_allow_html=True,
                     )
                 st.markdown('<span class="ips-app-header-menu-slot" aria-hidden="true"></span>', unsafe_allow_html=True)
-                if st.button("Menu", key=f"{header_key}_menu", help="Open menu"):
+                if st.button(" ", key=f"{header_key}_menu", help="Open menu"):
                     _request_sidebar_toggle()
-            with logo_slot:
+            with logo_col:
                 st.markdown(
-                    wording_logo_html(height=36, css_class="ips-app-header-logo"),
+                    wording_logo_html(height=46, css_class="ips-app-header-logo ips-header-logo"),
                     unsafe_allow_html=True,
                 )
+            with title_col:
+                st.markdown(title_html, unsafe_allow_html=True)
 
-        with identity_col:
-            st.markdown(title_html, unsafe_allow_html=True)
-
-        if merged_actions and act_col is not None:
-            with act_col:
+        if merged_actions and actions_col is not None:
+            with actions_col:
                 st.markdown(
-                    '<span class="ips-page-actions-marker ips-app-header-actions-marker" aria-hidden="true"></span>',
+                    '<span class="ips-page-actions-marker ips-app-header-actions-marker ips-header-actions-marker" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
                 _render_page_actions(merged_actions)
 
         with util_col:
             st.markdown(
-                '<span class="ips-app-header-utils-marker" aria-hidden="true"></span>',
+                '<span class="ips-app-header-utils-marker ips-header-utils-marker" aria-hidden="true"></span>',
                 unsafe_allow_html=True,
             )
             _render_header_utilities(header_key=header_key)

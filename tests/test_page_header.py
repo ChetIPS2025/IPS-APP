@@ -27,7 +27,12 @@ class PageHeaderSourceTests(unittest.TestCase):
         src = inspect.getsource(headers.render_page_brand_header)
         self.assertIn("render_page_header", src)
 
-    def test_default_subtitles_cover_core_modules(self) -> None:
+    def test_render_page_header_uses_compact_left_layout(self) -> None:
+        src = inspect.getsource(headers.render_page_header)
+        self.assertIn("ips-header-left-marker", src)
+        self.assertIn("ips-app-header-page-info", src)
+        self.assertIn("height=46", src)
+        self.assertIn("ips-app-header-back-active", src)
         for slug in (
             "dashboard",
             "jobs",

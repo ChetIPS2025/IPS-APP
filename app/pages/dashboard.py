@@ -143,23 +143,19 @@ def render() -> None:
     start, end = _date_range_state()
 
     def _dash_period() -> None:
-        st.markdown('<span class="ips-ops-action-label">📅 Date Range</span>', unsafe_allow_html=True)
         dr = st.date_input(
             "Period",
             value=(start, end),
             key="ips_dash_period",
             label_visibility="collapsed",
+            format="MMM D, YYYY",
         )
         if isinstance(dr, tuple) and len(dr) == 2:
             st.session_state["ips_dash_date_start"] = dr[0]
             st.session_state["ips_dash_date_end"] = dr[1]
 
     def _dash_refresh() -> None:
-        st.markdown(
-            '<span class="ips-ops-action-label ips-ops-action-label-spacer" aria-hidden="true">&nbsp;</span>',
-            unsafe_allow_html=True,
-        )
-        if st.button("🔄 Refresh", key="ips_dash_refresh", use_container_width=True):
+        if st.button("↻ Refresh", key="ips_dash_refresh", use_container_width=True):
             st.rerun()
 
     render_page_brand_header(

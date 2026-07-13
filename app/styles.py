@@ -12209,7 +12209,7 @@ def inject_global_css() -> None:
     """Inject global IPS SaaS styles on every render."""
     st.markdown(
         f"""
-<style id="ips-global-styles-v10">
+<style id="ips-global-styles-v11">
 :root {{
   --ips-bg: {APP_BG};
   --ips-sidebar: {SIDEBAR_BG};
@@ -12338,20 +12338,50 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-page-actions-marker) [data-testid="stButton"] > button p {{
   white-space: nowrap !important;
 }}
-section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-app-header-utils-marker) {{
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-app-header-utils-marker),
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-header-utils-marker) {{
   display: flex !important;
   align-items: center !important;
   justify-content: flex-end !important;
-  gap: 6px !important;
+  gap: 10px !important;
   position: relative !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
 }}
-section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-app-header-utils-marker) [data-testid="stHorizontalBlock"] {{
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-app-header-utils-marker) [data-testid="stHorizontalBlock"],
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-header-utils-marker) [data-testid="stHorizontalBlock"] {{
   justify-content: flex-end !important;
-  gap: 6px !important;
+  gap: 10px !important;
   flex-wrap: nowrap !important;
   align-items: center !important;
 }}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-utils-marker) [data-testid="column"] {{
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-header-left-marker) {{
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  width: auto !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-header-left-marker) > [data-testid="stHorizontalBlock"] {{
+  align-items: center !important;
+  gap: 10px !important;
+  flex-wrap: nowrap !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-header-actions-marker) {{
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+}}
+section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-header-actions-marker) > [data-testid="stHorizontalBlock"] {{
+  justify-content: flex-end !important;
+  align-items: center !important;
+  gap: 10px !important;
+  flex-wrap: nowrap !important;
+}}
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-utils-marker) [data-testid="column"],
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-header-utils-marker) [data-testid="column"] {{
   flex: 0 0 auto !important;
   width: auto !important;
   min-width: 0 !important;
@@ -12381,24 +12411,25 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]
 }}
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-util-bell-slot) .stButton > button,
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-util-settings-slot) .stButton > button {{
-  min-width: 36px !important;
-  width: 36px !important;
-  height: 36px !important;
-  min-height: 36px !important;
+  min-width: 38px !important;
+  width: 38px !important;
+  height: 38px !important;
+  min-height: 38px !important;
   padding: 0 !important;
-  border: 1px solid transparent !important;
-  background: transparent !important;
-  color: #64748b !important;
-  border-radius: 8px !important;
+  border: 1px solid #e5e7eb !important;
+  background: #ffffff !important;
+  color: transparent !important;
+  border-radius: 999px !important;
   box-shadow: none !important;
 }}
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-util-bell-slot) .stButton > button:hover,
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-util-settings-slot) .stButton > button:hover {{
   background: #f8fafc !important;
-  border-color: #e5e7eb !important;
+  border-color: #cbd5e1 !important;
 }}
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-util-bell-slot) .stButton > button p,
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-util-settings-slot) .stButton > button p {{
+  display: none !important;
   font-size: 0 !important;
   line-height: 0 !important;
   width: 0 !important;
@@ -12422,10 +12453,10 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]
   background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3Cpath d='M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42'/%3E%3C/svg%3E") !important;
 }}
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-util-help-slot) [data-testid="stPopover"] > button {{
-  min-width: 36px !important;
-  width: 36px !important;
-  height: 36px !important;
-  min-height: 36px !important;
+  min-width: 38px !important;
+  width: 38px !important;
+  height: 38px !important;
+  min-height: 38px !important;
   padding: 0 !important;
   border: 1px solid #e5e7eb !important;
   background: #ffffff !important;
@@ -12442,59 +12473,71 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]
   align-items: center !important;
   justify-content: center !important;
   color: #64748b !important;
-  font-size: 14px !important;
+  font-size: 15px !important;
   font-weight: 700 !important;
 }}
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-util-help-slot) [data-testid="stPopover"] > button p {{
   display: none !important;
 }}
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-util-user-slot) [data-testid="stPopover"] > button {{
-  min-height: 36px !important;
-  height: 36px !important;
-  padding: 0 10px 0 6px !important;
+  min-width: 52px !important;
+  width: auto !important;
+  min-height: 38px !important;
+  height: 38px !important;
+  padding: 0 8px 0 4px !important;
   border: 1px solid #e5e7eb !important;
   background: #ffffff !important;
   color: #4f46e5 !important;
   border-radius: 999px !important;
   box-shadow: none !important;
-  font-size: 12px !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.02em !important;
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
 }}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-util-user-slot) [data-testid="stPopover"] > button::before {{
-  content: "" !important;
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-util-user-slot) [data-testid="stPopover"] > button::after {{
+  content: "▾" !important;
   display: inline-block !important;
-  width: 24px !important;
-  height: 24px !important;
-  margin-right: 4px !important;
-  border-radius: 999px !important;
-  background: #ede9fe !important;
-  vertical-align: middle !important;
+  color: #64748b !important;
+  font-size: 11px !important;
+  line-height: 1 !important;
 }}
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-util-user-slot) [data-testid="stPopover"] > button p {{
-  display: inline !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  border-radius: 999px !important;
+  background: #ede9fe !important;
   color: #4f46e5 !important;
-  font-weight: 700 !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.02em !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1 !important;
 }}
 section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="column"]:has(.ips-app-header-back-slot) .stButton > button {{
-  min-height: 36px !important;
-  height: 36px !important;
-  min-width: 88px !important;
-  font-size: 0.84rem !important;
+  min-height: 40px !important;
+  height: 40px !important;
+  min-width: 92px !important;
+  font-size: 0.875rem !important;
   font-weight: 600 !important;
   border: 1px solid #d1d5db !important;
   background: #ffffff !important;
   color: #374151 !important;
   border-radius: 8px !important;
-  padding: 0 0.75rem !important;
+  padding: 0 0.85rem !important;
   white-space: nowrap !important;
   box-shadow: none !important;
 }}
 section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="column"]:has(.ips-app-header-menu-slot) .stButton > button {{
-  min-width: 36px !important;
-  width: 36px !important;
-  min-height: 36px !important;
-  height: 36px !important;
+  min-width: 40px !important;
+  width: 40px !important;
+  min-height: 40px !important;
+  height: 40px !important;
   padding: 0 !important;
   display: none !important;
   border: 1px solid #d1d5db !important;
@@ -12502,24 +12545,35 @@ section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="col
   border-radius: 8px !important;
 }}
 section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="column"]:has(.ips-app-header-menu-slot) .stButton > button p {{
-  font-size: 0 !important;
+  display: none !important;
 }}
 section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="column"]:has(.ips-app-header-menu-slot) .stButton > button::before {{
   content: "" !important;
   display: block !important;
-  width: 16px !important;
-  height: 16px !important;
+  width: 18px !important;
+  height: 18px !important;
   margin: 0 auto !important;
-  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23374151' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6h16M4 12h16M4 18h16'/%3E%3C/svg%3E") !important;
+  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23374151' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6h16M4 12h16M4 18h16'/%3E%3C/svg%3E") !important;
+}}
+.st-key-ips_app_page_header .ips-ops-action-label,
+.st-key-ips_app_page_header .ips-ops-action-label-spacer {{
+  display: none !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }}
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-actions-marker) [data-testid="stButton"] > button[kind="primary"],
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-actions-marker) .stButton > button[data-testid="stBaseButton-primary"] {{
-  background: #2563eb !important;
-  border: 1px solid #2563eb !important;
+  background: #3158e6 !important;
+  border: 1px solid #3158e6 !important;
   color: #ffffff !important;
   font-weight: 600 !important;
   border-radius: 8px !important;
   box-shadow: none !important;
+  min-height: 40px !important;
+  height: 40px !important;
+  padding: 0 0.9rem !important;
+  white-space: nowrap !important;
 }}
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-actions-marker) [data-testid="stButton"] > button[kind="secondary"],
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-actions-marker) .stButton > button:not([data-testid="stBaseButton-primary"]) {{
@@ -12529,26 +12583,100 @@ section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="col
   font-weight: 600 !important;
   border-radius: 8px !important;
   box-shadow: none !important;
+  min-height: 40px !important;
+  height: 40px !important;
+  padding: 0 0.85rem !important;
+  white-space: nowrap !important;
 }}
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-actions-marker) [data-testid="stDateInput"] {{
+  min-width: 220px !important;
+  width: 240px !important;
+  max-width: 260px !important;
+}}
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-actions-marker) [data-testid="stDateInput"] > div,
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-actions-marker) [data-testid="stDateInput"] > div > div,
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-actions-marker) [data-testid="stDateInput"] input {{
-  min-height: 36px !important;
-  height: 36px !important;
+  min-height: 40px !important;
+  height: 40px !important;
   border-radius: 8px !important;
   border-color: #d1d5db !important;
-  font-size: 0.84rem !important;
+  font-size: 0.875rem !important;
+  width: 100% !important;
+}}
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-actions-marker) [data-testid="stDateInput"] > div > div {{
+  position: relative !important;
+  padding-left: 30px !important;
+}}
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-actions-marker) [data-testid="stDateInput"] > div > div::before {{
+  content: "" !important;
+  position: absolute !important;
+  left: 10px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 16px !important;
+  height: 16px !important;
+  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cpath d='M16 2v4M8 2v4M3 10h18'/%3E%3C/svg%3E") !important;
+  pointer-events: none !important;
 }}
 @media (max-width: 899px) {{
-  section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="column"]:has(.ips-app-header-back-slot) .stButton > button {{
+  .st-key-ips_app_page_header > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"],
+  .st-key-ips_app_page_header [data-testid="stVerticalBlockBorderWrapper"] > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"] {{
+    flex-wrap: wrap !important;
+    row-gap: 8px !important;
+    column-gap: 10px !important;
+  }}
+  section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="column"]:has(.ips-header-left-marker) {{
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    order: 1 !important;
+  }}
+  section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="column"]:has(.ips-header-utils-marker) {{
+    flex: 0 0 auto !important;
+    width: auto !important;
+    order: 2 !important;
+    margin-left: auto !important;
+  }}
+  section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="column"]:has(.ips-header-actions-marker) {{
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    order: 3 !important;
+  }}
+  section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="column"]:has(.ips-header-left-marker):has(.ips-app-header-back-active) [data-testid="column"]:has(.ips-app-header-back-slot) .stButton > button {{
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 40px !important;
+    width: auto !important;
+    padding: 0 0.65rem !important;
+  }}
+  section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="column"]:has(.ips-header-left-marker):has(.ips-app-header-back-active) [data-testid="column"]:has(.ips-app-header-menu-slot) .stButton > button {{
     display: none !important;
   }}
-  section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="column"]:has(.ips-app-header-menu-slot) .stButton > button {{
+  section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="column"]:has(.ips-header-left-marker):not(:has(.ips-app-header-back-active)) [data-testid="column"]:has(.ips-app-header-menu-slot) .stButton > button {{
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
   }}
+  .st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-util-help-slot),
+  .st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-util-settings-slot) {{
+    display: none !important;
+  }}
   .ips-app-header-subtitle {{
     display: none !important;
+  }}
+  .st-key-ips_app_page_header [data-testid="column"]:has(.ips-app-header-actions-marker) [data-testid="stDateInput"] {{
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }}
+  .st-key-ips_app_page_header [data-testid="stHorizontalBlock"],
+  .st-key-ips_app_page_header [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+  }}
+  .st-key-ips_app_page_header [data-testid="column"]:has(.ips-header-left-marker) > [data-testid="stHorizontalBlock"] {{
+    flex-wrap: nowrap !important;
   }}
 }}
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="column"]:has(.ips-main-header-actions-marker) {{
@@ -12697,35 +12825,49 @@ section[data-testid="stSidebar"] .block-container {{
 .st-key-ips_app_page_header [data-testid="stVerticalBlockBorderWrapper"] {{
   margin-left: -22px !important;
   margin-right: -22px !important;
-  margin-bottom: 0 !important;
-  padding: 10px 24px !important;
-  background: #ffffff !important;
-  border-bottom: 1px solid #e5e7eb !important;
-  border-radius: 0 !important;
-  min-height: 68px !important;
-  box-sizing: border-box !important;
   margin-bottom: 16px !important;
+  padding: 10px 20px !important;
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  border-bottom: 2px solid #3158e6 !important;
+  border-radius: 0 !important;
+  min-height: 76px !important;
+  max-height: 80px !important;
+  box-sizing: border-box !important;
 }}
 .st-key-ips_app_page_header [data-testid="stHorizontalBlock"] {{
   align-items: center !important;
-  min-height: 48px !important;
-  gap: 0.35rem !important;
+  min-height: 52px !important;
+  gap: 12px !important;
+  flex-wrap: nowrap !important;
 }}
 .ips-app-page-header-shell {{
   display: none;
 }}
-.ips-app-header-logo {{
-  height: 36px;
-  width: auto;
-  max-width: 200px;
-  object-fit: contain;
-  display: block;
-  background: transparent;
+.ips-page-header-shell {{
+  display: none;
+}}
+.ips-app-header-logo,
+.ips-header-logo {{
+  height: 46px !important;
+  width: auto !important;
+  max-width: 320px !important;
+  object-fit: contain !important;
+  display: block !important;
+  background: transparent !important;
+  flex: 0 0 auto !important;
+}}
+.ips-app-header-page-info {{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  height: 100%;
 }}
 .ips-app-header-identity-wrap {{
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   min-width: 0;
   height: 100%;
 }}
@@ -12733,8 +12875,8 @@ section[data-testid="stSidebar"] .block-container {{
   display: block;
   width: 1px;
   align-self: stretch;
-  min-height: 44px;
-  background: #e5e7eb;
+  min-height: 46px;
+  background: #e2e8f0;
   flex: 0 0 auto;
 }}
 .ips-app-header-title-block {{
@@ -12761,23 +12903,29 @@ section[data-testid="stSidebar"] .block-container {{
 }}
 .ips-app-header-title {{
   margin: 0;
-  font-size: 24px;
-  line-height: 1.15;
+  font-size: 26px;
+  line-height: 1.1;
   font-weight: 700;
-  color: #0f172a;
+  color: #111827;
   letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }}
 .ips-app-header-subtitle {{
-  margin: 2px 0 0 0;
+  margin: 4px 0 0 0;
   font-size: 13px;
   color: #64748b;
-  line-height: 1.35;
+  line-height: 1.2;
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }}
 .ips-app-header-back-spacer {{
   display: inline-block;
-  width: 88px;
-  height: 36px;
+  width: 0;
+  height: 40px;
 }}
 .ips-app-header-avatar-lg {{
   display: inline-flex;
@@ -12849,14 +12997,16 @@ section[data-testid="stSidebar"] .block-container {{
     margin-left: -14px !important;
     margin-right: -14px !important;
     padding: 8px 14px !important;
-    min-height: 64px !important;
+    min-height: 0 !important;
+    max-height: none !important;
   }}
-  .ips-app-header-logo {{
-    height: 32px;
-    max-width: 150px;
+  .ips-app-header-logo,
+  .ips-header-logo {{
+    height: 34px !important;
+    max-width: 200px !important;
   }}
   .ips-app-header-divider {{
-    min-height: 36px;
+    min-height: 34px;
   }}
   .ips-app-header-title {{
     font-size: 20px;
