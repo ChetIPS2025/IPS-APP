@@ -97,7 +97,7 @@ class PageHeaderSourceTests(unittest.TestCase):
 
         src = inspect.getsource(inject_global_css)
         self.assertIn("ips-global-styles-v16", src)
-        self.assertIn("padding-top: 12px !important", src)
+        self.assertIn("padding-top: 0 !important", src)
         self.assertNotIn("margin-left: -22px", src)
         self.assertNotIn("margin-right: -22px", src)
 
@@ -108,11 +108,18 @@ class PageHeaderSourceTests(unittest.TestCase):
         self.assertIn("st.html", src)
         self.assertIn("unsafe_allow_javascript=True", src)
 
+    def test_authenticated_shell_css_injects_from_sidebar(self) -> None:
+        from app.styles import inject_authenticated_shell_css
+
+        src = inspect.getsource(inject_authenticated_shell_css)
+        self.assertIn("with st.sidebar:", src)
+        self.assertIn("inject_app_shell_script", src)
+
     def test_app_shell_layout_styles_reset_main_top_gap(self) -> None:
         from app.ui.app_shell_styles import inject_app_shell_layout_styles
 
         src = inspect.getsource(inject_app_shell_layout_styles)
-        self.assertIn("ips-app-shell-layout-v2", src)
+        self.assertIn("ips-app-shell-layout-v3", src)
         self.assertIn("stMainBlockContainer", src)
         self.assertIn("padding-top: var(--ips-main-top-gap)", src)
         self.assertIn("ips-app-shell-script-marker", src)

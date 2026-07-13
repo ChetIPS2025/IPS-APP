@@ -5,7 +5,7 @@ from __future__ import annotations
 import streamlit as st
 import streamlit.components.v1 as components
 
-IPS_APP_SHELL_LAYOUT_STYLES_KEY = "ips_app_shell_layout_styles_v2"
+IPS_APP_SHELL_LAYOUT_STYLES_KEY = "ips_app_shell_layout_styles_v3"
 IPS_APP_SHELL_SCRIPT_MARKER_CLASS = "ips-app-shell-script-marker"
 
 
@@ -27,9 +27,9 @@ def inject_app_shell_layout_styles() -> None:
     st.session_state[IPS_APP_SHELL_LAYOUT_STYLES_KEY] = True
     st.markdown(
         """
-<style id="ips-app-shell-layout-v2">
+<style id="ips-app-shell-layout-v3">
 :root {
-  --ips-main-top-gap: 12px;
+  --ips-main-top-gap: 0px;
 }
 body.ips-authed-app [data-testid="stAppViewContainer"] {
   padding-top: 0 !important;
@@ -49,6 +49,9 @@ body.ips-authed-app section[data-testid="stMain"] > div {
 body.ips-authed-app section[data-testid="stMain"] [data-testid="stVerticalBlock"] > div {
   padding-top: 0 !important;
 }
+body.ips-authed-app section[data-testid="stMain"] [data-testid="stVerticalBlock"] {
+  gap: 0 !important;
+}
 body.ips-authed-app .st-key-ips_page_header,
 body.ips-authed-app .st-key-ips_page_header [data-testid="stVerticalBlockBorderWrapper"] {
   margin-top: 0 !important;
@@ -57,6 +60,8 @@ body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContain
   margin-top: 0 !important;
   padding-top: 0 !important;
 }
+section[data-testid="stMain"] [data-testid="stElementContainer"]:has(style),
+section[data-testid="stMain"] [data-testid="stElementContainer"]:has(script),
 body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(.ips-app-shell-script-marker),
 body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(style),
 body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(script) {
@@ -68,6 +73,12 @@ body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContain
   padding: 0 !important;
   overflow: hidden !important;
 }
+section[data-testid="stMain"] [data-testid="stElementContainer"]:has([data-testid="stHtml"]),
+section[data-testid="stMain"] [data-testid="stElementContainer"]:has([data-testid="stIFrame"]),
+section[data-testid="stMain"] [data-testid="stElementContainer"]:has(iframe.stIFrame),
+section[data-testid="stMain"] [data-testid="stElementContainer"]:has([data-testid="stCustomComponentV1"]),
+section[data-testid="stMain"] [data-testid="stElementContainer"]:has(iframe[title="streamlit_components_v1.iframe"]),
+body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has([data-testid="stHtml"]),
 body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has([data-testid="stIFrame"]),
 body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(iframe.stIFrame),
 body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has([data-testid="stCustomComponentV1"]),
@@ -86,6 +97,19 @@ body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContain
   padding: 0 !important;
   overflow: hidden !important;
   border: none !important;
+}
+@media (min-width: 900px) {
+  body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(.ips-mobile-nav-fab),
+  body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(.ips-header-menu-btn) {
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border: none !important;
+  }
 }
 body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has([data-testid="stIFrame"][height="0"]) > div,
 body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(iframe.stIFrame[height="0"]) > div,
