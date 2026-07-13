@@ -23,11 +23,7 @@ from app.services.pricing_guide_service import (
 
 def _pricing_rows_for_matching() -> list[dict]:
     """All pricing guide rows (including asset-linked rows hidden from PG list views)."""
-    try:
-        from app.db import fetch_table_admin
-    except ImportError:
-        from db import fetch_table_admin  # type: ignore
-
+    from app.db import fetch_table_admin
     rows = list(fetch_table_admin("pricing_guide_items", limit=10000) or [])
     return [r for r in rows if isinstance(r, dict)]
 
