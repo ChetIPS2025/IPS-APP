@@ -12311,7 +12311,7 @@ def inject_global_css() -> None:
     """Inject global IPS SaaS styles on every render."""
     st.markdown(
         f"""
-<style id="ips-global-styles-v14">
+<style id="ips-global-styles-v15">
 :root {{
   --ips-bg: {APP_BG};
   --ips-sidebar: {SIDEBAR_BG};
@@ -12326,6 +12326,21 @@ def inject_global_css() -> None:
 
 html, body, .stApp {{
   background: {APP_BG} !important;
+}}
+body.ips-authed-app header[data-testid="stHeader"],
+body.ips-authed-app [data-testid="stHeader"] {{
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+  visibility: hidden !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+}}
+body.ips-authed-app [data-testid="stAppViewContainer"] {{
+  padding-top: 0 !important;
 }}
 [data-testid="stAppViewContainer"],
 [data-testid="stMain"],
@@ -12446,9 +12461,9 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stEle
 .st-key-ips_app_page_header [data-testid="stHorizontalBlock"]:has(.ips-ph-left):has(.ips-ph-center):has(.ips-ph-right),
 .st-key-ips_app_page_header [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stHorizontalBlock"]:has(.ips-ph-left):has(.ips-ph-center):has(.ips-ph-right) {{
   display: grid !important;
-  grid-template-columns: auto 1fr auto !important;
+  grid-template-columns: minmax(160px, auto) minmax(220px, 1fr) minmax(340px, auto) !important;
   align-items: center !important;
-  gap: 16px !important;
+  gap: 12px !important;
   width: 100% !important;
   min-height: 56px !important;
 }}
@@ -12473,7 +12488,16 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stEle
   width: auto !important;
   min-width: 0 !important;
   flex: none !important;
-  max-width: 62% !important;
+  max-width: 72% !important;
+}}
+.stApp:has(.ips-desktop-nav-rail) .st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-menu) {{
+  display: none !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
 }}
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-right) > [data-testid="stHorizontalBlock"] {{
   display: flex !important;
@@ -12514,8 +12538,24 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stEle
 }}
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-action-slot) [data-testid="stButton"] > button[kind="primary"],
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-action-slot) .stButton > button[data-testid="stBaseButton-primary"] {{
-  min-width: 108px !important;
+  min-width: 118px !important;
+  width: auto !important;
   padding: 0 0.9rem !important;
+}}
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-primary-action-marker) {{
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 118px !important;
+  max-width: none !important;
+}}
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-primary-action-marker) .stButton {{
+  width: auto !important;
+  min-width: 118px !important;
+}}
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-primary-action-marker) .stButton > button {{
+  width: auto !important;
+  min-width: 118px !important;
+  overflow: visible !important;
 }}
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-date-marker) {{
   position: relative !important;
@@ -12540,8 +12580,8 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stEle
 .ips-ph-logo {{
   height: 48px !important;
   width: auto !important;
-  min-width: 220px !important;
-  max-width: 360px !important;
+  min-width: 160px !important;
+  max-width: 280px !important;
   object-fit: contain !important;
   display: block !important;
   background: transparent !important;
@@ -15669,7 +15709,7 @@ def inject_ops_dashboard_css() -> None:
     """Compact operations dashboard layout — KPI row, news, quick actions, activity grid."""
     st.markdown(
         """
-<style id="ips-ops-dashboard-v30">
+<style id="ips-ops-dashboard-v31">
 /* ── App shell: flex main beside sidebar (desktop only) ── */
 .stApp:has(.ips-ops-dashboard-marker) [data-testid="stAppViewContainer"] {
   width: 100% !important;
@@ -15737,17 +15777,35 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stEle
   padding: 0 !important;
   overflow: hidden !important;
 }
-section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"]:has(style#ips-ops-dashboard-v30),
-section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"]:has(style#ips-global-styles-v14),
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"]:has(style#ips-ops-dashboard-v31),
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"]:has(style#ips-global-styles-v15),
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"]:has(style#ips-ui-library-v1) {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
   margin: 0 !important;
   padding: 0 !important;
+  overflow: hidden !important;
+}
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"]:has(style):not(:has(.ips-app-page-header-marker)):not(:has(.ips-ops-welcome)):not(:has(.st-key-dashboard_ops_shell)) {
+  display: none !important;
+  height: 0 !important;
   min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
 }
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"]:has(style) [data-testid="stMarkdownContainer"] {
   min-height: 0 !important;
   padding: 0 !important;
   margin: 0 !important;
+}
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-ph-title {
+  font-size: 22px !important;
+}
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .ips-ph-subtitle {
+  display: block !important;
+  font-size: 12px !important;
 }
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .block-container {
   width: 100% !important;

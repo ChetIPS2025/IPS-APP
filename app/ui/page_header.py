@@ -117,13 +117,13 @@ def _render_refresh(*, key: str) -> None:
 
 
 _RIGHT_SLOT_RATIOS: dict[str, float] = {
-    "date": 2.35,
-    "refresh": 0.55,
-    "primary": 1.15,
+    "date": 2.0,
+    "refresh": 0.48,
+    "primary": 1.9,
     "secondary": 1.0,
     "action": 1.0,
 }
-_RIGHT_UTIL_RATIO = 0.55
+_RIGHT_UTIL_RATIO = 0.4
 
 
 def _header_auth_context() -> tuple[str, str, str, Callable[[], None]]:
@@ -284,7 +284,7 @@ def render_page_header(
         )
 
         left_col, center_col, right_col = st.columns(
-            [0.24, 1, 0.62],
+            [0.2, 1.15, 0.72],
             gap="small",
             vertical_alignment="center",
         )
@@ -335,9 +335,15 @@ def render_page_header(
                 ratios.append(_RIGHT_SLOT_RATIOS.get(kind, _RIGHT_SLOT_RATIOS.get(base_kind, 1.0)))
             ratios.extend([_RIGHT_UTIL_RATIO] * util_count)
             cols = st.columns(ratios, gap="small")
-            for idx, (_kind, widget) in enumerate(right_slots):
+            for idx, (kind, widget) in enumerate(right_slots):
                 with cols[idx]:
-                    st.markdown('<span class="ips-ph-action-slot" aria-hidden="true"></span>', unsafe_allow_html=True)
+                    slot_class = "ips-ph-action-slot"
+                    if kind == "primary":
+                        slot_class += " ips-ph-primary-action-marker"
+                    st.markdown(
+                        f'<span class="{slot_class}" aria-hidden="true"></span>',
+                        unsafe_allow_html=True,
+                    )
                     widget()
             util_start = len(right_slots)
             with cols[util_start]:
