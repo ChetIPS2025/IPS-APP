@@ -79,3 +79,54 @@ def field_dashboard_snapshot(
         "unread_notifications": unread_notifications,
         "active_job_count": len(active_jobs),
     }
+
+
+def load_field_dashboard_snapshot(*, today: date | None = None) -> dict[str, Any]:
+    """Load field dashboard KPIs for header badges and lightweight widgets."""
+    from app.auth import current_profile, effective_role
+    from app.data_cache import fetch_table_for_session
+    from app.db import fetch_jobs_with_order_fallback
+    from app.services.job_service import sort_jobs_by_number_then_name
+
+    admin = effective_role() in {"admin", "manager"}
+    prof = current_profile() or {}
+    uid = str(prof.get("id") or "").strip() or None
+    session_key = uid or "anonymous"
+    work_date = today or date.today()
+
+    jobs = sort_jobs_by_number_then_name(
+        list(fetch_jobs_with_order_fallback(limit=3000, use_admin=admin) or [])
+    )
+    time_entries = fetch_table_for_session(
+        "time_entries",
+        session_key=session_key,
+        use_admin=admin,
+        limit=8000,
+    )
+    te_today = [
+        te
+        for te in (time_entries or [])
+        if isinstance(te, dict) and str(te.get("work_date") or "")[:10] == work_date.isoformat()[:10]
+    ]
+    estimates = {
+        str(e.get("id") or ""): e
+        for e in (
+            fetch_table_for_session(
+                "estimates",
+                session_key=session_key,
+                use_admin=admin,
+                limit=3000,
+            )
+            or []
+        )
+        if isinstance(e, dict) and e.get("id")
+    }
+
+    return field_dashboard_snapshot(
+        today=work_date,
+        jobs=jobs,
+        time_entries_today=te_today,
+        estimates_by_id=estimates,
+        admin=admin,
+        user_id=uid,
+    )
