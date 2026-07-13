@@ -105,6 +105,17 @@ def test_sidebar_shell_script_targets_streamlit_156_collapse_button():
     assert "stSidebarCollapseButton" in script
     assert "stSidebarCollapsed-" in script
     assert "forceExpandSidebar" in script
+    assert "translateX(-100%)" in script
+
+
+def test_inject_sidebar_layout_state_only_collapses_on_desktop():
+    import inspect
+
+    from app.components.sidebar_shell import inject_sidebar_layout_state
+
+    source = inspect.getsource(inject_sidebar_layout_state)
+    assert "DESKTOP_MIN" in source
+    assert "desktop &&" in source
 
 
 def test_inject_sidebar_shell_injects_layout_on_every_render():

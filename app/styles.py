@@ -12286,7 +12286,7 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElemen
   background: transparent !important;
   border: none !important;
 }}
-section[data-testid="stMain"] [data-testid="stElementContainer"]:has(.ips-ops-dashboard-marker):not(:has(.ips-page-title)) {{
+section[data-testid="stMain"] [data-testid="stElementContainer"]:has(.ips-ops-dashboard-marker):not(:has(.ips-page-title)):not(:has(.ips-app-header-title)) {{
   display: none !important;
   height: 0 !important;
   min-height: 0 !important;

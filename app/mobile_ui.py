@@ -468,6 +468,16 @@ def inject_sidebar_mobile_auto_collapse_once() -> None:
         btn.click();
       } catch (e3) {}
     }
+    side = d.querySelector('[data-testid="stSidebar"]');
+    if (side && side.getAttribute("aria-expanded") === "true") {
+      side.setAttribute("aria-expanded", "false");
+      side.style.setProperty("transform", "translateX(-100%)", "important");
+      var bd = d.getElementById("ips-sidebar-backdrop");
+      if (bd) bd.classList.remove("is-open");
+    }
+    try {
+      d.body.classList.remove("ips-sidebar-collapsed");
+    } catch (e4) {}
     sessionStorage.setItem("ips_mobile_sidebar_init", "1");
   }
   setTimeout(run, 60);

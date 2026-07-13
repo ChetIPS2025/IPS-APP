@@ -946,20 +946,33 @@ section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):n
 def inject_sidebar_layout_state(collapsed: bool) -> None:
     """Sync collapsed body class + localStorage after each render."""
     flag = "1" if collapsed else "0"
+    desktop_min = IPS_SIDEBAR_DESKTOP_MIN_PX
     components.html(
         f"""
 <script>
 (function () {{
+  var DESKTOP_MIN = {desktop_min};
   function rootDoc() {{
     try {{ return window.parent && window.parent.document ? window.parent.document : document; }}
     catch (e) {{ return document; }}
   }}
+  function vpW() {{
+    try {{
+      var t = window.top || window.parent || window;
+      return t.innerWidth || window.innerWidth || 1200;
+    }} catch (e0) {{
+      return window.innerWidth || 1200;
+    }}
+  }}
   function apply() {{
     var d = rootDoc();
     if (!d || !d.body) return;
-    if ({flag} === '1') d.body.classList.add('ips-sidebar-collapsed');
+    var desktop = vpW() >= DESKTOP_MIN;
+    if (desktop && {flag} === '1') d.body.classList.add('ips-sidebar-collapsed');
     else d.body.classList.remove('ips-sidebar-collapsed');
-    try {{ localStorage.setItem('{IPS_SIDEBAR_COLLAPSED_STORAGE_KEY}', '{flag}'); }} catch (e2) {{}}
+    if (desktop) {{
+      try {{ localStorage.setItem('{IPS_SIDEBAR_COLLAPSED_STORAGE_KEY}', '{flag}'); }} catch (e2) {{}}
+    }}
   }}
   apply();
   setTimeout(apply, 40);
@@ -1741,6 +1754,56 @@ button.ips-header-menu-btn {{
   [data-testid="stSidebar"][aria-expanded="true"] {{
     transform: translateX(0) !important;
   }}
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] .st-key-sidebar_expanded_header_wrap,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stVerticalBlock"].st-key-sidebar_expanded_header_wrap,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-header-expanded-rail-marker),
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-logo-wrap--expanded),
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-divider--expanded-rail),
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(.sidebar-header-brand-marker),
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:has(.sidebar-header-brand-marker) {{
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: revert !important;
+    padding: revert !important;
+    overflow: visible !important;
+    visibility: visible !important;
+    border: revert !important;
+  }}
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-nav-label,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-section-title,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-logo-tagline,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-divider,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-footer-label,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] .ips-sidebar-user,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] .sidebar-version,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] .ips-sidebar-brand,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] {{
+    opacity: 1 !important;
+    width: auto !important;
+    max-width: none !important;
+    overflow: visible !important;
+    white-space: normal !important;
+    margin: revert !important;
+    padding: revert !important;
+    pointer-events: auto !important;
+    visibility: visible !important;
+  }}
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] .stButton > button,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] [data-testid="stButton"] > button,
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-secondary"],
+  body.ips-sidebar-collapsed section[data-testid="stSidebar"] [class*="st-key-nav_"] button[data-testid="stBaseButton-primary"] {{
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 2.25rem !important;
+    padding: 10px 14px 10px 22px !important;
+    margin: 0 !important;
+    justify-content: flex-start !important;
+    overflow: visible !important;
+  }}
   section[data-testid="stMain"] {{
     width: 100% !important;
     max-width: 100% !important;
@@ -1918,6 +1981,10 @@ def _shell_script(nav_json: str) -> str:
   }}
   function setBodyCollapsed(d, collapsed) {{
     if (!d || !d.body) return;
+    if (!isDesktop()) {{
+      d.body.classList.remove('ips-sidebar-collapsed');
+      return;
+    }}
     if (collapsed) d.body.classList.add('ips-sidebar-collapsed');
     else d.body.classList.remove('ips-sidebar-collapsed');
     writeCollapsedPref(collapsed);
@@ -1950,7 +2017,20 @@ def _shell_script(nav_json: str) -> str:
     var wantOpen = pref === '1';
     if (wantOpen !== expanded) {{
       var btn = toggleBtn(d);
-      if (btn) btn.click();
+      if (btn) {{
+        try {{ btn.click(); }} catch (eBtn) {{}}
+      }}
+      side = sidebarEl(d);
+      if (side) {{
+        var nowExpanded = side.getAttribute('aria-expanded') === 'true';
+        if (wantOpen && !nowExpanded) {{
+          side.setAttribute('aria-expanded', 'true');
+          side.style.setProperty('transform', 'translateX(0)', 'important');
+        }} else if (!wantOpen && nowExpanded) {{
+          side.setAttribute('aria-expanded', 'false');
+          side.style.setProperty('transform', 'translateX(-100%)', 'important');
+        }}
+      }}
     }}
     syncBackdrop(d);
   }}
@@ -1962,7 +2042,14 @@ def _shell_script(nav_json: str) -> str:
       return;
     }}
     var btn = toggleBtn(d);
-    if (btn) btn.click();
+    if (btn) {{
+      try {{ btn.click(); }} catch (eBtn) {{}}
+    }}
+    side = sidebarEl(d);
+    if (side && side.getAttribute('aria-expanded') === 'true') {{
+      side.setAttribute('aria-expanded', 'false');
+      side.style.setProperty('transform', 'translateX(-100%)', 'important');
+    }}
     try {{ localStorage.setItem('ips_sidebar_open', '0'); }} catch (e3) {{}}
     syncBackdrop(d);
   }}
@@ -2054,7 +2141,11 @@ def _shell_script(nav_json: str) -> str:
       ensureDesktopVisible(d);
       setBodyCollapsed(d, true);
       tagSidebar(d);
-    }} else restoreMobilePreference(d);
+    }} else {{
+      setBodyCollapsed(d, false);
+      closeMobileDrawer(d);
+      restoreMobilePreference(d);
+    }}
     syncBackdrop(d);
     if (!sidebarEl(d) && NAV.length) window.IPS.showFallbackNav();
   }}

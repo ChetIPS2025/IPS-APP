@@ -218,7 +218,7 @@ def main() -> None:
         page_title=getattr(settings, "app_name", "IPS Operations"),
         page_icon=_page_icon or "🔧",
         layout="wide",
-        initial_sidebar_state="expanded",
+        initial_sidebar_state="collapsed",
     )
 
     try:
