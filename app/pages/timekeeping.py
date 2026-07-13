@@ -65,7 +65,7 @@ from app.styles import (
     _inject_timekeeping_daily_hour_focus_script,
     inject_timekeeping_module_css,
 )
-from app.utils.dates import week_dates, week_end, week_start
+from app.utils.dates import DATE_INPUT_FORMAT, normalize_date, week_dates, week_end, week_start
 from app.utils.field_context import get_field_job_id, is_field_context, is_field_mode, render_field_job_bar
 from app.utils.formatting import fmt_date
 from app.ui.streamlit_perf import (
@@ -1977,8 +1977,11 @@ def _handle_alloc_line_reject(emp: dict, week_start_d: date, day_id: str) -> boo
 
 def _current_week_start() -> date:
     raw = st.session_state.get(_WEEK_KEY)
-    if isinstance(raw, date):
-        return raw
+    normalized = normalize_date(raw)
+    if normalized is not None:
+        if normalized != raw:
+            st.session_state[_WEEK_KEY] = normalized
+        return normalized
     ws = week_start()
     st.session_state[_WEEK_KEY] = ws
     return ws
@@ -2683,6 +2686,7 @@ def _render_weekly_timekeeping_toolbar(week_start_d: date, week_end_d: date) -> 
             key="tk_week_calendar",
             label_visibility="collapsed",
             help="Jump to week",
+            format=DATE_INPUT_FORMAT,
         )
         if isinstance(picked, date) and picked != week_start_d:
             st.session_state[_WEEK_KEY] = week_start(picked)
@@ -4924,10 +4928,13 @@ def render() -> None:
             value=(ws, we),
             key="tk_hdr_week_range",
             label_visibility="collapsed",
-            format="MMM D, YYYY",
+            format=DATE_INPUT_FORMAT,
         )
         if isinstance(picked, tuple) and len(picked) == 2:
-            new_start = week_start(picked[0])
+            start_d = normalize_date(picked[0])
+            if start_d is None:
+                return
+            new_start = week_start(start_d)
             if new_start != ws:
                 st.session_state[_WEEK_KEY] = new_start
                 reset_table_page(_TABLE_KEY)

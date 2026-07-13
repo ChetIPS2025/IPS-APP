@@ -95,6 +95,7 @@ from app.services.users_service import (
 )
 from app.styles import inject_users_module_css
 from app.utils.constants import DEPARTMENTS, SESSION_NAV_KEY
+from app.utils.dates import DATE_INPUT_FORMAT
 from app.utils.formatting import fmt_date
 from app.utils.permissions import can_view_hr_documents, normalize_role
 _SEL = select_key("employees")
@@ -663,7 +664,7 @@ def _render_employee_edit_form(emp: dict) -> None:
             "Hire Date",
             key=f"emp_edit_hire_{rk}",
             value=None,
-            format="YYYY-MM-DD",
+            format=DATE_INPUT_FORMAT,
             help="Employment start date. Member Since is not changed by this field.",
         )
         st.checkbox(
