@@ -32,21 +32,35 @@ class TestTimekeepingListMasterDetail(unittest.TestCase):
         self.assertIn("_render_timekeeping_employee_row_body", fragment_source)
         self.assertNotIn("not expanded and not pending", fragment_source)
 
-    def test_day_modal_session_keys_and_dialog(self) -> None:
+    def test_day_editor_session_keys_and_dialog(self) -> None:
+        self.assertEqual(tk.SELECTED_TIME_EMPLOYEE_ID_KEY, "selected_time_employee_id")
+        self.assertEqual(tk.SELECTED_TIME_DATE_KEY, "selected_time_date")
         self.assertEqual(tk.TIMEKEEPING_MODAL_EMPLOYEE_ID_KEY, "timekeeping_modal_employee_id")
         self.assertEqual(tk.TIMEKEEPING_MODAL_DATE_KEY, "timekeeping_modal_date")
         self.assertIn("@st.dialog", inspect.getsource(tk._show_day_time_dialog))
         self.assertIn("render_day_time_dialog_body", inspect.getsource(tk._show_day_time_dialog))
 
-    def test_clickable_day_cell_opens_modal(self) -> None:
+    def test_clickable_day_cell_opens_editor(self) -> None:
         source = inspect.getsource(tk._render_clickable_list_day_cell)
-        self.assertIn('key=f"open_day_{eid}_{day_d.isoformat()}"', source)
-        self.assertIn("_open_day_time_modal", source)
+        self.assertIn('key=f"open_time_day_{eid}_{iso}"', source)
+        self.assertIn("_open_day_time_editor", source)
+        self.assertIn("_is_day_cell_selected", source)
         self.assertIn("_timekeeping_app_rerun", source)
+
+    def test_split_layout_and_panel_rendering(self) -> None:
+        render_source = inspect.getsource(tk.render)
+        self.assertIn("weekly_timekeeping_layout", render_source)
+        self.assertIn("_render_day_time_entry_panel", render_source)
+        self.assertIn("_render_timekeeping_table_area", render_source)
+        self.assertIn("ensure_narrow_viewport_detected", render_source)
+        self.assertIn("not _is_narrow_viewport()", render_source)
 
     def test_weekly_toolbar_and_mockup_labels(self) -> None:
         self.assertIn("_render_weekly_timekeeping_toolbar", inspect.getsource(tk.render))
         self.assertIn("Weekly Timekeeping", inspect.getsource(tk.render))
+        self.assertIn("View and manage weekly employee time entries.", inspect.getsource(tk.render))
+        toolbar_source = inspect.getsource(tk._render_weekly_timekeeping_toolbar)
+        self.assertIn("ips-timekeeping-week-helper", toolbar_source)
         self.assertEqual(tk._LIST_VIEW_SUMMARY_LABELS[0], "ST (≤40)")
         self.assertEqual(tk._LIST_VIEW_SUMMARY_LABELS[1], "OT (>40)")
 
