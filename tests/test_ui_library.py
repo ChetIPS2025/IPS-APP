@@ -24,12 +24,13 @@ class UiLibraryTests(unittest.TestCase):
         ):
             self.assertTrue(hasattr(kit, name), msg=name)
 
-    def test_page_header_delegates_to_core_header(self) -> None:
+    def test_page_header_is_self_contained(self) -> None:
         src = inspect.getsource(ui_page_header.render_page_header)
-        self.assertIn("_render_core_header", src)
+        self.assertIn("ips-ph-left", src)
         self.assertIn("inject_ips_ui_styles", src)
         self.assertIn("show_date_range", src)
         self.assertIn("show_refresh", src)
+        self.assertNotIn('format="MMM D, YYYY"', src)
 
     def test_status_badge_normalizes_labels(self) -> None:
         html = ui_status_badge.status_badge_html("pending approval")

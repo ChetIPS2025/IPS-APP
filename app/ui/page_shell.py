@@ -289,10 +289,7 @@ def render_page_header(
     """Delegate to the shared IPS page header component."""
     _ = (help_text, logo_width)
     inject_ips_dashboard_layout()
-    try:
-        from app.ui.page_header import render_page_header as _render_ips_header
-    except ImportError:
-        from ui.page_header import render_page_header as _render_ips_header  # type: ignore
+    from app.ui.page_header import render_page_header as _render_ips_header
     _render_ips_header(
         title,
         subtitle or None,
