@@ -96,7 +96,6 @@ def inject_ips_app_shell_styles() -> None:
             margin-right: auto;
         }
         section[data-testid="stMain"] .block-container {
-            padding-top: 0.1rem !important;
             padding-bottom: 0.75rem !important;
         }
         section[data-testid="stMain"] [data-testid="stVerticalBlock"] > div {

@@ -38,7 +38,6 @@ def inject_ips_dashboard_layout() -> None:
         <style>
         /* App canvas background: see theme.apply_global_app_styles() */
         section[data-testid="stMain"]:has(.ips-page-shell-marker) .block-container {
-            padding-top: 0.08rem !important;
             padding-bottom: 0.7rem !important;
             max-width: 1680px !important;
         }

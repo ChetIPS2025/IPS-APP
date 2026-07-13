@@ -10557,6 +10557,9 @@ def inject_authenticated_shell_css() -> None:
         '<script>document.body.classList.remove("ips-auth-login");document.body.classList.add("ips-authed-app");</script>',
         unsafe_allow_html=True,
     )
+    from app.ui.app_shell_styles import inject_app_shell_layout_styles
+
+    inject_app_shell_layout_styles()
     from app.components.sidebar_shell import inject_desktop_nav_rail_css
     inject_desktop_nav_rail_css()
 
@@ -12350,10 +12353,17 @@ section[data-testid="stMain"] > div,
 }}
 section[data-testid="stMain"]:not(:has(.ips-login-page-marker)) .block-container {{
   max-width: 100% !important;
-  padding-top: 0 !important;
   padding-left: 0 !important;
   padding-right: 0 !important;
   padding-bottom: 2rem !important;
+}}
+body.ips-authed-app section[data-testid="stMain"] .block-container {{
+  padding-top: 12px !important;
+  margin-top: 0 !important;
+}}
+body.ips-authed-app section[data-testid="stMain"] [data-testid="stMainBlockContainer"] {{
+  padding-top: 12px !important;
+  margin-top: 0 !important;
 }}
 section[data-testid="stMain"]:has(.ips-login-page-marker) .block-container {{
   max-width: 100% !important;

@@ -97,8 +97,20 @@ class PageHeaderSourceTests(unittest.TestCase):
 
         src = inspect.getsource(inject_global_css)
         self.assertIn("ips-global-styles-v16", src)
+        self.assertIn("padding-top: 12px !important", src)
         self.assertNotIn("margin-left: -22px", src)
         self.assertNotIn("margin-right: -22px", src)
+
+    def test_app_shell_layout_styles_reset_main_top_gap(self) -> None:
+        from app.ui.app_shell_styles import inject_app_shell_layout_styles
+
+        src = inspect.getsource(inject_app_shell_layout_styles)
+        self.assertIn("ips-app-shell-layout-v1", src)
+        self.assertIn("stMainBlockContainer", src)
+        self.assertIn("padding-top: var(--ips-main-top-gap)", src)
+        self.assertNotIn("margin-top: -", src)
+        self.assertNotIn("translateY", src)
+        self.assertNotIn("position: absolute", src)
 
 
 class NavHistoryTests(unittest.TestCase):
