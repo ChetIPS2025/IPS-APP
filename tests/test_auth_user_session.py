@@ -9,14 +9,20 @@ from unittest.mock import Mock, patch
 import streamlit as st
 
 from app.auth import (
+    AUTH_ACCESS_TOKEN_KEY,
+    AUTH_REFRESH_TOKEN_KEY,
+    AUTH_USER_ID_KEY,
     CURRENT_USER_ID_KEY,
+    CURRENT_USER_PROFILE_KEY,
     IPS_CURRENT_USER_FULL_NAME_KEY,
     _clear_cached_identity_keys,
+    _persist_auth_tokens,
     _sync_current_user_snapshot,
     current_user_display_name,
     ensure_authenticated_user_identity,
     sign_out,
     try_restore_supabase_session_from_cookies,
+    verify_identity_binding_or_stop,
 )
 
 
@@ -34,9 +40,14 @@ class TestAuthUserSession(unittest.TestCase):
             },
             auth_user_id="auth-amanda",
         )
+        self.assertEqual(st.session_state[AUTH_USER_ID_KEY], "auth-amanda")
         self.assertEqual(st.session_state[CURRENT_USER_ID_KEY], "auth-amanda")
         self.assertEqual(
             st.session_state[IPS_CURRENT_USER_FULL_NAME_KEY],
+            "Amanda M. Robicheaux",
+        )
+        self.assertEqual(
+            st.session_state[CURRENT_USER_PROFILE_KEY]["full_name"],
             "Amanda M. Robicheaux",
         )
 
@@ -128,6 +139,58 @@ class TestAuthUserSession(unittest.TestCase):
 
         invalidate_mock.assert_called_once()
         self.assertFalse(st.session_state.get("_ips_auth_clear_pending"))
+
+    def test_persist_auth_tokens_stores_explicit_session_keys(self) -> None:
+        _persist_auth_tokens("access-1", "refresh-1")
+        self.assertEqual(st.session_state[AUTH_ACCESS_TOKEN_KEY], "access-1")
+        self.assertEqual(st.session_state[AUTH_REFRESH_TOKEN_KEY], "refresh-1")
+
+    @patch("app.auth.st.stop")
+    @patch("app.auth.ensure_authenticated_user_identity")
+    @patch("app.auth._live_auth_user_from_client")
+    @patch("app.auth.is_authenticated", return_value=True)
+    def test_verify_identity_binding_stops_on_profile_mismatch(
+        self,
+        _auth_mock,
+        live_user_mock,
+        ensure_mock,
+        stop_mock,
+    ) -> None:
+        live_user_mock.return_value = SimpleNamespace(id="auth-chet", email="chet@example.com")
+        st.session_state["auth_user"] = SimpleNamespace(id="auth-chet", email="chet@example.com")
+        st.session_state[AUTH_USER_ID_KEY] = "auth-chet"
+        st.session_state["auth_profile"] = {
+            "id": "auth-amanda",
+            "full_name": "Amanda M. Robicheaux",
+        }
+        verify_identity_binding_or_stop()
+        stop_mock.assert_called_once()
+
+
+class TestPerSessionSupabaseClient(unittest.TestCase):
+    def setUp(self) -> None:
+        st.session_state.clear()
+
+    @patch("app.db._create_public_supabase_client")
+    def test_get_client_uses_per_streamlit_session_instance(self, create_mock) -> None:
+        from app.db import _IPS_USER_SUPABASE_CLIENT_KEY, get_client
+
+        client_a = SimpleNamespace(auth=SimpleNamespace(get_session=lambda: None))
+        client_b = SimpleNamespace(auth=SimpleNamespace(get_session=lambda: None))
+        create_mock.side_effect = [client_a, client_b]
+
+        st.session_state[AUTH_ACCESS_TOKEN_KEY] = "token-a"
+        st.session_state[AUTH_REFRESH_TOKEN_KEY] = "refresh-a"
+        first = get_client()
+        st.session_state.clear()
+        st.session_state[AUTH_ACCESS_TOKEN_KEY] = "token-b"
+        st.session_state[AUTH_REFRESH_TOKEN_KEY] = "refresh-b"
+        second = get_client()
+
+        self.assertIs(first, client_a)
+        self.assertIs(second, client_b)
+        self.assertIsNot(first, second)
+        self.assertEqual(st.session_state.get(_IPS_USER_SUPABASE_CLIENT_KEY), client_b)
 
 
 if __name__ == "__main__":

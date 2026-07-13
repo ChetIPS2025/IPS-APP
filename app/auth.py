@@ -24,6 +24,11 @@ IPS_CURRENT_USER_FULL_NAME_KEY = "ips_current_user_full_name"
 IPS_CURRENT_USER_ROLE_KEY = "ips_current_user_role"
 
 # Canonical session keys (also cleared on login/logout/user change).
+AUTH_ACCESS_TOKEN_KEY = "auth_access_token"
+AUTH_REFRESH_TOKEN_KEY = "auth_refresh_token"
+AUTH_USER_ID_KEY = "auth_user_id"
+AUTH_EMAIL_KEY = "auth_email"
+CURRENT_USER_PROFILE_KEY = "current_user_profile"
 CURRENT_USER_ID_KEY = "current_user_id"
 CURRENT_USER_KEY = "current_user"
 USER_PROFILE_KEY = "user_profile"
@@ -36,12 +41,17 @@ PREVIEW_MODE_KEY = "preview_mode"
 _CACHED_IDENTITY_KEYS: tuple[str, ...] = (
     CURRENT_USER_KEY,
     CURRENT_USER_ID_KEY,
+    CURRENT_USER_PROFILE_KEY,
     USER_PROFILE_KEY,
     FULL_NAME_KEY,
     DISPLAY_NAME_KEY,
     ROLE_KEY,
     PREVIEW_ROLE_KEY,
     PREVIEW_MODE_KEY,
+    AUTH_ACCESS_TOKEN_KEY,
+    AUTH_REFRESH_TOKEN_KEY,
+    AUTH_USER_ID_KEY,
+    AUTH_EMAIL_KEY,
     IPS_CURRENT_USER_ID_KEY,
     IPS_CURRENT_USER_EMAIL_KEY,
     IPS_CURRENT_USER_FULL_NAME_KEY,
@@ -52,6 +62,11 @@ _CACHED_IDENTITY_KEYS: tuple[str, ...] = (
     "auth_session",
     "user",
     "user_email",
+    "user_profile",
+    "employee_id",
+    "selected_employee",
+    "selected_user",
+    "preview_employee_id",
 )
 
 
@@ -99,6 +114,11 @@ def init_session() -> None:
         "user": None,
         "user_email": None,
         "auth_employee": None,
+        AUTH_ACCESS_TOKEN_KEY: None,
+        AUTH_REFRESH_TOKEN_KEY: None,
+        AUTH_USER_ID_KEY: None,
+        AUTH_EMAIL_KEY: None,
+        CURRENT_USER_PROFILE_KEY: None,
         IPS_CURRENT_USER_ID_KEY: None,
         IPS_CURRENT_USER_EMAIL_KEY: None,
         IPS_CURRENT_USER_FULL_NAME_KEY: None,
@@ -146,6 +166,15 @@ def _cookie_secure_flag() -> bool:
     return False
 
 
+def _persist_auth_tokens(access_token: str, refresh_token: str) -> None:
+    at = str(access_token or "").strip()
+    rt = str(refresh_token or "").strip()
+    if at:
+        st.session_state[AUTH_ACCESS_TOKEN_KEY] = at
+    if rt:
+        st.session_state[AUTH_REFRESH_TOKEN_KEY] = rt
+
+
 def _sync_auth_session_from_client(client: Any) -> None:
     """Store Supabase auth session on ``st.session_state`` (used after login / restore)."""
     try:
@@ -155,6 +184,9 @@ def _sync_auth_session_from_client(client: Any) -> None:
         return
     sess: Any = getattr(raw, "session", raw)
     st.session_state["auth_session"] = sess
+    toks = _auth_session_tokens(client)
+    if toks:
+        _persist_auth_tokens(toks[0], toks[1])
 
 
 def _auth_session_tokens(client: Any) -> tuple[str, str] | None:
@@ -224,6 +256,9 @@ def _clear_cached_identity_keys(*, preserve_auth_checked: bool = False) -> None:
         st.session_state.pop(key, None)
     from app.utils.view_as import clear_view_as
     clear_view_as()
+    from app.db import clear_streamlit_db_read_cache, clear_user_supabase_client
+    clear_user_supabase_client()
+    clear_streamlit_db_read_cache()
     st.session_state["authenticated"] = False
     st.session_state["is_authenticated"] = False
     if preserve_auth_checked:
@@ -260,13 +295,17 @@ def _sync_current_user_snapshot(profile: dict[str, Any], *, auth_user_id: str) -
     email = str(profile.get("email") or _auth_user_email() or "").strip()
     full_name = str(profile.get("full_name") or profile.get("name") or "").strip()
     role = str(profile.get("role") or "viewer").strip()
+    st.session_state[AUTH_USER_ID_KEY] = uid or None
+    st.session_state[AUTH_EMAIL_KEY] = email or None
     st.session_state[CURRENT_USER_ID_KEY] = uid or None
     st.session_state[IPS_CURRENT_USER_ID_KEY] = uid or None
     st.session_state[IPS_CURRENT_USER_EMAIL_KEY] = email or None
     st.session_state[IPS_CURRENT_USER_FULL_NAME_KEY] = full_name or None
     st.session_state[IPS_CURRENT_USER_ROLE_KEY] = role or None
-    st.session_state[CURRENT_USER_KEY] = dict(profile)
-    st.session_state[USER_PROFILE_KEY] = dict(profile)
+    profile_copy = dict(profile)
+    st.session_state[CURRENT_USER_KEY] = profile_copy
+    st.session_state[USER_PROFILE_KEY] = profile_copy
+    st.session_state[CURRENT_USER_PROFILE_KEY] = profile_copy
     st.session_state[FULL_NAME_KEY] = full_name or None
     st.session_state[DISPLAY_NAME_KEY] = full_name or None
     st.session_state[ROLE_KEY] = role or None
@@ -298,7 +337,7 @@ def _fetch_profile_for_auth_user_id(uid: str) -> dict[str, Any] | None:
     auth_uid = str(uid or "").strip()
     if not auth_uid:
         return None
-    from app.db import clear_streamlit_db_read_cache
+    from app.db import clear_streamlit_db_read_cache, fetch_by_match_admin, fetch_one
     clear_streamlit_db_read_cache()
 
     profile = fetch_one("profiles", {"id": auth_uid})
@@ -311,6 +350,30 @@ def _fetch_profile_for_auth_user_id(uid: str) -> dict[str, Any] | None:
         profile = fetch_one("profiles", {"user_id": auth_uid})
         if profile and _profile_matches_auth_user(profile, auth_uid):
             return profile
+
+    emp_rows = fetch_by_match_admin(
+        "employees",
+        {"auth_user_id": auth_uid},
+        columns="id,email,name,role,profile_id,auth_user_id",
+        limit=1,
+    )
+    if emp_rows:
+        emp = emp_rows[0]
+        profile_id = str(emp.get("profile_id") or "").strip()
+        if profile_id:
+            linked = fetch_one("profiles", {"id": profile_id})
+            if linked and _profile_matches_auth_user(linked, auth_uid):
+                return linked
+        return {
+            "id": auth_uid,
+            "user_id": auth_uid,
+            "email": str(emp.get("email") or "").strip(),
+            "full_name": str(emp.get("name") or "").strip(),
+            "name": str(emp.get("name") or "").strip(),
+            "role": str(emp.get("role") or "employee").strip(),
+            "employee_id": str(emp.get("id") or "").strip(),
+            "is_active": True,
+        }
     return None
 
 
@@ -351,7 +414,8 @@ def ensure_authenticated_user_identity(*, force_profile_reload: bool = False) ->
     if identity_changed or force_profile_reload:
         if identity_changed:
             _clear_cached_identity_keys(preserve_auth_checked=True)
-            from app.db import clear_streamlit_db_read_cache
+            from app.db import clear_streamlit_db_read_cache, clear_user_supabase_client
+            clear_user_supabase_client()
             clear_streamlit_db_read_cache()
 
         profile = _fetch_profile_for_auth_user_id(live_uid)
@@ -742,6 +806,7 @@ def sign_in(email: str, password: str, *, remember_device: bool = False) -> None
     toks = _auth_session_tokens(client)
     if toks:
         at, rt = toks
+        _persist_auth_tokens(at, rt)
         st.session_state["_ips_auth_persist_pending"] = {
             "access_token": at,
             "refresh_token": rt,
@@ -814,6 +879,7 @@ def verify_phone_otp(*, phone_number: str, code: str, remember_device: bool = Fa
     toks = _auth_session_tokens(client)
     if toks:
         at, rt = toks
+        _persist_auth_tokens(at, rt)
         st.session_state["_ips_auth_persist_pending"] = {
             "access_token": at,
             "refresh_token": rt,
@@ -840,6 +906,45 @@ def current_profile() -> dict:
     return st.session_state.get("auth_profile") or {}
 
 
+def verify_identity_binding_or_stop() -> None:
+    """Abort the run when the loaded profile does not match the authenticated user."""
+    if not is_authenticated():
+        return
+    ensure_authenticated_user_identity()
+    live_user = _live_auth_user_from_client()
+    authenticated_id = _auth_user_id(live_user) or str(st.session_state.get(AUTH_USER_ID_KEY) or "").strip()
+    if not authenticated_id:
+        return
+
+    stored_id = str(st.session_state.get(AUTH_USER_ID_KEY) or st.session_state.get(CURRENT_USER_ID_KEY) or "").strip()
+    if stored_id and stored_id != authenticated_id:
+        _log.error(
+            "Identity mismatch: session auth_user_id=%s authenticated=%s",
+            stored_id,
+            authenticated_id,
+        )
+        _clear_cached_identity_keys(preserve_auth_checked=True)
+        st.error("Your account profile could not be verified. Please sign in again.")
+        st.stop()
+
+    prof = st.session_state.get("auth_profile") or st.session_state.get(CURRENT_USER_PROFILE_KEY) or {}
+    profile_auth_id = str(prof.get("id") or prof.get("user_id") or "").strip()
+    if profile_auth_id and profile_auth_id != authenticated_id:
+        _log.error(
+            "Identity mismatch: authenticated user %s loaded profile %s",
+            authenticated_id,
+            profile_auth_id,
+        )
+        _clear_cached_identity_keys(preserve_auth_checked=True)
+        st.error("Your account profile could not be verified. Please sign in again.")
+        st.stop()
+
+    st.session_state[AUTH_USER_ID_KEY] = authenticated_id
+    email = _auth_user_email(live_user) or str(prof.get("email") or "").strip()
+    if email:
+        st.session_state[AUTH_EMAIL_KEY] = email
+
+
 def current_user_display_name() -> str:
     """Display name for greetings — always the authenticated profile, never preview/employee cache."""
     ensure_authenticated_user_identity()
@@ -850,6 +955,7 @@ def current_user_display_name() -> str:
     email = str(
         prof.get("email")
         or st.session_state.get(IPS_CURRENT_USER_EMAIL_KEY)
+        or st.session_state.get(AUTH_EMAIL_KEY)
         or st.session_state.get("user_email")
         or _auth_user_email()
         or ""
@@ -867,21 +973,23 @@ def render_auth_identity_debug_panel() -> None:
     live_uid = _auth_user_id(_live_auth_user_from_client())
     session_uid = _auth_user_id()
     stored_uid = str(st.session_state.get(CURRENT_USER_ID_KEY) or "").strip()
-    prof = st.session_state.get("auth_profile") or {}
+    prof = st.session_state.get("auth_profile") or st.session_state.get(CURRENT_USER_PROFILE_KEY) or {}
     prof_name = str(prof.get("full_name") or prof.get("name") or "").strip() or "—"
-    auth_email = _auth_user_email() or "—"
+    auth_email = _auth_user_email() or str(st.session_state.get(AUTH_EMAIL_KEY) or "—")
+    from app.utils.view_as import is_view_as_active, view_as_display_label
+    preview_label = view_as_display_label() if is_view_as_active() else "—"
     with st.expander("Auth identity debug (admin)", expanded=False):
         st.code(
             "\n".join(
                 [
-                    f"auth.user.id: {live_uid or session_uid or '—'}",
-                    f"session auth_user.id: {session_uid or '—'}",
-                    f"session current_user_id: {stored_uid or '—'}",
-                    f"authenticated email: {auth_email}",
-                    f"loaded profile.id: {str(prof.get('id') or '—')}",
-                    f"loaded profile.user_id: {str(prof.get('user_id') or '—')}",
-                    f"loaded profile full_name: {prof_name}",
-                    f"greeting display name: {current_user_display_name()}",
+                    f"Authenticated user ID: {live_uid or session_uid or '—'}",
+                    f"Authenticated email: {auth_email}",
+                    f"Session auth_user_id: {str(st.session_state.get(AUTH_USER_ID_KEY) or stored_uid or '—')}",
+                    f"Loaded profile ID: {str(prof.get('id') or '—')}",
+                    f"Loaded profile name: {prof_name}",
+                    f"Loaded profile auth user ID: {str(prof.get('id') or prof.get('user_id') or '—')}",
+                    f"Preview mode: {preview_label}",
+                    f"Greeting display name: {current_user_display_name()}",
                 ]
             )
         )

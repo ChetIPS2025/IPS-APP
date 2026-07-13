@@ -36,15 +36,14 @@ def _create_admin_supabase_client(url: str, key: str) -> Client:
 
 
 if _st_for_cache is not None:
-    _cached_public_supabase = _st_for_cache.cache_resource(_create_public_supabase_client)
     _cached_admin_supabase = _st_for_cache.cache_resource(_create_admin_supabase_client)
 else:
-    _cached_public_supabase = _create_public_supabase_client
     _cached_admin_supabase = _create_admin_supabase_client
 
 _client_fallback: Client | None = None
 _admin_client_fallback: Client | None = None
 _supabase_publishable_patch_applied = False
+_IPS_USER_SUPABASE_CLIENT_KEY = "_ips_supabase_user_client"
 
 
 def _patch_supabase_publishable_keys() -> None:
@@ -223,8 +222,8 @@ def get_client() -> Client:
     """
     Supabase client with the **publishable / anon** key only (RLS applies).
 
-    The underlying ``create_client`` is wrapped with ``streamlit.cache_resource`` so the
-    heavy client is built once per process per (url, key) pair.
+    Each Streamlit browser session gets its own client instance so mutable
+    ``auth.set_session`` state cannot leak across concurrent users.
     """
     from app.config import validate_supabase_public_config
     cfg_err = validate_supabase_public_config()
@@ -240,7 +239,12 @@ def get_client() -> Client:
         )
     if _st_for_cache is not None:
         try:
-            return _cached_public_supabase(url, public_key)
+            client = _st_for_cache.session_state.get(_IPS_USER_SUPABASE_CLIENT_KEY)
+            if client is None:
+                client = _create_public_supabase_client(url, public_key)
+                _st_for_cache.session_state[_IPS_USER_SUPABASE_CLIENT_KEY] = client
+            _sync_streamlit_session_to_client(client)
+            return client
         except Exception as exc:
             raise RuntimeError(f"create_client (anon) failed: {exc!r}") from exc
     global _client_fallback
@@ -250,6 +254,13 @@ def get_client() -> Client:
         except Exception as exc:
             raise RuntimeError(f"create_client (anon) failed: {exc!r}") from exc
     return _client_fallback
+
+
+def clear_user_supabase_client() -> None:
+    """Drop the per-session user Supabase client (login/logout/user change)."""
+    if _st_for_cache is None:
+        return
+    _st_for_cache.session_state.pop(_IPS_USER_SUPABASE_CLIENT_KEY, None)
 
 
 def get_admin_client() -> Client:
@@ -329,28 +340,69 @@ def _auth_session_tokens_from_client(client: Any) -> tuple[str, str] | None:
     return at_s, rt_s
 
 
-def _ensure_supabase_client_session() -> None:
-    """Attach Streamlit session tokens to the shared client when JWT is missing."""
+def _session_tokens_from_streamlit_state() -> tuple[str, str]:
+    """Return this Streamlit session's Supabase JWT pair, if stored."""
+    if _st_for_cache is None:
+        return "", ""
+    at = str(_st_for_cache.session_state.get("auth_access_token") or "").strip()
+    rt = str(_st_for_cache.session_state.get("auth_refresh_token") or "").strip()
+    if at and rt:
+        return at, rt
+    stored = _st_for_cache.session_state.get("auth_session")
+    if stored is None:
+        return "", ""
+    at_val = getattr(stored, "access_token", None)
+    rt_val = getattr(stored, "refresh_token", None)
+    if at_val is None and isinstance(stored, dict):
+        at_val = stored.get("access_token")
+        rt_val = stored.get("refresh_token")
+    return str(at_val or "").strip(), str(rt_val or "").strip()
+
+
+def _live_auth_user_id_from_client(client: Any) -> str:
+    try:
+        gu = client.auth.get_user()
+        user = getattr(gu, "user", None)
+        if user is None and isinstance(gu, dict):
+            user = gu.get("user")
+        uid = getattr(user, "id", None)
+        if uid is None and isinstance(user, dict):
+            uid = user.get("id")
+        return str(uid or "").strip()
+    except Exception:
+        return ""
+
+
+def _sync_streamlit_session_to_client(client: Client) -> None:
+    """Bind this Streamlit session's JWT to its dedicated Supabase client."""
     if _st_for_cache is None:
         return
+    at_s, rt_s = _session_tokens_from_streamlit_state()
+    if not at_s or not rt_s:
+        return
+    expected_uid = str(
+        _st_for_cache.session_state.get("auth_user_id")
+        or _st_for_cache.session_state.get("current_user_id")
+        or ""
+    ).strip()
+    current = _auth_session_tokens_from_client(client)
+    if current == (at_s, rt_s) and expected_uid:
+        if _live_auth_user_id_from_client(client) == expected_uid:
+            return
     try:
-        client = get_client()
-        if _auth_session_tokens_from_client(client):
-            return
-        stored = _st_for_cache.session_state.get("auth_session")
-        if stored is None:
-            return
-        at = getattr(stored, "access_token", None)
-        rt = getattr(stored, "refresh_token", None)
-        if at is None and isinstance(stored, dict):
-            at = stored.get("access_token")
-            rt = stored.get("refresh_token")
-        at_s = str(at or "").strip()
-        rt_s = str(rt or "").strip()
-        if at_s and rt_s:
-            client.auth.set_session(at_s, rt_s)
+        client.auth.set_session(at_s, rt_s)
     except Exception as exc:
-        _LOG.debug("ensure supabase client session failed: %r", exc)
+        _LOG.debug("sync streamlit session to client failed: %r", exc)
+
+
+def _ensure_supabase_client_session() -> None:
+    """Attach this Streamlit session's tokens to its dedicated Supabase client."""
+    if _st_for_cache is None:
+        return
+    client = _st_for_cache.session_state.get(_IPS_USER_SUPABASE_CLIENT_KEY)
+    if client is None:
+        return
+    _sync_streamlit_session_to_client(client)
 
 
 def _fetch_table_query(

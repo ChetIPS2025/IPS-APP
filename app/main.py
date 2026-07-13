@@ -237,6 +237,8 @@ def main() -> None:
 
     persist_auth_cookies_if_pending()
     inject_authenticated_shell_css()
+    from app.auth import render_auth_identity_debug_panel, verify_identity_binding_or_stop
+    verify_identity_binding_or_stop()
     inject_sidebar_mobile_auto_collapse_once()
     log_auth_state("app_authenticated")
 
@@ -306,6 +308,8 @@ def main() -> None:
     from app.components.sidebar_shell import inject_desktop_nav_rail_markup
     if not is_view_as_mobile_preview():
         inject_desktop_nav_rail_markup(active_slug=slug)
+
+    render_auth_identity_debug_panel()
 
 
 if __name__ == "__main__":
