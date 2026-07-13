@@ -118,6 +118,16 @@ def test_inject_sidebar_layout_state_only_collapses_on_desktop():
     assert "desktop &&" in source
 
 
+def test_inject_sidebar_shell_uses_inline_scripts_not_iframes():
+    import inspect
+
+    from app.components.sidebar_shell import inject_sidebar_shell
+
+    source = inspect.getsource(inject_sidebar_shell)
+    assert "inject_app_shell_script" in source
+    assert "components.html" not in source
+
+
 def test_inject_sidebar_shell_injects_layout_on_every_render():
     import inspect
 

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import streamlit as st
-import streamlit.components.v1 as components
+
+from app.ui.app_shell_styles import inject_app_shell_script
 
 IPS_GLOBAL_MOBILE_CSS_KEY = "ips_global_mobile_css_injected"
 IPS_VIEWPORT_NARROW_KEY = "ips_viewport_narrow"
@@ -36,7 +37,7 @@ def ensure_narrow_viewport_detected() -> None:
     if st.session_state.get(_VP_SCRIPT_SENT_KEY):
         return
     st.session_state[_VP_SCRIPT_SENT_KEY] = True
-    components.html(
+    inject_app_shell_script(
         """
 <script>
 (function () {
@@ -50,8 +51,7 @@ def ensure_narrow_viewport_detected() -> None:
   } catch (e) {}
 })();
 </script>
-        """,
-        height=0,
+        """
     )
 
 # Main content only — sidebar nav styling stays in sidebar_shell.py
@@ -428,7 +428,7 @@ def inject_sidebar_mobile_auto_collapse_once() -> None:
     if st.session_state.get(IPS_SIDEBAR_MOBILE_COLLAPSE_KEY):
         return
     st.session_state[IPS_SIDEBAR_MOBILE_COLLAPSE_KEY] = True
-    components.html(
+    inject_app_shell_script(
         """
 <script>
 (function () {
@@ -485,8 +485,7 @@ def inject_sidebar_mobile_auto_collapse_once() -> None:
   setTimeout(run, 800);
 })();
 </script>
-        """,
-        height=0,
+        """
     )
 
 

@@ -4,7 +4,19 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_APP_SHELL_LAYOUT_STYLES_KEY = "ips_app_shell_layout_styles_v1"
+IPS_APP_SHELL_LAYOUT_STYLES_KEY = "ips_app_shell_layout_styles_v2"
+IPS_APP_SHELL_SCRIPT_MARKER_CLASS = "ips-app-shell-script-marker"
+
+
+def inject_app_shell_script(script_html: str) -> None:
+    """Inject layout JS in the main document without zero-height Streamlit iframes."""
+    snippet = str(script_html or "").strip()
+    if not snippet:
+        return
+    st.markdown(
+        f'<span class="{IPS_APP_SHELL_SCRIPT_MARKER_CLASS}" aria-hidden="true"></span>{snippet}',
+        unsafe_allow_html=True,
+    )
 
 
 def inject_app_shell_layout_styles() -> None:
@@ -14,7 +26,7 @@ def inject_app_shell_layout_styles() -> None:
     st.session_state[IPS_APP_SHELL_LAYOUT_STYLES_KEY] = True
     st.markdown(
         """
-<style id="ips-app-shell-layout-v1">
+<style id="ips-app-shell-layout-v2">
 :root {
   --ips-main-top-gap: 12px;
 }
@@ -44,6 +56,7 @@ body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContain
   margin-top: 0 !important;
   padding-top: 0 !important;
 }
+body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(.ips-app-shell-script-marker),
 body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(style),
 body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(script) {
   display: none !important;
@@ -54,9 +67,13 @@ body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContain
   padding: 0 !important;
   overflow: hidden !important;
 }
+body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has([data-testid="stIFrame"][height="0"]),
+body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(iframe.stIFrame[height="0"]),
+body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has([data-testid="stCustomComponentV1"][height="0"]),
 body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(iframe[title="streamlit_components_v1.iframe"][height="0"]),
-body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(> div[style*="height: 0px"] > iframe[title="streamlit_components_v1.iframe"]),
-body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(> div[style*="height:0px"] > iframe[title="streamlit_components_v1.iframe"]) {
+body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(> div[style*="height: 0px"] > iframe),
+body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(> div[style*="height:0px"] > iframe) {
+  display: none !important;
   height: 0 !important;
   min-height: 0 !important;
   max-height: 0 !important;
@@ -65,12 +82,18 @@ body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContain
   overflow: hidden !important;
   border: none !important;
 }
+body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has([data-testid="stIFrame"][height="0"]) > div,
+body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(iframe.stIFrame[height="0"]) > div,
+body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has([data-testid="stCustomComponentV1"][height="0"]) > div,
 body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(iframe[title="streamlit_components_v1.iframe"][height="0"]) > div,
-body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(> div[style*="height: 0px"] > iframe[title="streamlit_components_v1.iframe"]) > div,
-body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(> div[style*="height:0px"] > iframe[title="streamlit_components_v1.iframe"]) > div,
+body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(> div[style*="height: 0px"] > iframe) > div,
+body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(> div[style*="height:0px"] > iframe) > div,
+body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has([data-testid="stIFrame"][height="0"]) iframe,
+body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(iframe.stIFrame[height="0"]) iframe,
+body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has([data-testid="stCustomComponentV1"][height="0"]) iframe,
 body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(iframe[title="streamlit_components_v1.iframe"][height="0"]) iframe,
-body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(> div[style*="height: 0px"] > iframe[title="streamlit_components_v1.iframe"]) iframe,
-body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(> div[style*="height:0px"] > iframe[title="streamlit_components_v1.iframe"]) iframe {
+body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(> div[style*="height: 0px"] > iframe) iframe,
+body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(> div[style*="height:0px"] > iframe) iframe {
   height: 0 !important;
   min-height: 0 !important;
   max-height: 0 !important;
@@ -96,4 +119,9 @@ body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContain
     )
 
 
-__all__ = ["inject_app_shell_layout_styles", "IPS_APP_SHELL_LAYOUT_STYLES_KEY"]
+__all__ = [
+    "inject_app_shell_layout_styles",
+    "inject_app_shell_script",
+    "IPS_APP_SHELL_LAYOUT_STYLES_KEY",
+    "IPS_APP_SHELL_SCRIPT_MARKER_CLASS",
+]

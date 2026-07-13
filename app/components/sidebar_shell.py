@@ -8,7 +8,8 @@ from pathlib import Path
 from typing import Any
 
 import streamlit as st
-import streamlit.components.v1 as components
+
+from app.ui.app_shell_styles import inject_app_shell_script
 
 IPS_SIDEBAR_SHELL_KEY = "_ips_sidebar_shell_injected"
 IPS_SIDEBAR_NAV_FALLBACK_KEY = "_ips_sidebar_nav_fallback_items"
@@ -469,7 +470,7 @@ def inject_sidebar_shell() -> None:
     st.markdown(_shell_css(), unsafe_allow_html=True)
 
     nav_json = _fallback_nav_json()
-    components.html(_shell_script(nav_json), height=0)
+    inject_app_shell_script(_shell_script(nav_json))
 
     inject_sidebar_menu_wire()
     inject_mobile_nav_menu_button()
@@ -477,7 +478,7 @@ def inject_sidebar_shell() -> None:
     inject_sidebar_layout_state(collapsed)
 
     if st.session_state.pop(IPS_SIDEBAR_TOGGLE_REQUEST_KEY, False):
-        components.html(_toggle_script(collapsed=collapsed, after_nav=True), height=0)
+        inject_app_shell_script(_toggle_script(collapsed=collapsed, after_nav=True))
 
     st.session_state[IPS_SIDEBAR_SHELL_KEY] = True
 
@@ -926,7 +927,7 @@ def inject_sidebar_layout_state(collapsed: bool) -> None:
     """Sync collapsed body class + localStorage after each render."""
     flag = "1" if collapsed else "0"
     desktop_min = IPS_SIDEBAR_DESKTOP_MIN_PX
-    components.html(
+    inject_app_shell_script(
         f"""
 <script>
 (function () {{
@@ -958,14 +959,13 @@ def inject_sidebar_layout_state(collapsed: bool) -> None:
   setTimeout(apply, 180);
 }})();
 </script>
-        """,
-        height=0,
+        """
     )
 
 
 def inject_sidebar_nav_align() -> None:
     """Split nav button labels into icon + text columns for left-aligned sidebar rows."""
-    components.html(
+    inject_app_shell_script(
         """
 <script>
 (function () {
@@ -1030,14 +1030,13 @@ def inject_sidebar_nav_align() -> None:
   setTimeout(run, 180);
 })();
 </script>
-        """,
-        height=0,
+        """
     )
 
 
 def inject_sidebar_menu_wire() -> None:
     """Re-bind header menu buttons after each module render."""
-    components.html(
+    inject_app_shell_script(
         """
 <script>
 (function () {
@@ -1059,8 +1058,7 @@ def inject_sidebar_menu_wire() -> None:
   setTimeout(function () { wire(rootDoc()); }, 40);
 })();
 </script>
-        """,
-        height=0,
+        """
     )
 
 

@@ -105,9 +105,11 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.ui.app_shell_styles import inject_app_shell_layout_styles
 
         src = inspect.getsource(inject_app_shell_layout_styles)
-        self.assertIn("ips-app-shell-layout-v1", src)
+        self.assertIn("ips-app-shell-layout-v2", src)
         self.assertIn("stMainBlockContainer", src)
         self.assertIn("padding-top: var(--ips-main-top-gap)", src)
+        self.assertIn("ips-app-shell-script-marker", src)
+        self.assertIn("stIFrame", src)
         self.assertNotIn("margin-top: -", src)
         self.assertNotIn("translateY", src)
         self.assertNotIn("position: absolute", src)
