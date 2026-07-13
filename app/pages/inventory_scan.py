@@ -373,24 +373,12 @@ def _item_model_line(item: dict[str, Any], sku: str) -> str:
 
 
 def _render_mobile_use_inventory_header() -> None:
-    """IPS logo, page title, and subtitle for the mobile use-inventory scan page."""
-    try:
-        from app.branding import wording_logo_html
-    except ImportError:
-        from branding import wording_logo_html  # type: ignore
+    """Page chrome for the mobile use-inventory scan route."""
     try:
         from app.components.headers import render_page_brand_header
     except ImportError:
         from components.headers import render_page_brand_header  # type: ignore
 
-    ot, ct = "d" + "iv", "/" + "d" + "iv"
-    logo = wording_logo_html(height=56)
-    st.markdown(
-        f'<{ot} class="ips-inv-qr-mobile-header">'
-        f'<{ot} class="ips-inv-qr-mobile-logo">{logo}</{ct}>'
-        f"</{ct}>",
-        unsafe_allow_html=True,
-    )
     render_page_brand_header(
         "Use Inventory",
         "Consumable materials — enter quantity and where used (Use on Job or Use in Shop).",
@@ -909,7 +897,6 @@ def _render_inv_scan_asset_panel(
 
 
 def render() -> None:
-    st.title("Scan")
     try:
         _render_inventory_scan_inner()
     except Exception as exc:

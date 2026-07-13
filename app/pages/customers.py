@@ -1979,17 +1979,20 @@ def render_customer_detail(customer_id: str) -> None:
         st.session_state[_CUSTOMERS_CACHE_KEY] = cache
     st.session_state[SELECTED_CUSTOMER_KEY] = cid
 
-    render_customer_detail_dialog(customer)
+    render_customer_detail_dialog(customer, page_mode=True)
 
 
-def render_customer_detail_dialog(customer: dict) -> None:
+def render_customer_detail_dialog(customer: dict, *, page_mode: bool = False) -> None:
     rk = record_session_key(customer, "id", "customer_name")
     cname = safe_value(customer.get("customer_name") or customer.get("company_name"))
     status = safe_value(customer.get("status"))
     cid = str(customer.get("id") or "")
 
-    render_modal_shell()
-    render_modal_header(title=cname, subtitle="Customer", status=status)
+    if not page_mode:
+        render_modal_shell()
+        render_modal_header(title=cname, subtitle="Customer", status=status)
+    else:
+        st.markdown('<span class="ips-customers-detail-body" aria-hidden="true"></span>', unsafe_allow_html=True)
 
     render_modal_edit_button(
         module=_MOD,

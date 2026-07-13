@@ -1755,10 +1755,10 @@ def render_estimate_detail(estimate_id: str) -> None:
     )
 
     st.session_state[ACTIVE_ESTIMATE_KEY] = eid
-    render_estimate_detail_dialog(est)
+    render_estimate_detail_dialog(est, page_mode=True)
 
 
-def render_estimate_detail_dialog(est: dict) -> None:
+def render_estimate_detail_dialog(est: dict, *, page_mode: bool = False) -> None:
     rk = record_session_key(est, "id", "estimate_number")
     eid = str(est.get("id") or "")
     if eid and not is_demo_id(eid):
@@ -1775,9 +1775,12 @@ def render_estimate_detail_dialog(est: dict) -> None:
     total = _estimate_customer_price(est)
     linked_job = str(est.get("job_id") or est.get("job_number") or "").strip()
 
-    render_modal_shell()
-    st.markdown('<span class="ips-estimate-detail-modal" aria-hidden="true"></span>', unsafe_allow_html=True)
-    render_modal_header(title=en, subtitle=project, status=status)
+    if not page_mode:
+        render_modal_shell()
+        st.markdown('<span class="ips-estimate-detail-modal" aria-hidden="true"></span>', unsafe_allow_html=True)
+        render_modal_header(title=en, subtitle=project, status=status)
+    else:
+        st.markdown('<span class="ips-estimate-detail-page" aria-hidden="true"></span>', unsafe_allow_html=True)
 
     editing_locked = _approved_estimate_editing_locked(est)
     if editing_locked:

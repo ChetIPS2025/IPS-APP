@@ -701,8 +701,6 @@ def render_asset_scan_page() -> None:
         render_rental_equipment_dashboard(asset)
         return
 
-    st.markdown("## IPS Asset Card")
-
     if view == "inspection":
         _render_inspection_form(asset)
     elif view == "issue":

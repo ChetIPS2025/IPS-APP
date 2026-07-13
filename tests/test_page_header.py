@@ -55,6 +55,21 @@ class PageHeaderSourceTests(unittest.TestCase):
         src = inspect.getsource(headers.render_page_header)
         self.assertIn("app.ui.page_header", src)
 
+    def test_full_page_detail_skips_duplicate_modal_header(self) -> None:
+        from app.pages import customers as customers_page
+        from app.pages import estimates as estimates_page
+
+        est_src = inspect.getsource(estimates_page.render_estimate_detail_dialog)
+        self.assertIn("page_mode", est_src)
+        self.assertIn("if not page_mode:", est_src)
+
+        cust_src = inspect.getsource(customers_page.render_customer_detail_dialog)
+        self.assertIn("page_mode", cust_src)
+        self.assertIn("if not page_mode:", cust_src)
+
+        inv_src = inspect.getsource(__import__("app.pages.inventory_scan", fromlist=["render"]).render)
+        self.assertNotIn("st.title", inv_src)
+
     def test_global_header_css_avoids_negative_margins(self) -> None:
         from app.styles import inject_global_css
 
