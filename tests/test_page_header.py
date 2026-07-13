@@ -70,6 +70,16 @@ class PageHeaderSourceTests(unittest.TestCase):
         inv_src = inspect.getsource(__import__("app.pages.inventory_scan", fromlist=["render"]).render)
         self.assertNotIn("st.title", inv_src)
 
+    def test_date_range_label_formats_like_mockup(self) -> None:
+        from datetime import date
+
+        from app.ui.page_header import _format_date_range_label
+
+        self.assertEqual(
+            _format_date_range_label(date(2026, 7, 13), date(2026, 7, 19)),
+            "Jul 13 – Jul 19, 2026",
+        )
+
     def test_global_header_css_avoids_negative_margins(self) -> None:
         from app.styles import inject_global_css
 

@@ -370,7 +370,7 @@ def load_recent_item_activity(*, limit: int = 10) -> tuple[list[dict[str, str]],
     items = recent_item_activity_feed(limit=limit)
     if items:
         return items, True
-    return demo_item_activities()[:limit], False
+    return demo_activities()[:limit], False
 
 
 def demo_qr_scans() -> list[dict[str, str]]:

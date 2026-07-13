@@ -12712,13 +12712,40 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVertic
   padding: 0 0.85rem !important;
   white-space: nowrap !important;
 }}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-action-slot) [data-testid="stDateInput"] {{
-  min-width: 220px !important;
-  width: 240px !important;
-  max-width: 260px !important;
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-date-marker) [data-testid="stPopover"] > button {{
+  min-height: 40px !important;
+  height: 40px !important;
+  border-radius: 8px !important;
+  border: 1px solid #d1d5db !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+  padding: 0 0.85rem 0 2rem !important;
+  box-shadow: none !important;
+  position: relative !important;
+  width: 100% !important;
 }}
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-action-slot) [data-testid="stDateInput"] > div,
-.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-action-slot) [data-testid="stDateInput"] input {{
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-date-marker) [data-testid="stPopover"] > button::before {{
+  content: "📅" !important;
+  position: absolute !important;
+  left: 0.65rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  font-size: 0.95rem !important;
+  line-height: 1 !important;
+}}
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-date-marker) {{
+  position: relative !important;
+  min-width: 220px !important;
+}}
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-date-marker) [data-testid="stPopover"] {{
+  width: 100% !important;
+}}
+.ips-ph-date-marker {{
+  display: none !important;
+}}
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-action-slot) [data-testid="stDateInput"] {{
   min-height: 40px !important;
   height: 40px !important;
   border-radius: 8px !important;
@@ -15589,7 +15616,7 @@ def inject_ops_dashboard_css() -> None:
     """Compact operations dashboard layout — KPI row, news, quick actions, activity grid."""
     st.markdown(
         """
-<style id="ips-ops-dashboard-v27">
+<style id="ips-ops-dashboard-v28">
 /* ── App shell: flex main beside sidebar (desktop only) ── */
 .stApp:has(.ips-ops-dashboard-marker) [data-testid="stAppViewContainer"] {
   width: 100% !important;
@@ -15606,11 +15633,23 @@ def inject_ops_dashboard_css() -> None:
   background: #f1f5f9 !important;
 }
 @media (min-width: 900px) {
-  .stApp:has(.ips-ops-dashboard-marker) [data-testid="stAppViewContainer"] {
+  .stApp:has(.ips-ops-dashboard-marker):has(.ips-desktop-nav-rail) [data-testid="stAppViewContainer"] {
+    display: block !important;
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+  }
+  .stApp:has(.ips-ops-dashboard-marker):has(.ips-desktop-nav-rail) section[data-testid="stSidebar"] {
+    display: none !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    flex: 0 0 0 !important;
+  }
+  .stApp:has(.ips-ops-dashboard-marker):not(:has(.ips-desktop-nav-rail)) [data-testid="stAppViewContainer"] {
     display: flex !important;
     flex-direction: row !important;
   }
-  .stApp:has(.ips-ops-dashboard-marker) section[data-testid="stSidebar"] {
+  .stApp:has(.ips-ops-dashboard-marker):not(:has(.ips-desktop-nav-rail)) section[data-testid="stSidebar"] {
     flex: 0 0 230px !important;
     width: 230px !important;
     min-width: 230px !important;
@@ -15691,6 +15730,7 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stEle
   overflow: visible !important;
 }
 .st-key-dashboard_ops_kpis,
+.st-key-dashboard_ops_panels,
 .st-key-dashboard_ops_row2,
 .st-key-dashboard_estimates_waiting_table,
 .st-key-dashboard_active_jobs_table,
@@ -16092,6 +16132,137 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="colum
   .ips-ops-kpi-grid {
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
+  .ips-ops-kpi-grid .ips-ops-kpi-card:nth-child(7),
+  .ips-ops-kpi-grid .ips-ops-kpi-card:nth-child(8) {
+    grid-column: span 3;
+  }
+}
+
+/* ── Dashboard ops panels: Jobs by Status + Recent Activity ── */
+.st-key-dashboard_ops_panels {
+  margin-top: 4px !important;
+}
+.st-key-dashboard_ops_panels [data-testid="stHorizontalBlock"] {
+  align-items: stretch !important;
+  gap: 16px !important;
+}
+.st-key-dashboard_ops_panels [data-testid="column"] {
+  min-width: 0 !important;
+}
+.ips-dash-ops-panel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 11px;
+  padding: 16px 18px 14px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  height: 100%;
+  box-sizing: border-box;
+}
+.ips-dash-ops-panel-title {
+  margin: 0 0 14px;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+}
+.ips-dash-status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ips-dash-status-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ips-dash-status-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ips-dash-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.ips-dash-status-label {
+  flex: 1 1 auto;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #334155;
+}
+.ips-dash-status-count {
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+.ips-dash-status-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: #eef2f7;
+  overflow: hidden;
+}
+.ips-dash-status-bar {
+  height: 100%;
+  border-radius: 999px;
+  min-width: 4px;
+  transition: width 0.2s ease;
+}
+.ips-dash-activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 220px;
+}
+.ips-dash-activity-item {
+  display: grid;
+  grid-template-columns: 30px 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+.ips-dash-activity-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+.ips-dash-activity-text {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.35;
+  min-width: 0;
+}
+.ips-dash-activity-time {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+.ips-dash-activity-empty {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #94a3b8;
+  font-style: italic;
+}
+.ips-dash-ops-panel-link {
+  display: inline-block;
+  margin-top: 14px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #2563eb;
+  text-decoration: none;
+}
+.ips-dash-ops-panel-link:hover,
+.ips-dash-ops-panel-link:focus {
+  color: #1d4ed8;
+  text-decoration: underline;
 }
 
 /* ── Second row: news + quick actions ── */

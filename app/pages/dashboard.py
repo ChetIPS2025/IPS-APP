@@ -8,19 +8,12 @@ from datetime import date, timedelta
 import streamlit as st
 
 try:
-    from app.auth import current_profile, current_role, current_user_display_name, effective_role
-    from app.components.headers import (
-        render_ops_quick_action_tiles,
-    )
-    from app.components.dashboard_active_jobs_table import render_dashboard_active_jobs_table
-    from app.components.dashboard_estimates_waiting_table import render_dashboard_estimates_waiting_table
-    from app.components.company_updates_feed import render_dashboard_company_updates_section
-    from app.components.dashboard_preview_cards import render_dashboard_preview_sections
+    from app.auth import current_profile, current_user_display_name, effective_role
+    from app.components.dashboard_ops_panels import render_dashboard_ops_panels
+    from app.components.quote_job_number_autofill import clear_new_job_number_state
+    from app.navigation import set_nav_slug
     from app.pages._core._data import (
-        load_awarded_jobs,
         load_dashboard_kpis,
-        load_estimates,
-        load_recent_company_updates,
         load_tasks,
         load_timekeeping_summaries,
     )
@@ -28,19 +21,12 @@ try:
     from app.ui.kit import inject_ips_ui_styles, render_metric_row, render_page_header
     from app.utils.formatting import fmt_currency
 except ImportError:
-    from auth import current_profile, current_role, current_user_display_name, effective_role  # type: ignore
-    from components.headers import (  # type: ignore
-        render_ops_quick_action_tiles,
-    )
-    from components.dashboard_active_jobs_table import render_dashboard_active_jobs_table  # type: ignore
-    from components.dashboard_estimates_waiting_table import render_dashboard_estimates_waiting_table  # type: ignore
-    from components.company_updates_feed import render_dashboard_company_updates_section  # type: ignore
-    from components.dashboard_preview_cards import render_dashboard_preview_sections  # type: ignore
+    from auth import current_profile, current_user_display_name, effective_role  # type: ignore
+    from components.dashboard_ops_panels import render_dashboard_ops_panels  # type: ignore
+    from components.quote_job_number_autofill import clear_new_job_number_state  # type: ignore
+    from navigation import set_nav_slug  # type: ignore
     from pages._core._data import (  # type: ignore
-        load_awarded_jobs,
         load_dashboard_kpis,
-        load_estimates,
-        load_recent_company_updates,
         load_tasks,
         load_timekeeping_summaries,
     )
@@ -56,11 +42,14 @@ def _welcome_name() -> str:
 def _date_range_state() -> tuple[date, date]:
     end = st.session_state.get("ips_dash_date_end")
     start = st.session_state.get("ips_dash_date_start")
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=6)
     if not isinstance(end, date):
-        end = date.today().replace(day=1)
+        end = week_end
         st.session_state["ips_dash_date_end"] = end
     if not isinstance(start, date):
-        start = end.replace(day=1)
+        start = week_start
         st.session_state["ips_dash_date_start"] = start
     return start, end
 
@@ -144,14 +133,23 @@ def render() -> None:
         st.session_state["ips_dash_date_start"] = dr[0]
         st.session_state["ips_dash_date_end"] = dr[1]
 
+    def _dash_new_job() -> None:
+        if st.button("+ New Job", key="ips_dash_new_job", type="primary", use_container_width=True):
+            clear_new_job_number_state()
+            st.session_state["ips_job_form"] = True
+            set_nav_slug("jobs")
+            st.rerun()
+
     render_page_header(
         "Operations Dashboard",
+        "Overview of key operational metrics and performance.",
         show_date_range=True,
         date_range_value=(start, end),
         date_range_key="ips_dash_period",
         on_date_range_change=_on_date_range_change,
         show_refresh=True,
         refresh_key="ips_dash_refresh",
+        primary_action=_dash_new_job,
     )
 
     with st.container(key="dashboard_ops_shell"):
@@ -183,29 +181,4 @@ def render() -> None:
             ]
             render_metric_row(kpi_items)
 
-        with st.container(key="dashboard_ops_company_updates"):
-            render_dashboard_company_updates_section(
-                load_recent_company_updates(limit=5),
-                limit=5,
-            )
-
-        render_dashboard_estimates_waiting_table(load_estimates(), limit=5)
-
-        render_dashboard_active_jobs_table(load_awarded_jobs(), limit=12)
-
-        render_ops_quick_action_tiles(
-            [
-                ("📁", "New Job", "jobs"),
-                ("📄", "New Estimate", "estimates"),
-                ("👤", "New Customer", "customers"),
-                ("🕒", "Timekeeping", "timekeeping"),
-                ("📝", "Daily Report", "field_daily_reports"),
-                ("📦", "Inventory", "inventory"),
-                ("✅", "Add To-Do", "tasks"),
-                ("🚛", "Add Asset", "assets"),
-                ("📊", "Run Job Cost Report", "job_costing"),
-            ],
-            key_prefix="ips_ops_qa",
-        )
-
-        render_dashboard_preview_sections()
+        render_dashboard_ops_panels()

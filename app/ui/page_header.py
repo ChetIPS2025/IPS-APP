@@ -94,18 +94,39 @@ def _coerce_date_range_value(
     return date.today()
 
 
+def _format_date_range_label(start: date, end: date) -> str:
+    def _part(d: date, *, include_year: bool) -> str:
+        text = f"{d.strftime('%b')} {d.day}"
+        if include_year:
+            text += f", {d.year}"
+        return text
+
+    if start == end:
+        return _part(start, include_year=True)
+    if start.year == end.year:
+        return f"{_part(start, include_year=False)} – {_part(end, include_year=True)}"
+    return f"{_part(start, include_year=True)} – {_part(end, include_year=True)}"
+
+
 def _render_date_range(
     *,
     key: str,
     value: tuple[date, date] | date | None,
     on_change: Callable[[tuple[date, date]], None] | None,
 ) -> None:
-    picked = st.date_input(
-        "Date range",
-        value=_coerce_date_range_value(value),
-        key=key,
-        label_visibility="collapsed",
-    )
+    coerced = _coerce_date_range_value(value)
+    if isinstance(coerced, tuple):
+        label = _format_date_range_label(coerced[0], coerced[1])
+    else:
+        label = _format_date_range_label(coerced, coerced)
+    st.markdown('<span class="ips-ph-date-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
+    with st.popover(label, help="Select date range"):
+        picked = st.date_input(
+            "Date range",
+            value=coerced,
+            key=key,
+            label_visibility="collapsed",
+        )
     if on_change and isinstance(picked, tuple) and len(picked) == 2:
         on_change((picked[0], picked[1]))
 

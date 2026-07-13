@@ -176,8 +176,20 @@ def test_ops_dashboard_css_uses_compact_vertical_spacing():
     from app.styles import inject_ops_dashboard_css
 
     source = inspect.getsource(inject_ops_dashboard_css)
-    assert "ips-ops-dashboard-v27" in source
+    assert "ips-ops-dashboard-v28" in source
     assert "gap: 14px !important" in source
     assert "margin: 0 !important" in source
-    assert "quick-actions-title" in source
-    assert "dashboard-card-grid" in source
+    assert "ips-dash-ops-panel" in source
+    assert "dashboard_ops_panels" in source
+
+
+def test_ops_dashboard_renders_mockup_panels():
+    import inspect
+
+    from app.pages import dashboard as dash
+
+    source = inspect.getsource(dash.render)
+    assert "render_dashboard_ops_panels" in source
+    assert "primary_action" in source
+    assert "render_dashboard_company_updates_section" not in source
+    assert "render_dashboard_preview_sections" not in source
