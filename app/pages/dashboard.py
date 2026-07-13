@@ -17,7 +17,7 @@ from app.pages._core._data import (
     load_timekeeping_summaries,
 )
 from app.styles import inject_ops_dashboard_css
-from app.ui.kit import inject_ips_ui_styles, render_metric_row, render_page_header
+from app.ui.kit import render_metric_row, render_page_header
 from app.utils.formatting import fmt_currency
 def _welcome_name() -> str:
     return current_user_display_name()
@@ -96,14 +96,9 @@ def _ops_welcome_html(*, employees: int, active_jobs: int) -> str:
 
 
 def render() -> None:
-    inject_ips_ui_styles()
-    inject_ops_dashboard_css()
     from app.pages._core._access import begin_module
     if not begin_module("dashboard", inject_css=False):
         return
-
-    ot = "d" + "iv"
-    st.markdown(f'<{ot} class="ips-ops-dashboard-marker"></{ot}>', unsafe_allow_html=True)
 
     start, end = _date_range_state()
 
@@ -112,7 +107,7 @@ def render() -> None:
         st.session_state["ips_dash_date_end"] = dr[1]
 
     def _dash_new_job() -> None:
-        if st.button("+ New Job", key="ips_dash_new_job", type="primary", use_container_width=True):
+        if st.button("+ New Job", key="ips_dash_new_job", type="primary"):
             clear_new_job_number_state()
             st.session_state["ips_job_form"] = True
             set_nav_slug("jobs")
@@ -121,6 +116,7 @@ def render() -> None:
     render_page_header(
         "Operations Dashboard",
         "Overview of key operational metrics and performance.",
+        show_back=False,
         show_date_range=True,
         date_range_value=(start, end),
         date_range_key="ips_dash_period",
@@ -128,7 +124,9 @@ def render() -> None:
         show_refresh=True,
         refresh_key="ips_dash_refresh",
         primary_action=_dash_new_job,
+        layout_marker="ips-ops-dashboard-marker",
     )
+    inject_ops_dashboard_css()
 
     with st.container(key="dashboard_ops_shell"):
         kpis = load_dashboard_kpis(period_start=start, period_end=end)

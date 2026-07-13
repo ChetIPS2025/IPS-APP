@@ -84,7 +84,7 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.styles import inject_global_css
 
         src = inspect.getsource(inject_global_css)
-        self.assertIn("ips-global-styles-v13", src)
+        self.assertIn("ips-global-styles-v14", src)
         self.assertIn("grid-template-columns: auto 1fr auto", src)
         self.assertNotIn("margin-left: -22px", src)
         self.assertNotIn("margin-right: -22px", src)

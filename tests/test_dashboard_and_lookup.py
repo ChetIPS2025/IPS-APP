@@ -176,7 +176,7 @@ def test_ops_dashboard_css_uses_compact_vertical_spacing():
     from app.styles import inject_ops_dashboard_css
 
     source = inspect.getsource(inject_ops_dashboard_css)
-    assert "ips-ops-dashboard-v28" in source
+    assert "ips-ops-dashboard-v30" in source
     assert "gap: 14px !important" in source
     assert "margin: 0 !important" in source
     assert "ips-dash-ops-panel" in source

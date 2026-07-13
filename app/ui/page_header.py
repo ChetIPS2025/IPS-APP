@@ -111,8 +111,19 @@ def _render_date_range(
 
 
 def _render_refresh(*, key: str) -> None:
-    if st.button("↻ Refresh", key=key, use_container_width=True):
+    st.markdown('<span class="ips-ph-refresh-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
+    if st.button("↻", key=key, help="Refresh"):
         st.rerun()
+
+
+_RIGHT_SLOT_RATIOS: dict[str, float] = {
+    "date": 2.35,
+    "refresh": 0.55,
+    "primary": 1.15,
+    "secondary": 1.0,
+    "action": 1.0,
+}
+_RIGHT_UTIL_RATIO = 0.55
 
 
 def _header_auth_context() -> tuple[str, str, str, Callable[[], None]]:
@@ -197,6 +208,7 @@ def render_page_header(
     user_initials: str | None = None,
     on_back: Callable[[], None] | None = None,
     show_logo: bool = True,
+    layout_marker: str | None = None,
 ) -> None:
     """
     Standard IPS page header.
@@ -263,35 +275,46 @@ def render_page_header(
             right_slots.append((f"action_{idx}", action))
 
     with st.container(key="ips_app_page_header"):
+        marker_classes = "ips-page-shell-marker ips-ph-root ips-page-header ips-app-page-header-marker"
+        if str(layout_marker or "").strip():
+            marker_classes += f" {html.escape(str(layout_marker).strip())}"
         st.markdown(
-            '<span class="ips-page-shell-marker ips-ph-root ips-page-header" aria-hidden="true"></span>',
+            f'<span class="{marker_classes}" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
 
         left_col, center_col, right_col = st.columns(
-            [0.24, 1, 0.42],
+            [0.24, 1, 0.62],
             gap="small",
             vertical_alignment="center",
         )
 
         with left_col:
             st.markdown('<span class="ips-ph-left" aria-hidden="true"></span>', unsafe_allow_html=True)
-            back_col, logo_col = st.columns([0.42, 0.58], gap="small", vertical_alignment="center")
-            with back_col:
-                st.markdown('<span class="ips-ph-back" aria-hidden="true"></span>', unsafe_allow_html=True)
-                if can_back:
+            left_slots: list[float] = []
+            if can_back:
+                left_slots.append(0.38)
+            left_slots.append(0.22)
+            if show_logo:
+                left_slots.append(1.0)
+            left_inner = st.columns(left_slots, gap="small", vertical_alignment="center")
+            slot_idx = 0
+            if can_back:
+                with left_inner[slot_idx]:
+                    st.markdown('<span class="ips-ph-back" aria-hidden="true"></span>', unsafe_allow_html=True)
                     if st.button("← Back", key=f"{header_key}_back", help="Go back"):
                         if on_back is not None:
                             on_back()
                         else:
                             _navigate_back()
-                elif show_back:
-                    st.markdown('<span class="ips-ph-back-spacer" aria-hidden="true"></span>', unsafe_allow_html=True)
+                slot_idx += 1
+            with left_inner[slot_idx]:
                 st.markdown('<span class="ips-ph-menu" aria-hidden="true"></span>', unsafe_allow_html=True)
                 if st.button(" ", key=f"{header_key}_menu", help="Open menu"):
                     _request_sidebar_toggle()
-            with logo_col:
-                if show_logo:
+            slot_idx += 1
+            if show_logo:
+                with left_inner[slot_idx]:
                     st.markdown(
                         wording_logo_html(height=48, css_class="ips-ph-logo"),
                         unsafe_allow_html=True,
@@ -306,8 +329,11 @@ def render_page_header(
             st.markdown('<span class="ips-ph-right" aria-hidden="true"></span>', unsafe_allow_html=True)
             role, display, initials, sign_out_fn = _header_auth_context()
             util_count = 4
-            slot_count = len(right_slots) + util_count
-            ratios = [1.0] * slot_count
+            ratios: list[float] = []
+            for kind, _widget in right_slots:
+                base_kind = kind.split("_", 1)[0]
+                ratios.append(_RIGHT_SLOT_RATIOS.get(kind, _RIGHT_SLOT_RATIOS.get(base_kind, 1.0)))
+            ratios.extend([_RIGHT_UTIL_RATIO] * util_count)
             cols = st.columns(ratios, gap="small")
             for idx, (_kind, widget) in enumerate(right_slots):
                 with cols[idx]:

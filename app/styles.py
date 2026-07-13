@@ -12311,7 +12311,7 @@ def inject_global_css() -> None:
     """Inject global IPS SaaS styles on every render."""
     st.markdown(
         f"""
-<style id="ips-global-styles-v13">
+<style id="ips-global-styles-v14">
 :root {{
   --ips-bg: {APP_BG};
   --ips-sidebar: {SIDEBAR_BG};
@@ -12395,7 +12395,7 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElemen
   background: transparent !important;
   border: none !important;
 }}
-section[data-testid="stMain"] [data-testid="stElementContainer"]:has(.ips-ops-dashboard-marker):not(:has(.ips-page-title)):not(:has(.ips-app-header-title)) {{
+section[data-testid="stMain"] [data-testid="stElementContainer"]:has(.ips-ops-dashboard-marker):not(:has(.ips-app-page-header-marker)):not(:has(.ips-page-title)):not(:has(.ips-app-header-title)) {{
   display: none !important;
   height: 0 !important;
   min-height: 0 !important;
@@ -12420,8 +12420,21 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVertic
   border-bottom: 2px solid #3158e6 !important;
   border-radius: 0 !important;
   min-height: 76px !important;
+  max-height: none !important;
   box-sizing: border-box !important;
   position: static !important;
+}}
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-ips_app_page_header,
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-ips_app_page_header [data-testid="stVerticalBlockBorderWrapper"] {{
+  margin-top: 0 !important;
+}}
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"]:has(.ips-page-shell-marker):not(:has(.ips-app-page-header-marker)) {{
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
 }}
 .st-key-ips_app_page_header [data-testid="stElementContainer"]:has(.ips-ph-root) {{
   height: 0 !important;
@@ -12460,19 +12473,69 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVertic
   width: auto !important;
   min-width: 0 !important;
   flex: none !important;
+  max-width: 62% !important;
 }}
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-right) > [data-testid="stHorizontalBlock"] {{
   display: flex !important;
   align-items: center !important;
   justify-content: flex-end !important;
-  gap: 10px !important;
-  flex-wrap: nowrap !important;
-  width: auto !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}}
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-refresh-marker) {{
+  flex: 0 0 40px !important;
+  width: 40px !important;
+  min-width: 40px !important;
+  max-width: 40px !important;
+}}
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-refresh-marker) .stButton > button {{
+  min-width: 40px !important;
+  width: 40px !important;
+  padding: 0 !important;
 }}
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-right) [data-testid="column"] {{
   flex: 0 0 auto !important;
   width: auto !important;
   min-width: 0 !important;
+  max-width: none !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}}
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-right) [data-testid="column"] .stButton,
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-right) [data-testid="column"] [data-testid="stPopover"] {{
+  width: auto !important;
+  min-width: 0 !important;
+}}
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-right) [data-testid="column"] .stButton > button {{
+  width: auto !important;
+  min-width: 0 !important;
+}}
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-action-slot) [data-testid="stButton"] > button[kind="primary"],
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-action-slot) .stButton > button[data-testid="stBaseButton-primary"] {{
+  min-width: 108px !important;
+  padding: 0 0.9rem !important;
+}}
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-date-marker) {{
+  position: relative !important;
+  min-width: 0 !important;
+  max-width: 240px !important;
+  flex: 0 1 240px !important;
+}}
+.st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-date-marker) [data-testid="stPopover"] > button {{
+  max-width: 240px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}}
+.ips-ph-back-spacer {{
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}}
+.ips-ph-refresh-marker {{
+  display: none !important;
 }}
 .ips-ph-logo {{
   height: 48px !important;
@@ -12527,11 +12590,6 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVertic
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
-}}
-.ips-ph-back-spacer {{
-  display: inline-block !important;
-  width: 92px !important;
-  height: 40px !important;
 }}
 .ips-ph-avatar-lg {{
   display: inline-flex !important;
@@ -12721,7 +12779,8 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVertic
   padding: 0 0.85rem 0 2rem !important;
   box-shadow: none !important;
   position: relative !important;
-  width: 100% !important;
+  width: auto !important;
+  max-width: 240px !important;
 }}
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-date-marker) [data-testid="stPopover"] > button::before {{
   content: "📅" !important;
@@ -12734,10 +12793,13 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVertic
 }}
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-date-marker) {{
   position: relative !important;
-  min-width: 220px !important;
+  min-width: 0 !important;
+  max-width: 240px !important;
+  flex: 0 1 240px !important;
 }}
 .st-key-ips_app_page_header [data-testid="column"]:has(.ips-ph-date-marker) [data-testid="stPopover"] {{
-  width: 100% !important;
+  width: auto !important;
+  max-width: 240px !important;
 }}
 .ips-ph-date-marker {{
   display: none !important;
@@ -15607,7 +15669,7 @@ def inject_ops_dashboard_css() -> None:
     """Compact operations dashboard layout — KPI row, news, quick actions, activity grid."""
     st.markdown(
         """
-<style id="ips-ops-dashboard-v28">
+<style id="ips-ops-dashboard-v30">
 /* ── App shell: flex main beside sidebar (desktop only) ── */
 .stApp:has(.ips-ops-dashboard-marker) [data-testid="stAppViewContainer"] {
   width: 100% !important;
@@ -15667,10 +15729,31 @@ def inject_ops_dashboard_css() -> None:
     margin-left: 0 !important;
   }
 }
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"]:has(.ips-page-dashboard):not(:has(.ips-app-page-header-marker)) {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"]:has(style#ips-ops-dashboard-v30),
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"]:has(style#ips-global-styles-v14),
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"]:has(style#ips-ui-library-v1) {
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+}
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"]:has(style) [data-testid="stMarkdownContainer"] {
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .block-container {
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
+  padding-top: 0 !important;
   padding-left: 0 !important;
   padding-right: 0 !important;
   box-sizing: border-box !important;
@@ -15684,8 +15767,11 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stVer
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stVerticalBlock"] > div {
   padding-left: 20px !important;
   padding-right: 20px !important;
-  padding-top: 14px !important;
+  padding-top: 0 !important;
   box-sizing: border-box !important;
+}
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-ips_app_page_header {
+  margin-top: 0 !important;
 }
 section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"] {
   margin-bottom: 0 !important;
