@@ -2062,8 +2062,9 @@ def get_inventory_transactions(job_id=None, limit=200):
     Safe inventory transaction fetcher for Job Detail Inventory tab.
     Prevents Job Details modal/page from crashing if inventory transaction data is missing.
     """
-    from app.services.inventory_service import get_inventory_transactions as _fetch_txns
-    return _fetch_txns(job_id=str(job_id).strip() or None, limit=limit)
+    try:
+        from app.services.inventory_service import get_inventory_transactions as _fetch_txns
+        return _fetch_txns(job_id=str(job_id).strip() or None, limit=limit)
     except Exception:
         pass
 
