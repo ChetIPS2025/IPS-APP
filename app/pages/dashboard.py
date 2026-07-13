@@ -9,15 +9,13 @@ import streamlit as st
 
 try:
     from app.auth import current_profile, current_role, current_user_display_name, effective_role
-    from app.components.cards import render_ops_kpi_row
+    from app.components.headers import (
+        render_ops_quick_action_tiles,
+    )
     from app.components.dashboard_active_jobs_table import render_dashboard_active_jobs_table
     from app.components.dashboard_estimates_waiting_table import render_dashboard_estimates_waiting_table
     from app.components.company_updates_feed import render_dashboard_company_updates_section
     from app.components.dashboard_preview_cards import render_dashboard_preview_sections
-    from app.components.headers import (
-        render_ops_quick_action_tiles,
-        render_page_brand_header,
-    )
     from app.pages._core._data import (
         load_awarded_jobs,
         load_dashboard_kpis,
@@ -26,19 +24,18 @@ try:
         load_tasks,
         load_timekeeping_summaries,
     )
-    from app.styles import inject_global_css, inject_ops_dashboard_css
+    from app.styles import inject_ops_dashboard_css
+    from app.ui.kit import inject_ips_ui_styles, render_metric_row, render_page_header
     from app.utils.formatting import fmt_currency
 except ImportError:
     from auth import current_profile, current_role, current_user_display_name, effective_role  # type: ignore
-    from components.cards import render_ops_kpi_row  # type: ignore
+    from components.headers import (  # type: ignore
+        render_ops_quick_action_tiles,
+    )
     from components.dashboard_active_jobs_table import render_dashboard_active_jobs_table  # type: ignore
     from components.dashboard_estimates_waiting_table import render_dashboard_estimates_waiting_table  # type: ignore
     from components.company_updates_feed import render_dashboard_company_updates_section  # type: ignore
     from components.dashboard_preview_cards import render_dashboard_preview_sections  # type: ignore
-    from components.headers import (  # type: ignore
-        render_ops_quick_action_tiles,
-        render_page_brand_header,
-    )
     from pages._core._data import (  # type: ignore
         load_awarded_jobs,
         load_dashboard_kpis,
@@ -47,7 +44,8 @@ except ImportError:
         load_tasks,
         load_timekeeping_summaries,
     )
-    from styles import inject_global_css, inject_ops_dashboard_css  # type: ignore
+    from styles import inject_ops_dashboard_css  # type: ignore
+    from ui.kit import inject_ips_ui_styles, render_metric_row, render_page_header  # type: ignore
     from utils.formatting import fmt_currency  # type: ignore
 
 
@@ -128,7 +126,7 @@ def _ops_welcome_html(*, employees: int, active_jobs: int) -> str:
 
 
 def render() -> None:
-    inject_global_css()
+    inject_ips_ui_styles()
     inject_ops_dashboard_css()
     try:
         from app.pages._core._access import begin_module
@@ -142,26 +140,18 @@ def render() -> None:
 
     start, end = _date_range_state()
 
-    def _dash_period() -> None:
-        dr = st.date_input(
-            "Period",
-            value=(start, end),
-            key="ips_dash_period",
-            label_visibility="collapsed",
-            format="MMM D, YYYY",
-        )
-        if isinstance(dr, tuple) and len(dr) == 2:
-            st.session_state["ips_dash_date_start"] = dr[0]
-            st.session_state["ips_dash_date_end"] = dr[1]
+    def _on_date_range_change(dr: tuple[date, date]) -> None:
+        st.session_state["ips_dash_date_start"] = dr[0]
+        st.session_state["ips_dash_date_end"] = dr[1]
 
-    def _dash_refresh() -> None:
-        if st.button("↻ Refresh", key="ips_dash_refresh", use_container_width=True):
-            st.rerun()
-
-    render_page_brand_header(
+    render_page_header(
         "Operations Dashboard",
-        actions=[_dash_period, _dash_refresh],
-        actions_column_ratio=(1.65, 1.35),
+        show_date_range=True,
+        date_range_value=(start, end),
+        date_range_key="ips_dash_period",
+        on_date_range_change=_on_date_range_change,
+        show_refresh=True,
+        refresh_key="ips_dash_refresh",
     )
 
     with st.container(key="dashboard_ops_shell"):
@@ -191,7 +181,7 @@ def render() -> None:
                 ("Inventory Value", fmt_currency(kpis.get("total_inventory_value", 0)), "📦", "#ede9fe"),
                 ("Asset Value", fmt_currency(kpis.get("total_asset_value", 0)), "🚛", "#fce7f3"),
             ]
-            render_ops_kpi_row(kpi_items)
+            render_metric_row(kpi_items)
 
         with st.container(key="dashboard_ops_company_updates"):
             render_dashboard_company_updates_section(

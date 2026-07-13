@@ -303,9 +303,9 @@ def render_page_header(
     _ = (help_text, logo_width)
     inject_ips_dashboard_layout()
     try:
-        from app.components.headers import render_page_header as _render_ips_header
+        from app.ui.page_header import render_page_header as _render_ips_header
     except ImportError:
-        from components.headers import render_page_header as _render_ips_header  # type: ignore
+        from ui.page_header import render_page_header as _render_ips_header  # type: ignore
     _render_ips_header(
         title,
         subtitle or None,
