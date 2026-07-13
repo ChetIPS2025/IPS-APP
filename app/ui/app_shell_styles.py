@@ -3,20 +3,18 @@
 from __future__ import annotations
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 IPS_APP_SHELL_LAYOUT_STYLES_KEY = "ips_app_shell_layout_styles_v2"
 IPS_APP_SHELL_SCRIPT_MARKER_CLASS = "ips-app-shell-script-marker"
 
 
 def inject_app_shell_script(script_html: str) -> None:
-    """Inject layout JS in the main document without zero-height Streamlit iframes."""
+    """Inject executable JS via a zero-height Streamlit component iframe."""
     snippet = str(script_html or "").strip()
     if not snippet:
         return
-    st.markdown(
-        f'<span class="{IPS_APP_SHELL_SCRIPT_MARKER_CLASS}" aria-hidden="true"></span>{snippet}',
-        unsafe_allow_html=True,
-    )
+    components.html(snippet, height=0, scrolling=False)
 
 
 def inject_app_shell_layout_styles() -> None:

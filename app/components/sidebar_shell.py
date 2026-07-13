@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from app.ui.app_shell_styles import inject_app_shell_script
 
@@ -472,10 +473,8 @@ def inject_sidebar_shell() -> None:
     nav_json = _fallback_nav_json()
     inject_app_shell_script(_shell_script(nav_json))
 
-    inject_sidebar_menu_wire()
     inject_mobile_nav_menu_button()
-    inject_sidebar_nav_align()
-    inject_sidebar_layout_state(collapsed)
+    inject_sidebar_navigation_script(collapsed)
 
     if st.session_state.pop(IPS_SIDEBAR_TOGGLE_REQUEST_KEY, False):
         inject_app_shell_script(_toggle_script(collapsed=collapsed, after_nav=True))
@@ -923,142 +922,119 @@ section[data-testid="stSidebar"]:has(.ips-sidebar-shell.ips-sidebar-collapsed):n
     )
 
 
-def inject_sidebar_layout_state(collapsed: bool) -> None:
-    """Sync collapsed body class + localStorage after each render."""
+def inject_sidebar_navigation_script(collapsed: bool = True) -> None:
+    """Split sidebar nav labels and sync collapsed layout via zero-height iframe."""
     flag = "1" if collapsed else "0"
     desktop_min = IPS_SIDEBAR_DESKTOP_MIN_PX
-    inject_app_shell_script(
+    components.html(
         f"""
-<script>
-(function () {{
-  var DESKTOP_MIN = {desktop_min};
-  function rootDoc() {{
-    try {{ return window.parent && window.parent.document ? window.parent.document : document; }}
-    catch (e) {{ return document; }}
-  }}
-  function vpW() {{
-    try {{
-      var t = window.top || window.parent || window;
-      return t.innerWidth || window.innerWidth || 1200;
-    }} catch (e0) {{
-      return window.innerWidth || 1200;
-    }}
-  }}
-  function apply() {{
-    var d = rootDoc();
-    if (!d || !d.body) return;
-    var desktop = vpW() >= DESKTOP_MIN;
-    if (desktop && {flag} === '1') d.body.classList.add('ips-sidebar-collapsed');
-    else d.body.classList.remove('ips-sidebar-collapsed');
-    if (desktop) {{
-      try {{ localStorage.setItem('{IPS_SIDEBAR_COLLAPSED_STORAGE_KEY}', '{flag}'); }} catch (e2) {{}}
-    }}
-  }}
-  apply();
-  setTimeout(apply, 40);
-  setTimeout(apply, 180);
-}})();
-</script>
-        """
-    )
-
-
-def inject_sidebar_nav_align() -> None:
-    """Split nav button labels into icon + text columns for left-aligned sidebar rows."""
-    inject_app_shell_script(
-        """
-<script>
-(function () {
-  function rootDoc() {
-    try { return window.parent && window.parent.document ? window.parent.document : document; }
-    catch (e) { return document; }
-  }
-  function esc(s) {
-    return String(s || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
-  function splitNavLabel(text) {
-    var raw = String(text || '').trim();
-    if (!raw) return null;
-    var sep = raw.indexOf('\u2002');
-    if (sep < 0) sep = raw.indexOf('  ');
-    if (sep >= 0) {
-      return { icon: raw.slice(0, sep).trim(), label: raw.slice(sep + 1).trim() };
-    }
-    var m = raw.match(/^(\\S+)\\s+(.+)$/);
-    if (m) return { icon: m[1], label: m[2] };
-    return null;
-  }
-  function align(d) {
-    if (!d || !d.body) return;
-    if (!d.querySelector('section[data-testid="stSidebar"] [class*="st-key-nav_"] button')) return;
-    d.querySelectorAll('section[data-testid="stSidebar"] [class*="st-key-nav_"] button').forEach(function (btn) {
-      var p = btn.querySelector('p');
-      if (!p) return;
-      if (p.querySelector('.sidebar-nav-icon') && p.querySelector('.sidebar-nav-label')) {
-        p.dataset.ipsNavSplit = '1';
-        return;
-      }
-      var parts = splitNavLabel(p.textContent || '');
-      if (!parts || !parts.label) return;
-      p.innerHTML =
-        '<span class="sidebar-nav-icon">' + esc(parts.icon) + '</span>' +
-        '<span class="sidebar-nav-label">' + esc(parts.label) + '</span>';
-      p.dataset.ipsNavSplit = '1';
-    });
-    d.querySelectorAll('section[data-testid="stSidebar"] [class*="st-key-nav_"] button').forEach(function (btn) {
-      var text = '';
-      var host = btn.closest('[data-testid="stElementContainer"]');
-      var marker = host && host.previousElementSibling;
-      if (marker) {
-        var navItem = marker.querySelector('.sidebar-nav-item');
-        if (navItem) text = navItem.getAttribute('data-nav-label') || '';
-      }
-      var splitLabel = btn.querySelector('.sidebar-nav-label');
-      if (!text && splitLabel) text = String(splitLabel.textContent || '').trim();
-      if (!text) text = String(btn.getAttribute('aria-label') || '').trim();
-      if (text) btn.setAttribute('title', text);
-      else btn.removeAttribute('title');
-    });
-  }
-  function run() { align(rootDoc()); }
-  run();
-  setTimeout(run, 40);
-  setTimeout(run, 180);
-})();
-</script>
-        """
-    )
-
-
-def inject_sidebar_menu_wire() -> None:
-    """Re-bind header menu buttons after each module render."""
-    inject_app_shell_script(
-        """
-<script>
-(function () {
-  function rootDoc() {
-    try { return window.parent && window.parent.document ? window.parent.document : document; }
-    catch (e) { return document; }
-  }
-  function wire(d) {
-    if (!window.IPS || !window.IPS.toggleSidebar) return;
-    d.querySelectorAll('button.ips-header-menu-btn').forEach(function (btn) {
-      if (btn.dataset.ipsMenuWired === '1') return;
-      btn.dataset.ipsMenuWired = '1';
-      btn.addEventListener('click', function (ev) {
-        ev.preventDefault();
-        window.IPS.toggleSidebar(true);
-      });
-    });
-  }
-  setTimeout(function () { wire(rootDoc()); }, 40);
-})();
-</script>
-        """
+        <script>
+        (() => {{
+          const getParentDocument = () => {{
+            try {{
+              return window.parent.document;
+            }} catch (error) {{
+              console.warn(
+                "IPS sidebar script could not access parent document",
+                error
+              );
+              return null;
+            }}
+          }};
+          const DESKTOP_MIN = {desktop_min};
+          const collapsedFlag = "{flag}";
+          const storageKey = "{IPS_SIDEBAR_COLLAPSED_STORAGE_KEY}";
+          const esc = (s) => String(s || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+          const splitNavLabel = (text) => {{
+            const raw = String(text || "").trim();
+            if (!raw) return null;
+            let sep = raw.indexOf("\\u2002");
+            if (sep < 0) sep = raw.indexOf("  ");
+            if (sep >= 0) {{
+              return {{ icon: raw.slice(0, sep).trim(), label: raw.slice(sep + 1).trim() }};
+            }}
+            const m = raw.match(/^(\\S+)\\s+(.+)$/);
+            if (m) return {{ icon: m[1], label: m[2] }};
+            return null;
+          }};
+          const vpW = () => {{
+            try {{
+              const t = window.top || window.parent || window;
+              return t.innerWidth || window.innerWidth || 1200;
+            }} catch (e0) {{
+              return window.innerWidth || 1200;
+            }}
+          }};
+          const applyCollapsedState = (documentRef) => {{
+            if (!documentRef || !documentRef.body) return;
+            const desktop = vpW() >= DESKTOP_MIN;
+            if (desktop && collapsedFlag === "1") {{
+              documentRef.body.classList.add("ips-sidebar-collapsed");
+            }} else {{
+              documentRef.body.classList.remove("ips-sidebar-collapsed");
+            }}
+            if (desktop) {{
+              try {{
+                localStorage.setItem(storageKey, collapsedFlag);
+              }} catch (e2) {{}}
+            }}
+          }};
+          const alignNavLabels = (documentRef) => {{
+            if (!documentRef || !documentRef.body) return;
+            if (!documentRef.querySelector(
+              'section[data-testid="stSidebar"] [class*="st-key-nav_"] button'
+            )) return;
+            documentRef.querySelectorAll(
+              'section[data-testid="stSidebar"] [class*="st-key-nav_"] button'
+            ).forEach((btn) => {{
+              const p = btn.querySelector("p");
+              if (!p) return;
+              if (p.querySelector(".sidebar-nav-icon") && p.querySelector(".sidebar-nav-label")) {{
+                p.dataset.ipsNavSplit = "1";
+                return;
+              }}
+              const parts = splitNavLabel(p.textContent || "");
+              if (!parts || !parts.label) return;
+              p.innerHTML =
+                '<span class="sidebar-nav-icon">' + esc(parts.icon) + "</span>" +
+                '<span class="sidebar-nav-label">' + esc(parts.label) + "</span>";
+              p.dataset.ipsNavSplit = "1";
+            }});
+            documentRef.querySelectorAll(
+              'section[data-testid="stSidebar"] [class*="st-key-nav_"] button'
+            ).forEach((btn) => {{
+              let text = "";
+              const host = btn.closest('[data-testid="stElementContainer"]');
+              const marker = host && host.previousElementSibling;
+              if (marker) {{
+                const navItem = marker.querySelector(".sidebar-nav-item");
+                if (navItem) text = navItem.getAttribute("data-nav-label") || "";
+              }}
+              const splitLabel = btn.querySelector(".sidebar-nav-label");
+              if (!text && splitLabel) text = String(splitLabel.textContent || "").trim();
+              if (!text) text = String(btn.getAttribute("aria-label") || "").trim();
+              if (text) btn.setAttribute("title", text);
+              else btn.removeAttribute("title");
+            }});
+          }};
+          const run = () => {{
+            const documentRef = getParentDocument();
+            if (!documentRef) return;
+            applyCollapsedState(documentRef);
+            alignNavLabels(documentRef);
+          }};
+          run();
+          window.setTimeout(run, 40);
+          window.setTimeout(run, 180);
+        }})();
+        </script>
+        """,
+        height=0,
+        scrolling=False,
     )
 
 

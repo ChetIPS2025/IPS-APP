@@ -108,24 +108,28 @@ def test_sidebar_shell_script_targets_streamlit_156_collapse_button():
     assert "translateX(-100%)" in script
 
 
-def test_inject_sidebar_layout_state_only_collapses_on_desktop():
+def test_inject_sidebar_navigation_script_only_collapses_on_desktop():
     import inspect
 
-    from app.components.sidebar_shell import inject_sidebar_layout_state
+    from app.components.sidebar_shell import inject_sidebar_navigation_script
 
-    source = inspect.getsource(inject_sidebar_layout_state)
+    source = inspect.getsource(inject_sidebar_navigation_script)
     assert "DESKTOP_MIN" in source
-    assert "desktop &&" in source
+    assert "desktop && collapsedFlag" in source or 'desktop && collapsedFlag === "1"' in source
+    assert "ipsNavSplit" in source
+    assert "components.html" in source
 
 
-def test_inject_sidebar_shell_uses_inline_scripts_not_iframes():
+def test_inject_sidebar_shell_uses_components_html_for_navigation():
     import inspect
 
     from app.components.sidebar_shell import inject_sidebar_shell
 
     source = inspect.getsource(inject_sidebar_shell)
-    assert "inject_app_shell_script" in source
-    assert "components.html" not in source
+    assert "inject_sidebar_navigation_script" in source
+    assert "inject_sidebar_nav_align" not in source
+    assert "inject_sidebar_layout_state" not in source
+    assert "inject_sidebar_menu_wire" not in source
 
 
 def test_inject_sidebar_shell_injects_layout_on_every_render():
