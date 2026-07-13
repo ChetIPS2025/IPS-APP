@@ -18,8 +18,8 @@ import pandas as pd
 import streamlit as st
 from branding import render_header
 
-from auth import current_profile, current_role
-from db import (
+from app.auth import current_profile, current_role
+from app.db import (
     create_signed_url,
     fetch_by_match,
     fetch_by_match_admin,

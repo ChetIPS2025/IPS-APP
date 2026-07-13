@@ -46,7 +46,7 @@ except ImportError:
 try:
     from app.auth import current_profile, current_role, effective_role, is_authenticated
     from app.ui.page_shell import render_page_header
-    from app.ui import role_can_open_page
+    from app.ui.nav_permissions import role_can_open_page
     from app.db import (
         create_signed_url,
         delete_rows_admin,
@@ -65,7 +65,7 @@ try:
 except ImportError:
     from auth import current_profile, current_role, effective_role, is_authenticated  # type: ignore
     from branding import render_header  # type: ignore
-    from ui import role_can_open_page  # type: ignore
+    from app.ui.nav_permissions import role_can_open_page  # type: ignore
     from db import (  # type: ignore
         create_signed_url,
         delete_rows_admin,

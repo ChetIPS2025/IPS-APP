@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from auth import current_profile, current_role, effective_role
+from app.auth import current_profile, current_role, effective_role
 
 try:
     from app.components.headers import render_page_brand_header

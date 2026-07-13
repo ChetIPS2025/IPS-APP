@@ -8,10 +8,7 @@ from typing import Any
 
 import streamlit as st
 
-try:
-    from app.ui import IPS_NAV_PENDING_KEY
-except ImportError:
-    from ui import IPS_NAV_PENDING_KEY  # type: ignore
+from app.navigation import IPS_NAV_PENDING_KEY
 
 _EST_DETAIL_STYLE_KEY = "ips_estimate_detail_styles_v1"
 

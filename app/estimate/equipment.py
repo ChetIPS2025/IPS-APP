@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import Counter
 from decimal import Decimal
 
-from db import fetch_table
+from app.db import fetch_table
 
 from app.estimate.calculations import _D0, _dec, money
 

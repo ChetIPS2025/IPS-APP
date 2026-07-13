@@ -20,9 +20,9 @@ import html
 import pandas as pd
 import streamlit as st
 
-from auth import current_role, effective_role
+from app.auth import current_role, effective_role
 
-from db import fetch_one, fetch_table, fetch_table_admin, insert_row, insert_row_admin
+from app.db import fetch_one, fetch_table, fetch_table_admin, insert_row, insert_row_admin
 
 
 # --- helpers (Phase 1; keep small and local) ---

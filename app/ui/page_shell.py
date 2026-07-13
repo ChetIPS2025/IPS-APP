@@ -17,18 +17,11 @@ import streamlit as st
 IPS_DASHBOARD_LAYOUT_KEY = "ips_dashboard_layout_injected_v7"
 
 # Re-export column hiding standard (catalog / inventory / materials tables).
-try:
-    from app.ui.catalog_inventory_display import (
-        HIDDEN_SYSTEM_COLUMNS,
-        drop_hidden_system_columns,
-        prepare_catalog_inventory_display_df,
-    )
-except ImportError:
-    from ui.catalog_inventory_display import (  # type: ignore
-        HIDDEN_SYSTEM_COLUMNS,
-        drop_hidden_system_columns,
-        prepare_catalog_inventory_display_df,
-    )
+from app.ui.catalog_inventory_display import (
+    HIDDEN_SYSTEM_COLUMNS,
+    drop_hidden_system_columns,
+    prepare_catalog_inventory_display_df,
+)
 
 
 def inject_ips_dashboard_layout() -> None:
@@ -36,15 +29,9 @@ def inject_ips_dashboard_layout() -> None:
     if st.session_state.get(IPS_DASHBOARD_LAYOUT_KEY):
         return
     st.session_state[IPS_DASHBOARD_LAYOUT_KEY] = True
-    try:
-        from app.ui.streamlit_perf import inject_scroll_preserve
-    except ImportError:
-        from ui.streamlit_perf import inject_scroll_preserve  # type: ignore
+    from app.ui.streamlit_perf import inject_scroll_preserve
     inject_scroll_preserve("ips_app")
-    try:
-        from app.ui.compact_forms import inject_compact_form_styles
-    except ImportError:
-        from ui.compact_forms import inject_compact_form_styles  # type: ignore
+    from app.ui.compact_forms import inject_compact_form_styles
     inject_compact_form_styles()
     st.markdown(
         """

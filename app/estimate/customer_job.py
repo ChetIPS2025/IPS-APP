@@ -4,8 +4,8 @@ import difflib
 
 import streamlit as st
 
-from auth import current_role
-from db import (
+from app.auth import current_role
+from app.db import (
     fetch_by_match,
     fetch_by_match_admin,
     fetch_one,

@@ -6,7 +6,7 @@ from datetime import date
 
 import streamlit as st
 
-from auth import current_profile, current_role, effective_role
+from app.auth import current_profile, current_role, effective_role
 
 try:
     from app.components.cards import render_kpi_card

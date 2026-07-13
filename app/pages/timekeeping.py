@@ -130,10 +130,11 @@ except ImportError:
     from utils.field_context import get_field_job_id, is_field_context, is_field_mode, render_field_job_bar  # type: ignore
     from utils.formatting import fmt_date  # type: ignore
 
-try:
-    from app.ui.streamlit_perf import fragment, inject_scroll_preserve, ips_app_rerun
-except ImportError:
-    from ui.streamlit_perf import fragment, inject_scroll_preserve, ips_app_rerun  # type: ignore
+from app.ui.streamlit_perf import (
+    fragment,
+    inject_scroll_preserve,
+    ips_app_rerun,
+)
 
 _SEL = select_key("timekeeping")
 _MODULE = "timekeeping"

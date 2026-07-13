@@ -6,8 +6,8 @@ from pathlib import Path
 
 import streamlit as st
 
-from auth import current_profile
-from db import (
+from app.auth import current_profile
+from app.db import (
     fetch_by_match_admin,
     fetch_one,
     fetch_table,

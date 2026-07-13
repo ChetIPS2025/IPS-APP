@@ -10,7 +10,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-from auth import current_profile, current_role, effective_role
+from app.auth import current_profile, current_role, effective_role
 try:
     from app.ui.page_shell import render_page_header
 except ImportError:

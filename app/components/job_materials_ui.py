@@ -23,7 +23,7 @@ try:
         resolve_inventory_by_scan_code,
     )
     from app.services.tasks_service import get_tasks_by_job
-    from app.ui import IPS_NAV_PENDING_KEY
+    from app.navigation import IPS_NAV_PENDING_KEY
     from app.utils.formatting import fmt_currency, fmt_date
     from app.utils.inventory_quantity import format_inventory_quantity, inventory_qty_input_kwargs
 except ImportError:
@@ -41,7 +41,7 @@ except ImportError:
         resolve_inventory_by_scan_code,
     )
     from services.tasks_service import get_tasks_by_job  # type: ignore
-    from ui import IPS_NAV_PENDING_KEY  # type: ignore
+    from app.navigation import IPS_NAV_PENDING_KEY  # type: ignore
     from utils.formatting import fmt_currency, fmt_date  # type: ignore
     from utils.inventory_quantity import format_inventory_quantity, inventory_qty_input_kwargs  # type: ignore
 
