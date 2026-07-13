@@ -171,26 +171,50 @@ class TestPerSessionSupabaseClient(unittest.TestCase):
     def setUp(self) -> None:
         st.session_state.clear()
 
+    @patch(
+        "app.config.validate_supabase_public_config",
+        return_value=None,
+    )
     @patch("app.db._create_public_supabase_client")
-    def test_get_client_uses_per_streamlit_session_instance(self, create_mock) -> None:
+    def test_get_client_uses_per_streamlit_session_instance(
+        self,
+        create_mock,
+        validate_config_mock,
+    ) -> None:
         from app.db import _IPS_USER_SUPABASE_CLIENT_KEY, get_client
+
+        session_keys = [
+            _IPS_USER_SUPABASE_CLIENT_KEY,
+            AUTH_ACCESS_TOKEN_KEY,
+            AUTH_REFRESH_TOKEN_KEY,
+        ]
+        for key in session_keys:
+            st.session_state.pop(key, None)
 
         client_a = SimpleNamespace(auth=SimpleNamespace(get_session=lambda: None))
         client_b = SimpleNamespace(auth=SimpleNamespace(get_session=lambda: None))
         create_mock.side_effect = [client_a, client_b]
 
-        st.session_state[AUTH_ACCESS_TOKEN_KEY] = "token-a"
-        st.session_state[AUTH_REFRESH_TOKEN_KEY] = "refresh-a"
-        first = get_client()
-        st.session_state.clear()
-        st.session_state[AUTH_ACCESS_TOKEN_KEY] = "token-b"
-        st.session_state[AUTH_REFRESH_TOKEN_KEY] = "refresh-b"
-        second = get_client()
-
-        self.assertIs(first, client_a)
-        self.assertIs(second, client_b)
-        self.assertIsNot(first, second)
-        self.assertEqual(st.session_state.get(_IPS_USER_SUPABASE_CLIENT_KEY), client_b)
+        try:
+            st.session_state[AUTH_ACCESS_TOKEN_KEY] = "token-a"
+            st.session_state[AUTH_REFRESH_TOKEN_KEY] = "refresh-a"
+            first = get_client()
+            # Repeated calls in the same Streamlit session should reuse the
+            # same per-session client.
+            second = get_client()
+            self.assertIs(first, client_a)
+            self.assertIs(second, client_a)
+            self.assertEqual(create_mock.call_count, 1)
+            # Removing the session-specific client simulates another/new
+            # Streamlit browser session.
+            st.session_state.pop(_IPS_USER_SUPABASE_CLIENT_KEY, None)
+            third = get_client()
+            self.assertIs(third, client_b)
+            self.assertEqual(create_mock.call_count, 2)
+            validate_config_mock.assert_called()
+        finally:
+            for key in session_keys:
+                st.session_state.pop(key, None)
 
 
 if __name__ == "__main__":
