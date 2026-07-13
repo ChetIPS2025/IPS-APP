@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v2"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v3"
 
 
 def inject_page_header_styles() -> None:
@@ -14,17 +14,19 @@ def inject_page_header_styles() -> None:
     st.session_state[IPS_PAGE_HEADER_STYLES_KEY] = True
     st.markdown(
         """
-<style id="ips-page-header-styles-v2">
+<style id="ips-page-header-styles-v3">
 .st-key-ips_page_header,
 .st-key-ips_page_header [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
   margin: 0 0 14px 0 !important;
-  padding: 10px 14px 8px !important;
+  padding: clamp(18px, 2.2vw, 24px) clamp(20px, 3vw, 48px) clamp(20px, 2.4vw, 26px) !important;
+  min-height: 112px !important;
   background: #ffffff !important;
   border: 1px solid #e5e7eb !important;
   border-bottom: 2px solid #3158e6 !important;
   border-radius: 0 !important;
   box-sizing: border-box !important;
+  overflow: visible !important;
 }
 .st-key-ips_page_header [data-testid="stElementContainer"]:has(.ips-header-root) {
   height: 0 !important;
@@ -33,10 +35,51 @@ def inject_page_header_styles() -> None:
   padding: 0 !important;
   overflow: hidden !important;
 }
+.st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] {
+  display: flex !important;
+  align-items: center !important;
+  gap: clamp(12px, 1.6vw, 20px) !important;
+  width: 100% !important;
+  flex-wrap: nowrap !important;
+  overflow: visible !important;
+}
 .st-key-ips_page_header [data-testid="stHorizontalBlock"] {
   align-items: center !important;
-  gap: 8px !important;
+  gap: clamp(10px, 1.2vw, 16px) !important;
   width: 100% !important;
+  overflow: visible !important;
+}
+.st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: clamp(280px, 25vw, 430px) !important;
+  max-width: 430px !important;
+  overflow: visible !important;
+}
+.st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {
+  flex: 1 1 320px !important;
+  min-width: 280px !important;
+  overflow: visible !important;
+}
+.st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+.st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) > [data-testid="stHorizontalBlock"] {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  gap: 14px !important;
+  width: 100% !important;
+  overflow: visible !important;
+}
+.st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) [data-testid="column"] {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  overflow: visible !important;
 }
 .st-key-ips_page_header .stButton,
 .st-key-ips_page_header .stDateInput,
@@ -74,6 +117,15 @@ def inject_page_header_styles() -> None:
   color: #ffffff !important;
   border-color: #3158e6 !important;
 }
+.st-key-header_date_range {
+  min-width: 190px !important;
+  max-width: 230px !important;
+}
+.st-key-header_date_range [data-testid="stDateInput"] {
+  width: 100% !important;
+  min-width: 190px !important;
+  max-width: 230px !important;
+}
 .st-key-header_date_range [data-testid="stDateInput"] > div {
   min-height: 40px !important;
   height: 40px !important;
@@ -90,44 +142,47 @@ def inject_page_header_styles() -> None:
   padding: 0 10px !important;
 }
 .ips-header-logo {
-  height: 46px !important;
-  width: auto !important;
-  min-width: 250px !important;
-  max-width: 330px !important;
+  width: clamp(280px, 25vw, 430px) !important;
+  height: auto !important;
+  max-height: 72px !important;
+  min-width: 280px !important;
   object-fit: contain !important;
   display: block !important;
   background: transparent !important;
 }
 .ips-header-title-block {
   display: flex !important;
-  align-items: center !important;
-  gap: 12px !important;
+  align-items: flex-start !important;
+  gap: 14px !important;
   min-width: 0 !important;
   overflow: visible !important;
+  padding-bottom: 2px !important;
 }
 .ips-header-icon-wrap {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  width: 28px !important;
-  height: 28px !important;
+  width: 32px !important;
+  height: 32px !important;
   flex: 0 0 auto !important;
+  margin-top: 4px !important;
 }
 .ips-header-icon-wrap .ips-app-header-icon-svg {
   display: block !important;
-  width: 22px !important;
-  height: 22px !important;
+  width: 24px !important;
+  height: 24px !important;
 }
 .ips-header-text {
   display: flex !important;
   flex-direction: column !important;
   min-width: 0 !important;
   overflow: visible !important;
+  padding-bottom: 4px !important;
 }
 .ips-header-title {
   margin: 0 !important;
-  font-size: 25px !important;
-  line-height: 1.1 !important;
+  font-size: clamp(24px, 2.1vw, 30px) !important;
+  line-height: 1.15 !important;
   font-weight: 700 !important;
   color: #111827 !important;
   letter-spacing: -0.02em !important;
@@ -135,12 +190,13 @@ def inject_page_header_styles() -> None:
   text-overflow: clip !important;
 }
 .ips-header-subtitle {
-  margin: 3px 0 0 0 !important;
-  font-size: 12.5px !important;
+  margin: 7px 0 0 0 !important;
+  font-size: 13px !important;
   color: #64748b !important;
-  line-height: 1.3 !important;
+  line-height: 1.4 !important;
   font-weight: 500 !important;
   overflow: visible !important;
+  padding-bottom: 2px !important;
 }
 .ips-header-badge {
   display: inline-flex !important;
@@ -168,18 +224,19 @@ def inject_page_header_styles() -> None:
 .stApp:has(.ips-desktop-nav-rail) .st-key-header_menu {
   display: none !important;
 }
-@media (min-width: 1100px) {
-  .ips-header-title {
-    white-space: nowrap !important;
+@media (min-width: 1440px) {
+  .st-key-ips_page_header,
+  .st-key-ips_page_header [data-testid="stVerticalBlockBorderWrapper"] {
+    min-height: 120px !important;
   }
-  .ips-header-subtitle {
-    white-space: nowrap !important;
+  .ips-header-title {
+    font-size: 30px !important;
   }
 }
 @media (max-width: 1439px) and (min-width: 1100px) {
   .ips-header-logo {
-    min-width: 210px !important;
-    max-width: 280px !important;
+    width: clamp(260px, 22vw, 380px) !important;
+    min-width: 260px !important;
   }
   .st-key-ips_page_header .st-key-header_help {
     display: none !important;
@@ -188,7 +245,14 @@ def inject_page_header_styles() -> None:
 @media (max-width: 1099px) {
   .st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] {
     flex-wrap: wrap !important;
-    row-gap: 10px !important;
+    row-gap: 14px !important;
+    align-items: flex-start !important;
+  }
+  .st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2),
+  .st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
   }
   .st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {
     flex: 1 1 100% !important;
@@ -196,23 +260,27 @@ def inject_page_header_styles() -> None:
     max-width: 100% !important;
   }
   .ips-header-logo {
-    min-width: 180px !important;
-    max-width: 260px !important;
-    height: 44px !important;
+    width: clamp(220px, 42vw, 340px) !important;
+    min-width: 220px !important;
   }
   .ips-header-title {
-    font-size: 22px !important;
+    font-size: 26px !important;
     white-space: normal !important;
   }
 }
 @media (max-width: 767px) {
+  .st-key-ips_page_header,
+  .st-key-ips_page_header [data-testid="stVerticalBlockBorderWrapper"] {
+    min-height: 96px !important;
+    padding: 16px 16px 18px !important;
+  }
   .ips-header-subtitle {
-    display: none !important;
+    font-size: 12px !important;
+    margin-top: 6px !important;
   }
   .ips-header-logo {
-    min-width: 140px !important;
-    max-width: 200px !important;
-    height: 40px !important;
+    width: clamp(180px, 58vw, 280px) !important;
+    min-width: 180px !important;
   }
   .st-key-header_help {
     display: none !important;

@@ -35,7 +35,7 @@ class PageHeaderSourceTests(unittest.TestCase):
         self.assertIn("back_col, logo_col, title_col, actions_col", render_src)
         self.assertIn("header_primary_action", render_src)
         self.assertIn("header_date_range", src)
-        self.assertIn("height=46", render_src)
+        self.assertIn("height=56", render_src)
         self.assertIn("ips_page_header", render_src)
         self.assertIn('format="MM/DD/YYYY"', src)
         self.assertNotIn('format="MMM D, YYYY"', src)
@@ -61,7 +61,7 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.ui.page_header_styles import inject_page_header_styles
 
         src = inspect.getsource(inject_page_header_styles)
-        self.assertIn("ips-page-header-styles-v2", src)
+        self.assertIn("ips-page-header-styles-v3", src)
         self.assertIn(".st-key-ips_page_header", src)
         self.assertIn(".st-key-header_primary_action", src)
         self.assertNotIn("position: absolute", src)

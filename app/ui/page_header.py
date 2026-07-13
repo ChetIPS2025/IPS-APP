@@ -19,7 +19,7 @@ from app.ui.page_header_styles import inject_page_header_styles
 
 _ActionFn = Callable[[], None]
 
-_MAIN_COLS = [0.55, 3.1, 4.2, 6.2]
+_MAIN_COLS = [0.4, 4.8, 5.0, 5.2]
 _ACTION_COLS = [2.25, 0.58, 1.25, 0.58, 0.58, 0.58, 0.82]
 
 
@@ -297,7 +297,7 @@ def render_page_header(
         with logo_col:
             if show_logo:
                 st.markdown(
-                    wording_logo_html(height=46, css_class="ips-header-logo"),
+                    wording_logo_html(height=56, css_class="ips-header-logo"),
                     unsafe_allow_html=True,
                 )
 
