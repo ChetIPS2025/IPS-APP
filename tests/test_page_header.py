@@ -61,7 +61,7 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.ui.page_header_styles import inject_page_header_styles
 
         src = inspect.getsource(inject_page_header_styles)
-        self.assertIn("ips-page-header-styles-v4", src)
+        self.assertIn("ips-page-header-styles-v5", src)
         self.assertIn(".st-key-ips_page_header", src)
         self.assertIn(".st-key-header_primary_action", src)
         self.assertNotIn("position: absolute", src)

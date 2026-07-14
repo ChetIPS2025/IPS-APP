@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v4"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v5"
 
 
 def inject_page_header_styles() -> None:
@@ -15,7 +15,7 @@ def inject_page_header_styles() -> None:
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-page-header-styles-v4">
+<style id="ips-page-header-styles-v5">
 .st-key-ips_page_header,
 .st-key-ips_page_header [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
@@ -51,20 +51,21 @@ def inject_page_header_styles() -> None:
   overflow: visible !important;
 }
 .st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) {
-  flex: 0 0 auto !important;
+  flex: 0 1 auto !important;
   width: auto !important;
-  min-width: clamp(280px, 25vw, 430px) !important;
-  max-width: 430px !important;
+  min-width: clamp(200px, 18vw, 340px) !important;
+  max-width: 340px !important;
   overflow: visible !important;
 }
 .st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {
-  flex: 1 1 320px !important;
-  min-width: 280px !important;
+  flex: 1 1 220px !important;
+  min-width: 200px !important;
   overflow: visible !important;
 }
 .st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {
-  flex: 0 1 auto !important;
-  min-width: 0 !important;
+  flex: 1 1 560px !important;
+  min-width: 520px !important;
+  max-width: 100% !important;
   overflow: visible !important;
 }
 .st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) > [data-testid="stHorizontalBlock"] {
@@ -72,15 +73,23 @@ def inject_page_header_styles() -> None:
   flex-wrap: wrap !important;
   justify-content: flex-end !important;
   align-items: center !important;
-  gap: 14px !important;
+  gap: 10px !important;
   width: 100% !important;
   overflow: visible !important;
 }
 .st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) [data-testid="column"] {
   flex: 0 0 auto !important;
+  flex-shrink: 0 !important;
   width: auto !important;
   min-width: 0 !important;
   overflow: visible !important;
+  position: relative !important;
+}
+.st-key-ips_page_header [class*="st-key-header_"] {
+  flex: 0 0 auto !important;
+  flex-shrink: 0 !important;
+  width: auto !important;
+  max-width: none !important;
 }
 .st-key-ips_page_header .stButton,
 .st-key-ips_page_header .stDateInput,
@@ -99,7 +108,6 @@ def inject_page_header_styles() -> None:
 .st-key-header_back .stButton > button,
 .st-key-header_menu .stButton > button,
 .st-key-header_refresh .stButton > button,
-.st-key-header_notifications .stButton > button,
 .st-key-header_help .stButton > button,
 .st-key-header_settings .stButton > button {
   width: 40px !important;
@@ -110,17 +118,45 @@ def inject_page_header_styles() -> None:
   align-items: center !important;
   justify-content: center !important;
 }
+.st-key-header_notifications .stButton > button {
+  width: auto !important;
+  min-width: 40px !important;
+  max-width: 72px !important;
+  padding: 0 8px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
 .st-key-header_primary_action .stButton > button {
   width: auto !important;
-  min-width: 108px !important;
+  min-width: 112px !important;
+  max-width: none !important;
   padding: 0 16px !important;
   background: #3158e6 !important;
   color: #ffffff !important;
   border-color: #3158e6 !important;
 }
+.st-key-header_primary_action {
+  min-width: 112px !important;
+}
 .st-key-header_date_range {
   min-width: 190px !important;
   max-width: 230px !important;
+  flex: 0 0 190px !important;
+}
+.st-key-header_refresh,
+.st-key-header_help,
+.st-key-header_settings {
+  min-width: 40px !important;
+  max-width: 40px !important;
+}
+.st-key-header_notifications {
+  min-width: 40px !important;
+  max-width: 72px !important;
+}
+.st-key-header_avatar {
+  min-width: 44px !important;
+  max-width: 58px !important;
 }
 .st-key-header_date_range [data-testid="stDateInput"] {
   width: 100% !important;
@@ -143,10 +179,10 @@ def inject_page_header_styles() -> None:
   padding: 0 10px !important;
 }
 .ips-header-logo {
-  width: clamp(280px, 25vw, 430px) !important;
+  width: clamp(200px, 18vw, 340px) !important;
   height: auto !important;
   max-height: 72px !important;
-  min-width: 280px !important;
+  min-width: 200px !important;
   object-fit: contain !important;
   display: block !important;
   background: transparent !important;
@@ -234,10 +270,24 @@ def inject_page_header_styles() -> None:
     font-size: 30px !important;
   }
 }
+@media (max-width: 1279px) and (min-width: 1100px) {
+  .st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] {
+    flex-wrap: wrap !important;
+    row-gap: 12px !important;
+  }
+  .st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    min-width: 100% !important;
+  }
+}
 @media (max-width: 1439px) and (min-width: 1100px) {
   .ips-header-logo {
-    width: clamp(260px, 22vw, 380px) !important;
-    min-width: 260px !important;
+    width: clamp(200px, 16vw, 300px) !important;
+    min-width: 200px !important;
+  }
+  .st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {
+    min-width: 480px !important;
   }
   .st-key-ips_page_header .st-key-header_help {
     display: none !important;
