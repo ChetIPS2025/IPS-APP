@@ -9,7 +9,6 @@ from typing import Any
 
 import streamlit as st
 
-from app.components.headers import render_page_brand_header
 from app.components.table_filters import (
     apply_column_filters,
     build_filter_options,
@@ -4898,13 +4897,6 @@ def render() -> None:
         return
 
     inject_timekeeping_module_css()
-    inject_scroll_preserve("timekeeping")
-    from app.mobile_ui import ensure_narrow_viewport_detected
-    ensure_narrow_viewport_detected()
-    st.markdown(
-        '<span class="ips-timekeeping-page ips-page-shell-marker" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
 
     from app.navigation import TK_PREFILL_WEEK_KEY
     pre_week_raw = str(st.session_state.pop(TK_PREFILL_WEEK_KEY, "") or "").strip()[:10]
@@ -4917,48 +4909,55 @@ def render() -> None:
 
     ws = _current_week_start()
     we = week_end(ws)
+
+    def _on_week_range_change(dr: tuple[date, date]) -> None:
+        start_d = normalize_date(dr[0])
+        if start_d is None:
+            return
+        new_start = week_start(start_d)
+        if new_start != ws:
+            st.session_state[_WEEK_KEY] = new_start
+            reset_table_page(_TABLE_KEY)
+            _clear_day_time_selection()
+            clear_timekeeping_list_caches()
+
+    def _on_refresh() -> None:
+        clear_timekeeping_list_caches()
+
+    def _tk_recalc() -> None:
+        if st.button("Recalculate", key="tk_hdr_recalc", help="Recalculate Totals", use_container_width=True):
+            _recalculate_visible_week_totals(ws)
+            st.rerun()
+
+    from app.ui.page_header import render_page_header
+
+    render_page_header(
+        "Weekly Timekeeping",
+        "View and manage weekly employee time entries.",
+        show_date_range=True,
+        date_range_value=(ws, we),
+        date_range_key="tk_hdr_week_range",
+        on_date_range_change=_on_week_range_change,
+        show_refresh=True,
+        refresh_key="tk_hdr_refresh",
+        on_refresh=_on_refresh,
+        secondary_action=_tk_recalc,
+    )
+
+    inject_scroll_preserve("timekeeping")
+    from app.mobile_ui import ensure_narrow_viewport_detected
+    ensure_narrow_viewport_detected()
+    st.markdown(
+        '<span class="ips-timekeeping-page ips-page-shell-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+
     summaries = _filter_summaries_for_field_user(load_timekeeping_summaries(ws))
     _ensure_week_days_by_employee(ws)
     built_rows = [_build_timecard_row(row, ws) for row in summaries]
     filter_options = build_filter_options(built_rows, _TK_COLUMN_FILTER_SPECS)
 
-    def _tk_week_range() -> None:
-        picked = st.date_input(
-            "Week",
-            value=(ws, we),
-            key="tk_hdr_week_range",
-            label_visibility="collapsed",
-            format=DATE_INPUT_FORMAT,
-        )
-        if isinstance(picked, tuple) and len(picked) == 2:
-            start_d = normalize_date(picked[0])
-            if start_d is None:
-                return
-            new_start = week_start(start_d)
-            if new_start != ws:
-                st.session_state[_WEEK_KEY] = new_start
-                reset_table_page(_TABLE_KEY)
-                _clear_day_time_selection()
-                clear_timekeeping_list_caches()
-                st.rerun()
-
-    def _tk_refresh() -> None:
-        if st.button("↻ Refresh", key="tk_hdr_refresh", use_container_width=True):
-            clear_timekeeping_list_caches()
-            st.rerun()
-
-    def _tk_recalc() -> None:
-        if st.button("↻ Recalculate Totals", key="tk_hdr_recalc", use_container_width=True):
-            _recalculate_visible_week_totals(ws)
-            st.rerun()
-
     can_enter = _can_submit_timekeeping()
-    render_page_brand_header(
-        "Weekly Timekeeping",
-        "View and manage weekly employee time entries.",
-        icon="🕒",
-        actions=[_tk_week_range, _tk_refresh, _tk_recalc],
-    )
 
     if not can_enter:
         st.info(

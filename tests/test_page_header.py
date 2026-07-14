@@ -181,6 +181,12 @@ class PageHeaderSourceTests(unittest.TestCase):
         self.assertIn('class*="st-key-ips_page_header"', src)
         self.assertNotIn("setTimeout(run, 500)", src)
 
+    def test_scroll_preserve_injects_from_sidebar(self) -> None:
+        from app.ui.streamlit_perf import inject_scroll_preserve
+
+        src = inspect.getsource(inject_scroll_preserve)
+        self.assertIn("with st.sidebar:", src)
+
 
 class NavHistoryTests(unittest.TestCase):
     def setUp(self) -> None:

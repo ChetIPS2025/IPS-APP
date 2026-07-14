@@ -42,8 +42,9 @@ def inject_scroll_preserve(marker: str) -> None:
         return
     st.session_state[sk] = True
     m = json.dumps(str(marker or "default"))
-    components.html(
-        f"""
+    with st.sidebar:
+        components.html(
+            f"""
 <script>
 (function() {{
   const w = window.parent || window;
@@ -72,6 +73,6 @@ def inject_scroll_preserve(marker: str) -> None:
   );
 }})();
 </script>
-        """,
-        height=0,
-    )
+            """,
+            height=0,
+        )

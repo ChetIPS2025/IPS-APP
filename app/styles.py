@@ -5462,15 +5462,20 @@ def inject_timekeeping_module_css() -> None:
         f'{tk_expand}:has(.timekeeping-allocation-panel-marker) '
         f'[class*="st-key-tk_alloc_week_footer_"]'
     )
-    st.markdown(
-        f"""
-<style id="ips-timekeeping-module-v104">
+    with st.sidebar:
+        st.markdown(
+            f"""
+<style id="ips-timekeeping-module-v105">
 .ips-timekeeping-page {{
   background: #f1f5f9 !important;
 }}
 .ips-timekeeping-week-toolbar-marker {{
   display: block !important;
+  height: 0 !important;
+  overflow: hidden !important;
   margin-top: 16px !important;
+  padding: 0 !important;
+  border: 0 !important;
 }}
 .ips-timekeeping-week-helper {{
   margin: 8px 0 12px 0 !important;

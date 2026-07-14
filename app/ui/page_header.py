@@ -180,9 +180,11 @@ def _render_menu(*, header_key: str) -> None:
             _request_sidebar_toggle()
 
 
-def _render_refresh(*, key: str) -> None:
+def _render_refresh(*, key: str, on_refresh: Callable[[], None] | None = None) -> None:
     with st.container(key="header_refresh"):
         if st.button("↻", key=key, help="Refresh", use_container_width=True):
+            if on_refresh is not None:
+                on_refresh()
             st.rerun()
 
 
@@ -255,6 +257,7 @@ def render_page_header(
     on_date_range_change: Callable[[tuple[date, date]], None] | None = None,
     show_refresh: bool = False,
     refresh_key: str = "ips_hdr_refresh",
+    on_refresh: Callable[[], None] | None = None,
     notification_count: int | None = None,
     user_initials: str | None = None,
     on_back: Callable[[], None] | None = None,
@@ -359,7 +362,7 @@ def render_page_header(
 
             if show_refresh:
                 with slots["refresh"]:
-                    _render_refresh(key=refresh_key)
+                    _render_refresh(key=refresh_key, on_refresh=on_refresh)
 
             if primary_action:
                 with slots["primary"]:
