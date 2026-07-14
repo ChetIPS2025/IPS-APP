@@ -5,7 +5,7 @@ from __future__ import annotations
 import streamlit as st
 import streamlit.components.v1 as components
 
-IPS_APP_SHELL_LAYOUT_STYLES_KEY = "ips_app_shell_layout_styles_v3"
+IPS_APP_SHELL_LAYOUT_STYLES_KEY = "ips_app_shell_layout_styles_v4"
 IPS_APP_SHELL_SCRIPT_MARKER_CLASS = "ips-app-shell-script-marker"
 
 
@@ -20,6 +20,62 @@ def inject_app_shell_script(script_html: str) -> None:
         components.html(snippet, height=0, scrolling=False)
 
 
+def _app_shell_pre_header_cleanup_script() -> str:
+    return """
+<script>
+(function () {
+  function zero(el) {
+    if (!el) return;
+    el.style.setProperty("display", "none", "important");
+    el.style.setProperty("height", "0", "important");
+    el.style.setProperty("min-height", "0", "important");
+    el.style.setProperty("max-height", "0", "important");
+    el.style.setProperty("margin", "0", "important");
+    el.style.setProperty("padding", "0", "important");
+    el.style.setProperty("overflow", "hidden", "important");
+    el.style.setProperty("border", "none", "important");
+  }
+  function collapsePreHeader() {
+    const w = window.parent || window;
+    const d = w.document;
+    const main = d.querySelector('section[data-testid="stMain"]');
+    if (!main) return;
+    const header = main.querySelector(".st-key-ips_page_header, .ips-app-page-header-marker");
+    if (!header) return;
+    const headerWrap =
+      header.closest('[data-testid="stElementContainer"]') ||
+      header.closest(".st-key-ips_page_header") ||
+      header;
+    const vertical = headerWrap.closest('[data-testid="stVerticalBlock"]') || main;
+    const children = vertical.children || [];
+    for (let i = 0; i < children.length; i += 1) {
+      const child = children[i];
+      if (!child) continue;
+      if (child === headerWrap || child.contains(headerWrap)) break;
+      zero(child);
+    }
+    const block = main.querySelector(".block-container");
+    if (block) {
+      block.style.setProperty("padding-top", "0", "important");
+      block.style.setProperty("margin-top", "0", "important");
+    }
+    const mainBlock = main.querySelector('[data-testid="stMainBlockContainer"]');
+    if (mainBlock) {
+      mainBlock.style.setProperty("padding-top", "0", "important");
+      mainBlock.style.setProperty("margin-top", "0", "important");
+    }
+  }
+  const run = function () { collapsePreHeader(); };
+  run();
+  w.requestAnimationFrame(run);
+  setTimeout(run, 0);
+  setTimeout(run, 120);
+  setTimeout(run, 500);
+})();
+</script>
+"""
+
+
 def inject_app_shell_layout_styles() -> None:
     """Inject shared main-content top spacing once per session."""
     if st.session_state.get(IPS_APP_SHELL_LAYOUT_STYLES_KEY):
@@ -27,7 +83,7 @@ def inject_app_shell_layout_styles() -> None:
     st.session_state[IPS_APP_SHELL_LAYOUT_STYLES_KEY] = True
     st.markdown(
         """
-<style id="ips-app-shell-layout-v3">
+<style id="ips-app-shell-layout-v4">
 :root {
   --ips-main-top-gap: 0px;
 }

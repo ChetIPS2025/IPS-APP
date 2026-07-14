@@ -361,6 +361,14 @@ def render_page_header(
                     sign_out=sign_out_fn,
                 )
 
+    from app.ui.app_shell_styles import (
+        _app_shell_pre_header_cleanup_script,
+        inject_app_shell_script,
+    )
+
+    with st.sidebar:
+        inject_app_shell_script(_app_shell_pre_header_cleanup_script())
+
 
 def render_page_brand_header(
     title: str,

@@ -61,7 +61,7 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.ui.page_header_styles import inject_page_header_styles
 
         src = inspect.getsource(inject_page_header_styles)
-        self.assertIn("ips-page-header-styles-v3", src)
+        self.assertIn("ips-page-header-styles-v4", src)
         self.assertIn(".st-key-ips_page_header", src)
         self.assertIn(".st-key-header_primary_action", src)
         self.assertNotIn("position: absolute", src)
@@ -101,6 +101,18 @@ class PageHeaderSourceTests(unittest.TestCase):
         self.assertNotIn("margin-left: -22px", src)
         self.assertNotIn("margin-right: -22px", src)
 
+    def test_global_css_injects_from_sidebar(self) -> None:
+        from app.styles import inject_global_css
+
+        src = inspect.getsource(inject_global_css)
+        self.assertIn("with st.sidebar:", src)
+
+    def test_page_header_styles_inject_from_sidebar(self) -> None:
+        from app.ui.page_header_styles import inject_page_header_styles
+
+        src = inspect.getsource(inject_page_header_styles)
+        self.assertIn("with st.sidebar:", src)
+
     def test_app_shell_script_uses_st_html_for_inline_js(self) -> None:
         from app.ui.app_shell_styles import inject_app_shell_script
 
@@ -119,7 +131,7 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.ui.app_shell_styles import inject_app_shell_layout_styles
 
         src = inspect.getsource(inject_app_shell_layout_styles)
-        self.assertIn("ips-app-shell-layout-v3", src)
+        self.assertIn("ips-app-shell-layout-v4", src)
         self.assertIn("stMainBlockContainer", src)
         self.assertIn("padding-top: var(--ips-main-top-gap)", src)
         self.assertIn("ips-app-shell-script-marker", src)

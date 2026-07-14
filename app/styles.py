@@ -10554,7 +10554,12 @@ body.ips-auth-login .st-key-ips_login_card [data-testid="stHorizontalBlock"] > [
 def inject_authenticated_shell_css() -> None:
     """Full app layout after login."""
     from app.components.sidebar_shell import inject_desktop_nav_rail_css
-    from app.ui.app_shell_styles import inject_app_shell_layout_styles, inject_app_shell_script
+    from app.ui.app_shell_styles import (
+        _app_shell_pre_header_cleanup_script,
+        inject_app_shell_layout_styles,
+        inject_app_shell_script,
+    )
+    from app.ui.page_header_styles import inject_page_header_styles
 
     with st.sidebar:
         inject_app_shell_script(
@@ -10562,6 +10567,8 @@ def inject_authenticated_shell_css() -> None:
             'document.body.classList.add("ips-authed-app");</script>'
         )
         inject_app_shell_layout_styles()
+        inject_page_header_styles()
+        inject_app_shell_script(_app_shell_pre_header_cleanup_script())
         inject_desktop_nav_rail_css()
 
 
@@ -12313,8 +12320,9 @@ table th {{
 
 def inject_global_css() -> None:
     """Inject global IPS SaaS styles on every render."""
-    st.markdown(
-        f"""
+    with st.sidebar:
+        st.markdown(
+            f"""
 <style id="ips-global-styles-v16">
 :root {{
   --ips-bg: {APP_BG};

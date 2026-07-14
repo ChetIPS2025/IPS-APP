@@ -145,8 +145,11 @@ def inject_pwa_support() -> None:
         "appleTouchIcon": _static_url("apple-touch-icon.png"),
     }
 
-    components.html(
-        f"""
+    from app.ui.app_shell_styles import inject_app_shell_script
+
+    with st.sidebar:
+        inject_app_shell_script(
+            f"""
 <script>
 (function() {{
   const cfg = {json.dumps(payload)};
@@ -258,9 +261,8 @@ def inject_pwa_support() -> None:
   }}
 }})();
 </script>
-        """,
-        height=0,
-    )
+            """
+        )
 
 
 def trigger_pwa_install_prompt() -> None:
@@ -268,8 +270,11 @@ def trigger_pwa_install_prompt() -> None:
     if not st.session_state.pop(_IPS_TRIGGER_INSTALL_KEY, False):
         return
     msg = json.dumps(_INSTALL_UNAVAILABLE_MSG)
-    components.html(
-        f"""
+    from app.ui.app_shell_styles import inject_app_shell_script
+
+    with st.sidebar:
+        inject_app_shell_script(
+            f"""
 <script>
 (function() {{
   const w = window.parent || window;
@@ -281,9 +286,8 @@ def trigger_pwa_install_prompt() -> None:
   }}
 }})();
 </script>
-        """,
-        height=0,
-    )
+            """
+        )
 
 
 def render_install_app_sidebar_block() -> None:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v3"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v4"
 
 
 def inject_page_header_styles() -> None:
@@ -12,9 +12,10 @@ def inject_page_header_styles() -> None:
     if st.session_state.get(IPS_PAGE_HEADER_STYLES_KEY):
         return
     st.session_state[IPS_PAGE_HEADER_STYLES_KEY] = True
-    st.markdown(
-        """
-<style id="ips-page-header-styles-v3">
+    with st.sidebar:
+        st.markdown(
+            """
+<style id="ips-page-header-styles-v4">
 .st-key-ips_page_header,
 .st-key-ips_page_header [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;

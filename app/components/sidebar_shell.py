@@ -478,8 +478,8 @@ def inject_sidebar_shell() -> None:
         inject_sidebar_navigation_script(collapsed)
         if toggle_requested:
             inject_app_shell_script(_toggle_script(collapsed=collapsed, after_nav=True))
+        inject_mobile_nav_menu_button()
 
-    inject_mobile_nav_menu_button()
     st.session_state[IPS_SIDEBAR_SHELL_KEY] = True
 
 
@@ -1091,7 +1091,7 @@ button.ips-header-menu-btn {{
     left: 12px !important;
     z-index: 99998 !important;
   }}
-  section[data-testid="stMain"] [data-testid="stElementContainer"]:has(.ips-mobile-nav-fab) {{
+  [data-testid="stElementContainer"]:has(.ips-mobile-nav-fab) {{
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;

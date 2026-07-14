@@ -494,4 +494,5 @@ def inject_ips_global_mobile_css() -> None:
     if st.session_state.get(IPS_GLOBAL_MOBILE_CSS_KEY):
         return
     st.session_state[IPS_GLOBAL_MOBILE_CSS_KEY] = True
-    st.markdown(_IPS_GLOBAL_MOBILE_CSS, unsafe_allow_html=True)
+    with st.sidebar:
+        st.markdown(_IPS_GLOBAL_MOBILE_CSS, unsafe_allow_html=True)
