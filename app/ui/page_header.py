@@ -277,7 +277,13 @@ def _render_bottom_actions(
             slot_names.append("primary")
         if not slot_names:
             return
-        slot_cols = st.columns([1.0] * len(slot_names), gap="small")
+        if len(slot_names) == 2:
+            ratios = [2.2, 1.4]
+        elif slot_names[0] == "date":
+            ratios = [2.2]
+        else:
+            ratios = [1.4]
+        slot_cols = st.columns(ratios, gap="small")
         slots = dict(zip(slot_names, slot_cols))
 
         if show_date_range:

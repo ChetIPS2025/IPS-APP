@@ -6,8 +6,8 @@ import streamlit as st
 
 from app.ui.css_inject import inject_css_once
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v21"
-IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v21"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v22"
+IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v22"
 
 
 def inject_page_header_styles() -> None:
@@ -17,7 +17,7 @@ def inject_page_header_styles() -> None:
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-page-header-styles-v21">
+<style id="ips-page-header-styles-v22">
 [class*="st-key-ips_page_header"],
 [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
@@ -159,10 +159,37 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   flex-wrap: nowrap !important;
   align-items: center !important;
   justify-content: flex-end !important;
-  gap: 4px !important;
+  gap: 8px !important;
   width: max-content !important;
   max-width: max-content !important;
   margin: 0 !important;
+}
+.st-key-header_bottom_actions [data-testid="stHorizontalBlock"] > [data-testid="column"],
+[class*="st-key-header_bottom_actions"] [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+  flex: 0 0 auto !important;
+  flex-shrink: 0 !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  padding: 0 !important;
+  position: relative !important;
+  overflow: visible !important;
+}
+.st-key-header_bottom_actions [data-testid="stHorizontalBlock"] > [data-testid="column"]:has(.st-key-header_date_range),
+.st-key-header_bottom_actions [data-testid="stHorizontalBlock"] > [data-testid="column"]:has([class*="st-key-header_date_range"]),
+[class*="st-key-header_bottom_actions"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:has(.st-key-header_date_range),
+[class*="st-key-header_bottom_actions"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:has([class*="st-key-header_date_range"]) {
+  min-width: 230px !important;
+  width: 230px !important;
+  max-width: 230px !important;
+}
+.st-key-header_bottom_actions [data-testid="stHorizontalBlock"] > [data-testid="column"]:has(.st-key-header_primary_action),
+.st-key-header_bottom_actions [data-testid="stHorizontalBlock"] > [data-testid="column"]:has([class*="st-key-header_primary_action"]),
+[class*="st-key-header_bottom_actions"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:has(.st-key-header_primary_action),
+[class*="st-key-header_bottom_actions"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:has([class*="st-key-header_primary_action"]) {
+  min-width: max-content !important;
+  width: auto !important;
+  max-width: none !important;
 }
 .st-key-header_bottom_actions [data-testid="column"],
 [class*="st-key-header_bottom_actions"] [data-testid="column"] {
@@ -174,8 +201,9 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
 }
 .st-key-header_bottom_actions .st-key-header_date_range,
 [class*="st-key-header_bottom_actions"] .st-key-header_date_range {
-  min-width: 190px !important;
+  min-width: 230px !important;
   max-width: 230px !important;
+  width: 230px !important;
   flex: 0 0 auto !important;
 }
 .st-key-header_bottom_actions .st-key-header_primary_action,
@@ -183,6 +211,20 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   min-width: max-content !important;
   max-width: none !important;
   flex: 0 0 auto !important;
+  width: auto !important;
+}
+.st-key-header_bottom_actions .st-key-header_primary_action .stButton,
+.st-key-header_bottom_actions .st-key-header_primary_action [data-testid="stDownloadButton"],
+[class*="st-key-header_bottom_actions"] .st-key-header_primary_action .stButton,
+[class*="st-key-header_bottom_actions"] .st-key-header_primary_action [data-testid="stDownloadButton"] {
+  width: auto !important;
+  margin: 0 !important;
+}
+.st-key-header_bottom_actions .st-key-header_primary_action .stButton > button,
+[class*="st-key-header_bottom_actions"] .st-key-header_primary_action .stButton > button {
+  width: auto !important;
+  min-width: 112px !important;
+  max-width: none !important;
 }
 [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) > [data-testid="stHorizontalBlock"] > [data-testid="column"]:has([class*="st-key-header_bottom_actions"]) {
   width: 0 !important;
