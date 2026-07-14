@@ -6,8 +6,8 @@ import streamlit as st
 
 from app.ui.css_inject import inject_css_once
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v18"
-IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v18"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v19"
+IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v19"
 
 
 def inject_page_header_styles() -> None:
@@ -17,7 +17,7 @@ def inject_page_header_styles() -> None:
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-page-header-styles-v18">
+<style id="ips-page-header-styles-v19">
 [class*="st-key-ips_page_header"],
 [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
@@ -139,18 +139,30 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   display: flex !important;
   flex-wrap: nowrap !important;
   justify-content: flex-end !important;
-  align-items: center !important;
+  align-items: flex-start !important;
   gap: 6px !important;
   width: 100% !important;
   overflow: visible !important;
 }
 .st-key-header_trailing_actions,
 [class*="st-key-header_trailing_actions"] {
-  margin-left: auto !important;
+  position: absolute !important;
+  top: 0 !important;
+  right: 0 !important;
+  margin-left: 0 !important;
   flex: 0 0 auto !important;
   min-width: max-content !important;
   max-width: max-content !important;
-  align-self: flex-start !important;
+  align-self: auto !important;
+  z-index: 4 !important;
+}
+[class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) > [data-testid="stHorizontalBlock"] > [data-testid="column"]:has([class*="st-key-header_trailing_actions"]) {
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  flex: 0 0 0 !important;
 }
 .st-key-header_trailing_actions [data-testid="stHorizontalBlock"],
 [class*="st-key-header_trailing_actions"] [data-testid="stHorizontalBlock"] {
