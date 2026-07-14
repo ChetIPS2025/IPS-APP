@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v14"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v15"
 
 
 def inject_page_header_styles() -> None:
@@ -15,7 +15,7 @@ def inject_page_header_styles() -> None:
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-page-header-styles-v14">
+<style id="ips-page-header-styles-v15">
 [class*="st-key-ips_page_header"],
 [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
@@ -52,6 +52,7 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   width: 100% !important;
   flex-wrap: nowrap !important;
   overflow: visible !important;
+  position: relative !important;
 }
 [class*="st-key-ips_page_header"] [data-testid="stHorizontalBlock"] {
   align-items: center !important;
@@ -67,15 +68,31 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   overflow: visible !important;
 }
 [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {
-  flex: 1 1 220px !important;
-  min-width: 200px !important;
   overflow: visible !important;
+  z-index: 1 !important;
 }
 [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {
-  flex: 1 1 auto !important;
+  flex: 0 1 auto !important;
   min-width: 260px !important;
   max-width: 100% !important;
+  margin-left: auto !important;
   overflow: visible !important;
+}
+@media (min-width: 768px) {
+  [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {
+    position: absolute !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    flex: 0 0 auto !important;
+    width: max-content !important;
+    min-width: 0 !important;
+    max-width: min(520px, 52vw) !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    pointer-events: none !important;
+  }
 }
 [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4):has(.st-key-header_date_range) {
   flex: 1 1 560px !important;
@@ -387,11 +404,15 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
 }
 .ips-header-title-block {
   display: flex !important;
-  align-items: flex-start !important;
-  gap: 14px !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
   min-width: 0 !important;
   overflow: visible !important;
   padding-bottom: 2px !important;
+  text-align: center !important;
+  width: 100% !important;
 }
 .ips-header-icon-wrap {
   display: inline-flex !important;
@@ -400,7 +421,7 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
   width: 32px !important;
   height: 32px !important;
   flex: 0 0 auto !important;
-  margin-top: 4px !important;
+  margin-top: 0 !important;
 }
 .ips-header-icon-wrap .ips-app-header-icon-svg {
   display: block !important;
@@ -410,9 +431,12 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
 .ips-header-text {
   display: flex !important;
   flex-direction: column !important;
+  align-items: center !important;
   min-width: 0 !important;
   overflow: visible !important;
   padding-bottom: 4px !important;
+  text-align: center !important;
+  width: 100% !important;
 }
 .ips-header-title {
   margin: 0 !important;
@@ -497,8 +521,7 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
     row-gap: 14px !important;
     align-items: flex-start !important;
   }
-  [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2),
-  [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {
+  [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) {
     flex: 1 1 auto !important;
     min-width: 0 !important;
     max-width: 100% !important;
@@ -518,6 +541,20 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
   }
 }
 @media (max-width: 767px) {
+  [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] {
+    flex-wrap: wrap !important;
+    row-gap: 10px !important;
+  }
+  [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    transform: none !important;
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    pointer-events: auto !important;
+  }
   [class*="st-key-ips_page_header"],
   [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
     min-height: 96px !important;
