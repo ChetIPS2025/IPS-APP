@@ -6,8 +6,8 @@ import streamlit as st
 
 from app.ui.css_inject import inject_css_once
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v16"
-IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v16"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v17"
+IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v17"
 
 
 def inject_page_header_styles() -> None:
@@ -17,7 +17,7 @@ def inject_page_header_styles() -> None:
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-page-header-styles-v16">
+<style id="ips-page-header-styles-v17">
 [class*="st-key-ips_page_header"],
 [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
@@ -386,13 +386,10 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
 .st-key-header_refresh,
 .st-key-header_help,
 .st-key-header_settings,
-.st-key-header_notifications {
+.st-key-header_notifications,
+.st-key-header_avatar {
   min-width: 40px !important;
   max-width: 40px !important;
-}
-.st-key-header_avatar {
-  min-width: 44px !important;
-  max-width: 58px !important;
 }
 .st-key-header_date_range [data-testid="stDateInput"] {
   width: 100% !important;
@@ -408,11 +405,55 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
   height: 40px !important;
   font-size: 0.8125rem !important;
 }
-.st-key-header_avatar [data-testid="stPopover"] > button {
-  width: auto !important;
-  min-width: 44px !important;
-  max-width: 58px !important;
-  padding: 0 10px !important;
+.st-key-header_avatar [data-testid="stPopover"] > button,
+[class*="st-key-header_avatar"] [data-testid="stPopover"] > button,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_avatar"] [data-testid="stPopover"] > button {
+  width: 40px !important;
+  min-width: 40px !important;
+  max-width: 40px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  background: #e2e8f0 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #334155 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.01em !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+}
+.st-key-header_avatar [data-testid="stPopover"] > button [data-testid="stIconMaterial"],
+[class*="st-key-header_avatar"] [data-testid="stPopover"] > button [data-testid="stIconMaterial"],
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_avatar"] [data-testid="stPopover"] > button [data-testid="stIconMaterial"] {
+  display: none !important;
+}
+.st-key-header_avatar [data-testid="stPopover"] > button p,
+[class*="st-key-header_avatar"] [data-testid="stPopover"] > button p,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_avatar"] [data-testid="stPopover"] > button p {
+  margin: 0 !important;
+  line-height: 1 !important;
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+}
+.st-key-header_avatar [data-testid="stPopover"] > button:hover,
+.st-key-header_avatar [data-testid="stPopover"] > button:focus,
+.st-key-header_avatar [data-testid="stPopover"] > button:focus-visible,
+[class*="st-key-header_avatar"] [data-testid="stPopover"] > button:hover,
+[class*="st-key-header_avatar"] [data-testid="stPopover"] > button:focus,
+[class*="st-key-header_avatar"] [data-testid="stPopover"] > button:focus-visible,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_avatar"] [data-testid="stPopover"] > button:hover,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_avatar"] [data-testid="stPopover"] > button:focus,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_avatar"] [data-testid="stPopover"] > button:focus-visible {
+  background: #cbd5e1 !important;
+  border-color: #94a3b8 !important;
+  color: #1e293b !important;
+  opacity: 1 !important;
+  box-shadow: none !important;
 }
 .ips-header-logo {
   width: clamp(200px, 18vw, 340px) !important;

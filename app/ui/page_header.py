@@ -28,7 +28,7 @@ _ACTION_WIDTHS: dict[str, float] = {
     "notification": 0.55,
     "help": 0.55,
     "settings": 0.55,
-    "avatar": 0.82,
+    "avatar": 0.55,
 }
 
 
@@ -254,7 +254,7 @@ def _render_user_menu(
     sign_out: Callable[[], None],
 ) -> None:
     with st.container(key="header_avatar"):
-        with st.popover(initials, help=display):
+        with st.popover(initials, help=display, type="tertiary"):
             st.markdown(f"**{html.escape(display)}**")
             st.caption(role.replace("_", " ").title())
             if st.button("Log out", key=f"{header_key}_logout", use_container_width=True):
