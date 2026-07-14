@@ -4230,9 +4230,10 @@ def inject_assets_module_css() -> None:
         ".st-key-assets_small_tools_table_wrap [data-testid=\"stVerticalBlock\"] > [data-testid=\"stHorizontalBlock\"] > [data-testid=\"column\"], "
         ".st-key-assets_small_tools_table_wrap [data-testid=\"stVerticalBlock\"] > [data-testid=\"stElementContainer\"] > [data-testid=\"stHorizontalBlock\"] > [data-testid=\"column\"]"
     )
-    st.markdown(
-        f"""
-<style id="ips-assets-module-v20">
+    with st.sidebar:
+        st.markdown(
+            f"""
+<style id="ips-assets-module-v21">
 .ips-assets-table-wrap,
 .ips-assets-table-wrap.asset-table {{
   background: #ffffff;

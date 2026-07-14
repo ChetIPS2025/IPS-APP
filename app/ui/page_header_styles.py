@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v8"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v9"
 
 
 def inject_page_header_styles() -> None:
@@ -15,7 +15,7 @@ def inject_page_header_styles() -> None:
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-page-header-styles-v8">
+<style id="ips-page-header-styles-v9">
 [class*="st-key-ips_page_header"],
 [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
@@ -124,6 +124,26 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   gap: 10px !important;
   width: 100% !important;
   overflow: visible !important;
+}
+[class*="st-key-ips_page_header"]:has(.ips-assets-page-header-actions) > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) > [data-testid="stHorizontalBlock"] {
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+}
+[class*="st-key-ips_page_header"]:has(.ips-assets-page-header-actions) .st-key-header_primary_action {
+  min-width: max-content !important;
+  flex: 1 1 auto !important;
+  max-width: none !important;
+}
+[class*="st-key-ips_page_header"]:has(.ips-assets-page-header-actions) .st-key-header_primary_action .stButton > button[kind="primary"] {
+  background: #3158e6 !important;
+  border-color: #3158e6 !important;
+  color: #ffffff !important;
+}
+[class*="st-key-ips_page_header"]:has(.ips-assets-page-header-actions) .st-key-header_primary_action .stButton > button[kind="secondary"],
+[class*="st-key-ips_page_header"]:has(.ips-assets-page-header-actions) .st-key-header_primary_action [data-testid="stDownloadButton"] > button {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #374151 !important;
 }
 [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) [data-testid="column"] {
   flex: 0 0 auto !important;

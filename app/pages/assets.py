@@ -24,7 +24,6 @@ from app.components.asset_pricing_guide_actions import (
 )
 from app.components.asset_documents_tab import asset_documents_count, render_asset_documents_tab
 from app.components.item_photo_manager import render_item_photo_manager
-from app.components.headers import render_page_brand_header
 from app.components.layout import render_filter_bar as layout_filter_bar
 from app.components.table_filters import (
     apply_column_filters,
@@ -2029,16 +2028,6 @@ def render() -> None:
         return
     from app.services.asset_qr import apply_pending_asset_deeplink
     apply_pending_asset_deeplink()
-    inject_assets_page_styles()
-    inject_assets_module_css()
-    inject_assets_page_layout_css()
-    if is_field_context():
-        inject_field_row_expand_css()
-    st.markdown(
-        '<span class="ips-assets-page ips-page-shell-marker" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
-    rows = load_assets()
 
     def _assets_header_actions() -> None:
         st.markdown(
@@ -2066,12 +2055,25 @@ def render() -> None:
             if st.button("+ New Asset", key="ast_new"):
                 st.session_state[_SHOW_NEW_ASSET_FORM_KEY] = True
 
-    render_page_brand_header(
+    from app.ui.page_header import render_page_header
+
+    render_page_header(
         "Assets",
         "Track and manage all company assets and equipment.",
-        actions=[_assets_header_actions],
-        actions_column_ratio=(0.38, 0.62),
+        primary_action=_assets_header_actions,
+        primary_action_width=5.8,
     )
+
+    inject_assets_page_styles()
+    inject_assets_module_css()
+    inject_assets_page_layout_css()
+    if is_field_context():
+        inject_field_row_expand_css()
+    st.markdown(
+        '<span class="ips-assets-page ips-page-shell-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    rows = load_assets()
 
     if st.session_state.get(QUICK_ADD_OPEN_KEY):
         show_quick_add_tool_dialog(uploaded_by=_current_user_id())

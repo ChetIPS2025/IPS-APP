@@ -38,6 +38,7 @@ def _action_slot_columns(
     show_refresh: bool,
     has_secondary_action: bool,
     has_primary_action: bool,
+    primary_action_width: float | None = None,
 ) -> tuple[list[str], list[float]]:
     names: list[str] = []
     if show_date_range:
@@ -50,6 +51,9 @@ def _action_slot_columns(
         names.append("secondary")
     names.extend(["notification", "help", "settings", "avatar"])
     ratios = [_ACTION_WIDTHS[name] for name in names]
+    if has_primary_action and primary_action_width is not None:
+        primary_idx = names.index("primary")
+        ratios[primary_idx] = float(primary_action_width)
     return names, ratios
 
 
@@ -263,6 +267,7 @@ def render_page_header(
     on_back: Callable[[], None] | None = None,
     show_logo: bool = True,
     layout_marker: str | None = None,
+    primary_action_width: float | None = None,
 ) -> None:
     """
     Standard IPS page header.
@@ -344,6 +349,7 @@ def render_page_header(
                 show_refresh=show_refresh,
                 has_secondary_action=secondary_action is not None,
                 has_primary_action=primary_action is not None,
+                primary_action_width=primary_action_width,
             )
             slot_cols = st.columns(
                 slot_ratios,

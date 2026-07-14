@@ -61,7 +61,7 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.ui.page_header_styles import inject_page_header_styles
 
         src = inspect.getsource(inject_page_header_styles)
-        self.assertIn("ips-page-header-styles-v8", src)
+        self.assertIn("ips-page-header-styles-v9", src)
         self.assertIn("st-key-header_page_toolbar", src)
         self.assertIn('[class*="st-key-ips_page_header"]', src)
         self.assertIn(".st-key-header_primary_action", src)
@@ -180,6 +180,19 @@ class PageHeaderSourceTests(unittest.TestCase):
         self.assertIn("stMainBlockContainer", src)
         self.assertIn('class*="st-key-ips_page_header"', src)
         self.assertNotIn("setTimeout(run, 500)", src)
+
+    def test_page_header_primary_action_width_override(self) -> None:
+        from app.ui.page_header import _action_slot_columns
+
+        names, ratios = _action_slot_columns(
+            show_date_range=False,
+            show_refresh=False,
+            has_secondary_action=False,
+            has_primary_action=True,
+            primary_action_width=5.8,
+        )
+        self.assertEqual(names[0], "primary")
+        self.assertEqual(ratios[0], 5.8)
 
     def test_scroll_preserve_injects_from_sidebar(self) -> None:
         from app.ui.streamlit_perf import inject_scroll_preserve

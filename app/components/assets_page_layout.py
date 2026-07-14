@@ -21,9 +21,10 @@ _ASSETS_PAGE_SIZE_OPTIONS = (50, 75, 100, 150)
 
 def inject_assets_page_layout_css() -> None:
     """Always inject — assets page layout overrides."""
-    st.markdown(
-        """
-<style id="ips-assets-page-layout-v7">
+    with st.sidebar:
+        st.markdown(
+            """
+<style id="ips-assets-page-layout-v8">
 section[data-testid="stMain"]:has(.ips-assets-page) {
   background: #ffffff !important;
 }

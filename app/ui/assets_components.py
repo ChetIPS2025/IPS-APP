@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v37"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v39"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -35,9 +35,10 @@ def inject_assets_page_styles() -> None:
     st.session_state[IPS_ASSETS_PAGE_STYLES_KEY] = True
     from app.ui.page_shell import inject_ips_dashboard_layout
     inject_ips_dashboard_layout()
-    st.markdown(
-        """
-        <style>
+    with st.sidebar:
+        st.markdown(
+            """
+        <style id="ips-assets-page-styles-v39">
         section[data-testid="stMain"]:has(.ips-assets-page)
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-assets-header-anchor),
         section[data-testid="stMain"]:has(.ips-assets-page)
@@ -71,7 +72,28 @@ def inject_assets_page_styles() -> None:
             display: none !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
+        [class*="st-key-header_primary_action"]:has(.ips-assets-page-header-actions) {
+            flex: 1 1 auto !important;
+            min-width: max-content !important;
+            max-width: none !important;
+            overflow-x: auto !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [class*="st-key-header_primary_action"]:has(.ips-assets-page-header-actions)
+        [data-testid="stHorizontalBlock"] {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            align-items: center !important;
+            justify-content: flex-end !important;
+            gap: 0.45rem !important;
+            width: max-content !important;
+            max-width: 100% !important;
+            margin-left: auto !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
         [class*="st-key-header_page_toolbar"]:has(.ips-assets-page-header-actions),
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [class*="st-key-header_primary_action"]:has(.ips-assets-page-header-actions),
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions) {
             align-items: flex-end !important;
@@ -81,6 +103,9 @@ def inject_assets_page_styles() -> None:
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         [class*="st-key-header_page_toolbar"]:has(.ips-assets-page-header-actions)
+        [data-testid="stHorizontalBlock"],
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [class*="st-key-header_primary_action"]:has(.ips-assets-page-header-actions)
         [data-testid="stHorizontalBlock"],
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions)
@@ -96,6 +121,9 @@ def inject_assets_page_styles() -> None:
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
         [class*="st-key-header_page_toolbar"]:has(.ips-assets-page-header-actions)
+        [data-testid="stHorizontalBlock"] > [data-testid="column"],
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [class*="st-key-header_primary_action"]:has(.ips-assets-page-header-actions)
         [data-testid="stHorizontalBlock"] > [data-testid="column"],
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions)
@@ -138,9 +166,13 @@ def inject_assets_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-assets-page)
         [class*="st-key-header_page_toolbar"]:has(.ips-assets-page-header-actions) .stButton,
         section[data-testid="stMain"]:has(.ips-assets-page)
+        [class*="st-key-header_primary_action"]:has(.ips-assets-page-header-actions) .stButton,
+        section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions) .stButton,
         section[data-testid="stMain"]:has(.ips-assets-page)
         [class*="st-key-header_page_toolbar"]:has(.ips-assets-page-header-actions) [data-testid="stDownloadButton"],
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [class*="st-key-header_primary_action"]:has(.ips-assets-page-header-actions) [data-testid="stDownloadButton"],
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions) [data-testid="stDownloadButton"] {
             margin: 0 !important;
@@ -149,9 +181,13 @@ def inject_assets_page_styles() -> None:
         section[data-testid="stMain"]:has(.ips-assets-page)
         [class*="st-key-header_page_toolbar"]:has(.ips-assets-page-header-actions) .stButton > button,
         section[data-testid="stMain"]:has(.ips-assets-page)
+        [class*="st-key-header_primary_action"]:has(.ips-assets-page-header-actions) .stButton > button,
+        section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions) .stButton > button,
         section[data-testid="stMain"]:has(.ips-assets-page)
         [class*="st-key-header_page_toolbar"]:has(.ips-assets-page-header-actions) [data-testid="stDownloadButton"] > button,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [class*="st-key-header_primary_action"]:has(.ips-assets-page-header-actions) [data-testid="stDownloadButton"] > button,
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions) [data-testid="stDownloadButton"] > button {
             width: auto !important;
