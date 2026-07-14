@@ -1,4 +1,4 @@
-"""Tests for session-guarded CSS injection helper."""
+"""Tests for CSS injection helper."""
 
 from __future__ import annotations
 
@@ -21,19 +21,22 @@ class CssInjectTests(unittest.TestCase):
         )
 
     @patch("app.ui.css_inject.st.session_state", new_callable=dict)
-    def test_inject_css_once_returns_true_only_first_time(self, session_state: dict) -> None:
+    def test_inject_css_once_always_allows_injection(self, session_state: dict) -> None:
+        """Each rerun must re-emit style tags — guard must not block second call."""
         first = inject_css_once("ips-test-style-v1")
         second = inject_css_once("ips-test-style-v1")
 
         self.assertTrue(first)
-        self.assertFalse(second)
+        self.assertTrue(second)
         self.assertTrue(session_state[css_inject_key("ips-test-style-v1")])
 
     @patch("app.ui.css_inject.st.session_state", new_callable=dict)
-    def test_inject_css_once_isolated_per_style_id(self, session_state: dict) -> None:
+    def test_inject_css_once_tracks_per_style_id(self, session_state: dict) -> None:
         self.assertTrue(inject_css_once("ips-a-v1"))
         self.assertTrue(inject_css_once("ips-b-v1"))
-        self.assertFalse(inject_css_once("ips-a-v1"))
+        self.assertTrue(inject_css_once("ips-a-v1"))
+        self.assertTrue(session_state[css_inject_key("ips-a-v1")])
+        self.assertTrue(session_state[css_inject_key("ips-b-v1")])
 
     def test_inject_global_css_called_only_from_main(self) -> None:
         callers: list[str] = []

@@ -1,4 +1,4 @@
-"""Session-guard helpers for one-time CSS injection per Streamlit session."""
+"""Helpers for CSS injection across Streamlit reruns."""
 
 from __future__ import annotations
 
@@ -12,14 +12,14 @@ def css_inject_key(style_id: str) -> str:
 
 def inject_css_once(style_id: str) -> bool:
     """
-    Mark a CSS bundle as injected for this session.
+    Record that a CSS bundle was emitted and allow injection on this run.
 
-    Returns True when the caller should inject CSS; False when already injected.
+    Always returns True. Streamlit re-executes the script on every rerun and only
+    keeps DOM nodes that are output again; skipping injection after the first run
+    drops ``<style>`` tags and breaks layout. Duplicate ``<style id="...">`` blocks
+    are harmless — browsers apply the same rules again.
     """
-    key = css_inject_key(style_id)
-    if st.session_state.get(key):
-        return False
-    st.session_state[key] = True
+    st.session_state[css_inject_key(style_id)] = True
     return True
 
 
