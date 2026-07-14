@@ -1166,9 +1166,10 @@ def inject_customers_module_css() -> None:
 
 def inject_jobs_module_css() -> None:
     """Jobs list custom table styling."""
-    st.markdown(
-        f"""
-<style id="ips-jobs-module-v28">
+    with st.sidebar:
+        st.markdown(
+            f"""
+<style id="ips-jobs-module-v29">
 .st-key-jobs_table_wrap .ips-jobs-table-wrap,
 .st-key-jobs_table_wrap .ips-jobs-table-wrap.jobs-table {{
   background: #ffffff !important;

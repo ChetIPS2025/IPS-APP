@@ -68,9 +68,10 @@ def _profit_pct_summary_class(value: float) -> str:
 
 
 def inject_jobs_page_layout_css() -> None:
-    st.markdown(
-        """
-<style id="ips-jobs-page-layout-v23">
+    with st.sidebar:
+        st.markdown(
+            """
+<style id="ips-jobs-page-layout-v24">
 section[data-testid="stMain"]:has(.ips-jobs-page) {
   background: #ffffff !important;
 }
@@ -78,7 +79,43 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .block-container {
   background: #ffffff !important;
 }
 section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="stVerticalBlock"] {
-  gap: 0.35rem !important;
+  gap: 0 !important;
+}
+section[data-testid="stMain"]:has(.ips-jobs-page) [class*="st-key-header_primary_action"]:has(.ips-jobs-page-header-actions) {
+  flex: 1 1 auto !important;
+  min-width: max-content !important;
+  max-width: none !important;
+}
+section[data-testid="stMain"]:has(.ips-jobs-page) [class*="st-key-header_primary_action"]:has(.ips-jobs-page-header-actions) [data-testid="stHorizontalBlock"] {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 0.45rem !important;
+  width: max-content !important;
+  max-width: 100% !important;
+  margin-left: auto !important;
+}
+section[data-testid="stMain"]:has(.ips-jobs-page) [class*="st-key-header_primary_action"]:has(.ips-jobs-page-header-actions) .stButton,
+section[data-testid="stMain"]:has(.ips-jobs-page) [class*="st-key-header_primary_action"]:has(.ips-jobs-page-header-actions) [data-testid="stDownloadButton"] {
+  margin: 0 !important;
+  width: auto !important;
+}
+section[data-testid="stMain"]:has(.ips-jobs-page) [class*="st-key-header_primary_action"]:has(.ips-jobs-page-header-actions) .stButton > button {
+  width: auto !important;
+  min-width: max-content !important;
+  max-width: none !important;
+  white-space: nowrap !important;
+}
+section[data-testid="stMain"]:has(.ips-jobs-page) [class*="st-key-header_primary_action"]:has(.ips-jobs-page-header-actions) [class*="st-key-jobs_export"] .stButton > button {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #374151 !important;
+}
+section[data-testid="stMain"]:has(.ips-jobs-page) [class*="st-key-header_primary_action"]:has(.ips-jobs-page-header-actions) [class*="st-key-jobs_new"] .stButton > button[kind="primary"] {
+  background: #3158e6 !important;
+  border-color: #3158e6 !important;
+  color: #ffffff !important;
 }
 section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="stElementContainer"] {
   margin-bottom: 0.15rem !important;

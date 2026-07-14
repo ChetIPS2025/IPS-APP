@@ -70,7 +70,6 @@ from app.components.job_labor_readonly_panel import (
     render_job_labor_summary_tab,
     render_job_weekly_timesheets_tab,
 )
-from app.components.headers import render_page_brand_header
 from app.components.layout import render_filter_bar as layout_filter_bar
 from app.components.table_filters import (
     apply_column_filters,
@@ -2821,6 +2820,28 @@ def render() -> None:
 
 
 def _render_jobs_page() -> None:
+    def _jobs_header_actions() -> None:
+        st.markdown(
+            '<span class="ips-jobs-page-header-actions ips-page-header-inline-actions" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        export_col, new_col = st.columns(2, gap="small")
+        with export_col:
+            st.button("Export", key="jobs_export", type="secondary", use_container_width=True)
+        with new_col:
+            if st.button("+ New Job", key="jobs_new", type="primary", use_container_width=True):
+                clear_new_job_number_state()
+                st.session_state["ips_job_form"] = True
+
+    from app.ui.page_header import render_page_header
+
+    render_page_header(
+        "Jobs",
+        "Track and manage company jobs, assignments, and costing.",
+        primary_action=_jobs_header_actions,
+        primary_action_width=2.4,
+    )
+
     st.markdown(
         '<span class="ips-jobs-page ips-page-shell-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
@@ -2831,21 +2852,6 @@ def _render_jobs_page() -> None:
         inject_field_row_expand_css()
     all_jobs = load_jobs()
     filter_options = build_filter_options(all_jobs, _JOB_COLUMN_FILTER_SPECS)
-
-    def _jobs_export() -> None:
-        st.button("Export", key="jobs_export", type="secondary", use_container_width=True)
-
-    def _jobs_new() -> None:
-        if st.button("+ New Job", key="jobs_new", type="primary", use_container_width=True):
-            clear_new_job_number_state()
-            st.session_state["ips_job_form"] = True
-
-    render_page_brand_header(
-        "Jobs",
-        "Track and manage company jobs, assignments, and costing.",
-        actions=[_jobs_export, _jobs_new],
-        actions_column_ratio=(1.85, 1.15),
-    )
 
     if is_field_mode():
         from app.services.job_service import sort_jobs_by_number_then_name
