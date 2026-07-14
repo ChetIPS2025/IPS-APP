@@ -6,8 +6,8 @@ import streamlit as st
 
 from app.ui.css_inject import inject_css_once
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v24"
-IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v24"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v25"
+IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v25"
 
 
 def inject_page_header_styles() -> None:
@@ -17,7 +17,7 @@ def inject_page_header_styles() -> None:
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-page-header-styles-v24">
+<style id="ips-page-header-styles-v25">
 [class*="st-key-ips_page_header"],
 [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
@@ -153,6 +153,108 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   max-width: max-content !important;
   z-index: 4 !important;
 }
+[class*="st-key-header_bottom_actions"] > div > div > [data-testid="stVerticalBlock"],
+[class*="st-key-header_bottom_actions"] [data-testid="stVerticalBlockBorderWrapper"] > div > [data-testid="stVerticalBlock"] {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  width: max-content !important;
+  max-width: max-content !important;
+}
+[class*="st-key-header_bottom_actions"] > div > div > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"],
+[class*="st-key-header_bottom_actions"] [data-testid="stVerticalBlockBorderWrapper"] > div > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  position: static !important;
+}
+[class*="st-key-header_bottom_actions"] > div > div > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has(.ips-header-bottom-actions-marker),
+[class*="st-key-header_bottom_actions"] [data-testid="stVerticalBlockBorderWrapper"] > div > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has(.ips-header-bottom-actions-marker) {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  flex: 0 0 0 !important;
+}
+[class*="st-key-header_bottom_actions"] > div > div > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has([class*="st-key-header_bottom_date"]),
+[class*="st-key-header_bottom_actions"] [data-testid="stVerticalBlockBorderWrapper"] > div > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has([class*="st-key-header_bottom_date"]) {
+  flex: 0 0 280px !important;
+  width: 280px !important;
+  max-width: 280px !important;
+}
+[class*="st-key-header_bottom_actions"] > div > div > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has([class*="st-key-header_bottom_primary"]),
+[class*="st-key-header_bottom_actions"] [data-testid="stVerticalBlockBorderWrapper"] > div > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has([class*="st-key-header_bottom_primary"]) {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  max-width: none !important;
+}
+.st-key-header_bottom_date,
+[class*="st-key-header_bottom_date"] {
+  width: 280px !important;
+  max-width: 280px !important;
+  min-width: 280px !important;
+  flex: 0 0 280px !important;
+}
+.st-key-header_bottom_primary,
+[class*="st-key-header_bottom_primary"] {
+  width: auto !important;
+  max-width: none !important;
+  min-width: max-content !important;
+  flex: 0 0 auto !important;
+  margin-left: 0 !important;
+}
+.st-key-header_bottom_date .st-key-header_date_range,
+[class*="st-key-header_bottom_date"] .st-key-header_date_range,
+[class*="st-key-header_bottom_date"] [class*="st-key-header_date_range"] {
+  width: 100% !important;
+  max-width: 280px !important;
+  min-width: 0 !important;
+}
+.st-key-header_bottom_date [data-testid="stDateInput"],
+[class*="st-key-header_bottom_date"] [data-testid="stDateInput"] {
+  width: 100% !important;
+  max-width: 280px !important;
+  min-width: 0 !important;
+}
+.st-key-header_bottom_date [data-testid="stDateInput"] > div,
+[class*="st-key-header_bottom_date"] [data-testid="stDateInput"] > div {
+  width: 100% !important;
+  max-width: 280px !important;
+  min-width: 0 !important;
+}
+.st-key-header_bottom_date [data-testid="stDateInput"] input,
+[class*="st-key-header_bottom_date"] [data-testid="stDateInput"] input {
+  width: 100% !important;
+  max-width: 280px !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+.st-key-header_bottom_primary .st-key-header_primary_action,
+[class*="st-key-header_bottom_primary"] .st-key-header_primary_action,
+[class*="st-key-header_bottom_primary"] [class*="st-key-header_primary_action"] {
+  width: auto !important;
+  max-width: none !important;
+  min-width: max-content !important;
+}
+.st-key-header_bottom_primary .stButton,
+[class*="st-key-header_bottom_primary"] .stButton {
+  width: auto !important;
+  margin: 0 !important;
+}
+.st-key-header_bottom_primary .stButton > button,
+[class*="st-key-header_bottom_primary"] .stButton > button {
+  width: auto !important;
+  min-width: 112px !important;
+  max-width: none !important;
+}
 [class*="st-key-header_bottom_actions"] [data-testid="stHorizontalBlock"] {
   display: flex !important;
   flex-direction: row !important;
@@ -175,14 +277,15 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   overflow: visible !important;
 }
 [class*="st-key-header_bottom_actions"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {
-  min-width: 260px !important;
-  width: auto !important;
-  max-width: 320px !important;
+  min-width: 280px !important;
+  width: 280px !important;
+  max-width: 280px !important;
 }
 [class*="st-key-header_bottom_actions"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child:not(:first-child) {
   min-width: max-content !important;
   width: auto !important;
   max-width: none !important;
+  margin-left: 0 !important;
 }
 [class*="st-key-header_bottom_actions"] [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has(.ips-header-bottom-actions-marker) {
   display: none !important;
@@ -194,10 +297,13 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
 }
 .st-key-header_bottom_actions .st-key-header_date_range,
 [class*="st-key-header_bottom_actions"] .st-key-header_date_range {
-  min-width: max-content !important;
-  max-width: none !important;
-  width: auto !important;
   flex: 0 0 auto !important;
+}
+[class*="st-key-header_bottom_date"] .st-key-header_date_range,
+[class*="st-key-header_bottom_date"] [class*="st-key-header_date_range"] {
+  width: 100% !important;
+  max-width: 280px !important;
+  min-width: 0 !important;
 }
 .st-key-header_bottom_actions .st-key-header_primary_action,
 [class*="st-key-header_bottom_actions"] .st-key-header_primary_action {
@@ -236,6 +342,26 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   width: 100% !important;
   min-width: 260px !important;
   max-width: 320px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+[class*="st-key-header_bottom_date"] .st-key-header_date_range [data-testid="stDateInput"],
+[class*="st-key-header_bottom_date"] [class*="st-key-header_date_range"] [data-testid="stDateInput"] {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 280px !important;
+}
+[class*="st-key-header_bottom_date"] .st-key-header_date_range [data-testid="stDateInput"] > div,
+[class*="st-key-header_bottom_date"] [class*="st-key-header_date_range"] [data-testid="stDateInput"] > div {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 280px !important;
+}
+[class*="st-key-header_bottom_date"] .st-key-header_date_range [data-testid="stDateInput"] input,
+[class*="st-key-header_bottom_date"] [class*="st-key-header_date_range"] [data-testid="stDateInput"] input {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 280px !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
 }

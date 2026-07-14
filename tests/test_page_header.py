@@ -62,7 +62,8 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.ui.page_header_styles import inject_page_header_styles
 
         src = inspect.getsource(inject_page_header_styles)
-        self.assertIn("ips-page-header-styles-v24", src)
+        self.assertIn("ips-page-header-styles-v25", src)
+        self.assertIn("st-key-header_bottom_date", src)
         self.assertIn("border-radius: 50%", src)
         self.assertIn("st-key-header_avatar", src)
         self.assertIn("st-key-header_trailing_actions", src)
@@ -173,7 +174,8 @@ class PageHeaderSourceTests(unittest.TestCase):
         self.assertIn("header_bottom_actions", src)
         self.assertIn("ips-header-bottom-actions-marker", src)
         self.assertIn("_render_date_range", src)
-        self.assertIn("header_primary_action", src)
+        self.assertIn("header_bottom_date", src)
+        self.assertIn("header_bottom_primary", src)
 
     def test_page_header_clusters_trailing_utilities(self) -> None:
         from app.ui import page_header as ui_page_header
