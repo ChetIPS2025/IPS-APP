@@ -4893,12 +4893,7 @@ def render() -> None:
     we = week_end(ws)
 
     def _on_refresh() -> None:
-        clear_timekeeping_list_caches()
-
-    def _tk_recalc() -> None:
-        if st.button("Recalculate", key="tk_hdr_recalc", help="Recalculate Totals", use_container_width=True):
-            _recalculate_visible_week_totals(ws)
-            st.rerun()
+        _recalculate_visible_week_totals(ws)
 
     from app.ui.page_header import render_page_header
 
@@ -4908,7 +4903,6 @@ def render() -> None:
         show_refresh=True,
         refresh_key="tk_hdr_refresh",
         on_refresh=_on_refresh,
-        secondary_action=_tk_recalc,
     )
 
     inject_timekeeping_module_css()
