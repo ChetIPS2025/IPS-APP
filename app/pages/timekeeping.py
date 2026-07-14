@@ -4908,17 +4908,6 @@ def render() -> None:
     ws = _current_week_start()
     we = week_end(ws)
 
-    def _on_week_range_change(dr: tuple[date, date]) -> None:
-        start_d = normalize_date(dr[0])
-        if start_d is None:
-            return
-        new_start = week_start(start_d)
-        if new_start != ws:
-            st.session_state[_WEEK_KEY] = new_start
-            reset_table_page(_TABLE_KEY)
-            _clear_day_time_selection()
-            clear_timekeeping_list_caches()
-
     def _on_refresh() -> None:
         clear_timekeeping_list_caches()
 
@@ -4932,10 +4921,6 @@ def render() -> None:
     render_page_header(
         "Weekly Timekeeping",
         "View and manage weekly employee time entries.",
-        show_date_range=True,
-        date_range_value=(ws, we),
-        date_range_key="tk_hdr_week_range",
-        on_date_range_change=_on_week_range_change,
         show_refresh=True,
         refresh_key="tk_hdr_refresh",
         on_refresh=_on_refresh,

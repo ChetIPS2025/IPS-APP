@@ -33,8 +33,8 @@ class StreamlitDateInputFormatTests(unittest.TestCase):
 
     def test_timekeeping_page_uses_supported_date_input_format(self) -> None:
         src = inspect.getsource(tk.render)
-        self.assertIn("show_date_range=True", src)
-        self.assertIn("date_range_key=\"tk_hdr_week_range\"", src)
+        self.assertNotIn("show_date_range=True", src)
+        self.assertNotIn("date_range_key=\"tk_hdr_week_range\"", src)
         self.assertNotIn('format="MMM D, YYYY"', src)
         self.assertNotIn("format='MMM D, YYYY'", src)
 
