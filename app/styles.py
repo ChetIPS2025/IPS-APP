@@ -5467,7 +5467,7 @@ def inject_timekeeping_module_css() -> None:
     with st.sidebar:
         st.markdown(
             f"""
-<style id="ips-timekeeping-module-v107">
+<style id="ips-timekeeping-module-v108">
 .ips-timekeeping-page {{
   background: #f1f5f9 !important;
 }}
@@ -5586,9 +5586,15 @@ def inject_timekeeping_module_css() -> None:
     min-width: 1122px !important;
   }}
 }}
-.ips-timekeeping-week-toolbar-marker + [data-testid="stHorizontalBlock"] {{
+.ips-timekeeping-week-toolbar-marker + [data-testid="stHorizontalBlock"],
+.ips-timekeeping-week-toolbar-marker + [data-testid="stElementContainer"]:has(.st-key-tk_week_range) {{
   align-items: center !important;
   margin: 0 0 14px 0 !important;
+}}
+.st-key-tk_week_range {{
+  width: 100% !important;
+  max-width: 420px !important;
+  margin: 0 auto 14px auto !important;
 }}
 .ips-timekeeping-week-pill {{
   display: flex !important;
@@ -5604,9 +5610,6 @@ def inject_timekeeping_module_css() -> None:
   font-size: 14px !important;
   font-weight: 600 !important;
   text-align: center !important;
-}}
-.st-key-tk_week_range {{
-  width: 100% !important;
 }}
 .st-key-tk_week_range [data-testid="stPopover"] {{
   width: 100% !important;

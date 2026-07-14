@@ -46,6 +46,8 @@ class StreamlitDateInputFormatTests(unittest.TestCase):
         self.assertIn("Week of", src)
         self.assertIn("format=DATE_INPUT_FORMAT", src)
         self.assertNotIn("ips-timekeeping-week-pill", src)
+        self.assertNotIn("tk_prev_week", src)
+        self.assertNotIn("tk_next_week", src)
 
 
 if __name__ == "__main__":
