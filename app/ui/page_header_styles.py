@@ -6,8 +6,8 @@ import streamlit as st
 
 from app.ui.css_inject import inject_css_once
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v20"
-IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v20"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v21"
+IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v21"
 
 
 def inject_page_header_styles() -> None:
@@ -17,7 +17,7 @@ def inject_page_header_styles() -> None:
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-page-header-styles-v20">
+<style id="ips-page-header-styles-v21">
 [class*="st-key-ips_page_header"],
 [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
@@ -30,6 +30,7 @@ def inject_page_header_styles() -> None:
   border-radius: 0 !important;
   box-sizing: border-box !important;
   overflow: visible !important;
+  position: relative !important;
 }
 [class*="st-key-ips_page_header"] [data-testid="stElementContainer"]:has(.ips-header-root) {
   height: 0 !important;
@@ -54,7 +55,6 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   width: 100% !important;
   flex-wrap: nowrap !important;
   overflow: visible !important;
-  position: relative !important;
 }
 [class*="st-key-ips_page_header"] [data-testid="stHorizontalBlock"] {
   align-items: center !important;
@@ -144,8 +144,10 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
 .st-key-header_bottom_actions,
 [class*="st-key-header_bottom_actions"] {
   position: absolute !important;
+  top: auto !important;
   bottom: 0 !important;
   right: 0 !important;
+  left: auto !important;
   flex: 0 0 auto !important;
   min-width: max-content !important;
   max-width: max-content !important;
@@ -194,13 +196,19 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
 [class*="st-key-header_trailing_actions"] {
   position: absolute !important;
   top: 0 !important;
+  bottom: auto !important;
   right: 0 !important;
+  left: auto !important;
   margin-left: 0 !important;
   flex: 0 0 auto !important;
   min-width: max-content !important;
   max-width: max-content !important;
   align-self: auto !important;
   z-index: 4 !important;
+}
+[class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) > [data-testid="stHorizontalBlock"] > [data-testid="column"]:has([class*="st-key-header_bottom_actions"]),
+[class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) > [data-testid="stHorizontalBlock"] > [data-testid="column"]:has([class*="st-key-header_trailing_actions"]) {
+  position: static !important;
 }
 [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) > [data-testid="stHorizontalBlock"] > [data-testid="column"]:has([class*="st-key-header_trailing_actions"]) {
   width: 0 !important;
@@ -287,7 +295,7 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   border: 1px solid #e2e8f0 !important;
   color: #374151 !important;
 }
-[class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) [data-testid="column"] {
+[class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) [data-testid="column"]:not(:has([class*="st-key-header_bottom_actions"])):not(:has([class*="st-key-header_trailing_actions"])) {
   flex: 0 0 auto !important;
   flex-shrink: 0 !important;
   width: auto !important;
