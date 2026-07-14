@@ -24,6 +24,7 @@ IPS_SIDEBAR_DESKTOP_MIN_PX = 900
 IPS_SIDEBAR_EXPANDED_WIDTH_PX = 232
 IPS_SIDEBAR_COLLAPSED_WIDTH_PX = 48
 IPS_NAV_RAIL_GUTTER_PX = 4
+IPS_NAV_RAIL_CONTENT_GAP_PX = 12
 IPS_SIDEBAR_COLLAPSED_NAV_HEIGHT_PX = 44
 IPS_SIDEBAR_COLLAPSED_ICON_PX = 18
 IPS_SIDEBAR_COLLAPSED_HEADER_HEIGHT_PX = 56
@@ -193,13 +194,14 @@ def _desktop_rail_logo_html() -> str:
 def _desktop_nav_rail_css() -> str:
     col = IPS_SIDEBAR_COLLAPSED_WIDTH_PX
     gutter = IPS_NAV_RAIL_GUTTER_PX
-    rail_total = col + gutter
+    content_gap = IPS_NAV_RAIL_CONTENT_GAP_PX
+    rail_total = col + gutter + content_gap
     exp = IPS_SIDEBAR_EXPANDED_WIDTH_PX
     header_h = IPS_SIDEBAR_COLLAPSED_HEADER_HEIGHT_PX
     nav_h = IPS_SIDEBAR_COLLAPSED_NAV_HEIGHT_PX
     mobile_max = IPS_SIDEBAR_DESKTOP_MIN_PX - 1
     return f"""
-<style id="ips-desktop-nav-rail-v5">
+<style id="ips-desktop-nav-rail-v6">
 @media (min-width: {IPS_SIDEBAR_DESKTOP_MIN_PX}px) {{
   body.ips-authed-app [data-testid="stSidebar"],
   body.ips-authed-app section[data-testid="stSidebar"],
