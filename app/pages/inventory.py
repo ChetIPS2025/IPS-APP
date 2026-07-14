@@ -785,7 +785,7 @@ def render() -> None:
     )
     export_cache_key = _sync_inventory_export_cache(filtered_export)
 
-    def _inv_export() -> None:
+    def _inv_export_header() -> None:
         from app.services.inventory_qr_labels import (
             build_inventory_labels_csv,
             build_inventory_labels_zip,
@@ -794,7 +794,12 @@ def render() -> None:
         )
         count = len(filtered_export)
         if not count:
-            st.caption("No items match the current filters.")
+            st.button(
+                "Prepare Label Export",
+                key="inv_prepare_label_export",
+                disabled=True,
+                help="No items match the current filters.",
+            )
             return
 
         zip_bytes = st.session_state.get(_EXPORT_ZIP_BYTES_KEY)
@@ -809,8 +814,7 @@ def render() -> None:
             if st.button(
                 "Prepare Label Export",
                 key="inv_prepare_label_export",
-                use_container_width=True,
-                help="Build ZIP and CSV once for the current filters (can take a moment for large lists).",
+                help=f"Build ZIP and CSV for {count} filtered item(s).",
             ):
                 with st.spinner(f"Building labels for {count} item(s)…"):
                     st.session_state[_EXPORT_ZIP_BYTES_KEY] = build_inventory_labels_zip(filtered_export)
@@ -820,12 +824,10 @@ def render() -> None:
                     st.session_state[_EXPORT_COUNT_KEY] = count
                     st.session_state[_EXPORT_CACHE_KEY] = export_cache_key
                 st.rerun()
-            st.caption(f"{count} item(s) — prepare export before downloading.")
             return
 
         export_count = int(st.session_state.get(_EXPORT_COUNT_KEY) or count)
-        c1, c2 = st.columns(2)
-        with c1:
+        with st.popover("Label Export", help=f"{export_count} item(s) ready to download."):
             st.download_button(
                 "Labels ZIP",
                 data=zip_bytes,
@@ -835,7 +837,6 @@ def render() -> None:
                 use_container_width=True,
                 help="DuraLabel bulk import: CSV plus PDF labels, QR PNGs, and thumbnails.",
             )
-        with c2:
             st.download_button(
                 "Labels CSV",
                 data=csv_bytes,
@@ -845,19 +846,20 @@ def render() -> None:
                 use_container_width=True,
                 help="Variable data only — pair with ZIP for image and PDF paths.",
             )
-        if st.button("Rebuild export", key="inv_rebuild_label_export", use_container_width=True):
-            _clear_prepared_inventory_exports()
-            st.session_state[_EXPORT_CACHE_KEY] = export_cache_key
-            st.rerun()
+            if st.button("Rebuild export", key="inv_rebuild_label_export", use_container_width=True):
+                _clear_prepared_inventory_exports()
+                st.session_state[_EXPORT_CACHE_KEY] = export_cache_key
+                st.rerun()
 
     def _inv_new() -> None:
-        if st.button("+ New Item", key="inv_new", type="primary", use_container_width=True):
+        if st.button("+ New Item", key="inv_new", type="primary"):
             st.session_state["ips_inv_form"] = True
 
     render_page_brand_header(
         "Inventory",
         "Track and manage all inventory items and stock levels.",
-        actions=[_inv_export, _inv_new],
+        secondary_action=_inv_export_header,
+        primary_action=_inv_new,
     )
 
     if is_field_context():

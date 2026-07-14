@@ -23,6 +23,7 @@ _MAIN_COLS = [0.35, 3.2, 3.5, 7.5]
 _ACTION_WIDTHS: dict[str, float] = {
     "date": 2.05,
     "refresh": 0.5,
+    "secondary": 1.95,
     "primary": 1.55,
     "notification": 0.55,
     "help": 0.55,
@@ -35,6 +36,7 @@ def _action_slot_columns(
     *,
     show_date_range: bool,
     show_refresh: bool,
+    has_secondary_action: bool,
     has_primary_action: bool,
 ) -> tuple[list[str], list[float]]:
     names: list[str] = []
@@ -44,6 +46,8 @@ def _action_slot_columns(
         names.append("refresh")
     if has_primary_action:
         names.append("primary")
+    if has_secondary_action:
+        names.append("secondary")
     names.extend(["notification", "help", "settings", "avatar"])
     ratios = [_ACTION_WIDTHS[name] for name in names]
     return names, ratios
@@ -241,6 +245,7 @@ def render_page_header(
     *,
     icon: str | None = None,
     primary_action: _ActionFn | None = None,
+    secondary_action: _ActionFn | None = None,
     secondary_actions: list[_ActionFn] | None = None,
     actions: list[_ActionFn] | None = None,
     show_back: bool = True,
@@ -334,6 +339,7 @@ def render_page_header(
             slot_names, slot_ratios = _action_slot_columns(
                 show_date_range=show_date_range,
                 show_refresh=show_refresh,
+                has_secondary_action=secondary_action is not None,
                 has_primary_action=primary_action is not None,
             )
             slot_cols = st.columns(
@@ -359,6 +365,11 @@ def render_page_header(
                 with slots["primary"]:
                     with st.container(key="header_primary_action"):
                         primary_action()
+
+            if secondary_action:
+                with slots["secondary"]:
+                    with st.container(key="header_secondary_action"):
+                        secondary_action()
 
             role, display, initials, sign_out_fn = _header_auth_context()
 

@@ -61,10 +61,11 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.ui.page_header_styles import inject_page_header_styles
 
         src = inspect.getsource(inject_page_header_styles)
-        self.assertIn("ips-page-header-styles-v7", src)
+        self.assertIn("ips-page-header-styles-v8", src)
         self.assertIn("st-key-header_page_toolbar", src)
         self.assertIn('[class*="st-key-ips_page_header"]', src)
         self.assertIn(".st-key-header_primary_action", src)
+        self.assertIn(".st-key-header_secondary_action", src)
         self.assertNotIn("position: absolute", src)
         self.assertNotIn("width: 100vw", src)
 
@@ -147,6 +148,19 @@ class PageHeaderSourceTests(unittest.TestCase):
         names, ratios = _action_slot_columns(
             show_date_range=False,
             show_refresh=False,
+            has_secondary_action=True,
+            has_primary_action=True,
+        )
+        self.assertEqual(names, ["primary", "secondary", "notification", "help", "settings", "avatar"])
+        self.assertEqual(len(ratios), 6)
+
+    def test_page_header_uses_dynamic_action_slots_without_secondary(self) -> None:
+        from app.ui.page_header import _action_slot_columns
+
+        names, ratios = _action_slot_columns(
+            show_date_range=False,
+            show_refresh=False,
+            has_secondary_action=False,
             has_primary_action=False,
         )
         self.assertEqual(names, ["notification", "help", "settings", "avatar"])
