@@ -167,11 +167,18 @@ def test_desktop_nav_rail_item_active_for_scan_aliases():
 
 
 def test_desktop_nav_rail_css_hides_legacy_streamlit_wrap():
-    from app.components.sidebar_shell import _desktop_nav_rail_css
+    from app.components.sidebar_shell import (
+        IPS_NAV_RAIL_GUTTER_PX,
+        IPS_SIDEBAR_COLLAPSED_WIDTH_PX,
+        _desktop_nav_rail_css,
+    )
 
     css = _desktop_nav_rail_css()
     assert "st-key-ips_desktop_nav_rail_wrap" in css
     assert "ips-desktop-nav-rail" in css
+    assert "ips-desktop-nav-rail-v5" in css
+    assert f"left: {IPS_NAV_RAIL_GUTTER_PX}px" in css
+    assert f"margin-left: {IPS_SIDEBAR_COLLAPSED_WIDTH_PX + IPS_NAV_RAIL_GUTTER_PX}px" in css
 
 
 def test_employee_field_nav_is_restricted_without_legacy_access():

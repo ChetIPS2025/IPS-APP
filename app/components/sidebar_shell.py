@@ -23,6 +23,7 @@ IPS_SIDEBAR_COLLAPSED_HYDRATED_KEY = "_ips_sidebar_collapsed_hydrated"
 IPS_SIDEBAR_DESKTOP_MIN_PX = 900
 IPS_SIDEBAR_EXPANDED_WIDTH_PX = 232
 IPS_SIDEBAR_COLLAPSED_WIDTH_PX = 48
+IPS_NAV_RAIL_GUTTER_PX = 4
 IPS_SIDEBAR_COLLAPSED_NAV_HEIGHT_PX = 44
 IPS_SIDEBAR_COLLAPSED_ICON_PX = 18
 IPS_SIDEBAR_COLLAPSED_HEADER_HEIGHT_PX = 56
@@ -191,12 +192,14 @@ def _desktop_rail_logo_html() -> str:
 
 def _desktop_nav_rail_css() -> str:
     col = IPS_SIDEBAR_COLLAPSED_WIDTH_PX
+    gutter = IPS_NAV_RAIL_GUTTER_PX
+    rail_total = col + gutter
     exp = IPS_SIDEBAR_EXPANDED_WIDTH_PX
     header_h = IPS_SIDEBAR_COLLAPSED_HEADER_HEIGHT_PX
     nav_h = IPS_SIDEBAR_COLLAPSED_NAV_HEIGHT_PX
     mobile_max = IPS_SIDEBAR_DESKTOP_MIN_PX - 1
     return f"""
-<style id="ips-desktop-nav-rail-v4">
+<style id="ips-desktop-nav-rail-v5">
 @media (min-width: {IPS_SIDEBAR_DESKTOP_MIN_PX}px) {{
   body.ips-authed-app [data-testid="stSidebar"],
   body.ips-authed-app section[data-testid="stSidebar"],
@@ -210,16 +213,21 @@ def _desktop_nav_rail_css() -> str:
     overflow: hidden !important;
     visibility: hidden !important;
   }}
+  .stApp:has(.ips-desktop-nav-rail),
+  body.ips-authed-app:has(.ips-desktop-nav-rail) .stApp {{
+    overflow-x: visible !important;
+  }}
   body.ips-authed-app [data-testid="stAppViewContainer"],
   .stApp:has(.ips-desktop-nav-rail) [data-testid="stAppViewContainer"] {{
-    margin-left: {col}px !important;
-    width: calc(100% - {col}px) !important;
-    max-width: calc(100% - {col}px) !important;
+    margin-left: {rail_total}px !important;
+    width: calc(100% - {rail_total}px) !important;
+    max-width: calc(100% - {rail_total}px) !important;
+    overflow-x: visible !important;
   }}
   body.ips-authed-app [data-testid="stHeader"],
   .stApp:has(.ips-desktop-nav-rail) [data-testid="stHeader"] {{
-    margin-left: {col}px !important;
-    width: calc(100% - {col}px) !important;
+    margin-left: {rail_total}px !important;
+    width: calc(100% - {rail_total}px) !important;
   }}
   .ips-desktop-nav-rail {{
     display: flex !important;
@@ -242,7 +250,7 @@ def _desktop_nav_rail_css() -> str:
 .ips-desktop-nav-rail {{
   display: none;
   position: fixed;
-  left: 0;
+  left: {gutter}px;
   top: 0;
   bottom: 0;
   width: {col}px;
@@ -250,7 +258,7 @@ def _desktop_nav_rail_css() -> str:
   background: #ffffff;
   border-right: 1px solid #e5eaf2;
   flex-direction: column;
-  overflow-x: hidden;
+  overflow-x: visible;
   overflow-y: auto;
   transition: width 0.2s ease, box-shadow 0.2s ease;
   box-sizing: border-box;
@@ -294,7 +302,7 @@ def _desktop_nav_rail_css() -> str:
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 6px 0 10px;
+  padding: 6px 2px 10px;
   flex: 1 1 auto;
   min-height: 0;
 }}
@@ -324,7 +332,7 @@ def _desktop_nav_rail_css() -> str:
 }}
 .ips-desktop-nav-rail:not(:hover) .ips-desktop-nav-rail__link {{
   justify-content: center !important;
-  padding: 0 !important;
+  padding: 0 2px !important;
   width: {col}px !important;
   margin: 0 !important;
 }}
