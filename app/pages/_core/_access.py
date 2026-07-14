@@ -5,24 +5,24 @@ from __future__ import annotations
 import streamlit as st
 
 from app.auth import current_role, effective_role
-from app.styles import inject_global_css
 from app.utils.permissions import role_can_access_page
 _DEMO_FLAG = "ips_showing_demo_data"
 _MODULE_SHELL_KEY = "_ips_module_page_shell_open"
 
 
-def begin_module(slug: str, *, inject_css: bool = False) -> bool:
+def begin_module(slug: str) -> bool:
     """
-    Per-page gate: foundation CSS + role check.
+    Per-page gate: role check and page shell markers.
 
     Emits ``.ips-page-content`` / ``.ips-page-{slug}`` markers for main-area CSS
-    (``:has(.ips-page-content)`` in global styles). ``end_module`` clears session state
-    after the page body (``phase2.render_module`` does this automatically).
+    (``:has(.ips-page-content)`` in global styles). Global CSS is injected once
+    from ``main()`` via :func:`app.styles.inject_global_css`.
+
+    ``end_module`` clears session state after the page body
+    (``phase2.render_module`` does this automatically).
 
     Returns False when the user must not see page content.
     """
-    if inject_css:
-        inject_global_css()
     role = effective_role()
     if not role_can_access_page(role, slug):
         st.error("You do not have access to this page.")

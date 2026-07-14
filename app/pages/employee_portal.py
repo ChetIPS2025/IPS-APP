@@ -30,7 +30,7 @@ from app.services.employee_portal_service import (
     portal_greeting_period,
 )
 from app.services.employees_service import get_certification_attachment_url
-from app.styles import inject_employee_portal_css, inject_global_css
+from app.styles import inject_employee_portal_css
 from app.utils.formatting import fmt_date
 from app.utils.permissions import role_can_access_page
 _PORTAL_UPDATE_KEY = "ips_portal_selected_update"
@@ -370,7 +370,6 @@ def _render_all_jobs_section() -> None:
 def render() -> None:
     if not begin_module("employee_portal"):
         return
-    inject_global_css()
     inject_employee_portal_css()
     st.markdown(
         '<span class="ips-employee-portal-page ips-page-shell-marker" aria-hidden="true"></span>',

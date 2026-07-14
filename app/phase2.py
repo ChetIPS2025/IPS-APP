@@ -133,6 +133,4 @@ def render_module(slug: str | None = None) -> None:
         return
 
     from app.components.headers import render_page_header
-    from app.styles import inject_global_css
-    inject_global_css()
     st.markdown('<p class="ips-module-placeholder">Module not found.</p>', unsafe_allow_html=True)

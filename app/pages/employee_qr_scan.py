@@ -7,11 +7,10 @@ import streamlit as st
 from app.components.headers import render_page_header
 from app.navigation import set_nav_slug
 from app.pages._core._access import begin_module
-from app.styles import inject_employee_portal_css, inject_global_css
+from app.styles import inject_employee_portal_css
 def render() -> None:
     if not begin_module("employee_qr_scan"):
         return
-    inject_global_css()
     inject_employee_portal_css()
     st.markdown(
         '<span class="ips-employee-qr-page" aria-hidden="true"></span>',

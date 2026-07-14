@@ -11,12 +11,13 @@ IPS_UI_LIBRARY_STYLE_ID = "ips-ui-library-v1"
 
 
 def inject_ips_ui_styles() -> None:
-    """Inject shared IPS UI styles once per session."""
+    """Inject shared IPS UI library styles once per session.
+
+    Global foundation CSS is injected from ``main()`` via
+    :func:`app.styles.inject_global_css`.
+    """
     if not inject_css_once(IPS_UI_LIBRARY_STYLE_ID):
         return
-
-    from app.styles import inject_global_css
-    inject_global_css()
 
     st.markdown(
         """

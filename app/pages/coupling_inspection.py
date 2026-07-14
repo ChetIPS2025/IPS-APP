@@ -651,7 +651,7 @@ def _render_context_picker() -> None:
 
 
 def render() -> None:
-    if not begin_module("coupling_inspection", inject_css=True):
+    if not begin_module("coupling_inspection"):
         return
     inject_coupling_inspection_css()
     st.markdown('<span class="ips-page-coupling_inspection" aria-hidden="true"></span>', unsafe_allow_html=True)

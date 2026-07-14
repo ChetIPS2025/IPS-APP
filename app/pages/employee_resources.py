@@ -20,7 +20,7 @@ from app.services.employee_resources_service import (
     resource_open_url,
     save_employee_resource,
 )
-from app.styles import inject_employee_portal_css, inject_global_css
+from app.styles import inject_employee_portal_css
 from app.utils.formatting import fmt_date
 from app.utils.permissions import normalize_role
 _ADMIN_EDIT_KEY = "ips_er_admin_edit"
@@ -164,7 +164,6 @@ def _render_admin_panel(rows: list[dict[str, Any]]) -> None:
 def render() -> None:
     if not begin_module("employee_resources"):
         return
-    inject_global_css()
     inject_employee_portal_css()
     st.markdown(
         '<span class="ips-employee-resources-page" aria-hidden="true"></span>',

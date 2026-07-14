@@ -11,12 +11,11 @@ from app.components.headers import render_page_header
 from app.pages._core._access import begin_module
 from app.pages._core._data import get_employee
 from app.services.certification_helpers import resolve_logged_in_employee_id
-from app.styles import inject_employee_portal_css, inject_global_css
+from app.styles import inject_employee_portal_css
 from app.utils.formatting import fmt_date
 def render() -> None:
     if not begin_module("employee_profile"):
         return
-    inject_global_css()
     inject_employee_portal_css()
     st.markdown(
         '<span class="ips-employee-profile-page" aria-hidden="true"></span>',

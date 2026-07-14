@@ -39,7 +39,6 @@ from app.services.reports_service import (
     live_open_estimates_report,
     live_timekeeping_summary_report,
 )
-from app.styles import inject_global_css
 from app.utils.formatting import fmt_currency, fmt_date, fmt_hours
 _TAB_KEY = "ips_reports_tab"
 
@@ -305,9 +304,8 @@ def _render_compliance() -> None:
 
 
 def render() -> None:
-    inject_global_css()
     from app.pages._core._access import begin_module
-    if not begin_module("reports", inject_css=False):
+    if not begin_module("reports"):
         return
     st.markdown(
         '<span class="ips-reports-page ips-page-shell-marker" aria-hidden="true"></span>',

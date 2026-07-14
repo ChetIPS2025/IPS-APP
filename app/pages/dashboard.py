@@ -100,7 +100,7 @@ def _ops_dashboard_header_html(*, employees: int, active_jobs: int) -> str:
 
 def render() -> None:
     from app.pages._core._access import begin_module
-    if not begin_module("dashboard", inject_css=False):
+    if not begin_module("dashboard"):
         return
 
     start, end = _date_range_state()
