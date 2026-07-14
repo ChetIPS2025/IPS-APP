@@ -9,7 +9,12 @@ import streamlit as st
 
 from app.services.job_cost_transaction_service import fetch_job_cost_transactions
 from app.services.jobs_service import can_manage_job_actions
+from app.ui.css_inject import inject_css_once
+
+
 def inject_job_detail_layout_css() -> None:
+    if not inject_css_once("ips-job-detail-layout-v5"):
+        return
     st.markdown(
         """
 <style id="ips-job-detail-layout-v5">

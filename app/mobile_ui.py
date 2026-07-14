@@ -5,8 +5,10 @@ from __future__ import annotations
 import streamlit as st
 
 from app.ui.app_shell_styles import inject_app_shell_script
+from app.ui.css_inject import inject_css_once
 
 IPS_GLOBAL_MOBILE_CSS_KEY = "ips_global_mobile_css_injected"
+IPS_GLOBAL_MOBILE_STYLE_ID = "ips-global-mobile-css-v1"
 IPS_VIEWPORT_NARROW_KEY = "ips_viewport_narrow"
 _VP_SCRIPT_SENT_KEY = "_ips_viewport_detect_script_sent"
 
@@ -56,7 +58,7 @@ def ensure_narrow_viewport_detected() -> None:
 
 # Main content only — sidebar nav styling stays in sidebar_shell.py
 _IPS_GLOBAL_MOBILE_CSS = """
-<style>
+<style id="ips-global-mobile-css-v1">
 /* Sidebar chrome only; width tokens live in sidebar_shell (232 expanded / 48 collapsed) */
 [data-testid="stSidebar"],
 section[data-testid="stSidebar"],
@@ -491,8 +493,7 @@ def inject_sidebar_mobile_auto_collapse_once() -> None:
 
 def inject_ips_global_mobile_css() -> None:
     """Inject once per session; safe to call from multiple pages."""
-    if st.session_state.get(IPS_GLOBAL_MOBILE_CSS_KEY):
+    if not inject_css_once(IPS_GLOBAL_MOBILE_STYLE_ID):
         return
-    st.session_state[IPS_GLOBAL_MOBILE_CSS_KEY] = True
     with st.sidebar:
         st.markdown(_IPS_GLOBAL_MOBILE_CSS, unsafe_allow_html=True)

@@ -4,16 +4,18 @@ from __future__ import annotations
 
 import streamlit as st
 
+from app.ui.css_inject import inject_css_once
+
 IPS_SIDEBAR_THEME_KEY = "ips_sidebar_theme_v4"
+IPS_SIDEBAR_THEME_STYLE_ID = "ips-sidebar-theme-v4"
 
 
 def inject_sidebar_theme() -> None:
-    if st.session_state.get(IPS_SIDEBAR_THEME_KEY):
+    if not inject_css_once(IPS_SIDEBAR_THEME_STYLE_ID):
         return
-    st.session_state[IPS_SIDEBAR_THEME_KEY] = True
     st.markdown(
         """
-        <style>
+        <style id="ips-sidebar-theme-v4">
         section[data-testid="stSidebar"] [data-testid="stExpander"] details {
             border: none !important;
             background: transparent !important;

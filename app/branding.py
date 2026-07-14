@@ -7,7 +7,10 @@ from pathlib import Path
 
 import streamlit as st
 
+from app.ui.css_inject import inject_css_once
+
 _ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
+IPS_BRANDING_STYLE_ID = "ips-branding-styles-v1"
 
 
 def _find_wide_logo() -> Path | None:
@@ -153,9 +156,11 @@ def header_logo_html(*, height: int = 40, alt: str = "IPS") -> str:
 
 
 def apply_branding() -> None:
+    if not inject_css_once(IPS_BRANDING_STYLE_ID):
+        return
     st.markdown(
         """
-        <style>
+        <style id="ips-branding-styles-v1">
         /* App/sidebar background: theme.apply_global_app_styles() */
 
         .ips-topbar {

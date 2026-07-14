@@ -38,11 +38,10 @@ class UiLibraryTests(unittest.TestCase):
         self.assertIn("ips-status-badge", html)
 
     def test_styles_inject_once_guard(self) -> None:
-        from app.ui.styles import IPS_UI_STYLES_KEY, inject_ips_ui_styles
+        from app.ui.styles import inject_ips_ui_styles
 
         src = inspect.getsource(inject_ips_ui_styles)
-        self.assertIn("IPS_UI_STYLES_KEY", src)
-        self.assertEqual(IPS_UI_STYLES_KEY, "ips_ui_styles_v1")
+        self.assertIn("inject_css_once", src)
         self.assertIn("ips-ui-library-v1", src)
 
 

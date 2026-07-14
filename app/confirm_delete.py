@@ -18,8 +18,10 @@ from collections.abc import Callable
 
 import streamlit as st
 
-from app.components.action_styles import danger_solid
+from app.ui.css_inject import inject_css_once
+
 IPS_DELETE_CONFIRM_STYLE_KEY = "ips_delete_confirm_styles_injected"
+IPS_DELETE_CONFIRM_STYLE_ID = "ips-delete-confirm-styles-v1"
 
 
 def destructive_confirm_open_key(key_prefix: str) -> str:
@@ -37,12 +39,11 @@ def close_destructive_confirmation(key_prefix: str) -> None:
 
 def inject_delete_confirm_styles() -> None:
     """Bordered danger/warning panel — compact, distinct on dark background."""
-    if st.session_state.get(IPS_DELETE_CONFIRM_STYLE_KEY):
+    if not inject_css_once(IPS_DELETE_CONFIRM_STYLE_ID):
         return
-    st.session_state[IPS_DELETE_CONFIRM_STYLE_KEY] = True
     st.markdown(
         """
-        <style>
+        <style id="ips-delete-confirm-styles-v1">
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-del-anchor) {
             background: rgba(127, 29, 29, 0.2) !important;
             border-color: rgba(248, 113, 113, 0.5) !important;

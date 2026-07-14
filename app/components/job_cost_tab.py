@@ -8,6 +8,8 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
+from app.ui.css_inject import inject_css_once
+
 from app.pages._core._data import load_inventory
 from app.services.catalog_images import catalog_thumbnail_html
 from app.services.job_cost_transaction_service import (
@@ -82,6 +84,8 @@ def _compact_cost_display_df(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def inject_job_cost_tab_css() -> None:
+    if not inject_css_once("ips-job-cost-tab-v2"):
+        return
     st.markdown(
         """
 <style id="ips-job-cost-tab-v2">

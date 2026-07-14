@@ -12,6 +12,8 @@ import inspect
 from typing import Any
 
 import streamlit as st
+
+from app.ui.css_inject import inject_css_once
 import streamlit.components.v1 as components
 
 IPS_CLEAN_TABLE_STYLE_ID = "ips-clean-table-global-v15"
@@ -143,7 +145,9 @@ def _table_scope_has() -> str:
 
 
 def inject_clean_table_css() -> None:
-    """Inject global clean table row CSS (no session guard — safe on every rerun)."""
+    """Inject global clean table row CSS once per session."""
+    if not inject_css_once(IPS_CLEAN_TABLE_STYLE_ID):
+        return
     tbl = _table_scope_has()
     vb_wrap = _vb_has_row_wrap()
     rows = _css_join(ROW_HTML_SELECTORS)

@@ -5,6 +5,7 @@ import re
 import streamlit as st
 
 from app.db import fetch_one
+from app.ui.css_inject import inject_css_once
 from app.proposal import (
     build_proposal_docx,
     proposal_preview_page_html,
@@ -79,11 +80,11 @@ def _lookup_prepared_by_phone(est: dict) -> str:
 
 def _inject_proposal_preview_styles() -> None:
     """One-time CSS: Word-like page (8.5in) on a light mat + structured quote blocks."""
-    if st.session_state.get("_ips_proposal_preview_css_injected_v11"):
+    if not inject_css_once("ips-proposal-preview-css-v11"):
         return
     st.markdown(
         """
-        <style>
+        <style id="ips-proposal-preview-css-v11">
         .ips-proposal-preview-root.ips-proposal-preview-desk {
             box-sizing: border-box;
             width: 100%;
@@ -399,7 +400,6 @@ def _inject_proposal_preview_styles() -> None:
         """,
         unsafe_allow_html=True,
     )
-    st.session_state["_ips_proposal_preview_css_injected_v11"] = True
 
 
 def _render_proposal_preview_html(

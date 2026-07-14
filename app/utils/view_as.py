@@ -9,6 +9,7 @@ import streamlit as st
 
 from app.auth import current_role
 from app.mobile_ui import IPS_VIEWPORT_NARROW_KEY
+from app.ui.css_inject import inject_css_once
 from app.utils.constants import EMPLOYEE_NAV_PAGES
 from app.utils.permissions import normalize_role, role_default_nav_slug
 IPS_VIEW_AS_ACTIVE_KEY = "ips_view_as_active"
@@ -150,10 +151,10 @@ def clear_view_as() -> None:
 
 
 def inject_view_as_styles() -> None:
-    if not st.session_state.get("_ips_view_as_base_css"):
-        st.session_state["_ips_view_as_base_css"] = True
-        st.markdown(
-            """
+    if not inject_css_once("ips-view-as-base-v2"):
+        return
+    st.markdown(
+        """
 <style id="ips-view-as-base-v2">
 .ips-view-as-banner-wrap {
   margin: 0 0 0.5rem 0;
@@ -313,9 +314,9 @@ def inject_view_as_styles() -> None:
   box-sizing: border-box;
 }
 </style>
-            """,
-            unsafe_allow_html=True,
-        )
+        """,
+        unsafe_allow_html=True,
+    )
 
     marker_classes = "ips-view-as-marker"
     mobile_css = """

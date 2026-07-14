@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import streamlit as st
 
+from app.ui.css_inject import inject_css_once
+
 IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v16"
+IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v16"
 
 
 def inject_page_header_styles() -> None:
     """Inject shared header styles once per session."""
-    if st.session_state.get(IPS_PAGE_HEADER_STYLES_KEY):
+    if not inject_css_once(IPS_PAGE_HEADER_STYLE_ID):
         return
-    st.session_state[IPS_PAGE_HEADER_STYLES_KEY] = True
     with st.sidebar:
         st.markdown(
             """

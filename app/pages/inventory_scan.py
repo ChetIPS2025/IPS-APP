@@ -21,6 +21,8 @@ from typing import Any
 
 import streamlit as st
 
+from app.ui.css_inject import inject_css_once
+
 try:
     from app.mobile_ui import ensure_narrow_viewport_detected
 except ImportError:
@@ -74,9 +76,11 @@ _TXN_MAP = {
 
 
 def _inject_inv_scan_mobile_css() -> None:
+    if not inject_css_once("ips-inv-scan-mobile-v1"):
+        return
     st.markdown(
         """
-        <style>
+        <style id="ips-inv-scan-mobile-v1">
         div[data-testid="stVerticalBlock"]:has(span.ips-inv-scan-scope) label {
             font-size: 1rem !important;
         }

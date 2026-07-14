@@ -9,8 +9,10 @@ from typing import Any
 import streamlit as st
 
 from app.navigation import IPS_NAV_PENDING_KEY
+from app.ui.css_inject import inject_css_once
 
 _EST_DETAIL_STYLE_KEY = "ips_estimate_detail_styles_v1"
+_EST_DETAIL_STYLE_ID = "ips-estimate-detail-styles-v1"
 
 ESTIMATE_DETAIL_TABS: tuple[str, ...] = (
     "Overview",
@@ -38,12 +40,11 @@ _TAB_TO_EDITOR_SECTION: dict[str, str] = {
 
 
 def inject_estimate_detail_styles() -> None:
-    if st.session_state.get(_EST_DETAIL_STYLE_KEY):
+    if not inject_css_once(_EST_DETAIL_STYLE_ID):
         return
-    st.session_state[_EST_DETAIL_STYLE_KEY] = True
     st.markdown(
         """
-        <style>
+        <style id="ips-estimate-detail-styles-v1">
         section[data-testid="stMain"]:has(.ips-estimate-detail-marker) .block-container {
             padding: 1.25rem 1.5rem 1.5rem !important;
             max-width: 1680px !important;

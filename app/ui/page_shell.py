@@ -14,7 +14,10 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
+from app.ui.css_inject import inject_css_once
+
 IPS_DASHBOARD_LAYOUT_KEY = "ips_dashboard_layout_injected_v8"
+IPS_DASHBOARD_LAYOUT_STYLE_ID = "ips-dashboard-layout-v8"
 
 # Re-export column hiding standard (catalog / inventory / materials tables).
 from app.ui.catalog_inventory_display import (
@@ -26,16 +29,15 @@ from app.ui.catalog_inventory_display import (
 
 def inject_ips_dashboard_layout() -> None:
     """Global compact industrial dashboard chrome."""
-    if st.session_state.get(IPS_DASHBOARD_LAYOUT_KEY):
+    if not inject_css_once(IPS_DASHBOARD_LAYOUT_STYLE_ID):
         return
-    st.session_state[IPS_DASHBOARD_LAYOUT_KEY] = True
     from app.ui.streamlit_perf import inject_scroll_preserve
     inject_scroll_preserve("ips_app")
     from app.ui.compact_forms import inject_compact_form_styles
     inject_compact_form_styles()
     st.markdown(
         """
-        <style>
+        <style id="ips-dashboard-layout-v8">
         /* App canvas background: see theme.apply_global_app_styles() */
         section[data-testid="stMain"]:has(.ips-page-shell-marker) .block-container {
             padding-bottom: 0.7rem !important;

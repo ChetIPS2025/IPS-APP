@@ -8,8 +8,12 @@ from __future__ import annotations
 
 import streamlit as st
 
+from app.ui.css_inject import inject_css_once
+
 IPS_THEME_CSS_KEY = "ips_theme_global_v2"
 IPS_GLOBAL_APP_STYLES_KEY = "ips_global_app_styles_v2"
+IPS_GLOBAL_APP_STYLE_ID = "ips-global-app-styles-v2"
+IPS_THEME_STYLE_ID = "ips-theme-global-v2"
 IPS_DENSITY_KEY = "ips_display_density"
 
 DENSITY_CHOICES = ("compact", "comfortable", "spacious")
@@ -58,13 +62,12 @@ def set_density(value: str) -> None:
 
 def apply_global_app_styles() -> None:
     """Inject unified white app canvas, surfaces, tables, tabs, dialogs (once per session)."""
-    if st.session_state.get(IPS_GLOBAL_APP_STYLES_KEY):
+    if not inject_css_once(IPS_GLOBAL_APP_STYLE_ID):
         return
-    st.session_state[IPS_GLOBAL_APP_STYLES_KEY] = True
 
     st.markdown(
         f"""
-        <style>
+        <style id="{IPS_GLOBAL_APP_STYLE_ID}">
         :root {{
             --ips-bg-main: {APP_BG};
             --ips-bg-sidebar: {SIDEBAR_BG};
@@ -252,11 +255,11 @@ def apply_global_css() -> None:
     from app.ips_app_shell import inject_ips_app_shell_styles
     inject_ips_app_shell_styles()
 
-    if not st.session_state.get(IPS_THEME_CSS_KEY):
-        st.session_state[IPS_THEME_CSS_KEY] = True
-        st.markdown(
+    if not inject_css_once(IPS_THEME_STYLE_ID):
+        return
+    st.markdown(
         f"""
-        <style>
+        <style id="{IPS_THEME_STYLE_ID}">
         /* ----- Display density ----- */
         .ips-density-compact {{
             --ips-row-pad: 5px 8px;
@@ -487,7 +490,7 @@ def apply_global_css() -> None:
         </style>
         """,
         unsafe_allow_html=True,
-        )
+    )
 
     from app.ui.clean_table import inject_clean_table_css
     inject_clean_table_css()

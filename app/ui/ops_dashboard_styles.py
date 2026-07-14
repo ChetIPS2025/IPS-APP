@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import streamlit as st
 
+from app.ui.css_inject import inject_css_once
+
 IPS_OPS_DASHBOARD_STYLES_KEY = "ips_ops_dashboard_styles_v32"
+IPS_OPS_DASHBOARD_STYLE_ID = "ips-ops-dashboard-v32"
 
 
 def inject_ops_dashboard_styles() -> None:
     """Inject operations dashboard layout styles once per session."""
-    if st.session_state.get(IPS_OPS_DASHBOARD_STYLES_KEY):
+    if not inject_css_once(IPS_OPS_DASHBOARD_STYLE_ID):
         return
-    st.session_state[IPS_OPS_DASHBOARD_STYLES_KEY] = True
     st.markdown(
         """
 <style id="ips-ops-dashboard-v32">

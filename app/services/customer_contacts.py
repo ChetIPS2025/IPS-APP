@@ -8,6 +8,7 @@ from typing import Any
 
 import streamlit as st
 
+from app.ui.css_inject import inject_css_once
 from app.db import (
     delete_rows,
     delete_rows_admin,
@@ -101,16 +102,16 @@ def fetch_contacts_for_customer_scope(
 
 
 _CONTACT_PICKER_STYLE_KEY = "ips_contact_picker_styles_injected"
+_CONTACT_PICKER_STYLE_ID = "ips-contact-picker-styles-v1"
 
 
 def inject_contact_picker_styles() -> None:
     """IPS dark-theme polish for contact preview + quick-add (Estimates / Jobs)."""
-    if st.session_state.get(_CONTACT_PICKER_STYLE_KEY):
+    if not inject_css_once(_CONTACT_PICKER_STYLE_ID):
         return
-    st.session_state[_CONTACT_PICKER_STYLE_KEY] = True
     st.markdown(
         """
-        <style>
+        <style id="ips-contact-picker-styles-v1">
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-contact-quick-add) {
             background: rgba(15, 23, 42, 0.55) !important;
             border: 1px solid rgba(100, 116, 139, 0.42) !important;

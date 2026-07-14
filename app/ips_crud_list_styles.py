@@ -13,8 +13,12 @@ from __future__ import annotations
 
 import streamlit as st
 
+from app.ui.css_inject import inject_css_once
+
 IPS_CRUD_LIST_STYLES_KEY = "ips_crud_list_styles_injected_v4"
 IPS_MODAL_STYLES_KEY = "ips_modal_styles_injected_v4"
+IPS_MODAL_STYLE_ID = "ips-modal-styles-v4"
+IPS_CRUD_LIST_STYLE_ID = "ips-crud-list-styles-v4"
 
 # Main grid vs side panel — use everywhere (Customers, Labor, Employees) so widths stay identical.
 IPS_CRUD_LIST_PAGE_SPLIT: tuple[float, float] = (2.35, 1.0)
@@ -23,12 +27,11 @@ IPS_CRUD_LIST_PAGE_GAP = "medium"
 
 def inject_ips_modal_styles() -> None:
     """IPS visual system for ``st.dialog`` modals: navy shell, soft border, compact controls, button roles."""
-    if st.session_state.get(IPS_MODAL_STYLES_KEY):
+    if not inject_css_once(IPS_MODAL_STYLE_ID):
         return
-    st.session_state[IPS_MODAL_STYLES_KEY] = True
     st.markdown(
         """
-        <style>
+        <style id="ips-modal-styles-v4">
         /* ----- IPS modal / Streamlit st.dialog ----- */
         div[data-testid="stBackdrop"] {
             background: rgba(17, 24, 39, 0.45) !important;
@@ -162,12 +165,11 @@ def inject_ips_modal_styles() -> None:
 
 def inject_ips_crud_list_styles() -> None:
     inject_ips_modal_styles()
-    if st.session_state.get(IPS_CRUD_LIST_STYLES_KEY):
+    if not inject_css_once(IPS_CRUD_LIST_STYLE_ID):
         return
-    st.session_state[IPS_CRUD_LIST_STYLES_KEY] = True
     st.markdown(
         """
-        <style>
+        <style id="ips-crud-list-styles-v4">
         /* ----- Page subtitle (under render_header) ----- */
         p.ips-crud-page-subtitle {
             color: #4b5563;

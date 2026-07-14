@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import streamlit as st
 
+from app.ui.css_inject import inject_css_once
+
 IPS_UI_STYLES_KEY = "ips_ui_styles_v1"
+IPS_UI_LIBRARY_STYLE_ID = "ips-ui-library-v1"
 
 
 def inject_ips_ui_styles() -> None:
     """Inject shared IPS UI styles once per session."""
-    if st.session_state.get(IPS_UI_STYLES_KEY):
+    if not inject_css_once(IPS_UI_LIBRARY_STYLE_ID):
         return
-    st.session_state[IPS_UI_STYLES_KEY] = True
 
     from app.styles import inject_global_css
     inject_global_css()

@@ -6,6 +6,8 @@ import html
 
 import streamlit as st
 
+from app.ui.css_inject import inject_css_once
+
 from app.components.table_pagination import (
     page_key,
     page_size_key,
@@ -68,6 +70,8 @@ def _profit_pct_summary_class(value: float) -> str:
 
 
 def inject_jobs_page_layout_css() -> None:
+    if not inject_css_once("ips-jobs-page-layout-v24"):
+        return
     with st.sidebar:
         st.markdown(
             """
@@ -1706,6 +1710,8 @@ def job_health_badge_html(cost_summary: dict) -> str:
 
 def inject_dashboard_active_jobs_table_css() -> None:
     """Scope real HTML table styling to the dashboard Active Jobs panel."""
+    if not inject_css_once("ips-dashboard-active-jobs-table-v11"):
+        return
     st.markdown(
         """
 <style id="ips-dashboard-active-jobs-table-v11">

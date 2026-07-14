@@ -8,6 +8,7 @@ from typing import Any
 import streamlit as st
 
 from app.components.tables import data_table_html
+from app.ui.css_inject import inject_css_once
 from app.utils.formatting import fmt_datetime
 _FULL_COLS = (
     ("summary", "Scan"),
@@ -105,12 +106,11 @@ def render_qr_scan_history_table(
 
 def inject_qr_scan_history_css() -> None:
     """Inject result-badge styles (grid layout comes from shared data-table CSS)."""
-    if st.session_state.get("_ips_qr_scan_history_css"):
+    if not inject_css_once("ips-qr-scan-history-v1"):
         return
-    st.session_state["_ips_qr_scan_history_css"] = True
     st.markdown(
         """
-        <style>
+        <style id="ips-qr-scan-history-v1">
         .ips-qr-scan-result {
             display: inline-block;
             padding: 2px 8px;

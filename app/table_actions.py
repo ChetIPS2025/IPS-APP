@@ -28,11 +28,13 @@ import pandas as pd
 import streamlit as st
 
 from app.components.action_styles import danger_outline, danger_solid
+from app.ui.css_inject import inject_css_once
 # Legacy: dict-based storage (migrated on read into selected_<table_key>_ids)
 IPS_ROW_SELECTIONS = "ips_row_selections"
 
 IPS_PENDING_DELETE = "ips_table_pending_delete"
 IPS_ACTION_BAR_CSS = "ips_table_action_bar_injected"
+IPS_ACTION_BAR_STYLE_ID = "ips-table-action-bar-v1"
 
 # Canonical table_key values -> session key ``selected_{table_key}_ids``
 # Asset Database uses ``assets`` -> ``selected_assets_ids``; Asset Manager (Overview) uses ``asset_manager``.
@@ -147,12 +149,11 @@ def inject_table_action_styles() -> None:
     Pages mark toolbars with ``.ips-list-top-anchor`` inside ``st.container(border=True)``.
     Action bars use ``.ips-ta-bar-anchor`` (injected by :func:`render_table_action_bar`).
     """
-    if st.session_state.get(IPS_ACTION_BAR_CSS):
+    if not inject_css_once(IPS_ACTION_BAR_STYLE_ID):
         return
-    st.session_state[IPS_ACTION_BAR_CSS] = True
     st.markdown(
         """
-        <style>
+        <style id="ips-table-action-bar-v1">
         /* ----- List-page top actions (aligned with ips-crud-toolbar-root rhythm) ----- */
         div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-list-top-anchor) {
             padding: 6px 8px 8px 8px !important;

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import streamlit as st
 
+from app.ui.css_inject import inject_css_once
 from app.ui.theme import COLORS
 IPS_ROW_ACTION_COLORS_KEY = "ips_row_action_colors_v2"
+IPS_ROW_ACTION_COLORS_STYLE_ID = "ips-row-action-colors-v1"
 
 ROW_ACTION_COLORS = {
     "open_bg": COLORS.get("action_open", COLORS["primary"]),
@@ -92,9 +94,8 @@ def _label_selectors(fragments: tuple[str, ...]) -> str:
 
 def inject_row_action_colors_css() -> None:
     """Open/View=blue, Edit/Cancel=neutral, Move=blue. Delete stays in inject_action_colors_css."""
-    if st.session_state.get(IPS_ROW_ACTION_COLORS_KEY):
+    if not inject_css_once(IPS_ROW_ACTION_COLORS_STYLE_ID):
         return
-    st.session_state[IPS_ROW_ACTION_COLORS_KEY] = True
 
     c = ROW_ACTION_COLORS
     open_btns = _btn_selectors(OPEN_VIEW_KEY_FRAGMENTS)

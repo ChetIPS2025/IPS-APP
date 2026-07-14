@@ -5,7 +5,10 @@ from __future__ import annotations
 import streamlit as st
 import streamlit.components.v1 as components
 
+from app.ui.css_inject import inject_css_once
+
 IPS_APP_SHELL_LAYOUT_STYLES_KEY = "ips_app_shell_layout_styles_v5"
+IPS_APP_SHELL_LAYOUT_STYLE_ID = "ips-app-shell-layout-v5"
 IPS_APP_SHELL_SCRIPT_MARKER_CLASS = "ips-app-shell-script-marker"
 
 
@@ -105,9 +108,8 @@ def _app_shell_pre_header_cleanup_script() -> str:
 
 def inject_app_shell_layout_styles() -> None:
     """Inject shared main-content top spacing once per session."""
-    if st.session_state.get(IPS_APP_SHELL_LAYOUT_STYLES_KEY):
+    if not inject_css_once(IPS_APP_SHELL_LAYOUT_STYLE_ID):
         return
-    st.session_state[IPS_APP_SHELL_LAYOUT_STYLES_KEY] = True
     st.markdown(
         """
 <style id="ips-app-shell-layout-v5">

@@ -12,11 +12,9 @@ _FILTER_CSS_SESSION_KEY = "ips_table_header_filter_css_v8"
 
 
 def inject_table_header_filter_css_once() -> None:
-    if st.session_state.get(_FILTER_CSS_SESSION_KEY):
-        return
     from app.styles import inject_table_header_filter_css
+
     inject_table_header_filter_css()
-    st.session_state[_FILTER_CSS_SESSION_KEY] = True
 
 
 def filter_session_key(table_key: str, field: str) -> str:

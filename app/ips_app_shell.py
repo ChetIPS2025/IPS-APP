@@ -12,14 +12,15 @@ from __future__ import annotations
 
 import streamlit as st
 
+from app.ui.css_inject import inject_css_once
+
 IPS_APP_SHELL_CSS_KEY = "ips_app_shell_styles_injected_v15"
 
 
 def inject_ips_app_shell_styles() -> None:
     """Inject global IPS chrome for main app content (safe to call multiple times)."""
-    if st.session_state.get(IPS_APP_SHELL_CSS_KEY):
+    if not inject_css_once("ips-app-shell-styles-v15"):
         return
-    st.session_state[IPS_APP_SHELL_CSS_KEY] = True
     st.markdown(
         """
         <style>

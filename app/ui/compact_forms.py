@@ -9,16 +9,18 @@ from __future__ import annotations
 
 import streamlit as st
 
+from app.ui.css_inject import inject_css_once
+
 IPS_COMPACT_FORM_CSS_KEY = "ips_compact_form_styles_v2"
+IPS_COMPACT_FORM_STYLE_ID = "ips-compact-form-styles-v2"
 
 
 def inject_compact_form_styles() -> None:
-    if st.session_state.get(IPS_COMPACT_FORM_CSS_KEY):
+    if not inject_css_once(IPS_COMPACT_FORM_STYLE_ID):
         return
-    st.session_state[IPS_COMPACT_FORM_CSS_KEY] = True
     st.markdown(
         """
-        <style>
+        <style id="ips-compact-form-styles-v2">
         /* ----- Compact form scope: tighter vertical rhythm ----- */
         section[data-testid="stMain"]:has(.ips-compact-form) [data-testid="stElementContainer"],
         section[data-testid="stMain"] .ips-compact-form-scope [data-testid="stElementContainer"] {

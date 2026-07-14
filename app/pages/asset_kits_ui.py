@@ -10,6 +10,7 @@ from typing import Any
 import streamlit as st
 
 from app.auth import current_profile
+from app.ui.css_inject import inject_css_once
 from app.components.kit_audit_item_ui import clear_audit_item_photos, render_audit_item_fields
 from app.components.action_styles import danger_outline
 from app.components.status import status_pill_html
@@ -75,12 +76,11 @@ def kit_item_status_pill_html(status: str) -> str:
 
 
 def inject_kit_ui_styles() -> None:
-    if st.session_state.get("_ips_kit_ui_styles"):
+    if not inject_css_once("ips-kit-ui-styles-v1"):
         return
-    st.session_state["_ips_kit_ui_styles"] = True
     st.markdown(
         """
-        <style>
+        <style id="ips-kit-ui-styles-v1">
         .ips-kit-badge {
             display: inline-block;
             margin-left: 0.35rem;

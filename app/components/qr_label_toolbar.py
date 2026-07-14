@@ -11,6 +11,7 @@ from app.services.inventory_qr_labels import (
     LABEL_PNG_SIZE_2X6,
     label_png_download_filename,
 )
+from app.ui.css_inject import inject_css_once
 _LABEL_PNG_BUTTONS: tuple[tuple[str, str], ...] = (
     (LABEL_PNG_SIZE_1X4, '1"×4" label'),
     (LABEL_PNG_SIZE_2X6, '2"×6" label'),
@@ -61,9 +62,8 @@ div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-qr-label-png-toolbar) [
 
 
 def _ensure_qr_label_png_css() -> None:
-    if st.session_state.get("_ips_qr_label_png_css"):
+    if not inject_css_once("ips-qr-label-png-toolbar-v1"):
         return
-    st.session_state["_ips_qr_label_png_css"] = True
     st.markdown(_QR_LABEL_PNG_CSS, unsafe_allow_html=True)
 
 

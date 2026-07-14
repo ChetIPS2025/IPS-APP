@@ -1,13 +1,15 @@
 """
 Centralized IPS operations platform CSS.
 
-Call inject_global_css() on every Streamlit render (no session guard).
+CSS injectors are session-guarded by style version id (see ``app.ui.css_inject``).
 """
 
 from __future__ import annotations
 
 import streamlit as st
 import streamlit.components.v1 as components
+
+from app.ui.css_inject import inject_css_once
 
 # Design tokens
 APP_BG = "#f4f6f9"
@@ -27,6 +29,8 @@ SELECTED_BORDER = "#2563eb"
 
 def inject_users_module_css() -> None:
     """Users list custom table styling — call at the top of the users page render."""
+    if not inject_css_once("ips-users-module-v31"):
+        return
     st.markdown(
         f"""
 <style id="ips-users-module-v31">
@@ -565,6 +569,8 @@ section[data-testid="stMain"]:has(.ips-users-page) .st-key-users_table_wrap [dat
 
 def inject_documents_module_css() -> None:
     """Documents hub table stability — call at the top of documents page render."""
+    if not inject_css_once("ips-documents-module-v1"):
+        return
     st.markdown(
         f"""
 <style id="ips-documents-module-v1">
@@ -594,6 +600,8 @@ def inject_documents_module_css() -> None:
 
 def inject_customers_module_css() -> None:
     """Customers list custom table styling."""
+    if not inject_css_once("ips-customers-module-v7"):
+        return
     st.markdown(
         f"""
 <style id="ips-customers-module-v7">
@@ -1166,6 +1174,8 @@ def inject_customers_module_css() -> None:
 
 def inject_jobs_module_css() -> None:
     """Jobs list custom table styling."""
+    if not inject_css_once("ips-jobs-module-v29"):
+        return
     with st.sidebar:
         st.markdown(
             f"""
@@ -1988,6 +1998,8 @@ div[data-testid="stPopoverBody"]:has(.job-row-actions-panel) [data-testid="stEle
 
 def inject_tasks_module_css() -> None:
     """Tasks custom interactive table styling."""
+    if not inject_css_once("ips-tasks-module-v3"):
+        return
     st.markdown(
         f"""
 <style id="ips-tasks-module-v3">
@@ -2317,6 +2329,8 @@ def inject_tasks_module_css() -> None:
 
 def inject_certifications_module_css() -> None:
     """Employee certifications custom table styling."""
+    if not inject_css_once("ips-certifications-module-v1"):
+        return
     st.markdown(
         f"""
 <style id="ips-certifications-module-v1">
@@ -2622,6 +2636,8 @@ def inject_certifications_module_css() -> None:
 
 def inject_estimates_module_css() -> None:
     """Estimates list custom table styling."""
+    if not inject_css_once("ips-estimates-module-v3"):
+        return
     st.markdown(
         f"""
 <style id="ips-estimates-module-v3">
@@ -2949,6 +2965,8 @@ def _list_table_checkbox_column_css(table_wrap_key: str) -> str:
 
 def inject_inventory_module_css() -> None:
     """Inventory module styling (detail views, thumbnails, transactions)."""
+    if not inject_css_once("ips-inventory-module-v8"):
+        return
     st.markdown(
         f"""
 <style id="ips-inventory-module-v8">
@@ -3091,6 +3109,8 @@ def inject_inventory_module_css() -> None:
 
 def inject_pricing_guide_module_css() -> None:
     """Pricing Guide list custom table styling (matches Inventory table)."""
+    if not inject_css_once("ips-pricing-guide-module-v5"):
+        return
     st.markdown(
         f"""
 <style id="ips-pricing-guide-module-v5">
@@ -3417,6 +3437,8 @@ def inject_pricing_guide_module_css() -> None:
 
 def inject_inventory_qr_scan_css() -> None:
     """Mobile inventory QR scan / Use Inventory page."""
+    if not inject_css_once("ips-inventory-qr-scan-v3"):
+        return
     st.markdown(
         f"""
 <script>document.body.classList.add("ips-inv-qr-scan-page");</script>
@@ -3585,6 +3607,8 @@ body.ips-inv-qr-scan-page section[data-testid="stMain"]:has(.ips-inv-qr-scan-sco
 
 def inject_table_header_filter_css() -> None:
     """Compact popover filters inside custom table headers."""
+    if not inject_css_once("ips-table-header-filter-v8"):
+        return
     st.markdown(
         """
 <style id="ips-table-header-filter-v8">
@@ -3783,6 +3807,8 @@ section[data-testid="stMain"] [class*="_table_wrap"] [data-testid="stHorizontalB
 
 def inject_table_viewport_fit() -> None:
     """Scale wide list tables to fit the main content area; full width when there is room."""
+    if not inject_css_once("ips-table-viewport-fit-v2"):
+        return
     st.markdown(
         """
 <style id="ips-table-viewport-fit-v2">
@@ -4001,6 +4027,8 @@ div[data-testid="stDataFrame"].ips-table-fit-host {
 
 def inject_asset_qr_scan_css() -> None:
     """Mobile asset QR scan page."""
+    if not inject_css_once("ips-asset-qr-scan-v1"):
+        return
     st.markdown(
         """
 <style id="ips-asset-qr-scan-v1">
@@ -4103,6 +4131,8 @@ div[data-testid="stVerticalBlock"]:has(span.ips-asset-qr-scan-scope) button[kind
 
 def inject_trailer_dashboard_css() -> None:
     """Mobile tool trailer dashboard (field supervisors, iPad/phone)."""
+    if not inject_css_once("ips-trailer-dashboard-v1"):
+        return
     st.markdown(
         """
 <style id="ips-trailer-dashboard-v1">
@@ -4200,6 +4230,8 @@ div[data-testid="stVerticalBlock"]:has(span.ips-trailer-dash-scope) textarea {
 
 def inject_assets_module_css() -> None:
     """Assets list custom table styling."""
+    if not inject_css_once("ips-assets-module-v21"):
+        return
     checkbox_css = _list_table_checkbox_column_css("assets_table_wrap")
     checkbox_css_small = _list_table_checkbox_column_css("assets_small_tools_table_wrap")
     ast_list_wrap = ".st-key-assets_table_wrap, .st-key-assets_small_tools_table_wrap"
@@ -5357,9 +5389,8 @@ def _inject_timekeeping_daily_hour_focus_script() -> None:
 
 def inject_timekeeping_module_css() -> None:
     """Timekeeping list custom table styling."""
-    if st.session_state.get("_ips_timekeeping_module_css"):
+    if not inject_css_once("ips-timekeeping-module-v108"):
         return
-    st.session_state["_ips_timekeeping_module_css"] = True
     tk_expand = ".st-key-timekeeping_table_wrap [class*='st-key-tk_expand_detail_']"
     tk_list_detail_excl = (
         ":not(:has(.timekeeping-detail-header-marker)):not(:has(.timekeeping-detail-row-marker))"
@@ -10121,6 +10152,8 @@ body:has(.timekeeping-allocation-panel-marker) div[data-baseweb="popover"] li di
 
 def inject_updates_module_css() -> None:
     """Company Updates list custom table styling."""
+    if not inject_css_once("ips-updates-module-v1"):
+        return
     st.markdown(
         f"""
 <style id="ips-updates-module-v1">
@@ -10281,6 +10314,8 @@ def inject_updates_module_css() -> None:
 
 def inject_install_page_css() -> None:
     """Public Install IPS App page — centered card, mobile-friendly, no sidebar."""
+    if not inject_css_once("ips-install-page-v1"):
+        return
     st.markdown(
         f"""
 <script>document.body.classList.add("ips-auth-login", "ips-install-page");</script>
@@ -10462,6 +10497,8 @@ body.ips-install-page section[data-testid="stMain"]:has(.ips-install-page-marker
 
 def inject_unauthenticated_shell_css() -> None:
     """Login-only layout: centered card, no sidebar navigation."""
+    if not inject_css_once("ips-login-layout-v2"):
+        return
     st.markdown(
         f"""
 <script>document.body.classList.add("ips-auth-login");</script>
@@ -10629,6 +10666,8 @@ def inject_authenticated_shell_css() -> None:
 
 def inject_ips_dialog_styles() -> None:
     """Reusable IPS SaaS dialog / ``st.dialog`` styling (Jobs detail and future modals)."""
+    if not inject_css_once("ips-dialog-styles-v5"):
+        return
     st.markdown(
         f"""
 <style id="ips-dialog-styles-v5">
@@ -11335,6 +11374,8 @@ div[data-testid="stDialog"] [class*="st-key-job_subjob_doc_"][class*="cancel_del
 
 def inject_action_colors_css() -> None:
     """Shared destructive buttons and semantic status pill colors."""
+    if not inject_css_once("ips-action-colors-v6"):
+        return
     st.markdown(
         """
 <style id="ips-action-colors-v6">
@@ -11880,6 +11921,8 @@ div[data-testid="stDialog"] div[data-testid="stElementContainer"]:has(.ips-catal
 
 def inject_global_button_css() -> None:
     """Single-line horizontal labels on every Streamlit and custom button app-wide."""
+    if not inject_css_once("ips-global-buttons-v2"):
+        return
     st.markdown(
         """
 <style id="ips-global-buttons-v2">
@@ -12104,6 +12147,8 @@ section[data-testid="stSidebar"] [class*="st-key-nav_"] .sidebar-nav-label {
 
 def inject_compact_table_rows_css() -> None:
     """Global compact row height and vertical centering for all list/data tables."""
+    if not inject_css_once("ips-compact-table-rows-v2"):
+        return
     st.markdown(
         f"""
 <style id="ips-compact-table-rows-v2">
@@ -12374,7 +12419,9 @@ table th {{
 
 
 def inject_global_css() -> None:
-    """Inject global IPS SaaS styles on every render."""
+    """Inject global IPS SaaS styles once per session."""
+    if not inject_css_once("ips-global-styles-v19"):
+        return
     with st.sidebar:
         st.markdown(
             f"""
@@ -15109,6 +15156,8 @@ section[data-testid="stMain"]:has(.ips-wt-preview-frame-marker) [data-testid="st
 
 def _inject_timekeeping_list_row_gap_css() -> None:
     """Minimal list spacing — native Streamlit columns own the row layout."""
+    if not inject_css_once("ips-timekeeping-list-gap-v5"):
+        return
     st.markdown(
         """
 <style id="ips-timekeeping-list-gap-v5">
@@ -15352,6 +15401,8 @@ def inject_ops_dashboard_css() -> None:
 
 def inject_coupling_inspection_css() -> None:
     """Mobile/iPad-friendly coupling inspection V7 form styling."""
+    if not inject_css_once("ips-coupling-inspection-v7"):
+        return
     st.markdown(
         """
 <style id="ips-coupling-inspection-v7">
@@ -15495,6 +15546,8 @@ def inject_coupling_inspection_css() -> None:
 
 def inject_employee_portal_css() -> None:
     """Mobile-first IPS Employee Portal styling."""
+    if not inject_css_once("ips-employee-portal"):
+        return
     st.markdown(
         """
 <style id="ips-employee-portal">
@@ -15712,7 +15765,7 @@ def inject_employee_portal_css() -> None:
   border-radius: 10px !important;
 }}
 
-/* Header utility icons — must repeat in global CSS (injected every render) */
+/* Header utility icons — repeated in global CSS for cascade priority */
 body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_refresh"] .stButton > button,
 body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_refresh"] [data-testid="stButton"] > button,
 body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"] .stButton > button,

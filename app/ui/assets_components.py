@@ -6,7 +6,10 @@ import html
 
 import streamlit as st
 
+from app.ui.css_inject import inject_css_once
+
 IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v39"
+IPS_ASSETS_PAGE_STYLE_ID = "ips-assets-page-styles-v39"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -30,11 +33,10 @@ _TAB_ICONS: dict[str, str] = {
 def inject_assets_page_styles() -> None:
     from app.ui.clean_table import inject_clean_table_css
     inject_clean_table_css()
-    if st.session_state.get(IPS_ASSETS_PAGE_STYLES_KEY):
-        return
-    st.session_state[IPS_ASSETS_PAGE_STYLES_KEY] = True
     from app.ui.page_shell import inject_ips_dashboard_layout
     inject_ips_dashboard_layout()
+    if not inject_css_once(IPS_ASSETS_PAGE_STYLE_ID):
+        return
     with st.sidebar:
         st.markdown(
             """

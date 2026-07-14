@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import streamlit as st
 
+from app.ui.css_inject import inject_css_once
+
 
 def inject_pricing_guide_page_layout_css() -> None:
+    if not inject_css_once("ips-pricing-guide-page-layout-v1"):
+        return
     st.markdown(
         """
 <style id="ips-pricing-guide-page-layout-v1">

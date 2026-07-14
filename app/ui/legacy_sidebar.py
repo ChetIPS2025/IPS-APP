@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 import streamlit as st
 
+from app.ui.css_inject import inject_css_once
+
 from app.auth import current_profile, current_role, sign_out
 
 from app.mobile_ui import inject_ips_global_mobile_css, inject_sidebar_mobile_auto_collapse_once
@@ -290,9 +292,11 @@ def _sidebar_brand() -> None:
 
 
 def _inject_sidebar_nav_css() -> None:
+    if not inject_css_once("ips-legacy-sidebar-nav-v1"):
+        return
     st.sidebar.markdown(
         """
-<style>
+<style id="ips-legacy-sidebar-nav-v1">
 /* --- Sidebar: white panel (canvas from theme.apply_global_app_styles) --- */
 section[data-testid="stSidebar"],
 section[data-testid="stSidebar"] > div,

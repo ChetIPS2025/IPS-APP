@@ -11,6 +11,7 @@ import streamlit as st
 
 from app.mobile_ui import inject_sidebar_mobile_auto_collapse_once
 from app.ui.app_shell_styles import inject_app_shell_script
+from app.ui.css_inject import inject_css_once
 
 IPS_SIDEBAR_SHELL_KEY = "_ips_sidebar_shell_injected"
 IPS_SIDEBAR_NAV_FALLBACK_KEY = "_ips_sidebar_nav_fallback_items"
@@ -511,6 +512,8 @@ def _desktop_nav_rail_item_is_active(slug: str, active_slug: str) -> bool:
 
 def inject_desktop_nav_rail_css() -> None:
     """Inject desktop rail layout CSS (safe inside hidden style containers)."""
+    if not inject_css_once("ips-desktop-nav-rail-v6"):
+        return
     st.markdown(_desktop_nav_rail_css(), unsafe_allow_html=True)
 
 
@@ -558,8 +561,10 @@ def inject_sidebar_shell() -> None:
     toggle_requested = bool(st.session_state.pop(IPS_SIDEBAR_TOGGLE_REQUEST_KEY, False))
 
     with st.sidebar:
-        inject_sidebar_nav_override_css()
-        st.markdown(_shell_css(), unsafe_allow_html=True)
+        if inject_css_once("ips-sidebar-nav-override-v10"):
+            st.markdown(_sidebar_nav_override_css(), unsafe_allow_html=True)
+        if inject_css_once("ips-sidebar-shell-v16"):
+            st.markdown(_shell_css(), unsafe_allow_html=True)
         inject_sidebar_mobile_auto_collapse_once()
         inject_app_shell_script(_shell_script(nav_json))
         inject_sidebar_navigation_script(collapsed)
@@ -572,6 +577,8 @@ def inject_sidebar_shell() -> None:
 
 def inject_sidebar_nav_override_css() -> None:
     """Inject flat sidebar nav overrides last so they beat global button + theme CSS."""
+    if not inject_css_once("ips-sidebar-nav-override-v10"):
+        return
     st.markdown(_sidebar_nav_override_css(), unsafe_allow_html=True)
 
 

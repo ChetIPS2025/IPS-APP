@@ -6,6 +6,8 @@ import html
 
 import streamlit as st
 
+from app.ui.css_inject import inject_css_once
+
 from app.components.table_pagination import (
     page_key,
     page_size_key,
@@ -20,7 +22,9 @@ _ASSETS_PAGE_SIZE_OPTIONS = (50, 75, 100, 150)
 
 
 def inject_assets_page_layout_css() -> None:
-    """Always inject — assets page layout overrides."""
+    """Assets page layout overrides."""
+    if not inject_css_once("ips-assets-page-layout-v8"):
+        return
     with st.sidebar:
         st.markdown(
             """

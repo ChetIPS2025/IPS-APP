@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import streamlit as st
 
+from app.ui.css_inject import inject_css_once
+
 DEFAULT_CATALOG_PAGE_SIZE = 50
 _PAGE_SIZE_OPTIONS = (50, 75, 100, 150)
 _PAGINATION_CSS_KEY = "_ips_table_pagination_css"
+_PAGINATION_STYLE_ID = "ips-table-pagination-v1"
 
 
 def page_key(table_key: str) -> str:
@@ -50,9 +53,8 @@ def paginate_rows(
 
 
 def _inject_pagination_css() -> None:
-    if st.session_state.get(_PAGINATION_CSS_KEY):
+    if not inject_css_once(_PAGINATION_STYLE_ID):
         return
-    st.session_state[_PAGINATION_CSS_KEY] = True
     st.markdown(
         """
 <style id="ips-table-pagination-v1">

@@ -6,6 +6,8 @@ import html
 
 import streamlit as st
 
+from app.ui.css_inject import inject_css_once
+
 from app.components.table_pagination import (
     DEFAULT_CATALOG_PAGE_SIZE,
     page_key,
@@ -50,6 +52,8 @@ def estimate_col_marker(name: str) -> str:
 
 
 def inject_estimates_page_layout_css() -> None:
+    if not inject_css_once("ips-estimates-page-layout-v9"):
+        return
     st.markdown(
         """
 <style id="ips-estimates-page-layout-v9">

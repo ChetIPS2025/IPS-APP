@@ -7,6 +7,7 @@ from typing import Any
 import streamlit as st
 
 from app.services.job_service import job_row_select_label
+from app.ui.css_inject import inject_css_once
 FIELD_JOB_SESSION_KEY = "ips_field_job_id"
 FIELD_EXPANDED_JOB_KEY = "ips_field_expanded_job_id"
 FIELD_EXPANDED_TASK_KEY = "ips_field_expanded_task_id"
@@ -26,9 +27,8 @@ SDR_WIZARD_STEP_PREFIX = "ips_sdr_wizard_step"
 
 
 def _inject_field_job_bar_css() -> None:
-    if st.session_state.get("_ips_field_job_bar_css"):
+    if not inject_css_once("ips-field-job-bar-v1"):
         return
-    st.session_state["_ips_field_job_bar_css"] = True
     st.markdown(
         """
 <style id="ips-field-job-bar-v1">
@@ -101,9 +101,8 @@ def set_sdr_wizard_step(job_id: str, step: int) -> None:
 
 
 def inject_field_day_shell_css() -> None:
-    if st.session_state.get("_ips_field_day_shell_css"):
+    if not inject_css_once("ips-field-day-shell-v1"):
         return
-    st.session_state["_ips_field_day_shell_css"] = True
     inject_field_row_expand_css()
     st.markdown(
         """
@@ -271,9 +270,8 @@ def navigate_to_field_page(slug: str, *, job_id: str | None = None) -> None:
 
 
 def inject_field_row_expand_css() -> None:
-    if st.session_state.get("_ips_field_row_expand_css"):
+    if not inject_css_once("ips-field-row-expand-v1"):
         return
-    st.session_state["_ips_field_row_expand_css"] = True
     st.markdown(
         """
 <style id="ips-field-row-expand-v1">
