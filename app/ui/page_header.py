@@ -186,7 +186,7 @@ def _render_menu(*, header_key: str) -> None:
 
 def _render_refresh(*, key: str, on_refresh: Callable[[], None] | None = None) -> None:
     with st.container(key="header_refresh"):
-        if st.button("↻", key=key, help="Refresh", use_container_width=True):
+        if st.button("🔄", key=key, help="Refresh", use_container_width=True):
             if on_refresh is not None:
                 on_refresh()
             st.rerun()
@@ -197,21 +197,26 @@ def _render_bell(*, header_key: str, role: str) -> None:
     from app.utils.permissions import role_can_access_page
 
     unread = _unread_notification_count()
-    label = "🔔"
+    help_text = "Notifications"
     if unread > 0:
-        label = f"🔔 {int(unread)}"
+        help_text = f"Notifications ({int(unread)} unread)"
     with st.container(key="header_notifications"):
+        if unread > 0:
+            st.markdown(
+                f'<span class="ips-header-notify-badge" aria-hidden="true">{int(unread)}</span>',
+                unsafe_allow_html=True,
+            )
         if role_can_access_page(role, "company_updates"):
-            if st.button(label, key=f"{header_key}_bell", help="Notifications", use_container_width=True):
+            if st.button("🔔", key=f"{header_key}_bell", help=help_text, use_container_width=True):
                 set_nav_slug("company_updates")
                 st.rerun()
         else:
-            st.button(label, key=f"{header_key}_bell", help="Notifications", disabled=True, use_container_width=True)
+            st.button("🔔", key=f"{header_key}_bell", help=help_text, disabled=True, use_container_width=True)
 
 
 def _render_help(*, header_key: str) -> None:
     with st.container(key="header_help"):
-        with st.popover("?", help="Help"):
+        with st.popover("❓", help="Help"):
             st.markdown("**Help**")
             st.caption("Use the sidebar to switch modules. Contact your administrator for access changes.")
 
@@ -222,11 +227,11 @@ def _render_settings(*, header_key: str, role: str) -> None:
 
     with st.container(key="header_settings"):
         if role_can_access_page(role, "settings"):
-            if st.button("⚙", key=f"{header_key}_settings", help="Settings", use_container_width=True):
+            if st.button("⚙️", key=f"{header_key}_settings", help="Settings", use_container_width=True):
                 set_nav_slug("settings")
                 st.rerun()
         else:
-            st.button("⚙", key=f"{header_key}_settings", help="Settings", disabled=True, use_container_width=True)
+            st.button("⚙️", key=f"{header_key}_settings", help="Settings", disabled=True, use_container_width=True)
 
 
 def _render_user_menu(

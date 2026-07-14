@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v11"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v12"
 
 
 def inject_page_header_styles() -> None:
@@ -15,7 +15,7 @@ def inject_page_header_styles() -> None:
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-page-header-styles-v11">
+<style id="ips-page-header-styles-v12">
 [class*="st-key-ips_page_header"],
 [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
@@ -184,7 +184,8 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
 .st-key-header_back .stButton > button,
 .st-key-header_menu .stButton > button,
 .st-key-header_refresh .stButton > button,
-.st-key-header_help .stButton > button,
+.st-key-header_notifications .stButton > button,
+.st-key-header_help [data-testid="stPopover"] > button,
 .st-key-header_settings .stButton > button {
   width: 40px !important;
   min-width: 40px !important;
@@ -193,15 +194,44 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
+  font-size: 1.05rem !important;
+  line-height: 1 !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #374151 !important;
+  box-shadow: none !important;
 }
-.st-key-header_notifications .stButton > button {
-  width: auto !important;
-  min-width: 40px !important;
-  max-width: 72px !important;
-  padding: 0 8px !important;
+.st-key-header_refresh .stButton > button p,
+.st-key-header_notifications .stButton > button p,
+.st-key-header_help [data-testid="stPopover"] > button p,
+.st-key-header_settings .stButton > button p,
+.st-key-header_back .stButton > button p,
+.st-key-header_menu .stButton > button p {
+  margin: 0 !important;
+  line-height: 1 !important;
+  font-size: 1.05rem !important;
+}
+.st-key-header_notifications {
+  position: relative !important;
+}
+.st-key-header_notifications .ips-header-notify-badge {
+  position: absolute !important;
+  top: 2px !important;
+  right: 2px !important;
+  z-index: 2 !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
+  min-width: 16px !important;
+  height: 16px !important;
+  padding: 0 4px !important;
+  border-radius: 999px !important;
+  background: #ef4444 !important;
+  color: #ffffff !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  pointer-events: none !important;
 }
 .st-key-header_primary_action .stButton > button {
   width: auto !important;
@@ -233,13 +263,10 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
 }
 .st-key-header_refresh,
 .st-key-header_help,
-.st-key-header_settings {
-  min-width: 40px !important;
-  max-width: 40px !important;
-}
+.st-key-header_settings,
 .st-key-header_notifications {
   min-width: 40px !important;
-  max-width: 72px !important;
+  max-width: 40px !important;
 }
 .st-key-header_avatar {
   min-width: 44px !important;

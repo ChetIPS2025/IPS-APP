@@ -61,13 +61,24 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.ui.page_header_styles import inject_page_header_styles
 
         src = inspect.getsource(inject_page_header_styles)
-        self.assertIn("ips-page-header-styles-v11", src)
+        self.assertIn("ips-page-header-styles-v12", src)
         self.assertIn("st-key-header_page_toolbar", src)
         self.assertIn('[class*="st-key-ips_page_header"]', src)
         self.assertIn(".st-key-header_primary_action", src)
         self.assertIn(".st-key-header_secondary_action", src)
-        self.assertNotIn("position: absolute", src)
+        self.assertIn("st-key-header_help [data-testid=\"stPopover\"]", src)
+        self.assertIn("ips-header-notify-badge", src)
         self.assertNotIn("width: 100vw", src)
+
+    def test_header_utility_buttons_use_icon_only_labels(self) -> None:
+        from app.ui import page_header as ui_page_header
+
+        src = inspect.getsource(ui_page_header)
+        self.assertIn('st.button("🔄"', src)
+        self.assertIn('st.button("🔔"', src)
+        self.assertIn('st.popover("❓"', src)
+        self.assertIn('st.button("⚙️"', src)
+        self.assertNotIn("🔔 {int(unread)}", src)
 
     def test_full_page_detail_skips_duplicate_modal_header(self) -> None:
         from app.pages import customers as customers_page
