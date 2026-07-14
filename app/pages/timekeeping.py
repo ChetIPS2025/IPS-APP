@@ -380,6 +380,8 @@ def clear_timekeeping_week_days_cache() -> None:
 def clear_timekeeping_list_caches() -> None:
     clear_timekeeping_assignment_options_cache()
     clear_timekeeping_week_days_cache()
+    from app.pages._core.page_data_cache import clear_timekeeping_summaries_page_data_cache
+    clear_timekeeping_summaries_page_data_cache()
 
 
 def _recalculate_visible_week_totals(week_start_d: date) -> None:

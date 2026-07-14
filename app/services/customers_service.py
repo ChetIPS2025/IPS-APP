@@ -140,9 +140,18 @@ def _enrich_customer(
 
 def get_customers(*, enrich: bool = True) -> list[dict[str, Any]]:
     from app.pages._core._data import load_customers
+    from app.pages._core.page_data_cache import page_data_cache_get
+
     rows = load_customers()
     if not enrich:
         return rows
+    return page_data_cache_get(
+        "customers_enriched_list",
+        lambda: _get_customers_enriched(rows),
+    )
+
+
+def _get_customers_enriched(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     locs_by_cid = _bulk_locations_by_customer_id()
     cons_by_cid = _bulk_contacts_by_customer_id()
     return [

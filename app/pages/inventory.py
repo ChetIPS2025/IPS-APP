@@ -88,6 +88,7 @@ from app.services.inventory_service import (
 from app.services.catalog_stock_policy_service import (
     INVENTORY_VIEW_FILTERS,
     enrich_inventory_rows,
+    load_enriched_inventory_rows,
     inventory_needs_reorder,
     passes_inventory_view_filter,
 )
@@ -772,7 +773,7 @@ def render() -> None:
         '<span class="ips-inventory-page ips-page-shell-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
-    rows = enrich_inventory_rows(load_inventory())
+    rows = load_enriched_inventory_rows()
     filter_options = build_filter_options(rows, _COLUMN_FILTER_SPECS)
     reorder_count = sum(1 for r in rows if inventory_needs_reorder(r))
     if reorder_count:

@@ -28,6 +28,7 @@ __all__ = [
     "apply_pricing_stock_settings_to_inventory",
     "derive_inventory_stock_status",
     "enrich_inventory_rows",
+    "load_enriched_inventory_rows",
     "inventory_needs_reorder",
     "inventory_status_fields_for_qty",
     "linked_inventory_quantity",
@@ -100,6 +101,16 @@ def enrich_inventory_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     from app.perf_debug import perf_span
     with perf_span("inventory.enrich_rows"):
         return _enrich_inventory_rows_impl(rows)
+
+
+def load_enriched_inventory_rows() -> list[dict[str, Any]]:
+    from app.pages._core._data import load_inventory
+    from app.pages._core.page_data_cache import page_data_cache_get
+
+    return page_data_cache_get(
+        "inventory_enriched_rows",
+        lambda: enrich_inventory_rows(load_inventory()),
+    )
 
 
 def _enrich_inventory_rows_impl(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:

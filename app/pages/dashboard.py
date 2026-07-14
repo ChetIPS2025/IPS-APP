@@ -109,6 +109,15 @@ def render() -> None:
         st.session_state["ips_dash_date_start"] = dr[0]
         st.session_state["ips_dash_date_end"] = dr[1]
 
+    def _on_dashboard_refresh() -> None:
+        from app.pages._core.page_data_cache import (
+            clear_dashboard_page_data_cache,
+            clear_timekeeping_summaries_page_data_cache,
+        )
+
+        clear_dashboard_page_data_cache()
+        clear_timekeeping_summaries_page_data_cache()
+
     def _dash_new_job() -> None:
         if st.button("+ New Job", key="ips_dash_new_job", type="primary"):
             clear_new_job_number_state()
@@ -126,6 +135,7 @@ def render() -> None:
         on_date_range_change=_on_date_range_change,
         show_refresh=True,
         refresh_key="ips_dash_refresh",
+        on_refresh=_on_dashboard_refresh,
         primary_action=_dash_new_job,
         layout_marker="ips-ops-dashboard-marker",
     )

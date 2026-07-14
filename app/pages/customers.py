@@ -396,6 +396,15 @@ def _open_counts_by_customer_name(
     return open_jobs, open_ests
 
 
+def _load_customers_list_rows() -> list[dict]:
+    from app.pages._core.page_data_cache import page_data_cache_get
+
+    return page_data_cache_get(
+        "customers_page_list_rows",
+        lambda: _enrich_list_rows(get_customers()),
+    )
+
+
 def _enrich_list_rows(rows: list[dict]) -> list[dict]:
     from app.perf_debug import perf_span
     with perf_span("customers.enrich_list_rows"):
@@ -2518,7 +2527,7 @@ def render() -> None:
         render_customer_detail(str(st.session_state[CUSTOMERS_SELECTED_ID_KEY]))
         st.stop()
 
-    all_rows = _enrich_list_rows(get_customers())
+    all_rows = _load_customers_list_rows()
     filter_options = build_filter_options(all_rows, _CUSTOMER_COLUMN_FILTER_SPECS)
     if sanitize_column_filters(_CUSTOMERS_TABLE_KEY, filter_options, filter_fields=_CUSTOMER_BAR_FILTER_FIELDS):
         st.rerun()

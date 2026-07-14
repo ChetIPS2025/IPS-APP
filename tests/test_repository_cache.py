@@ -42,6 +42,20 @@ def test_clear_data_cache_for_table_estimate_line_items_clears_estimates() -> No
     mock_est.assert_called_once()
 
 
+def test_clear_data_cache_for_table_customer_locations_clears_customers() -> None:
+    with patch("app.services.repository._clear_db_read_caches"):
+        with patch("app.pages._core._data.clear_customers_catalog_cache") as mock_customers:
+            clear_data_cache_for_table("customer_locations")
+    mock_customers.assert_called_once()
+
+
+def test_clear_data_cache_for_table_inventory_transactions_clears_inventory() -> None:
+    with patch("app.services.repository._clear_db_read_caches"):
+        with patch("app.pages._core._data.clear_inventory_catalog_cache") as mock_inv:
+            clear_data_cache_for_table("inventory_transactions")
+    mock_inv.assert_called_once()
+
+
 def test_update_row_invalidates_table_cache() -> None:
     with patch("app.services.repository._db") as mock_db:
         mock_db.return_value.update_rows.return_value = [{"id": "j1"}]

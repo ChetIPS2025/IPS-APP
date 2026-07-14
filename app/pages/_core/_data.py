@@ -7,8 +7,18 @@ from typing import Any
 
 import streamlit as st
 
+from app.pages._core.page_data_cache import (
+    clear_customers_page_data_cache,
+    clear_dashboard_page_data_cache,
+    clear_inventory_page_data_cache,
+    clear_page_data_cache,
+    clear_timekeeping_summaries_page_data_cache,
+    page_data_cache_get,
+)
+
 CATALOG_CACHE_TTL = 300
 _CATALOG_SESSION_KEY = "_ips_catalog_datasets"
+_JOBS_LIST_COST_CACHE_KEY = "_ips_jobs_list_cost_by_id"
 
 
 def _catalog_session_get(name: str, loader):
@@ -21,6 +31,32 @@ def _catalog_session_get(name: str, loader):
 
 def clear_catalog_session_datasets() -> None:
     st.session_state.pop(_CATALOG_SESSION_KEY, None)
+    clear_page_data_cache()
+
+
+def clear_jobs_list_cost_cache() -> None:
+    st.session_state.pop(_JOBS_LIST_COST_CACHE_KEY, None)
+
+
+def invalidate_jobs_list_cost_cache_job(job_id: str) -> None:
+    jid = str(job_id or "").strip()
+    if not jid:
+        return
+    store = st.session_state.get(_JOBS_LIST_COST_CACHE_KEY)
+    if isinstance(store, dict) and jid in store:
+        del store[jid]
+
+
+def jobs_list_cost_cache(jobs: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Incremental per-job costing snapshot for list views."""
+    from app.services.job_financial_ui import job_table_list_financials_from_row
+
+    store = st.session_state.setdefault(_JOBS_LIST_COST_CACHE_KEY, {})
+    for job in jobs:
+        jid = str(job.get("id") or "").strip()
+        if jid and jid not in store:
+            store[jid] = job_table_list_financials_from_row(job)
+    return store
 
 
 def clear_catalog_session_key(name: str) -> None:
@@ -164,6 +200,20 @@ def _cached_jobs_rows() -> tuple[tuple[dict[str, Any], ...], bool]:
 
 
 def load_dashboard_kpis(
+    *,
+    period_start: date | None = None,
+    period_end: date | None = None,
+) -> dict[str, Any]:
+    start = period_start.isoformat() if isinstance(period_start, date) else ""
+    end = period_end.isoformat() if isinstance(period_end, date) else ""
+    cache_key = f"dashboard_kpis:{start}:{end}"
+    return page_data_cache_get(cache_key, lambda: _load_dashboard_kpis_uncached(
+        period_start=period_start,
+        period_end=period_end,
+    ))
+
+
+def _load_dashboard_kpis_uncached(
     *,
     period_start: date | None = None,
     period_end: date | None = None,
@@ -319,6 +369,11 @@ def demo_item_activities() -> list[dict[str, str]]:
 
 
 def load_recent_item_activity(*, limit: int = 10) -> tuple[list[dict[str, str]], bool]:
+    cache_key = f"dashboard_item_activity:{int(limit)}"
+    return page_data_cache_get(cache_key, lambda: _load_recent_item_activity_uncached(limit=limit))
+
+
+def _load_recent_item_activity_uncached(*, limit: int = 10) -> tuple[list[dict[str, str]], bool]:
     from app.services.dashboard_item_activity_service import recent_item_activity_feed
     items = recent_item_activity_feed(limit=limit)
     if items:
@@ -729,17 +784,23 @@ def clear_labor_rates_cache() -> None:
 def clear_jobs_catalog_cache() -> None:
     clear_jobs_list_cache()
     clear_catalog_session_key("jobs")
+    clear_jobs_list_cost_cache()
+    clear_dashboard_page_data_cache()
+    clear_customers_page_data_cache()
 
 
 def clear_estimates_catalog_cache() -> None:
     clear_estimates_list_cache()
     clear_catalog_session_key("estimates")
     clear_jobs_catalog_cache()
+    clear_customers_page_data_cache()
 
 
 def clear_inventory_catalog_cache() -> None:
     clear_inventory_list_cache()
     clear_catalog_session_key("inventory")
+    clear_inventory_page_data_cache()
+    clear_dashboard_page_data_cache()
     from app.services.pricing_guide_service import clear_pricing_guide_cache
     clear_pricing_guide_cache()
 
@@ -747,6 +808,7 @@ def clear_inventory_catalog_cache() -> None:
 def clear_assets_catalog_cache() -> None:
     clear_assets_list_cache()
     clear_catalog_session_key("assets")
+    clear_dashboard_page_data_cache()
     from app.services.pricing_guide_service import clear_pricing_guide_cache
     clear_pricing_guide_cache()
 
@@ -754,17 +816,21 @@ def clear_assets_catalog_cache() -> None:
 def clear_customers_catalog_cache() -> None:
     clear_customers_list_cache()
     clear_catalog_session_key("customers")
+    clear_customers_page_data_cache()
 
 
 def clear_employees_catalog_cache() -> None:
     clear_employees_list_cache()
     clear_user_profiles_cache()
     clear_catalog_session_key("employees")
+    clear_timekeeping_summaries_page_data_cache()
+    clear_dashboard_page_data_cache()
 
 
 def clear_tasks_catalog_cache() -> None:
     clear_tasks_list_cache()
     clear_catalog_session_key("tasks")
+    clear_dashboard_page_data_cache()
 
 
 def clear_labor_rates_catalog_cache() -> None:
@@ -773,6 +839,7 @@ def clear_labor_rates_catalog_cache() -> None:
 
 def clear_timekeeping_catalog_cache() -> None:
     """Timekeeping writes roll up to job costing — refresh jobs only."""
+    clear_timekeeping_summaries_page_data_cache()
     clear_jobs_catalog_cache()
 
 
@@ -784,6 +851,7 @@ def clear_pricing_guide_catalog_cache() -> None:
 def clear_all_catalog_list_caches() -> None:
     """Invalidate Streamlit catalog caches after mutations."""
     clear_catalog_session_datasets()
+    clear_jobs_list_cost_cache()
     clear_inventory_list_cache()
     clear_assets_list_cache()
     clear_jobs_list_cache()
@@ -1138,7 +1206,7 @@ def _demo_timekeeping_summaries(week_start: date) -> list[dict[str, Any]]:
     return [_timekeeping_summary_for_employee(e, week_start, None) for e in _active_employees()]
 
 
-def load_timekeeping_summaries(week_start: date) -> list[dict[str, Any]]:
+def _load_timekeeping_summaries_uncached(week_start: date) -> list[dict[str, Any]]:
     from app.services.timekeeping_service import list_timekeeping_summaries
     employees = _active_employees()
     employee_ids = {str(e.get("id") or "").strip() for e in employees}
@@ -1155,6 +1223,11 @@ def load_timekeeping_summaries(week_start: date) -> list[dict[str, Any]]:
         _timekeeping_summary_for_employee(emp, week_start, by_id.get(str(emp.get("id") or "").strip()))
         for emp in employees
     ]
+
+
+def load_timekeeping_summaries(week_start: date) -> list[dict[str, Any]]:
+    cache_key = f"timekeeping_summaries:{week_start.isoformat()}"
+    return page_data_cache_get(cache_key, lambda: _load_timekeeping_summaries_uncached(week_start))
 
 
 def _normalize_timekeeping_assignment(label: str) -> str:

@@ -1123,6 +1123,8 @@ def invalidate_job_cost_session(job_id: str = "") -> None:
         if isinstance(synced, set):
             synced.discard(jid)
         st.session_state.pop(_job_cost_summary_cache_key(jid), None)
+        from app.pages._core._data import invalidate_jobs_list_cost_cache_job
+        invalidate_jobs_list_cost_cache_job(jid)
         return
     st.session_state.pop(_JOB_COST_SYNCED_KEY, None)
 

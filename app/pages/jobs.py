@@ -88,6 +88,7 @@ from app.pages._core._data import (
     customer_id_for_name,
     customer_location_select_options,
     employee_options,
+    jobs_list_cost_cache,
     load_estimates,
     load_jobs,
     lookup_options,
@@ -3011,7 +3012,7 @@ def _render_jobs_page() -> None:
     _render_jobs_list_fragment(
         page_rows,
         filter_options=filter_options,
-        cost_cache=None,
+        cost_cache=jobs_list_cost_cache(filtered),
         subjob_counts=subjob_counts,
     )
 
