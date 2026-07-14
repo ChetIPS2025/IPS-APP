@@ -24,8 +24,12 @@ def _app_shell_pre_header_cleanup_script() -> str:
     return """
 <script>
 (function () {
+  const w = window.parent || window;
+  const d = w.document;
   function zero(el) {
     if (!el) return;
+    if (el.closest(".st-key-ips_page_header")) return;
+    if (el.querySelector(".st-key-ips_page_header, .ips-app-page-header-marker")) return;
     el.style.setProperty("display", "none", "important");
     el.style.setProperty("height", "0", "important");
     el.style.setProperty("min-height", "0", "important");
@@ -35,23 +39,36 @@ def _app_shell_pre_header_cleanup_script() -> str:
     el.style.setProperty("overflow", "hidden", "important");
     el.style.setProperty("border", "none", "important");
   }
+  function pageRootVertical(main) {
+    return (
+      main.querySelector('[data-testid="stMainBlockContainer"] [data-testid="stVerticalBlock"]') ||
+      main.querySelector(".block-container [data-testid=\"stVerticalBlock\"]") ||
+      main.querySelector('[data-testid="stVerticalBlock"]')
+    );
+  }
   function collapsePreHeader() {
-    const w = window.parent || window;
-    const d = w.document;
     const main = d.querySelector('section[data-testid="stMain"]');
     if (!main) return;
-    const header = main.querySelector(".st-key-ips_page_header, .ips-app-page-header-marker");
-    if (!header) return;
-    const headerWrap =
-      header.closest('[data-testid="stElementContainer"]') ||
-      header.closest(".st-key-ips_page_header") ||
-      header;
-    const vertical = headerWrap.closest('[data-testid="stVerticalBlock"]') || main;
+    const vertical = pageRootVertical(main);
+    if (!vertical) return;
+    let headerContainer = null;
     const children = vertical.children || [];
     for (let i = 0; i < children.length; i += 1) {
       const child = children[i];
+      if (!child || !child.querySelector) continue;
+      if (
+        child.querySelector(".st-key-ips_page_header") ||
+        child.querySelector(".ips-app-page-header-marker")
+      ) {
+        headerContainer = child;
+        break;
+      }
+    }
+    if (!headerContainer) return;
+    for (let i = 0; i < children.length; i += 1) {
+      const child = children[i];
       if (!child) continue;
-      if (child === headerWrap || child.contains(headerWrap)) break;
+      if (child === headerContainer) break;
       zero(child);
     }
     const block = main.querySelector(".block-container");
@@ -68,9 +85,6 @@ def _app_shell_pre_header_cleanup_script() -> str:
   const run = function () { collapsePreHeader(); };
   run();
   w.requestAnimationFrame(run);
-  setTimeout(run, 0);
-  setTimeout(run, 120);
-  setTimeout(run, 500);
 })();
 </script>
 """

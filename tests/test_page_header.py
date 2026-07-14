@@ -140,6 +140,15 @@ class PageHeaderSourceTests(unittest.TestCase):
         self.assertNotIn("translateY", src)
         self.assertNotIn("position: absolute", src)
 
+    def test_pre_header_cleanup_targets_page_level_siblings_only(self) -> None:
+        from app.ui.app_shell_styles import _app_shell_pre_header_cleanup_script
+
+        src = _app_shell_pre_header_cleanup_script()
+        self.assertIn("pageRootVertical", src)
+        self.assertIn("stMainBlockContainer", src)
+        self.assertIn('closest(".st-key-ips_page_header")', src)
+        self.assertNotIn("setTimeout(run, 500)", src)
+
 
 class NavHistoryTests(unittest.TestCase):
     def setUp(self) -> None:

@@ -10555,7 +10555,6 @@ def inject_authenticated_shell_css() -> None:
     """Full app layout after login."""
     from app.components.sidebar_shell import inject_desktop_nav_rail_css
     from app.ui.app_shell_styles import (
-        _app_shell_pre_header_cleanup_script,
         inject_app_shell_layout_styles,
         inject_app_shell_script,
     )
@@ -10568,7 +10567,6 @@ def inject_authenticated_shell_css() -> None:
         )
         inject_app_shell_layout_styles()
         inject_page_header_styles()
-        inject_app_shell_script(_app_shell_pre_header_cleanup_script())
         inject_desktop_nav_rail_css()
 
 
