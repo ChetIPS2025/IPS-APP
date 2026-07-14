@@ -6,8 +6,8 @@ import streamlit as st
 
 from app.ui.css_inject import inject_css_once
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v22"
-IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v22"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v23"
+IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v23"
 
 
 def inject_page_header_styles() -> None:
@@ -17,7 +17,7 @@ def inject_page_header_styles() -> None:
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-page-header-styles-v22">
+<style id="ips-page-header-styles-v23">
 [class*="st-key-ips_page_header"],
 [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
@@ -153,57 +153,37 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   max-width: max-content !important;
   z-index: 4 !important;
 }
-.st-key-header_bottom_actions [data-testid="stHorizontalBlock"],
-[class*="st-key-header_bottom_actions"] [data-testid="stHorizontalBlock"] {
+[class*="st-key-header_bottom_actions"] [data-testid="stVerticalBlockBorderWrapper"] > div > [data-testid="stVerticalBlock"],
+[class*="st-key-header_bottom_actions"] > div > div > [data-testid="stVerticalBlock"] {
   display: flex !important;
+  flex-direction: row !important;
   flex-wrap: nowrap !important;
   align-items: center !important;
   justify-content: flex-end !important;
   gap: 8px !important;
   width: max-content !important;
   max-width: max-content !important;
+}
+[class*="st-key-header_bottom_actions"] [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has(.ips-header-bottom-actions-marker) {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
   margin: 0 !important;
-}
-.st-key-header_bottom_actions [data-testid="stHorizontalBlock"] > [data-testid="column"],
-[class*="st-key-header_bottom_actions"] [data-testid="stHorizontalBlock"] > [data-testid="column"] {
-  flex: 0 0 auto !important;
-  flex-shrink: 0 !important;
-  width: auto !important;
-  min-width: 0 !important;
-  max-width: none !important;
   padding: 0 !important;
-  position: relative !important;
-  overflow: visible !important;
+  overflow: hidden !important;
 }
-.st-key-header_bottom_actions [data-testid="stHorizontalBlock"] > [data-testid="column"]:has(.st-key-header_date_range),
-.st-key-header_bottom_actions [data-testid="stHorizontalBlock"] > [data-testid="column"]:has([class*="st-key-header_date_range"]),
-[class*="st-key-header_bottom_actions"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:has(.st-key-header_date_range),
-[class*="st-key-header_bottom_actions"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:has([class*="st-key-header_date_range"]) {
-  min-width: 230px !important;
-  width: 230px !important;
-  max-width: 230px !important;
-}
-.st-key-header_bottom_actions [data-testid="stHorizontalBlock"] > [data-testid="column"]:has(.st-key-header_primary_action),
-.st-key-header_bottom_actions [data-testid="stHorizontalBlock"] > [data-testid="column"]:has([class*="st-key-header_primary_action"]),
-[class*="st-key-header_bottom_actions"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:has(.st-key-header_primary_action),
-[class*="st-key-header_bottom_actions"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:has([class*="st-key-header_primary_action"]) {
-  min-width: max-content !important;
-  width: auto !important;
-  max-width: none !important;
-}
-.st-key-header_bottom_actions [data-testid="column"],
-[class*="st-key-header_bottom_actions"] [data-testid="column"] {
+[class*="st-key-header_bottom_actions"] [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] {
   flex: 0 0 auto !important;
   width: auto !important;
   min-width: 0 !important;
   max-width: none !important;
-  padding: 0 !important;
+  margin: 0 !important;
 }
 .st-key-header_bottom_actions .st-key-header_date_range,
 [class*="st-key-header_bottom_actions"] .st-key-header_date_range {
-  min-width: 230px !important;
-  max-width: 230px !important;
-  width: 230px !important;
+  min-width: max-content !important;
+  max-width: none !important;
+  width: auto !important;
   flex: 0 0 auto !important;
 }
 .st-key-header_bottom_actions .st-key-header_primary_action,
@@ -225,6 +205,26 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   width: auto !important;
   min-width: 112px !important;
   max-width: none !important;
+}
+.st-key-header_bottom_actions .st-key-header_date_range [data-testid="stDateInput"],
+[class*="st-key-header_bottom_actions"] .st-key-header_date_range [data-testid="stDateInput"] {
+  width: auto !important;
+  min-width: 260px !important;
+  max-width: 320px !important;
+}
+.st-key-header_bottom_actions .st-key-header_date_range [data-testid="stDateInput"] > div,
+[class*="st-key-header_bottom_actions"] .st-key-header_date_range [data-testid="stDateInput"] > div {
+  width: auto !important;
+  min-width: 260px !important;
+  max-width: 320px !important;
+}
+.st-key-header_bottom_actions .st-key-header_date_range [data-testid="stDateInput"] input,
+[class*="st-key-header_bottom_actions"] .st-key-header_date_range [data-testid="stDateInput"] input {
+  width: 100% !important;
+  min-width: 260px !important;
+  max-width: 320px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) > [data-testid="stHorizontalBlock"] > [data-testid="column"]:has([class*="st-key-header_bottom_actions"]) {
   width: 0 !important;

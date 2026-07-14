@@ -270,34 +270,15 @@ def _render_bottom_actions(
             '<span class="ips-header-bottom-actions-marker" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        slot_names: list[str] = []
         if show_date_range:
-            slot_names.append("date")
+            _render_date_range(
+                key=date_range_key,
+                value=date_range_value,
+                on_change=on_date_range_change,
+            )
         if primary_action is not None:
-            slot_names.append("primary")
-        if not slot_names:
-            return
-        if len(slot_names) == 2:
-            ratios = [2.2, 1.4]
-        elif slot_names[0] == "date":
-            ratios = [2.2]
-        else:
-            ratios = [1.4]
-        slot_cols = st.columns(ratios, gap="small")
-        slots = dict(zip(slot_names, slot_cols))
-
-        if show_date_range:
-            with slots["date"]:
-                _render_date_range(
-                    key=date_range_key,
-                    value=date_range_value,
-                    on_change=on_date_range_change,
-                )
-
-        if primary_action is not None:
-            with slots["primary"]:
-                with st.container(key="header_primary_action"):
-                    primary_action()
+            with st.container(key="header_primary_action"):
+                primary_action()
 
 
 def _render_trailing_actions(
