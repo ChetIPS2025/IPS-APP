@@ -12380,9 +12380,15 @@ section[data-testid="stMain"]:has(.ips-login-page-marker) .block-container {{
   padding-bottom: 2rem !important;
 }}
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVerticalBlock"] > div {{
-  padding-left: 22px;
-  padding-right: 22px;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
   padding-top: 0;
+}}
+body.ips-authed-app section[data-testid="stMain"]:has(.ips-page-shell-marker) .block-container {{
+  max-width: 100% !important;
+  width: 100% !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
 }}
 section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="stVerticalBlock"] > div {{
   padding-top: 0 !important;

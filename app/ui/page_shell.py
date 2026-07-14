@@ -14,7 +14,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-IPS_DASHBOARD_LAYOUT_KEY = "ips_dashboard_layout_injected_v7"
+IPS_DASHBOARD_LAYOUT_KEY = "ips_dashboard_layout_injected_v8"
 
 # Re-export column hiding standard (catalog / inventory / materials tables).
 from app.ui.catalog_inventory_display import (
@@ -39,7 +39,10 @@ def inject_ips_dashboard_layout() -> None:
         /* App canvas background: see theme.apply_global_app_styles() */
         section[data-testid="stMain"]:has(.ips-page-shell-marker) .block-container {
             padding-bottom: 0.7rem !important;
-            max-width: 1680px !important;
+            max-width: 100% !important;
+            width: 100% !important;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
         }
         section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"] {
             margin-bottom: 0.1rem !important;

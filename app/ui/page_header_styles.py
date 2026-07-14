@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v6"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v7"
 
 
 def inject_page_header_styles() -> None:
@@ -15,12 +15,12 @@ def inject_page_header_styles() -> None:
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-page-header-styles-v6">
+<style id="ips-page-header-styles-v7">
 [class*="st-key-ips_page_header"],
 [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
   margin: 0 0 14px 0 !important;
-  padding: clamp(18px, 2.2vw, 24px) clamp(20px, 3vw, 48px) clamp(20px, 2.4vw, 26px) !important;
+  padding: clamp(18px, 2.2vw, 24px) clamp(12px, 1.5vw, 20px) clamp(20px, 2.4vw, 26px) !important;
   min-height: 112px !important;
   background: #ffffff !important;
   border: 1px solid #e5e7eb !important;
@@ -72,10 +72,49 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   overflow: visible !important;
 }
 [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {
-  flex: 1 1 560px !important;
-  min-width: 520px !important;
+  flex: 1 1 auto !important;
+  min-width: 260px !important;
   max-width: 100% !important;
   overflow: visible !important;
+}
+[class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4):has(.st-key-header_date_range) {
+  flex: 1 1 560px !important;
+  min-width: 520px !important;
+}
+[class*="st-key-header_page_toolbar"] {
+  width: 100% !important;
+  margin-top: 12px !important;
+  padding-top: 12px !important;
+  border-top: 1px solid #e5e7eb !important;
+  box-sizing: border-box !important;
+}
+[class*="st-key-header_page_toolbar"] [data-testid="stHorizontalBlock"] {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  gap: 10px !important;
+  width: 100% !important;
+  overflow: visible !important;
+}
+[class*="st-key-header_page_toolbar"] [data-testid="column"] {
+  flex: 0 0 auto !important;
+  flex-shrink: 0 !important;
+  width: auto !important;
+  min-width: max-content !important;
+  max-width: none !important;
+}
+[class*="st-key-header_page_toolbar"] .stButton,
+[class*="st-key-header_page_toolbar"] [data-testid="stDownloadButton"] {
+  width: auto !important;
+  margin: 0 !important;
+}
+[class*="st-key-header_page_toolbar"] .stButton > button,
+[class*="st-key-header_page_toolbar"] [data-testid="stDownloadButton"] > button {
+  width: auto !important;
+  min-width: max-content !important;
+  max-width: none !important;
+  white-space: nowrap !important;
 }
 [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) > [data-testid="stHorizontalBlock"] {
   display: flex !important;

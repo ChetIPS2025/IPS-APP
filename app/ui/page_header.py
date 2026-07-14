@@ -20,7 +20,33 @@ from app.ui.page_header_styles import inject_page_header_styles
 _ActionFn = Callable[[], None]
 
 _MAIN_COLS = [0.35, 3.2, 3.5, 7.5]
-_ACTION_COLS = [2.05, 0.5, 1.55, 0.55, 0.55, 0.55, 0.75]
+_ACTION_WIDTHS: dict[str, float] = {
+    "date": 2.05,
+    "refresh": 0.5,
+    "primary": 1.55,
+    "notification": 0.55,
+    "help": 0.55,
+    "settings": 0.55,
+    "avatar": 0.82,
+}
+
+
+def _action_slot_columns(
+    *,
+    show_date_range: bool,
+    show_refresh: bool,
+    has_primary_action: bool,
+) -> tuple[list[str], list[float]]:
+    names: list[str] = []
+    if show_date_range:
+        names.append("date")
+    if show_refresh:
+        names.append("refresh")
+    if has_primary_action:
+        names.append("primary")
+    names.extend(["notification", "help", "settings", "avatar"])
+    ratios = [_ACTION_WIDTHS[name] for name in names]
+    return names, ratios
 
 
 def _resolve_icon(icon: str | None) -> str:
@@ -305,54 +331,47 @@ def render_page_header(
             st.markdown(title_html, unsafe_allow_html=True)
 
         with actions_col:
-            (
-                date_col,
-                refresh_col,
-                primary_col,
-                notification_col,
-                help_col,
-                settings_col,
-                avatar_col,
-            ) = st.columns(
-                _ACTION_COLS,
+            slot_names, slot_ratios = _action_slot_columns(
+                show_date_range=show_date_range,
+                show_refresh=show_refresh,
+                has_primary_action=primary_action is not None,
+            )
+            slot_cols = st.columns(
+                slot_ratios,
                 gap="small",
                 vertical_alignment="center",
             )
+            slots = dict(zip(slot_names, slot_cols))
 
-            with date_col:
-                if show_date_range:
+            if show_date_range:
+                with slots["date"]:
                     _render_date_range(
                         key=date_range_key,
                         value=date_range_value,
                         on_change=on_date_range_change,
                     )
 
-            with refresh_col:
-                if show_refresh:
+            if show_refresh:
+                with slots["refresh"]:
                     _render_refresh(key=refresh_key)
 
-            with primary_col:
-                if extra_actions:
-                    extra_cols = st.columns([1.0] * len(extra_actions), gap="small")
-                    for col, action in zip(extra_cols, extra_actions):
-                        with col:
-                            action()
-                if primary_action:
+            if primary_action:
+                with slots["primary"]:
                     with st.container(key="header_primary_action"):
                         primary_action()
 
             role, display, initials, sign_out_fn = _header_auth_context()
 
-            with notification_col:
+            with slots["notification"]:
                 _render_bell(header_key=header_key, role=role)
 
-            with help_col:
+            with slots["help"]:
                 _render_help(header_key=header_key)
 
-            with settings_col:
+            with slots["settings"]:
                 _render_settings(header_key=header_key, role=role)
 
-            with avatar_col:
+            with slots["avatar"]:
                 _render_user_menu(
                     header_key=header_key,
                     role=role,
@@ -360,6 +379,11 @@ def render_page_header(
                     initials=initials,
                     sign_out=sign_out_fn,
                 )
+
+        if extra_actions:
+            with st.container(key="header_page_toolbar"):
+                for action_fn in extra_actions:
+                    action_fn()
 
     from app.ui.app_shell_styles import (
         _app_shell_pre_header_cleanup_script,

@@ -61,7 +61,8 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.ui.page_header_styles import inject_page_header_styles
 
         src = inspect.getsource(inject_page_header_styles)
-        self.assertIn("ips-page-header-styles-v6", src)
+        self.assertIn("ips-page-header-styles-v7", src)
+        self.assertIn("st-key-header_page_toolbar", src)
         self.assertIn('[class*="st-key-ips_page_header"]', src)
         self.assertIn(".st-key-header_primary_action", src)
         self.assertNotIn("position: absolute", src)
@@ -139,6 +140,17 @@ class PageHeaderSourceTests(unittest.TestCase):
         self.assertNotIn("margin-top: -", src)
         self.assertNotIn("translateY", src)
         self.assertNotIn("position: absolute", src)
+
+    def test_page_header_uses_dynamic_action_slots(self) -> None:
+        from app.ui.page_header import _action_slot_columns
+
+        names, ratios = _action_slot_columns(
+            show_date_range=False,
+            show_refresh=False,
+            has_primary_action=False,
+        )
+        self.assertEqual(names, ["notification", "help", "settings", "avatar"])
+        self.assertEqual(len(ratios), 4)
 
     def test_page_header_uses_slug_specific_container_key(self) -> None:
         from app.ui.page_header import render_page_header

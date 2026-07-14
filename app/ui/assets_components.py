@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v36"
+IPS_ASSETS_PAGE_STYLES_KEY = "ips_assets_page_styles_v37"
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),
@@ -71,12 +71,17 @@ def inject_assets_page_styles() -> None:
             display: none !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
+        [class*="st-key-header_page_toolbar"]:has(.ips-assets-page-header-actions),
+        section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions) {
             align-items: flex-end !important;
             justify-content: flex-end !important;
             min-width: 0 !important;
             overflow-x: auto !important;
         }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [class*="st-key-header_page_toolbar"]:has(.ips-assets-page-header-actions)
+        [data-testid="stHorizontalBlock"],
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions)
         [data-testid="stHorizontalBlock"] {
@@ -89,6 +94,9 @@ def inject_assets_page_styles() -> None:
             max-width: 100% !important;
             margin-left: auto !important;
         }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [class*="st-key-header_page_toolbar"]:has(.ips-assets-page-header-actions)
+        [data-testid="stHorizontalBlock"] > [data-testid="column"],
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions)
         [data-testid="stHorizontalBlock"] > [data-testid="column"] {
@@ -128,14 +136,22 @@ def inject_assets_page_styles() -> None:
             background: #ffffff !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
+        [class*="st-key-header_page_toolbar"]:has(.ips-assets-page-header-actions) .stButton,
+        section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions) .stButton,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [class*="st-key-header_page_toolbar"]:has(.ips-assets-page-header-actions) [data-testid="stDownloadButton"],
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions) [data-testid="stDownloadButton"] {
             margin: 0 !important;
             width: auto !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
+        [class*="st-key-header_page_toolbar"]:has(.ips-assets-page-header-actions) .stButton > button,
+        section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions) .stButton > button,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        [class*="st-key-header_page_toolbar"]:has(.ips-assets-page-header-actions) [data-testid="stDownloadButton"] > button,
         section[data-testid="stMain"]:has(.ips-assets-page)
         [data-testid="column"]:has(.ips-assets-page-header-actions) [data-testid="stDownloadButton"] > button {
             width: auto !important;
