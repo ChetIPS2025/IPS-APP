@@ -10,6 +10,7 @@ import streamlit as st
 
 from app.auth import current_role, effective_role
 from app.pages._core._crud import is_demo_id
+from app.ui.streamlit_perf import fragment_rerun, ips_app_rerun
 from app.services.estimate_job_workflow_service import (
     can_approve_estimates,
     estimate_status_approvable,
@@ -580,7 +581,7 @@ def handle_estimates_table_action(
         if eid not in estimates_by_id:
             return
         st.session_state[pending_approve_key] = eid
-        st.rerun()
+        fragment_rerun()
         return
 
     eid = val.split(":", 1)[1].strip() if val.startswith("open:") else val
@@ -588,11 +589,11 @@ def handle_estimates_table_action(
         return
     if open_estimate_fn is not None:
         open_estimate_fn(eid, estimates_by_id.get(eid))
-        st.rerun()
+        ips_app_rerun()
         return
     from app.navigation import navigate_to_estimate_detail
     navigate_to_estimate_detail(eid)
-    st.rerun()
+    ips_app_rerun()
 
 
 def render_estimates_table_open_buttons(

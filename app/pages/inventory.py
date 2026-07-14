@@ -93,6 +93,7 @@ from app.services.catalog_stock_policy_service import (
     passes_inventory_view_filter,
 )
 from app.styles import inject_inventory_module_css
+from app.ui.streamlit_perf import fragment, fragment_rerun, ips_app_rerun
 from app.utils.formatting import fmt_currency, fmt_date
 from app.utils.inventory_quantity import format_inventory_quantity, inventory_qty_input_kwargs
 from app.utils.phone_helpers import format_phone_display
@@ -371,6 +372,7 @@ def _open_inventory_modal(record_id: str, record: dict | None) -> None:
 def _open_inventory_table_item(item_id: str, item: dict | None = None) -> None:
     """Set selected inventory state; the page render opens the dialog once."""
     _open_inventory_modal(item_id, item)
+    ips_app_rerun()
 
 
 def _inventory_select_options(slug: str, current: str) -> list[str]:
@@ -756,6 +758,62 @@ def _sync_inventory_export_cache(filtered: list[dict]) -> str:
     return cache_key
 
 
+@fragment
+def _render_inventory_items_fragment(
+    rows: list[dict],
+    *,
+    filter_options: dict[str, list[str]],
+) -> None:
+    """Inventory items tab — filters and table with local reruns."""
+
+    def _filters() -> None:
+        c1, c2, c3 = st.columns([3.2, 2.2, 0.6])
+        with c1:
+            st.text_input(
+                "Search",
+                placeholder="Search SKU, name, category, vendor…",
+                key="inv_search",
+                label_visibility="collapsed",
+            )
+        with c2:
+            st.selectbox(
+                "Stock view",
+                list(INVENTORY_VIEW_FILTERS),
+                key="inv_stock_view",
+                label_visibility="collapsed",
+            )
+        with c3:
+            if st.button("Clear", key="inv_clear", use_container_width=True):
+                clear_table_filters(
+                    _TABLE_KEY,
+                    _FILTER_FIELDS,
+                    extra_keys=["inv_search", "inv_stock_view"],
+                )
+                st.session_state["inv_stock_view"] = "In stock"
+                reset_table_page(_TABLE_KEY)
+                _clear_inventory_selection(st.session_state.get(_ALL_INVENTORY_IDS_KEY))
+                clear_field_expanded(FIELD_EXPANDED_INVENTORY_KEY)
+                fragment_rerun()
+
+    render_inventory_filter_bar_shell()
+    layout_filter_bar(_filters)
+    close_inventory_filter_bar_shell()
+
+    filtered = _filter_rows(
+        rows,
+        q=str(st.session_state.get("inv_search") or "").strip(),
+        stock_view=str(st.session_state.get("inv_stock_view") or "In stock"),
+    )
+
+    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="item")
+    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
+
+    build_modal_cache(filtered, cache_key=_CACHE_KEY)
+    _render_custom_inventory_table(page_rows, filter_options=filter_options)
+
+    render_table_pagination_footer(len(filtered), _TABLE_KEY)
+
+
 def render() -> None:
     from app.pages._core._access import begin_module
     if not begin_module("inventory"):
@@ -909,55 +967,10 @@ def render() -> None:
                     st.success("Inventory item saved.")
                     st.rerun()
 
-    def _filters() -> None:
-        c1, c2, c3 = st.columns([3.2, 2.2, 0.6])
-        with c1:
-            st.text_input(
-                "Search",
-                placeholder="Search inventory...",
-                key="inv_search",
-                label_visibility="collapsed",
-            )
-        with c2:
-            st.selectbox(
-                "Stock view",
-                list(INVENTORY_VIEW_FILTERS),
-                key="inv_stock_view",
-                label_visibility="collapsed",
-            )
-        with c3:
-            if st.button("Clear", key="inv_clear", use_container_width=True):
-                clear_table_filters(
-                    _TABLE_KEY,
-                    _FILTER_FIELDS,
-                    extra_keys=["inv_search", "inv_stock_view"],
-                )
-                st.session_state["inv_stock_view"] = "In stock"
-                reset_table_page(_TABLE_KEY)
-                _clear_inventory_selection(st.session_state.get(_ALL_INVENTORY_IDS_KEY))
-                clear_field_expanded(FIELD_EXPANDED_INVENTORY_KEY)
-                st.rerun()
-
     tab_items, tab_qr_history = st.tabs(["Items", "QR Scan History"])
 
     with tab_items:
-        render_inventory_filter_bar_shell()
-        layout_filter_bar(_filters)
-        close_inventory_filter_bar_shell()
-
-        filtered = _filter_rows(
-            rows,
-            q=str(st.session_state.get("inv_search") or "").strip(),
-            stock_view=str(st.session_state.get("inv_stock_view") or "In stock"),
-        )
-
-        render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="item")
-        page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
-
-        build_modal_cache(filtered, cache_key=_CACHE_KEY)
-        _render_custom_inventory_table(page_rows, filter_options=filter_options)
-
-        render_table_pagination_footer(len(filtered), _TABLE_KEY)
+        _render_inventory_items_fragment(rows, filter_options=filter_options)
 
     with tab_qr_history:
         inject_qr_scan_history_css()

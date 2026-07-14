@@ -81,7 +81,7 @@ from app.services.customers_service import (
     update_customer_location,
 )
 from app.styles import inject_customers_module_css
-from app.ui.streamlit_perf import fragment
+from app.ui.streamlit_perf import fragment, fragment_rerun
 _SEL = select_key("customers")
 _LOC_SEL = select_key("customer_locations")
 _CT_SEL = select_key("customer_contacts")
@@ -2508,6 +2508,54 @@ def _show_contact_detail_modal() -> None:
 # --- Page render ---
 
 
+@fragment
+def _render_customers_catalog_fragment(
+    all_rows: list[dict],
+    *,
+    filter_options: dict[str, list[str]],
+) -> None:
+    """Customers search, filters, and list table — local reruns for list interactions."""
+
+    def _filters() -> None:
+        c1, c2 = st.columns([5.4, 0.6])
+        with c1:
+            st.text_input(
+                "Search",
+                placeholder="Search company, customer #, city, email…",
+                key="cust_search",
+                label_visibility="collapsed",
+            )
+        with c2:
+            if st.button("Clear", key="cust_clear", use_container_width=True):
+                clear_table_filters(
+                    _CUSTOMERS_TABLE_KEY,
+                    _CUSTOMER_BAR_FILTER_FIELDS,
+                    extra_keys=["cust_search"],
+                )
+                reset_table_page(_CUSTOMERS_TABLE_KEY)
+                _clear_customer_selection(st.session_state.get(_ALL_CUSTOMER_IDS_KEY))
+                fragment_rerun()
+
+    render_customers_filter_bar_shell()
+    layout_filter_bar(_filters)
+    close_customers_filter_bar_shell()
+
+    search_q = str(st.session_state.get("cust_search") or "").strip()
+    filtered = _filter_customers(all_rows, q=search_q)
+
+    render_table_pagination_header(len(filtered), _CUSTOMERS_TABLE_KEY, item_label="customer")
+    page_rows, _, _, _ = paginate_rows(filtered, _CUSTOMERS_TABLE_KEY)
+
+    build_modal_cache(filtered, cache_key=_CUSTOMERS_CACHE_KEY)
+    _render_customers_list_table(
+        page_rows,
+        filter_options=filter_options,
+        total_count=len(all_rows),
+        search=search_q,
+    )
+    render_table_pagination_footer(len(filtered), _CUSTOMERS_TABLE_KEY)
+
+
 def render() -> None:
     from app.pages._core._access import begin_module
     if not begin_module("customers"):
@@ -2592,41 +2640,4 @@ def render() -> None:
                     st.session_state.pop("ips_cust_form", None)
                     st.rerun()
 
-    def _filters() -> None:
-        c1, c2 = st.columns([5.4, 0.6])
-        with c1:
-            st.text_input(
-                "Search",
-                placeholder="Search company, customer #, city, email…",
-                key="cust_search",
-                label_visibility="collapsed",
-            )
-        with c2:
-            if st.button("Clear", key="cust_clear", use_container_width=True):
-                clear_table_filters(
-                    _CUSTOMERS_TABLE_KEY,
-                    _CUSTOMER_BAR_FILTER_FIELDS,
-                    extra_keys=["cust_search"],
-                )
-                reset_table_page(_CUSTOMERS_TABLE_KEY)
-                _clear_customer_selection(st.session_state.get(_ALL_CUSTOMER_IDS_KEY))
-                st.rerun()
-
-    render_customers_filter_bar_shell()
-    layout_filter_bar(_filters)
-    close_customers_filter_bar_shell()
-
-    search_q = str(st.session_state.get("cust_search") or "").strip()
-    filtered = _filter_customers(all_rows, q=search_q)
-
-    render_table_pagination_header(len(filtered), _CUSTOMERS_TABLE_KEY, item_label="customer")
-    page_rows, _, _, _ = paginate_rows(filtered, _CUSTOMERS_TABLE_KEY)
-
-    build_modal_cache(filtered, cache_key=_CUSTOMERS_CACHE_KEY)
-    _render_customers_list_table(
-        page_rows,
-        filter_options=filter_options,
-        total_count=len(all_rows),
-        search=search_q,
-    )
-    render_table_pagination_footer(len(filtered), _CUSTOMERS_TABLE_KEY)
+    _render_customers_catalog_fragment(all_rows, filter_options=filter_options)

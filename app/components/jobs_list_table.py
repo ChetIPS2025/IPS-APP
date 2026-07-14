@@ -10,6 +10,7 @@ import streamlit as st
 
 from app.components.job_status_ui import job_status_pill_html, job_status_table_label
 from app.services.jobs_service import can_manage_job_actions
+from app.ui.streamlit_perf import fragment_rerun, ips_app_rerun
 JOBS_TABLE_LAST_ACTION_KEY = "jobs_list_last_action"
 JOBS_TABLE_PENDING_STATUS_KEY = "jobs_table_pending_status_id"
 JOBS_TABLE_PENDING_MENU_KEY = "jobs_table_pending_menu_id"
@@ -389,7 +390,7 @@ def handle_jobs_table_action(
         if job_id in jobs_by_id:
             st.session_state[pending_status_key] = job_id
             st.session_state.pop(pending_menu_key, None)
-            st.rerun()
+            fragment_rerun()
         return
 
     if val.startswith("menu:"):
@@ -397,7 +398,7 @@ def handle_jobs_table_action(
         if job_id in jobs_by_id:
             st.session_state[pending_menu_key] = job_id
             st.session_state.pop(pending_status_key, None)
-            st.rerun()
+            fragment_rerun()
         return
 
     if val.startswith("expand:"):
@@ -405,7 +406,7 @@ def handle_jobs_table_action(
         job = jobs_by_id.get(job_id)
         if job and on_expand_fn is not None:
             on_expand_fn(job_id, job)
-            st.rerun()
+            fragment_rerun()
         return
 
     job_id = val.split(":", 1)[1].strip() if val.startswith("open:") else val
@@ -418,7 +419,7 @@ def handle_jobs_table_action(
     st.session_state.pop(pending_menu_key, None)
     st.session_state[JOBS_TABLE_PENDING_OPEN_KEY] = job_id
     open_job_fn(job_id, open_job)
-    st.rerun()
+    ips_app_rerun()
 
 
 def render_jobs_table_open_buttons(

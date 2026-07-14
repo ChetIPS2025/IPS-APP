@@ -88,6 +88,7 @@ from app.ui.assets_components import (
     status_badge_html,
     summary_card_html,
 )
+from app.ui.streamlit_perf import fragment, fragment_rerun, ips_app_rerun
 from app.utils.formatting import fmt_currency, fmt_date
 from app.services.asset_rental_service import (
     RENTAL_RATE_UNITS,
@@ -735,7 +736,7 @@ def _render_asset_expand_panel(asset: dict) -> None:
     st.markdown('<div class="ips-nav-name-button">', unsafe_allow_html=True)
     if st.button("Full asset details", key=f"ast_full_modal_{aid}", use_container_width=True):
         _open_assets_detail_modal(aid, asset)
-        st.rerun()
+        ips_app_rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -966,9 +967,11 @@ def _equipment_summary_counts(rows: list[dict]) -> dict[str, int]:
     return counts
 
 
+@fragment
 def _render_equipment_list(
     rows: list[dict],
 ) -> None:
+    """Equipment tab filters and table — local reruns avoid full page reload."""
     equipment_rows = [r for r in rows if is_equipment_tab_asset(r)]
     filter_options = build_filter_options(equipment_rows, _COLUMN_FILTER_SPECS)
     status_options = sorted(
@@ -1002,7 +1005,7 @@ def _render_equipment_list(
                 reset_table_page(_TABLE_KEY)
                 _clear_asset_selection(st.session_state.get(_ALL_ASSET_IDS_KEY))
                 clear_field_expanded(FIELD_EXPANDED_ASSET_KEY)
-                st.rerun()
+                fragment_rerun()
 
     render_assets_filter_bar_shell()
     layout_filter_bar(_filters)
@@ -1031,7 +1034,9 @@ def _render_equipment_list(
     render_table_pagination_footer(len(filtered), _TABLE_KEY)
 
 
+@fragment
 def _render_small_tools_list(rows: list[dict]) -> None:
+    """Serialized tools tab filters and table — local reruns avoid full page reload."""
     assets_by_id, employees_by_id, jobs_by_id = _small_tool_context_maps(rows)
     small_tool_rows = _build_serialized_tool_list(rows)
     enriched_rows = [
@@ -1090,7 +1095,7 @@ def _render_small_tools_list(rows: list[dict]) -> None:
                 st.session_state["ast_st_status"] = "All Statuses"
                 reset_table_page(_SMALL_TOOLS_TABLE_KEY)
                 _clear_small_tool_selection(st.session_state.get(_ALL_SMALL_TOOL_IDS_KEY))
-                st.rerun()
+                fragment_rerun()
 
     render_assets_filter_bar_shell()
     layout_filter_bar(_filters)

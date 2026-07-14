@@ -69,6 +69,7 @@ from app.utils.field_context import get_field_job_id, is_field_context, is_field
 from app.utils.formatting import fmt_date
 from app.ui.streamlit_perf import (
     fragment,
+    fragment_rerun,
     inject_scroll_preserve,
     ips_app_rerun,
 )
@@ -3585,7 +3586,7 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
                         if st.button("No", key=f"tk_day_no_{eid}_{week_sig}_{i}", use_container_width=True):
                             action_taken = _handle_day_reject(emp, week_start_d, i)
             if action_taken:
-                st.rerun()
+                fragment_rerun()
         with c[8]:
             grid[i]["notes"] = st.text_input(
                 "Notes",
@@ -3604,7 +3605,7 @@ def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
                 grid[i]["notes"] = ""
                 grid[i]["status"] = "Draft"
                 st.session_state[gk] = grid
-                st.rerun()
+                fragment_rerun()
     st.session_state[gk] = grid
 
 
@@ -3897,7 +3898,7 @@ def _render_list_allocation_detail(
             if _save_allocation_week(emp, week_start_d, show_message=False)[0] and _submit_timekeeping_week(
                 emp, week_start_d
             ):
-                st.rerun()
+                fragment_rerun()
         if week_status == "Pending" and can_approve:
             reject_notes = st.text_input(
                 "Rejection notes (optional)",
@@ -3914,7 +3915,7 @@ def _render_list_allocation_detail(
                     use_container_width=True,
                 ):
                     if _approve_timekeeping_week(emp, week_start_d):
-                        st.rerun()
+                        fragment_rerun()
             with reject_col:
                 if st.button(
                     "Reject",
@@ -3922,7 +3923,7 @@ def _render_list_allocation_detail(
                     use_container_width=True,
                 ):
                     if _reject_timekeeping_week(emp, week_start_d, reject_notes):
-                        st.rerun()
+                        fragment_rerun()
         elif week_status == "Pending":
             st.caption("Pending approval — waiting for an administrator to approve or reject.")
         st.caption(
@@ -3977,14 +3978,14 @@ def _render_daily_entries_tab(emp: dict, week_start_d: date) -> None:
     with action_left:
         if st.button("Save Hours", key=f"tk_save_hours_{record_key}", type="primary"):
             if _save_timekeeping_week(emp, week_start_d):
-                st.rerun()
+                fragment_rerun()
     with action_right:
         if _can_submit_timekeeping() and week_status in ("Draft", "Rejected") and st.button(
             "Submit All for Approval",
             key=f"tk_submit_{record_key}",
         ):
             if _submit_timekeeping_week(emp, week_start_d):
-                st.rerun()
+                fragment_rerun()
     st.caption(
         "Enter hours on the grid, assign jobs per day, then submit each day or the full week."
     )
@@ -4019,11 +4020,11 @@ def _render_approval_tab(emp: dict, week_start_d: date) -> None:
         with approve_col:
             if st.button("Approve Timecard", key=f"tk_approve_{record_session_key(emp, 'id')}", type="primary"):
                 if _approve_timekeeping_week(emp, week_start_d):
-                    st.rerun()
+                    fragment_rerun()
         with reject_col:
             if st.button("Reject Timecard", key=f"tk_reject_{record_session_key(emp, 'id')}"):
                 if _reject_timekeeping_week(emp, week_start_d, reject_notes):
-                    st.rerun()
+                    fragment_rerun()
     elif status == "Pending":
         st.caption("Submitted for approval. An administrator can approve or reject from the expanded list row or below.")
     elif status == "Draft":
@@ -4792,23 +4793,25 @@ def _render_timekeeping_employee_row_body(
     )
 
 
+@fragment
 def _render_timekeeping_employee_row_fragment(
     row: dict,
     *,
     week_start_d: date,
     days: list[date],
 ) -> None:
-    """One employee list row — always compact; day edits open a modal dialog."""
+    """One employee list row — local reruns when day cells update this row."""
     _render_timekeeping_employee_row_body(row, week_start_d=week_start_d, days=days)
 
 
+@fragment
 def _render_timekeeping_table_area(
     filtered: list[dict],
     *,
     filter_options: dict[str, list[str]],
     week_start_d: date,
 ) -> list[str]:
-    """Weekly grid table with pagination."""
+    """Weekly grid table with pagination — local reruns for filters and paging."""
     if not filtered:
         st.info("No timecards match your filters.")
         st.session_state[_ALL_TIMECARD_IDS_KEY] = []

@@ -8,6 +8,8 @@ from typing import Any
 
 import streamlit as st
 
+from app.ui.streamlit_perf import fragment_rerun, ips_app_rerun
+
 from app.services.inventory_images import inventory_thumbnail_html
 from app.utils.formatting import fmt_currency
 from app.utils.inventory_quantity import format_inventory_quantity
@@ -332,7 +334,7 @@ def handle_inventory_table_action(
         item = items_by_id.get(item_id)
         if item and on_expand_fn is not None:
             on_expand_fn(item_id, item)
-            st.rerun()
+            fragment_rerun()
         return
 
     item_id = val.split(":", 1)[1].strip() if val.startswith("open:") else val
@@ -342,7 +344,7 @@ def handle_inventory_table_action(
     if not item:
         return
     open_item_fn(item_id, item)
-    st.rerun()
+    ips_app_rerun()
 
 
 def render_inventory_table_open_buttons(

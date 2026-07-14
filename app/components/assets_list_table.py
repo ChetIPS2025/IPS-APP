@@ -8,6 +8,8 @@ from typing import Any
 
 import streamlit as st
 
+from app.ui.streamlit_perf import fragment_rerun, ips_app_rerun
+
 from app.services.catalog_images import catalog_thumbnail_html
 from app.services.phase2_modules_service import asset_is_rentable
 from app.services.status_maps import normalize_asset_status
@@ -329,7 +331,7 @@ def handle_assets_table_action(
         asset = assets_by_id.get(asset_id)
         if asset and on_expand_fn is not None:
             on_expand_fn(asset_id, asset)
-            st.rerun()
+            fragment_rerun()
         return
 
     asset_id = val.split(":", 1)[1].strip() if val.startswith("open:") else val
@@ -339,7 +341,7 @@ def handle_assets_table_action(
     if not asset:
         return
     open_asset_fn(asset_id, asset)
-    st.rerun()
+    ips_app_rerun()
 
 
 def render_assets_table_open_buttons(

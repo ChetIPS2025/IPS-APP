@@ -35,6 +35,11 @@ def fragment_rerun() -> None:
         st.rerun()
 
 
+def ips_open_rerun() -> None:
+    """Rerun the full app after navigation or opening a dialog outside the fragment."""
+    ips_app_rerun()
+
+
 def inject_scroll_preserve(marker: str) -> None:
     """Persist main-window scroll across Streamlit reruns (sessionStorage)."""
     sk = f"ips_scroll_preserve_injected_{marker}"

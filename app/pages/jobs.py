@@ -119,7 +119,7 @@ from app.utils.field_context import (
     set_field_job_id,
     toggle_field_expanded,
 )
-from app.ui.streamlit_perf import fragment, ips_app_rerun
+from app.ui.streamlit_perf import fragment, fragment_rerun, ips_app_rerun
 _SEL = select_key("jobs")
 _TABLE_KEY = "jobs_list"
 _JOBS_MODAL_KEY = "ips_jobs_detail_modal_id"
@@ -1039,6 +1039,99 @@ def _render_jobs_list_fragment(
     )
 
 
+@fragment
+def _render_jobs_catalog_fragment(
+    all_jobs: list[dict],
+    *,
+    filter_options: dict[str, list[str]],
+) -> None:
+    """Jobs filters, summary cards, and table — local reruns avoid full page reload."""
+
+    def _filters() -> None:
+        c1, c2 = st.columns([9, 1], gap="small")
+        with c1:
+            st.text_input(
+                "Search",
+                placeholder="Search job #, project, customer, supervisor…",
+                key="jobs_search",
+                label_visibility="collapsed",
+            )
+        with c2:
+            if st.button("Clear", key="jobs_clear", use_container_width=True):
+                clear_table_filters(
+                    _TABLE_KEY,
+                    _JOB_BAR_FILTER_FIELDS,
+                    extra_keys=["jobs_search", "jobs_view"],
+                )
+                st.session_state["jobs_view"] = _JOBS_DEFAULT_VIEW
+                reset_table_page(_TABLE_KEY)
+                _clear_job_selection()
+                clear_field_expanded(FIELD_EXPANDED_JOB_KEY)
+                fragment_rerun()
+
+    subjob_counts = _load_open_subjob_counts()
+    filtered = _filter_jobs(
+        all_jobs,
+        q=str(st.session_state.get("jobs_search") or "").strip(),
+        view=str(st.session_state.get("jobs_view") or _JOBS_DEFAULT_VIEW),
+    )
+
+    render_jobs_filter_bar_shell()
+    layout_filter_bar(_filters)
+    close_jobs_filter_bar_shell()
+    render_jobs_view_navigation(
+        _JOBS_VIEW_OPTIONS,
+        session_key="jobs_view",
+        default=_JOBS_DEFAULT_VIEW,
+    )
+
+    summary = _jobs_summary_counts(filtered, subjob_counts)
+    render_jobs_summary_cards(
+        total=int(summary["total"]),
+        active=int(summary["active"]),
+        on_hold=int(summary["on_hold"]),
+        completed=int(summary["completed"]),
+        open_subjobs=int(summary["open_subjobs"]),
+        total_contract=float(summary["total_contract"]),
+        total_actual=float(summary["total_actual"]),
+        total_profit=float(summary["total_profit"]),
+        avg_profit_pct=float(summary["avg_profit_pct"]),
+        has_contract_data=bool(summary.get("has_any_contract")),
+    )
+    render_jobs_summary_badge_bar(
+        total=int(summary["total"]),
+        active=int(summary["active"]),
+        on_hold=int(summary["on_hold"]),
+        open_subjobs=int(summary["open_subjobs"]),
+        total_contract=float(summary["total_contract"]),
+        has_contract_data=bool(summary.get("has_any_contract")),
+    )
+    render_jobs_table_pagination_header(len(filtered), _TABLE_KEY)
+    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
+
+    modal_cache = {
+        str(job.get("id") or "").strip(): job
+        for job in filtered
+        if str(job.get("id") or "").strip()
+    }
+    selected_job_id = str(st.session_state.get(SELECTED_JOB_KEY) or "").strip()
+    if selected_job_id and st.session_state.get(SHOW_MODAL_KEY):
+        for job in all_jobs:
+            if str(job.get("id") or "").strip() == selected_job_id:
+                modal_cache[selected_job_id] = job
+                break
+    st.session_state[CACHE_KEY] = modal_cache
+
+    _render_jobs_list_fragment(
+        page_rows,
+        filter_options=filter_options,
+        cost_cache=jobs_list_cost_cache(filtered),
+        subjob_counts=subjob_counts,
+    )
+
+    render_jobs_pagination_footer(len(filtered), _TABLE_KEY, item_label="job")
+
+
 def _jobs_table_cost_payload(job: dict, *, cost_cache: dict[str, dict[str, float | dict | bool]]) -> dict[str, Any]:
     costs = _job_list_cost_fields(job, cost_cache=cost_cache)
     return dict(costs)
@@ -1085,7 +1178,7 @@ def _render_jobs_table_pending_panels(
         with panel_cols[1]:
             if st.button("Close", key=f"jobs_status_panel_close_{status_jid}", use_container_width=True):
                 st.session_state.pop(JOBS_TABLE_PENDING_STATUS_KEY, None)
-                st.rerun()
+                fragment_rerun()
 
     menu_jid = str(st.session_state.get(JOBS_TABLE_PENDING_MENU_KEY) or "").strip()
     if menu_jid and menu_jid in jobs_by_id:
@@ -1106,7 +1199,7 @@ def _render_jobs_table_pending_panels(
         )
         if st.button("Close", key=f"jobs_menu_panel_close_{menu_jid}", use_container_width=False):
             st.session_state.pop(JOBS_TABLE_PENDING_MENU_KEY, None)
-            st.rerun()
+            fragment_rerun()
 
 
 def _on_jobs_table_expand(job_id: str, job: dict) -> None:
@@ -2934,89 +3027,7 @@ def _render_jobs_page() -> None:
                 else:
                     _show_job_persist_error(msg, dev_detail)
 
-    def _filters() -> None:
-        c1, c2 = st.columns([9, 1], gap="small")
-        with c1:
-            st.text_input(
-                "Search",
-                placeholder="Search job #, project, customer, supervisor…",
-                key="jobs_search",
-                label_visibility="collapsed",
-            )
-        with c2:
-            if st.button("Clear", key="jobs_clear", use_container_width=True):
-                clear_table_filters(
-                    _TABLE_KEY,
-                    _JOB_BAR_FILTER_FIELDS,
-                    extra_keys=["jobs_search", "jobs_view"],
-                )
-                st.session_state["jobs_view"] = _JOBS_DEFAULT_VIEW
-                reset_table_page(_TABLE_KEY)
-                _clear_job_selection()
-                clear_field_expanded(FIELD_EXPANDED_JOB_KEY)
-                st.rerun()
-
-    subjob_counts = _load_open_subjob_counts()
-    filtered = _filter_jobs(
-        all_jobs,
-        q=str(st.session_state.get("jobs_search") or "").strip(),
-        view=str(st.session_state.get("jobs_view") or _JOBS_DEFAULT_VIEW),
-    )
-
-    render_jobs_filter_bar_shell()
-    layout_filter_bar(_filters)
-    close_jobs_filter_bar_shell()
-    render_jobs_view_navigation(
-        _JOBS_VIEW_OPTIONS,
-        session_key="jobs_view",
-        default=_JOBS_DEFAULT_VIEW,
-    )
-
-    summary = _jobs_summary_counts(filtered, subjob_counts)
-    render_jobs_summary_cards(
-        total=int(summary["total"]),
-        active=int(summary["active"]),
-        on_hold=int(summary["on_hold"]),
-        completed=int(summary["completed"]),
-        open_subjobs=int(summary["open_subjobs"]),
-        total_contract=float(summary["total_contract"]),
-        total_actual=float(summary["total_actual"]),
-        total_profit=float(summary["total_profit"]),
-        avg_profit_pct=float(summary["avg_profit_pct"]),
-        has_contract_data=bool(summary.get("has_any_contract")),
-    )
-    render_jobs_summary_badge_bar(
-        total=int(summary["total"]),
-        active=int(summary["active"]),
-        on_hold=int(summary["on_hold"]),
-        open_subjobs=int(summary["open_subjobs"]),
-        total_contract=float(summary["total_contract"]),
-        has_contract_data=bool(summary.get("has_any_contract")),
-    )
-    render_jobs_table_pagination_header(len(filtered), _TABLE_KEY)
-    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
-
-    modal_cache = {
-        str(job.get("id") or "").strip(): job
-        for job in filtered
-        if str(job.get("id") or "").strip()
-    }
-    selected_job_id = str(st.session_state.get(SELECTED_JOB_KEY) or "").strip()
-    if selected_job_id and st.session_state.get(SHOW_MODAL_KEY):
-        for job in all_jobs:
-            if str(job.get("id") or "").strip() == selected_job_id:
-                modal_cache[selected_job_id] = job
-                break
-    st.session_state[CACHE_KEY] = modal_cache
-
-    _render_jobs_list_fragment(
-        page_rows,
-        filter_options=filter_options,
-        cost_cache=jobs_list_cost_cache(filtered),
-        subjob_counts=subjob_counts,
-    )
-
-    render_jobs_pagination_footer(len(filtered), _TABLE_KEY, item_label="job")
+    _render_jobs_catalog_fragment(all_jobs, filter_options=filter_options)
 
     if st.session_state.get(SHOW_MODAL_KEY) or str(st.session_state.get(_JOBS_MODAL_KEY) or "").strip():
         show_modal_if_pending(_JOBS_MODAL_KEY, _show_jobs_detail_modal)

@@ -121,7 +121,7 @@ from app.services.estimate_expiration_service import (
     format_effective_expiration,
     format_estimate_date,
 )
-from app.ui.streamlit_perf import fragment
+from app.ui.streamlit_perf import fragment, fragment_rerun, ips_app_rerun
 _SEL = select_key("estimates")
 _MOD = "estimates"
 _TABLE_KEY = "estimates_list"
@@ -627,7 +627,7 @@ def _open_estimate_from_list(est: dict) -> None:
     if not eid:
         return
     _activate_estimate_detail_modal(eid, est)
-    st.rerun()
+    ips_app_rerun()
 
 
 def _render_estimates_table_column_filters(
@@ -1789,51 +1789,9 @@ def _export_estimates_csv(rows: list[dict]) -> str:
     return buf.getvalue()
 
 
-def render() -> None:
-    from app.pages._core._access import begin_module
-    if not begin_module("estimates"):
-        return
-
-    if st.session_state.get(ESTIMATES_MODE_KEY) == "detail" and st.session_state.get(SELECTED_ESTIMATE_KEY):
-        inject_estimates_module_css()
-        inject_estimates_page_layout_css()
-        render_estimate_detail(str(st.session_state[SELECTED_ESTIMATE_KEY]))
-        st.stop()
-
-    rows = load_estimates()
-
-    def _estimates_header_actions() -> None:
-        st.markdown(
-            '<span class="ips-estimates-page-header-actions ips-page-header-inline-actions" aria-hidden="true"></span>',
-            unsafe_allow_html=True,
-        )
-        export_col, new_col = st.columns(2, gap="small")
-        with export_col:
-            if st.button("Export", key="est_export", use_container_width=True):
-                st.session_state["est_export_ready"] = True
-        with new_col:
-            if st.button("+ New Estimate", key="est_new", type="primary", use_container_width=True):
-                clear_new_estimate_number_state()
-                st.session_state[_NEW_ESTIMATE_DIALOG_KEY] = True
-
-    from app.ui.page_header import render_page_header
-
-    render_page_header(
-        "Estimates",
-        "Track and manage estimates",
-        primary_action=_estimates_header_actions,
-        primary_action_width=2.4,
-    )
-
-    st.markdown(
-        '<span class="ips-estimates-page ips-page-shell-marker" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
-    inject_estimates_module_css()
-    inject_estimates_page_layout_css()
-
-    if st.session_state.get(_NEW_ESTIMATE_DIALOG_KEY):
-        _show_new_estimate_dialog()
+@fragment
+def _render_estimates_catalog_fragment(rows: list[dict]) -> None:
+    """Estimates filters, summary, and table — local reruns for list interactions."""
 
     def _filters() -> None:
         c1, c2 = st.columns([9, 1], gap="small")
@@ -1854,7 +1812,7 @@ def render() -> None:
                 st.session_state["estimates_view"] = _ESTIMATES_DEFAULT_VIEW
                 reset_table_page(_TABLE_KEY)
                 _clear_estimate_selection(st.session_state.get(_ALL_ESTIMATE_IDS_KEY))
-                st.rerun()
+                fragment_rerun()
 
     render_estimates_filter_bar_shell()
     layout_filter_bar(_filters)
@@ -1909,3 +1867,52 @@ def render() -> None:
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
     _render_custom_estimates_table(page_rows, filter_options=filter_options)
     render_estimates_pagination_footer(len(filtered), _TABLE_KEY)
+
+
+def render() -> None:
+    from app.pages._core._access import begin_module
+    if not begin_module("estimates"):
+        return
+
+    if st.session_state.get(ESTIMATES_MODE_KEY) == "detail" and st.session_state.get(SELECTED_ESTIMATE_KEY):
+        inject_estimates_module_css()
+        inject_estimates_page_layout_css()
+        render_estimate_detail(str(st.session_state[SELECTED_ESTIMATE_KEY]))
+        st.stop()
+
+    rows = load_estimates()
+
+    def _estimates_header_actions() -> None:
+        st.markdown(
+            '<span class="ips-estimates-page-header-actions ips-page-header-inline-actions" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        export_col, new_col = st.columns(2, gap="small")
+        with export_col:
+            if st.button("Export", key="est_export", use_container_width=True):
+                st.session_state["est_export_ready"] = True
+        with new_col:
+            if st.button("+ New Estimate", key="est_new", type="primary", use_container_width=True):
+                clear_new_estimate_number_state()
+                st.session_state[_NEW_ESTIMATE_DIALOG_KEY] = True
+
+    from app.ui.page_header import render_page_header
+
+    render_page_header(
+        "Estimates",
+        "Track and manage estimates",
+        primary_action=_estimates_header_actions,
+        primary_action_width=2.4,
+    )
+
+    st.markdown(
+        '<span class="ips-estimates-page ips-page-shell-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    inject_estimates_module_css()
+    inject_estimates_page_layout_css()
+
+    if st.session_state.get(_NEW_ESTIMATE_DIALOG_KEY):
+        _show_new_estimate_dialog()
+
+    _render_estimates_catalog_fragment(rows)
