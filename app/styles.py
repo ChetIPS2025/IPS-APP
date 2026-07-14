@@ -12378,7 +12378,7 @@ def inject_global_css() -> None:
     with st.sidebar:
         st.markdown(
             f"""
-<style id="ips-global-styles-v18">
+<style id="ips-global-styles-v19">
 :root {{
   --ips-bg: {APP_BG};
   --ips-sidebar: {SIDEBAR_BG};
@@ -15719,7 +15719,14 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
 body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"] [data-testid="stButton"] > button,
 body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] .stButton > button,
 body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] [data-testid="stButton"] > button,
-body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stPopover"] > button {{
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stPopover"] > button,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_refresh"] .stButton > button[kind="tertiary"],
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_refresh"] [data-testid="stButton"] > button[kind="tertiary"],
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"] .stButton > button[kind="tertiary"],
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"] [data-testid="stButton"] > button[kind="tertiary"],
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] .stButton > button[kind="tertiary"],
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] [data-testid="stButton"] > button[kind="tertiary"],
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stPopover"] > button[kind="tertiary"] {{
   width: 40px !important;
   min-width: 40px !important;
   max-width: 40px !important;
@@ -15731,7 +15738,9 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
   border: none !important;
   border-width: 0 !important;
   box-shadow: none !important;
+  outline: none !important;
   color: inherit !important;
+  font-weight: 400 !important;
 }}
 body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_refresh"] .stButton > button:hover,
 body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"] .stButton > button:hover,
@@ -15740,7 +15749,11 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
 body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_refresh"] .stButton > button:focus,
 body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"] .stButton > button:focus,
 body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] .stButton > button:focus,
-body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stPopover"] > button:focus {{
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stPopover"] > button:focus,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_refresh"] .stButton > button[kind="tertiary"]:hover,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"] .stButton > button[kind="tertiary"]:hover,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] .stButton > button[kind="tertiary"]:hover,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stPopover"] > button[kind="tertiary"]:hover {{
   background: transparent !important;
   background-color: transparent !important;
   border: none !important;
@@ -15751,13 +15764,23 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
 body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stPopover"] > button [data-testid="stIconMaterial"] {{
   display: none !important;
 }}
+body.ips-authed-app [class*="st-key-ips_page_header"] [class*="st-key-header_refresh"][data-testid="stVerticalBlockBorderWrapper"],
+body.ips-authed-app [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"][data-testid="stVerticalBlockBorderWrapper"],
+body.ips-authed-app [class*="st-key-ips_page_header"] [class*="st-key-header_help"][data-testid="stVerticalBlockBorderWrapper"],
+body.ips-authed-app [class*="st-key-ips_page_header"] [class*="st-key-header_settings"][data-testid="stVerticalBlockBorderWrapper"],
 body.ips-authed-app [class*="st-key-ips_page_header"] [class*="st-key-header_refresh"] [data-testid="stVerticalBlockBorderWrapper"],
 body.ips-authed-app [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"] [data-testid="stVerticalBlockBorderWrapper"],
 body.ips-authed-app [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stVerticalBlockBorderWrapper"],
-body.ips-authed-app [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] [data-testid="stVerticalBlockBorderWrapper"] {{
+body.ips-authed-app [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] [data-testid="stVerticalBlockBorderWrapper"],
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-header-utility-icon-slot) {{
   border: none !important;
+  border-width: 0 !important;
   box-shadow: none !important;
   background: transparent !important;
+  background-color: transparent !important;
+  padding: 0 !important;
+}}
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-header-utility-icon-slot) > div {{
   padding: 0 !important;
 }}
 </style>

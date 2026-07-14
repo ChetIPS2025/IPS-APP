@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v15"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v16"
 
 
 def inject_page_header_styles() -> None:
@@ -15,7 +15,7 @@ def inject_page_header_styles() -> None:
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-page-header-styles-v15">
+<style id="ips-page-header-styles-v16">
 [class*="st-key-ips_page_header"],
 [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
@@ -238,12 +238,21 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
 body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"] [data-testid="stButton"] > button,
 body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] .stButton > button,
 body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] [data-testid="stButton"] > button,
-body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stPopover"] > button {
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stPopover"] > button,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_refresh"] .stButton > button[kind="tertiary"],
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_refresh"] [data-testid="stButton"] > button[kind="tertiary"],
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"] .stButton > button[kind="tertiary"],
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"] [data-testid="stButton"] > button[kind="tertiary"],
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] .stButton > button[kind="tertiary"],
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] [data-testid="stButton"] > button[kind="tertiary"],
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stPopover"] > button[kind="tertiary"] {
   background: transparent !important;
   background-color: transparent !important;
   border: none !important;
   border-width: 0 !important;
+  outline: none !important;
   color: inherit !important;
+  font-weight: 400 !important;
 }
 .st-key-header_refresh .stButton > button:hover,
 .st-key-header_notifications .stButton > button:hover,
@@ -293,13 +302,23 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
 body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stPopover"] > button [data-testid="stIconMaterial"] {
   display: none !important;
 }
+[class*="st-key-header_refresh"][data-testid="stVerticalBlockBorderWrapper"],
+[class*="st-key-header_notifications"][data-testid="stVerticalBlockBorderWrapper"],
+[class*="st-key-header_help"][data-testid="stVerticalBlockBorderWrapper"],
+[class*="st-key-header_settings"][data-testid="stVerticalBlockBorderWrapper"],
 [class*="st-key-header_refresh"] [data-testid="stVerticalBlockBorderWrapper"],
 [class*="st-key-header_notifications"] [data-testid="stVerticalBlockBorderWrapper"],
 [class*="st-key-header_help"] [data-testid="stVerticalBlockBorderWrapper"],
-[class*="st-key-header_settings"] [data-testid="stVerticalBlockBorderWrapper"] {
+[class*="st-key-header_settings"] [data-testid="stVerticalBlockBorderWrapper"],
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-header-utility-icon-slot) {
   border: none !important;
+  border-width: 0 !important;
   box-shadow: none !important;
   background: transparent !important;
+  background-color: transparent !important;
+  padding: 0 !important;
+}
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] div[data-testid="stVerticalBlockBorderWrapper"]:has(.ips-header-utility-icon-slot) > div {
   padding: 0 !important;
 }
 .st-key-header_refresh .stButton > button p,

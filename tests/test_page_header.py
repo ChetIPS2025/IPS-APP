@@ -61,9 +61,10 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.ui.page_header_styles import inject_page_header_styles
 
         src = inspect.getsource(inject_page_header_styles)
-        self.assertIn("ips-page-header-styles-v15", src)
+        self.assertIn("ips-page-header-styles-v16", src)
         self.assertIn("translate(-50%, -50%)", src)
         self.assertIn("flex-direction: column", src)
+        self.assertIn("ips-header-utility-icon-slot", src)
         self.assertIn("body.ips-authed-app section[data-testid=\"stMain\"]", src)
         self.assertIn("st-key-header_page_toolbar", src)
         self.assertIn('[class*="st-key-ips_page_header"]', src)
@@ -83,6 +84,8 @@ class PageHeaderSourceTests(unittest.TestCase):
         self.assertIn('st.button("🔔"', src)
         self.assertIn('st.popover("❓"', src)
         self.assertIn('st.button("⚙️"', src)
+        self.assertIn('type="tertiary"', src)
+        self.assertIn("ips-header-utility-icon-slot", src)
         self.assertNotIn("🔔 {int(unread)}", src)
 
     def test_full_page_detail_skips_duplicate_modal_header(self) -> None:
@@ -114,7 +117,7 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.styles import inject_global_css
 
         src = inspect.getsource(inject_global_css)
-        self.assertIn("ips-global-styles-v18", src)
+        self.assertIn("ips-global-styles-v19", src)
         self.assertIn("padding-top: 0 !important", src)
         self.assertNotIn("margin-left: -22px", src)
         self.assertNotIn("margin-right: -22px", src)

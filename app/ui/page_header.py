@@ -184,9 +184,17 @@ def _render_menu(*, header_key: str) -> None:
             _request_sidebar_toggle()
 
 
+def _render_header_utility_slot_marker() -> None:
+    st.markdown(
+        '<span class="ips-header-utility-icon-slot" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+
+
 def _render_refresh(*, key: str, on_refresh: Callable[[], None] | None = None) -> None:
     with st.container(key="header_refresh"):
-        if st.button("🔄", key=key, help="Refresh", use_container_width=True):
+        _render_header_utility_slot_marker()
+        if st.button("🔄", key=key, help="Refresh", type="tertiary"):
             if on_refresh is not None:
                 on_refresh()
             st.rerun()
@@ -201,22 +209,24 @@ def _render_bell(*, header_key: str, role: str) -> None:
     if unread > 0:
         help_text = f"Notifications ({int(unread)} unread)"
     with st.container(key="header_notifications"):
+        _render_header_utility_slot_marker()
         if unread > 0:
             st.markdown(
                 f'<span class="ips-header-notify-badge" aria-hidden="true">{int(unread)}</span>',
                 unsafe_allow_html=True,
             )
         if role_can_access_page(role, "company_updates"):
-            if st.button("🔔", key=f"{header_key}_bell", help=help_text, use_container_width=True):
+            if st.button("🔔", key=f"{header_key}_bell", help=help_text, type="tertiary"):
                 set_nav_slug("company_updates")
                 st.rerun()
         else:
-            st.button("🔔", key=f"{header_key}_bell", help=help_text, disabled=True, use_container_width=True)
+            st.button("🔔", key=f"{header_key}_bell", help=help_text, disabled=True, type="tertiary")
 
 
 def _render_help(*, header_key: str) -> None:
     with st.container(key="header_help"):
-        with st.popover("❓", help="Help"):
+        _render_header_utility_slot_marker()
+        with st.popover("❓", help="Help", type="tertiary"):
             st.markdown("**Help**")
             st.caption("Use the sidebar to switch modules. Contact your administrator for access changes.")
 
@@ -226,12 +236,13 @@ def _render_settings(*, header_key: str, role: str) -> None:
     from app.utils.permissions import role_can_access_page
 
     with st.container(key="header_settings"):
+        _render_header_utility_slot_marker()
         if role_can_access_page(role, "settings"):
-            if st.button("⚙️", key=f"{header_key}_settings", help="Settings", use_container_width=True):
+            if st.button("⚙️", key=f"{header_key}_settings", help="Settings", type="tertiary"):
                 set_nav_slug("settings")
                 st.rerun()
         else:
-            st.button("⚙️", key=f"{header_key}_settings", help="Settings", disabled=True, use_container_width=True)
+            st.button("⚙️", key=f"{header_key}_settings", help="Settings", disabled=True, type="tertiary")
 
 
 def _render_user_menu(
