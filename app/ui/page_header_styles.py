@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v12"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v13"
 
 
 def inject_page_header_styles() -> None:
@@ -15,7 +15,7 @@ def inject_page_header_styles() -> None:
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-page-header-styles-v12">
+<style id="ips-page-header-styles-v13">
 [class*="st-key-ips_page_header"],
 [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
@@ -196,10 +196,41 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   justify-content: center !important;
   font-size: 1.05rem !important;
   line-height: 1 !important;
+  box-shadow: none !important;
+}
+.st-key-header_back .stButton > button,
+.st-key-header_menu .stButton > button {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
   color: #374151 !important;
+}
+.st-key-header_refresh .stButton > button,
+.st-key-header_notifications .stButton > button,
+.st-key-header_help [data-testid="stPopover"] > button,
+.st-key-header_settings .stButton > button {
+  background: transparent !important;
+  border: none !important;
+  color: inherit !important;
+}
+.st-key-header_refresh .stButton > button:hover,
+.st-key-header_notifications .stButton > button:hover,
+.st-key-header_help [data-testid="stPopover"] > button:hover,
+.st-key-header_settings .stButton > button:hover,
+.st-key-header_refresh .stButton > button:focus,
+.st-key-header_notifications .stButton > button:focus,
+.st-key-header_help [data-testid="stPopover"] > button:focus,
+.st-key-header_settings .stButton > button:focus,
+.st-key-header_refresh .stButton > button:focus-visible,
+.st-key-header_notifications .stButton > button:focus-visible,
+.st-key-header_help [data-testid="stPopover"] > button:focus-visible,
+.st-key-header_settings .stButton > button:focus-visible {
+  background: transparent !important;
+  border: none !important;
   box-shadow: none !important;
+  opacity: 0.72 !important;
+}
+.st-key-header_help [data-testid="stPopover"] > button [data-testid="stIconMaterial"] {
+  display: none !important;
 }
 .st-key-header_refresh .stButton > button p,
 .st-key-header_notifications .stButton > button p,

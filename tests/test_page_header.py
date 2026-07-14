@@ -61,13 +61,15 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.ui.page_header_styles import inject_page_header_styles
 
         src = inspect.getsource(inject_page_header_styles)
-        self.assertIn("ips-page-header-styles-v12", src)
+        self.assertIn("ips-page-header-styles-v13", src)
         self.assertIn("st-key-header_page_toolbar", src)
         self.assertIn('[class*="st-key-ips_page_header"]', src)
         self.assertIn(".st-key-header_primary_action", src)
         self.assertIn(".st-key-header_secondary_action", src)
         self.assertIn("st-key-header_help [data-testid=\"stPopover\"]", src)
         self.assertIn("ips-header-notify-badge", src)
+        self.assertIn("background: transparent !important", src)
+        self.assertIn("stIconMaterial", src)
         self.assertNotIn("width: 100vw", src)
 
     def test_header_utility_buttons_use_icon_only_labels(self) -> None:
