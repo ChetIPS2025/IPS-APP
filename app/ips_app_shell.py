@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_APP_SHELL_CSS_KEY = "ips_app_shell_styles_injected_v13"
+IPS_APP_SHELL_CSS_KEY = "ips_app_shell_styles_injected_v14"
 
 
 def inject_ips_app_shell_styles() -> None:
@@ -274,6 +274,26 @@ def inject_ips_app_shell_styles() -> None:
             background: #F8FAFC !important;
             border-color: #9ca3af !important;
             color: #111827 !important;
+        }
+        body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_refresh"] .stButton > button,
+        body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_refresh"] [data-testid="stButton"] > button,
+        body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"] .stButton > button,
+        body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"] [data-testid="stButton"] > button,
+        body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] .stButton > button,
+        body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] [data-testid="stButton"] > button,
+        body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stPopover"] > button {
+            width: 40px !important;
+            min-width: 40px !important;
+            max-width: 40px !important;
+            height: 40px !important;
+            min-height: 40px !important;
+            padding: 0 !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+        body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stPopover"] > button [data-testid="stIconMaterial"] {
+            display: none !important;
         }
         section[data-testid="stMain"] .stLinkButton > a {
             border-radius: var(--ips-btn-radius) !important;

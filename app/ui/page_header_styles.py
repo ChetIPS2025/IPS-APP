@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v13"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v14"
 
 
 def inject_page_header_styles() -> None:
@@ -15,7 +15,7 @@ def inject_page_header_styles() -> None:
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-page-header-styles-v13">
+<style id="ips-page-header-styles-v14">
 [class*="st-key-ips_page_header"],
 [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
@@ -207,30 +207,83 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
 .st-key-header_refresh .stButton > button,
 .st-key-header_notifications .stButton > button,
 .st-key-header_help [data-testid="stPopover"] > button,
-.st-key-header_settings .stButton > button {
+.st-key-header_settings .stButton > button,
+[class*="st-key-header_refresh"] .stButton > button,
+[class*="st-key-header_refresh"] [data-testid="stButton"] > button,
+[class*="st-key-header_notifications"] .stButton > button,
+[class*="st-key-header_notifications"] [data-testid="stButton"] > button,
+[class*="st-key-header_settings"] .stButton > button,
+[class*="st-key-header_settings"] [data-testid="stButton"] > button,
+[class*="st-key-header_help"] [data-testid="stPopover"] > button,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_refresh"] .stButton > button,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_refresh"] [data-testid="stButton"] > button,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"] .stButton > button,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"] [data-testid="stButton"] > button,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] .stButton > button,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] [data-testid="stButton"] > button,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stPopover"] > button {
   background: transparent !important;
+  background-color: transparent !important;
   border: none !important;
+  border-width: 0 !important;
   color: inherit !important;
 }
 .st-key-header_refresh .stButton > button:hover,
 .st-key-header_notifications .stButton > button:hover,
 .st-key-header_help [data-testid="stPopover"] > button:hover,
 .st-key-header_settings .stButton > button:hover,
+[class*="st-key-header_refresh"] .stButton > button:hover,
+[class*="st-key-header_notifications"] .stButton > button:hover,
+[class*="st-key-header_settings"] .stButton > button:hover,
+[class*="st-key-header_help"] [data-testid="stPopover"] > button:hover,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_refresh"] .stButton > button:hover,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"] .stButton > button:hover,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] .stButton > button:hover,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stPopover"] > button:hover,
 .st-key-header_refresh .stButton > button:focus,
 .st-key-header_notifications .stButton > button:focus,
 .st-key-header_help [data-testid="stPopover"] > button:focus,
 .st-key-header_settings .stButton > button:focus,
+[class*="st-key-header_refresh"] .stButton > button:focus,
+[class*="st-key-header_notifications"] .stButton > button:focus,
+[class*="st-key-header_settings"] .stButton > button:focus,
+[class*="st-key-header_help"] [data-testid="stPopover"] > button:focus,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_refresh"] .stButton > button:focus,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"] .stButton > button:focus,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] .stButton > button:focus,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stPopover"] > button:focus,
 .st-key-header_refresh .stButton > button:focus-visible,
 .st-key-header_notifications .stButton > button:focus-visible,
 .st-key-header_help [data-testid="stPopover"] > button:focus-visible,
-.st-key-header_settings .stButton > button:focus-visible {
+.st-key-header_settings .stButton > button:focus-visible,
+[class*="st-key-header_refresh"] .stButton > button:focus-visible,
+[class*="st-key-header_notifications"] .stButton > button:focus-visible,
+[class*="st-key-header_settings"] .stButton > button:focus-visible,
+[class*="st-key-header_help"] [data-testid="stPopover"] > button:focus-visible,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_refresh"] .stButton > button:focus-visible,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"] .stButton > button:focus-visible,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] .stButton > button:focus-visible,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stPopover"] > button:focus-visible {
   background: transparent !important;
+  background-color: transparent !important;
   border: none !important;
+  border-width: 0 !important;
   box-shadow: none !important;
   opacity: 0.72 !important;
 }
-.st-key-header_help [data-testid="stPopover"] > button [data-testid="stIconMaterial"] {
+.st-key-header_help [data-testid="stPopover"] > button [data-testid="stIconMaterial"],
+[class*="st-key-header_help"] [data-testid="stPopover"] > button [data-testid="stIconMaterial"],
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stPopover"] > button [data-testid="stIconMaterial"] {
   display: none !important;
+}
+[class*="st-key-header_refresh"] [data-testid="stVerticalBlockBorderWrapper"],
+[class*="st-key-header_notifications"] [data-testid="stVerticalBlockBorderWrapper"],
+[class*="st-key-header_help"] [data-testid="stVerticalBlockBorderWrapper"],
+[class*="st-key-header_settings"] [data-testid="stVerticalBlockBorderWrapper"] {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
 }
 .st-key-header_refresh .stButton > button p,
 .st-key-header_notifications .stButton > button p,

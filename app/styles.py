@@ -12378,7 +12378,7 @@ def inject_global_css() -> None:
     with st.sidebar:
         st.markdown(
             f"""
-<style id="ips-global-styles-v17">
+<style id="ips-global-styles-v18">
 :root {{
   --ips-bg: {APP_BG};
   --ips-sidebar: {SIDEBAR_BG};
@@ -15707,10 +15707,59 @@ def inject_employee_portal_css() -> None:
 }
 .ips-page-employee_portal [data-testid="stButton"] > button,
 .ips-page-employee_qr_scan [data-testid="stButton"] > button,
-.ips-page-employee_resources [data-testid="stButton"] > button {
+.ips-page-employee_resources [data-testid="stButton"] > button {{
   min-height: 2.6rem !important;
   border-radius: 10px !important;
-}
+}}
+
+/* Header utility icons — must repeat in global CSS (injected every render) */
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_refresh"] .stButton > button,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_refresh"] [data-testid="stButton"] > button,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"] .stButton > button,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"] [data-testid="stButton"] > button,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] .stButton > button,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] [data-testid="stButton"] > button,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stPopover"] > button {{
+  width: 40px !important;
+  min-width: 40px !important;
+  max-width: 40px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-width: 0 !important;
+  box-shadow: none !important;
+  color: inherit !important;
+}}
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_refresh"] .stButton > button:hover,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"] .stButton > button:hover,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] .stButton > button:hover,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stPopover"] > button:hover,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_refresh"] .stButton > button:focus,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"] .stButton > button:focus,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] .stButton > button:focus,
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stPopover"] > button:focus {{
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-width: 0 !important;
+  box-shadow: none !important;
+  opacity: 0.72 !important;
+}}
+body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stPopover"] > button [data-testid="stIconMaterial"] {{
+  display: none !important;
+}}
+body.ips-authed-app [class*="st-key-ips_page_header"] [class*="st-key-header_refresh"] [data-testid="stVerticalBlockBorderWrapper"],
+body.ips-authed-app [class*="st-key-ips_page_header"] [class*="st-key-header_notifications"] [data-testid="stVerticalBlockBorderWrapper"],
+body.ips-authed-app [class*="st-key-ips_page_header"] [class*="st-key-header_help"] [data-testid="stVerticalBlockBorderWrapper"],
+body.ips-authed-app [class*="st-key-ips_page_header"] [class*="st-key-header_settings"] [data-testid="stVerticalBlockBorderWrapper"] {{
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+}}
 </style>
 """,
         unsafe_allow_html=True,

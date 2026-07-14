@@ -61,7 +61,8 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.ui.page_header_styles import inject_page_header_styles
 
         src = inspect.getsource(inject_page_header_styles)
-        self.assertIn("ips-page-header-styles-v13", src)
+        self.assertIn("ips-page-header-styles-v14", src)
+        self.assertIn("body.ips-authed-app section[data-testid=\"stMain\"]", src)
         self.assertIn("st-key-header_page_toolbar", src)
         self.assertIn('[class*="st-key-ips_page_header"]', src)
         self.assertIn(".st-key-header_primary_action", src)
@@ -111,7 +112,7 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.styles import inject_global_css
 
         src = inspect.getsource(inject_global_css)
-        self.assertIn("ips-global-styles-v17", src)
+        self.assertIn("ips-global-styles-v18", src)
         self.assertIn("padding-top: 0 !important", src)
         self.assertNotIn("margin-left: -22px", src)
         self.assertNotIn("margin-right: -22px", src)
