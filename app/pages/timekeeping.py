@@ -64,7 +64,7 @@ from app.styles import (
     _inject_timekeeping_daily_hour_focus_script,
     inject_timekeeping_module_css,
 )
-from app.utils.dates import DATE_INPUT_FORMAT, normalize_date, week_dates, week_end, week_start
+from app.utils.dates import normalize_date, week_dates, week_end, week_start
 from app.utils.field_context import get_field_job_id, is_field_context, is_field_mode, render_field_job_bar
 from app.utils.formatting import fmt_date
 from app.ui.streamlit_perf import (
@@ -2654,7 +2654,7 @@ def _render_weekly_timekeeping_toolbar(week_start_d: date, week_end_d: date) -> 
         '<span class="ips-timekeeping-week-toolbar-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
-    prev_col, week_col, next_col, cal_col = st.columns([0.4, 3.4, 0.4, 0.45], gap="small")
+    prev_col, week_col, next_col = st.columns([0.4, 3.85, 0.4], gap="small")
     with prev_col:
         if st.button("‹", key="tk_prev_week", help="Previous week", use_container_width=True):
             st.session_state[_WEEK_KEY] = week_start_d - timedelta(days=7)
@@ -2673,22 +2673,6 @@ def _render_weekly_timekeeping_toolbar(week_start_d: date, week_end_d: date) -> 
     with next_col:
         if st.button("›", key="tk_next_week", help="Next week", use_container_width=True):
             st.session_state[_WEEK_KEY] = week_start_d + timedelta(days=7)
-            reset_table_page(_TABLE_KEY)
-            _clear_expanded_timecard()
-            _clear_day_time_selection()
-            clear_timekeeping_list_caches()
-            st.rerun()
-    with cal_col:
-        picked = st.date_input(
-            "Jump to week",
-            value=week_start_d,
-            key="tk_week_calendar",
-            label_visibility="collapsed",
-            help="Jump to week",
-            format=DATE_INPUT_FORMAT,
-        )
-        if isinstance(picked, date) and picked != week_start_d:
-            st.session_state[_WEEK_KEY] = week_start(picked)
             reset_table_page(_TABLE_KEY)
             _clear_expanded_timecard()
             _clear_day_time_selection()
