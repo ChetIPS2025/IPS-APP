@@ -144,7 +144,8 @@ def capture_nav_slug_from_query() -> None:
     slug = str(raw or "").strip()
     if not slug:
         return
-    from app.navigation import set_nav_slug
+    from app.navigation import IPS_NAV_PENDING_KEY, set_nav_slug
+    st.session_state.pop(IPS_NAV_PENDING_KEY, None)
     set_nav_slug(slug)
     try:
         del st.query_params["ips_nav"]
@@ -387,10 +388,12 @@ def _desktop_nav_rail_html(rows: list[dict[str, str]], active_slug: str) -> str:
         icon = html.escape(nav_icon_for_slug(slug))
         is_active = _desktop_nav_rail_item_is_active(slug, active_slug)
         active_cls = " is-active" if is_active else ""
-        href = html.escape(f"?ips_nav={slug}", quote=True)
+        href = "#"
+        slug_attr = html.escape(slug, quote=True)
         item_bits.append(
             f'<a class="ips-desktop-nav-rail__link{active_cls}" href="{href}" '
-            f'target="_top" rel="noopener noreferrer" title="{label}" aria-label="{label}">'
+            f'data-ips-rail-slug="{slug_attr}" role="button" '
+            f'title="{label}" aria-label="{label}">'
             f'<span class="ips-desktop-nav-rail__icon" aria-hidden="true">{icon}</span>'
             f'<span class="ips-desktop-nav-rail__label">{label}</span>'
             f"</a>"
@@ -403,12 +406,85 @@ def _desktop_nav_rail_html(rows: list[dict[str, str]], active_slug: str) -> str:
     {items_html}
   </div>
   <div class="ips-desktop-nav-rail__footer">
-    <a class="ips-desktop-nav-rail__link ips-desktop-nav-rail__link--logout" href="?ips_logout=1" target="_top" rel="noopener noreferrer" title="Log out" aria-label="Log out">
+    <a class="ips-desktop-nav-rail__link ips-desktop-nav-rail__link--logout" href="#" data-ips-rail-logout="1" role="button" title="Log out" aria-label="Log out">
       <span class="ips-desktop-nav-rail__icon" aria-hidden="true">⎋</span>
       <span class="ips-desktop-nav-rail__label">Log out</span>
     </a>
   </div>
 </nav>
+"""
+
+
+def _desktop_nav_rail_click_script() -> str:
+    """Route fixed-rail clicks through hidden Streamlit sidebar nav buttons."""
+    return """
+<script>
+(function () {
+  function rootDoc() {
+    try {
+      return window.parent && window.parent.document ? window.parent.document : document;
+    } catch (e) {
+      return document;
+    }
+  }
+  function sidebarNavButton(d, slug) {
+    if (!slug) return null;
+    return d.querySelector(
+      'section[data-testid="stSidebar"] [class*="st-key-nav_' + slug + '"] button'
+    );
+  }
+  function fallbackNav(slug) {
+    try {
+      var top = window.top || window.parent || window;
+      top.location.href = '?ips_nav=' + encodeURIComponent(slug);
+    } catch (e2) {
+      window.location.href = '?ips_nav=' + encodeURIComponent(slug);
+    }
+  }
+  function wireDesktopNavRail(d) {
+    if (!d || !d.body) return;
+    d.querySelectorAll('.ips-desktop-nav-rail__link[data-ips-rail-slug]').forEach(function (link) {
+      if (link.dataset.ipsRailNavWired === '1') return;
+      link.dataset.ipsRailNavWired = '1';
+      link.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        var slug = link.getAttribute('data-ips-rail-slug');
+        if (!slug) return;
+        var btn = sidebarNavButton(d, slug);
+        if (btn) {
+          btn.click();
+          return;
+        }
+        fallbackNav(slug);
+      });
+    });
+    d.querySelectorAll('.ips-desktop-nav-rail__link[data-ips-rail-logout="1"]').forEach(function (link) {
+      if (link.dataset.ipsRailLogoutWired === '1') return;
+      link.dataset.ipsRailLogoutWired = '1';
+      link.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        var btn = d.querySelector('section[data-testid="stSidebar"] [class*="st-key-ips_logout"] button');
+        if (btn) {
+          btn.click();
+          return;
+        }
+        try {
+          var top = window.top || window.parent || window;
+          top.location.href = '?ips_logout=1';
+        } catch (e3) {
+          window.location.href = '?ips_logout=1';
+        }
+      });
+    });
+  }
+  function boot() {
+    wireDesktopNavRail(rootDoc());
+  }
+  boot();
+  setTimeout(boot, 80);
+  setTimeout(boot, 400);
+})();
+</script>
 """
 
 
@@ -429,7 +505,7 @@ def inject_desktop_nav_rail_css() -> None:
 
 
 def inject_desktop_nav_rail_markup(*, active_slug: str | None = None) -> None:
-    """Inject fixed HTML nav rail (anchors use query params; no layout-breaking widgets)."""
+    """Inject fixed HTML nav rail and wire clicks to hidden sidebar nav buttons."""
     rows = _nav_fallback_rows()
     if not rows:
         return
@@ -437,6 +513,7 @@ def inject_desktop_nav_rail_markup(*, active_slug: str | None = None) -> None:
         from app.navigation import current_nav_slug
         active_slug = current_nav_slug()
     st.markdown(_desktop_nav_rail_html(rows, active_slug), unsafe_allow_html=True)
+    inject_app_shell_script(_desktop_nav_rail_click_script())
 
 
 def inject_desktop_nav_rail(*, active_slug: str | None = None) -> None:

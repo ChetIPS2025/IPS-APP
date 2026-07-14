@@ -3,18 +3,21 @@
 from __future__ import annotations
 
 import unittest
+from unittest import mock
 from unittest.mock import patch
 
 import streamlit as st
 
 from app.navigation import (
     INVENTORY_SCAN_EMBED_KEY,
+    IPS_NAV_PENDING_KEY,
     JC_FOCUS_JOB_KEY,
     JOBS_DETAIL_FOCUS_TAB_KEY,
     TK_PREFILL_JOB_KEY,
     TK_PREFILL_WEEK_KEY,
     WJT_PREFILL_JOB_KEY,
     WJT_PREFILL_WEEK_KEY,
+    apply_pending_navigation,
     navigate_to_estimate_detail,
     navigate_to_estimate_materials,
     navigate_to_timekeeping,
@@ -79,6 +82,28 @@ class TestNavigationHandoffs(unittest.TestCase):
     def test_normalize_unknown_slug_falls_back_to_field_dashboard(self) -> None:
         st.session_state["ips_field_mode"] = True
         self.assertEqual(normalize_nav_slug("not_a_real_page"), "field_dashboard")
+
+    def test_apply_pending_navigation_then_query_slug_prefers_timekeeping(self) -> None:
+        st.session_state[IPS_NAV_PENDING_KEY] = "Jobs"
+        apply_pending_navigation()
+        self.assertEqual(st.session_state["ips_nav_page"], "jobs")
+
+        from app.components.sidebar_shell import capture_nav_slug_from_query
+
+        class _QueryParams(dict):
+            def get(self, key, default=None):
+                if key == "ips_nav":
+                    return "timekeeping"
+                return default
+
+            def __delitem__(self, key):
+                super().pop(key, None)
+
+        with mock.patch.object(st, "query_params", _QueryParams()):
+            capture_nav_slug_from_query()
+
+        self.assertEqual(st.session_state["ips_nav_page"], "timekeeping")
+        self.assertNotIn(IPS_NAV_PENDING_KEY, st.session_state)
 
 
 if __name__ == "__main__":

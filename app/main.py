@@ -248,7 +248,6 @@ def main() -> None:
         inject_sidebar_shell,
     )
     capture_logout_from_query()
-    capture_nav_slug_from_query()
     ensure_sidebar_collapsed_hydrated()
 
     if must_reset_password():
@@ -257,6 +256,7 @@ def main() -> None:
             st.stop()
 
     apply_pending_navigation()
+    capture_nav_slug_from_query()
 
     from app.auth import is_authenticated as _auth_check
     from app.navigation import (
