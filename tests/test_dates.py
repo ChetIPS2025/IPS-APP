@@ -38,10 +38,13 @@ class StreamlitDateInputFormatTests(unittest.TestCase):
         self.assertNotIn('format="MMM D, YYYY"', src)
         self.assertNotIn("format='MMM D, YYYY'", src)
 
-    def test_timekeeping_week_toolbar_has_no_calendar_date_input(self) -> None:
+    def test_timekeeping_week_toolbar_uses_date_range_picker(self) -> None:
         src = inspect.getsource(tk._render_weekly_timekeeping_toolbar)
-        self.assertNotIn("st.date_input", src)
-        self.assertNotIn("tk_week_calendar", src)
+        self.assertIn("st.date_input", src)
+        self.assertIn("tk_week_range_picker", src)
+        self.assertIn("value=(week_start_d, week_end_d)", src)
+        self.assertIn("format=DATE_INPUT_FORMAT", src)
+        self.assertNotIn("ips-timekeeping-week-pill", src)
 
 
 if __name__ == "__main__":

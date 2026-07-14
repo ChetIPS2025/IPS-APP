@@ -64,7 +64,7 @@ from app.styles import (
     _inject_timekeeping_daily_hour_focus_script,
     inject_timekeeping_module_css,
 )
-from app.utils.dates import normalize_date, week_dates, week_end, week_start
+from app.utils.dates import DATE_INPUT_FORMAT, normalize_date, week_dates, week_end, week_start
 from app.utils.field_context import get_field_job_id, is_field_context, is_field_mode, render_field_job_bar
 from app.utils.formatting import fmt_date
 from app.ui.streamlit_perf import (
@@ -2664,12 +2664,26 @@ def _render_weekly_timekeeping_toolbar(week_start_d: date, week_end_d: date) -> 
             clear_timekeeping_list_caches()
             st.rerun()
     with week_col:
-        st.markdown(
-            f'<div class="ips-timekeeping-week-pill">'
-            f"Week of {html.escape(fmt_date(week_start_d))} – {html.escape(fmt_date(week_end_d))}"
-            f"</div>",
-            unsafe_allow_html=True,
-        )
+        with st.container(key="tk_week_range"):
+            picked = st.date_input(
+                "Week range",
+                value=(week_start_d, week_end_d),
+                key="tk_week_range_picker",
+                label_visibility="collapsed",
+                help="Select week range",
+                format=DATE_INPUT_FORMAT,
+            )
+        if isinstance(picked, tuple) and len(picked) == 2:
+            start_d = normalize_date(picked[0])
+            if start_d is not None:
+                new_start = week_start(start_d)
+                if new_start != week_start_d:
+                    st.session_state[_WEEK_KEY] = new_start
+                    reset_table_page(_TABLE_KEY)
+                    _clear_expanded_timecard()
+                    _clear_day_time_selection()
+                    clear_timekeeping_list_caches()
+                    st.rerun()
     with next_col:
         if st.button("›", key="tk_next_week", help="Next week", use_container_width=True):
             st.session_state[_WEEK_KEY] = week_start_d + timedelta(days=7)

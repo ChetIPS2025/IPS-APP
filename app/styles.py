@@ -5467,7 +5467,7 @@ def inject_timekeeping_module_css() -> None:
     with st.sidebar:
         st.markdown(
             f"""
-<style id="ips-timekeeping-module-v105">
+<style id="ips-timekeeping-module-v106">
 .ips-timekeeping-page {{
   background: #f1f5f9 !important;
 }}
@@ -5604,6 +5604,29 @@ def inject_timekeeping_module_css() -> None:
   font-size: 14px !important;
   font-weight: 600 !important;
   text-align: center !important;
+}}
+.st-key-tk_week_range {{
+  width: 100% !important;
+}}
+.st-key-tk_week_range [data-testid="stDateInput"] {{
+  width: 100% !important;
+}}
+.st-key-tk_week_range [data-testid="stDateInput"] > div {{
+  min-height: 42px !important;
+  height: 42px !important;
+  border: 1px solid #dbe3ef !important;
+  border-radius: 10px !important;
+  background: #f8fafc !important;
+  box-shadow: none !important;
+}}
+.st-key-tk_week_range [data-testid="stDateInput"] input {{
+  min-height: 40px !important;
+  height: 40px !important;
+  text-align: center !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #334155 !important;
+  background: transparent !important;
 }}
 .ips-timekeeping-page-range {{
   margin: 8px 0 0 0 !important;
