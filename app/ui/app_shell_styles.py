@@ -5,7 +5,7 @@ from __future__ import annotations
 import streamlit as st
 import streamlit.components.v1 as components
 
-IPS_APP_SHELL_LAYOUT_STYLES_KEY = "ips_app_shell_layout_styles_v4"
+IPS_APP_SHELL_LAYOUT_STYLES_KEY = "ips_app_shell_layout_styles_v5"
 IPS_APP_SHELL_SCRIPT_MARKER_CLASS = "ips-app-shell-script-marker"
 
 
@@ -68,6 +68,9 @@ def _app_shell_pre_header_cleanup_script() -> str:
       }
     }
     if (!headerContainer) return;
+    headerContainer.style.setProperty("margin-top", "0", "important");
+    headerContainer.style.setProperty("padding-top", "0", "important");
+    vertical.style.setProperty("gap", "0", "important");
     for (let i = 0; i < children.length; i += 1) {
       const child = children[i];
       if (!child) continue;
@@ -94,6 +97,7 @@ def _app_shell_pre_header_cleanup_script() -> str:
   const run = function () { collapsePreHeader(); };
   run();
   w.requestAnimationFrame(run);
+  w.requestAnimationFrame(function () { w.requestAnimationFrame(run); });
 })();
 </script>
 """
@@ -106,7 +110,7 @@ def inject_app_shell_layout_styles() -> None:
     st.session_state[IPS_APP_SHELL_LAYOUT_STYLES_KEY] = True
     st.markdown(
         """
-<style id="ips-app-shell-layout-v4">
+<style id="ips-app-shell-layout-v5">
 :root {
   --ips-main-top-gap: 0px;
 }
@@ -130,6 +134,22 @@ body.ips-authed-app section[data-testid="stMain"] [data-testid="stVerticalBlock"
 }
 body.ips-authed-app section[data-testid="stMain"] [data-testid="stVerticalBlock"] {
   gap: 0 !important;
+}
+body.ips-authed-app [data-testid="stAppViewBlockContainer"] {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+body.ips-authed-app section[data-testid="stMain"]:has(.ips-app-page-header-marker) .block-container,
+body.ips-authed-app section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="stMainBlockContainer"] {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+body.ips-authed-app section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="stVerticalBlock"] {
+  gap: 0 !important;
+}
+body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has([class*="st-key-ips_page_header"]) {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
 }
 body.ips-authed-app [class*="st-key-ips_page_header"],
 body.ips-authed-app [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {

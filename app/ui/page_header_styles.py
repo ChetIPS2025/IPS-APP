@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v9"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v10"
 
 
 def inject_page_header_styles() -> None:
@@ -15,13 +15,13 @@ def inject_page_header_styles() -> None:
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-page-header-styles-v9">
+<style id="ips-page-header-styles-v10">
 [class*="st-key-ips_page_header"],
 [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
   margin: 0 0 14px 0 !important;
-  padding: clamp(18px, 2.2vw, 24px) clamp(12px, 1.5vw, 20px) clamp(20px, 2.4vw, 26px) !important;
-  min-height: 112px !important;
+  padding: clamp(10px, 1.2vw, 14px) clamp(12px, 1.5vw, 20px) clamp(16px, 2vw, 22px) !important;
+  min-height: 96px !important;
   background: #ffffff !important;
   border: 1px solid #e5e7eb !important;
   border-bottom: 2px solid #3158e6 !important;
@@ -343,7 +343,7 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
 @media (min-width: 1440px) {
   [class*="st-key-ips_page_header"],
   [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
-    min-height: 120px !important;
+    min-height: 104px !important;
   }
   .ips-header-title {
     font-size: 30px !important;

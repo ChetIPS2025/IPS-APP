@@ -12327,7 +12327,7 @@ def inject_global_css() -> None:
     with st.sidebar:
         st.markdown(
             f"""
-<style id="ips-global-styles-v16">
+<style id="ips-global-styles-v17">
 :root {{
   --ips-bg: {APP_BG};
   --ips-sidebar: {SIDEBAR_BG};
@@ -12400,7 +12400,10 @@ section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="stV
   padding-top: 0 !important;
 }}
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVerticalBlock"] {{
-  gap: 0.4rem !important;
+  gap: 0 !important;
+}}
+section[data-testid="stMain"]:has(.ips-app-page-header-marker) [data-testid="stVerticalBlock"] {{
+  gap: 0 !important;
 }}
 section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stElementContainer"] {{
   margin-bottom: 0.25rem !important;

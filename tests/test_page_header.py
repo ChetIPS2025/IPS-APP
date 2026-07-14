@@ -61,7 +61,7 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.ui.page_header_styles import inject_page_header_styles
 
         src = inspect.getsource(inject_page_header_styles)
-        self.assertIn("ips-page-header-styles-v9", src)
+        self.assertIn("ips-page-header-styles-v10", src)
         self.assertIn("st-key-header_page_toolbar", src)
         self.assertIn('[class*="st-key-ips_page_header"]', src)
         self.assertIn(".st-key-header_primary_action", src)
@@ -98,7 +98,7 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.styles import inject_global_css
 
         src = inspect.getsource(inject_global_css)
-        self.assertIn("ips-global-styles-v16", src)
+        self.assertIn("ips-global-styles-v17", src)
         self.assertIn("padding-top: 0 !important", src)
         self.assertNotIn("margin-left: -22px", src)
         self.assertNotIn("margin-right: -22px", src)
@@ -133,7 +133,7 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.ui.app_shell_styles import inject_app_shell_layout_styles
 
         src = inspect.getsource(inject_app_shell_layout_styles)
-        self.assertIn("ips-app-shell-layout-v4", src)
+        self.assertIn("ips-app-shell-layout-v5", src)
         self.assertIn("stMainBlockContainer", src)
         self.assertIn("padding-top: var(--ips-main-top-gap)", src)
         self.assertIn("ips-app-shell-script-marker", src)

@@ -4896,8 +4896,6 @@ def render() -> None:
     if not begin_module("timekeeping"):
         return
 
-    inject_timekeeping_module_css()
-
     from app.navigation import TK_PREFILL_WEEK_KEY
     pre_week_raw = str(st.session_state.pop(TK_PREFILL_WEEK_KEY, "") or "").strip()[:10]
     if pre_week_raw:
@@ -4944,6 +4942,7 @@ def render() -> None:
         secondary_action=_tk_recalc,
     )
 
+    inject_timekeeping_module_css()
     inject_scroll_preserve("timekeeping")
     from app.mobile_ui import ensure_narrow_viewport_detected
     ensure_narrow_viewport_detected()
