@@ -6,8 +6,8 @@ import streamlit as st
 
 from app.ui.css_inject import inject_css_once
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v23"
-IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v23"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v24"
+IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v24"
 
 
 def inject_page_header_styles() -> None:
@@ -17,7 +17,7 @@ def inject_page_header_styles() -> None:
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-page-header-styles-v23">
+<style id="ips-page-header-styles-v24">
 [class*="st-key-ips_page_header"],
 [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
@@ -153,8 +153,7 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   max-width: max-content !important;
   z-index: 4 !important;
 }
-[class*="st-key-header_bottom_actions"] [data-testid="stVerticalBlockBorderWrapper"] > div > [data-testid="stVerticalBlock"],
-[class*="st-key-header_bottom_actions"] > div > div > [data-testid="stVerticalBlock"] {
+[class*="st-key-header_bottom_actions"] [data-testid="stHorizontalBlock"] {
   display: flex !important;
   flex-direction: row !important;
   flex-wrap: nowrap !important;
@@ -163,6 +162,27 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   gap: 8px !important;
   width: max-content !important;
   max-width: max-content !important;
+  margin: 0 !important;
+}
+[class*="st-key-header_bottom_actions"] [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+  flex: 0 0 auto !important;
+  flex-shrink: 0 !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  padding: 0 !important;
+  position: static !important;
+  overflow: visible !important;
+}
+[class*="st-key-header_bottom_actions"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:first-child {
+  min-width: 260px !important;
+  width: auto !important;
+  max-width: 320px !important;
+}
+[class*="st-key-header_bottom_actions"] [data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child:not(:first-child) {
+  min-width: max-content !important;
+  width: auto !important;
+  max-width: none !important;
 }
 [class*="st-key-header_bottom_actions"] [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has(.ips-header-bottom-actions-marker) {
   display: none !important;
@@ -171,13 +191,6 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   margin: 0 !important;
   padding: 0 !important;
   overflow: hidden !important;
-}
-[class*="st-key-header_bottom_actions"] [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] {
-  flex: 0 0 auto !important;
-  width: auto !important;
-  min-width: 0 !important;
-  max-width: none !important;
-  margin: 0 !important;
 }
 .st-key-header_bottom_actions .st-key-header_date_range,
 [class*="st-key-header_bottom_actions"] .st-key-header_date_range {

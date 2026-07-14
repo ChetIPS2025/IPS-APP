@@ -270,13 +270,24 @@ def _render_bottom_actions(
             '<span class="ips-header-bottom-actions-marker" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        if show_date_range:
+        if show_date_range and primary_action is not None:
+            date_col, primary_col = st.columns([1, 1], gap="small")
+            with date_col:
+                _render_date_range(
+                    key=date_range_key,
+                    value=date_range_value,
+                    on_change=on_date_range_change,
+                )
+            with primary_col:
+                with st.container(key="header_primary_action"):
+                    primary_action()
+        elif show_date_range:
             _render_date_range(
                 key=date_range_key,
                 value=date_range_value,
                 on_change=on_date_range_change,
             )
-        if primary_action is not None:
+        elif primary_action is not None:
             with st.container(key="header_primary_action"):
                 primary_action()
 
