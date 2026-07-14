@@ -26,10 +26,17 @@ def _app_shell_pre_header_cleanup_script() -> str:
 (function () {
   const w = window.parent || window;
   const d = w.document;
+  function isPageHeaderContainer(el) {
+    if (!el || !el.querySelector) return false;
+    return !!(
+      el.querySelector(".ips-app-page-header-marker") ||
+      el.querySelector('[class*="st-key-ips_page_header"]')
+    );
+  }
   function zero(el) {
     if (!el) return;
-    if (el.closest(".st-key-ips_page_header")) return;
-    if (el.querySelector(".st-key-ips_page_header, .ips-app-page-header-marker")) return;
+    if (el.closest('[class*="st-key-ips_page_header"]')) return;
+    if (isPageHeaderContainer(el)) return;
     el.style.setProperty("display", "none", "important");
     el.style.setProperty("height", "0", "important");
     el.style.setProperty("min-height", "0", "important");
@@ -53,13 +60,9 @@ def _app_shell_pre_header_cleanup_script() -> str:
     if (!vertical) return;
     let headerContainer = null;
     const children = vertical.children || [];
-    for (let i = 0; i < children.length; i += 1) {
+    for (let i = children.length - 1; i >= 0; i -= 1) {
       const child = children[i];
-      if (!child || !child.querySelector) continue;
-      if (
-        child.querySelector(".st-key-ips_page_header") ||
-        child.querySelector(".ips-app-page-header-marker")
-      ) {
+      if (isPageHeaderContainer(child)) {
         headerContainer = child;
         break;
       }
@@ -68,8 +71,14 @@ def _app_shell_pre_header_cleanup_script() -> str:
     for (let i = 0; i < children.length; i += 1) {
       const child = children[i];
       if (!child) continue;
-      if (child === headerContainer) break;
-      zero(child);
+      if (child === headerContainer) continue;
+      if (isPageHeaderContainer(child)) {
+        zero(child);
+        continue;
+      }
+      if (child.compareDocumentPosition(headerContainer) & Node.DOCUMENT_POSITION_FOLLOWING) {
+        zero(child);
+      }
     }
     const block = main.querySelector(".block-container");
     if (block) {
@@ -122,11 +131,11 @@ body.ips-authed-app section[data-testid="stMain"] [data-testid="stVerticalBlock"
 body.ips-authed-app section[data-testid="stMain"] [data-testid="stVerticalBlock"] {
   gap: 0 !important;
 }
-body.ips-authed-app .st-key-ips_page_header,
-body.ips-authed-app .st-key-ips_page_header [data-testid="stVerticalBlockBorderWrapper"] {
+body.ips-authed-app [class*="st-key-ips_page_header"],
+body.ips-authed-app [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
   margin-top: 0 !important;
 }
-body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(.st-key-ips_page_header) {
+body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has([class*="st-key-ips_page_header"]) {
   margin-top: 0 !important;
   padding-top: 0 !important;
 }
@@ -204,7 +213,7 @@ body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContain
 body.ips-authed-app section[data-testid="stMain"] > div > [data-testid="stVerticalBlock"] {
   gap: 0 !important;
 }
-body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(.ips-page-shell-marker):not(:has(.ips-app-page-header-marker)):not(:has(.st-key-ips_page_header)) {
+body.ips-authed-app section[data-testid="stMain"] [data-testid="stElementContainer"]:has(.ips-page-shell-marker):not(:has(.ips-app-page-header-marker)):not(:has([class*="st-key-ips_page_header"])) {
   display: none !important;
   height: 0 !important;
   min-height: 0 !important;

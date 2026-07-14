@@ -12442,12 +12442,12 @@ section[data-testid="stMain"]:has(.ips-page-shell-marker) [data-testid="stVertic
 }}
 
 /* IPS shared page header - authoritative styles live in app/ui/page_header_styles.py */
-.st-key-ips_page_header,
-.st-key-ips_page_header [data-testid="stVerticalBlockBorderWrapper"] {{
+[class*="st-key-ips_page_header"],
+[class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {{
   margin: 0 0 14px 0 !important;
 }}
-section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-ips_page_header,
-section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) .st-key-ips_page_header [data-testid="stVerticalBlockBorderWrapper"] {{
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [class*="st-key-ips_page_header"],
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {{
   margin-top: 0 !important;
 }}
 .ips-header-root {{

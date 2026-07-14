@@ -61,8 +61,8 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.ui.page_header_styles import inject_page_header_styles
 
         src = inspect.getsource(inject_page_header_styles)
-        self.assertIn("ips-page-header-styles-v5", src)
-        self.assertIn(".st-key-ips_page_header", src)
+        self.assertIn("ips-page-header-styles-v6", src)
+        self.assertIn('[class*="st-key-ips_page_header"]', src)
         self.assertIn(".st-key-header_primary_action", src)
         self.assertNotIn("position: absolute", src)
         self.assertNotIn("width: 100vw", src)
@@ -140,13 +140,19 @@ class PageHeaderSourceTests(unittest.TestCase):
         self.assertNotIn("translateY", src)
         self.assertNotIn("position: absolute", src)
 
+    def test_page_header_uses_slug_specific_container_key(self) -> None:
+        from app.ui.page_header import render_page_header
+
+        src = inspect.getsource(render_page_header)
+        self.assertIn('key=f"ips_page_header_{slug}"', src)
+
     def test_pre_header_cleanup_targets_page_level_siblings_only(self) -> None:
         from app.ui.app_shell_styles import _app_shell_pre_header_cleanup_script
 
         src = _app_shell_pre_header_cleanup_script()
         self.assertIn("pageRootVertical", src)
         self.assertIn("stMainBlockContainer", src)
-        self.assertIn('closest(".st-key-ips_page_header")', src)
+        self.assertIn('class*="st-key-ips_page_header"', src)
         self.assertNotIn("setTimeout(run, 500)", src)
 
 

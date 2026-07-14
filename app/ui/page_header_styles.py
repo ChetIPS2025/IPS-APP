@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v5"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v6"
 
 
 def inject_page_header_styles() -> None:
@@ -15,9 +15,9 @@ def inject_page_header_styles() -> None:
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-page-header-styles-v5">
-.st-key-ips_page_header,
-.st-key-ips_page_header [data-testid="stVerticalBlockBorderWrapper"] {
+<style id="ips-page-header-styles-v6">
+[class*="st-key-ips_page_header"],
+[class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
   margin: 0 0 14px 0 !important;
   padding: clamp(18px, 2.2vw, 24px) clamp(20px, 3vw, 48px) clamp(20px, 2.4vw, 26px) !important;
@@ -29,14 +29,23 @@ def inject_page_header_styles() -> None:
   box-sizing: border-box !important;
   overflow: visible !important;
 }
-.st-key-ips_page_header [data-testid="stElementContainer"]:has(.ips-header-root) {
+[class*="st-key-ips_page_header"] [data-testid="stElementContainer"]:has(.ips-header-root) {
   height: 0 !important;
   min-height: 0 !important;
   margin: 0 !important;
   padding: 0 !important;
   overflow: hidden !important;
 }
-.st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] {
+section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has(.ips-app-page-header-marker):has(~ [data-testid="stElementContainer"]:has(.ips-app-page-header-marker)) {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: none !important;
+}
+[class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] {
   display: flex !important;
   align-items: center !important;
   gap: clamp(12px, 1.6vw, 20px) !important;
@@ -44,31 +53,31 @@ def inject_page_header_styles() -> None:
   flex-wrap: nowrap !important;
   overflow: visible !important;
 }
-.st-key-ips_page_header [data-testid="stHorizontalBlock"] {
+[class*="st-key-ips_page_header"] [data-testid="stHorizontalBlock"] {
   align-items: center !important;
   gap: clamp(10px, 1.2vw, 16px) !important;
   width: 100% !important;
   overflow: visible !important;
 }
-.st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) {
+[class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2) {
   flex: 0 1 auto !important;
   width: auto !important;
   min-width: clamp(200px, 18vw, 340px) !important;
   max-width: 340px !important;
   overflow: visible !important;
 }
-.st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {
+[class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {
   flex: 1 1 220px !important;
   min-width: 200px !important;
   overflow: visible !important;
 }
-.st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {
+[class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {
   flex: 1 1 560px !important;
   min-width: 520px !important;
   max-width: 100% !important;
   overflow: visible !important;
 }
-.st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) > [data-testid="stHorizontalBlock"] {
+[class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) > [data-testid="stHorizontalBlock"] {
   display: flex !important;
   flex-wrap: wrap !important;
   justify-content: flex-end !important;
@@ -77,7 +86,7 @@ def inject_page_header_styles() -> None:
   width: 100% !important;
   overflow: visible !important;
 }
-.st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) [data-testid="column"] {
+[class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) [data-testid="column"] {
   flex: 0 0 auto !important;
   flex-shrink: 0 !important;
   width: auto !important;
@@ -85,19 +94,19 @@ def inject_page_header_styles() -> None:
   overflow: visible !important;
   position: relative !important;
 }
-.st-key-ips_page_header [class*="st-key-header_"] {
+[class*="st-key-ips_page_header"] [class*="st-key-header_"] {
   flex: 0 0 auto !important;
   flex-shrink: 0 !important;
   width: auto !important;
   max-width: none !important;
 }
-.st-key-ips_page_header .stButton,
-.st-key-ips_page_header .stDateInput,
-.st-key-ips_page_header [data-testid="stPopover"] {
+[class*="st-key-ips_page_header"] .stButton,
+[class*="st-key-ips_page_header"] .stDateInput,
+[class*="st-key-ips_page_header"] [data-testid="stPopover"] {
   margin: 0 !important;
 }
-.st-key-ips_page_header .stButton > button,
-.st-key-ips_page_header [data-testid="stPopover"] > button {
+[class*="st-key-ips_page_header"] .stButton > button,
+[class*="st-key-ips_page_header"] [data-testid="stPopover"] > button {
   min-height: 40px !important;
   height: 40px !important;
   margin: 0 !important;
@@ -262,8 +271,8 @@ def inject_page_header_styles() -> None:
   display: none !important;
 }
 @media (min-width: 1440px) {
-  .st-key-ips_page_header,
-  .st-key-ips_page_header [data-testid="stVerticalBlockBorderWrapper"] {
+  [class*="st-key-ips_page_header"],
+  [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
     min-height: 120px !important;
   }
   .ips-header-title {
@@ -271,11 +280,11 @@ def inject_page_header_styles() -> None:
   }
 }
 @media (max-width: 1279px) and (min-width: 1100px) {
-  .st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] {
+  [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] {
     flex-wrap: wrap !important;
     row-gap: 12px !important;
   }
-  .st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {
+  [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {
     flex: 1 1 100% !important;
     width: 100% !important;
     min-width: 100% !important;
@@ -286,26 +295,26 @@ def inject_page_header_styles() -> None:
     width: clamp(200px, 16vw, 300px) !important;
     min-width: 200px !important;
   }
-  .st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {
+  [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {
     min-width: 480px !important;
   }
-  .st-key-ips_page_header .st-key-header_help {
+  [class*="st-key-ips_page_header"] .st-key-header_help {
     display: none !important;
   }
 }
 @media (max-width: 1099px) {
-  .st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] {
+  [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] {
     flex-wrap: wrap !important;
     row-gap: 14px !important;
     align-items: flex-start !important;
   }
-  .st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2),
-  .st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {
+  [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(2),
+  [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {
     flex: 1 1 auto !important;
     min-width: 0 !important;
     max-width: 100% !important;
   }
-  .st-key-ips_page_header > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {
+  [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) {
     flex: 1 1 100% !important;
     width: 100% !important;
     max-width: 100% !important;
@@ -320,8 +329,8 @@ def inject_page_header_styles() -> None:
   }
 }
 @media (max-width: 767px) {
-  .st-key-ips_page_header,
-  .st-key-ips_page_header [data-testid="stVerticalBlockBorderWrapper"] {
+  [class*="st-key-ips_page_header"],
+  [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
     min-height: 96px !important;
     padding: 16px 16px 18px !important;
   }

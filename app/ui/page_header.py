@@ -273,7 +273,7 @@ def render_page_header(
     if actions:
         extra_actions.extend(actions)
 
-    with st.container(key="ips_page_header"):
+    with st.container(key=f"ips_page_header_{slug}"):
         marker_classes = "ips-page-shell-marker ips-header-root ips-page-header ips-app-page-header-marker"
         if str(layout_marker or "").strip():
             marker_classes += f" {html.escape(str(layout_marker).strip())}"
