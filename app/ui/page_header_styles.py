@@ -6,8 +6,8 @@ import streamlit as st
 
 from app.ui.css_inject import inject_css_once
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v19"
-IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v19"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v20"
+IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v20"
 
 
 def inject_page_header_styles() -> None:
@@ -17,7 +17,7 @@ def inject_page_header_styles() -> None:
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-page-header-styles-v19">
+<style id="ips-page-header-styles-v20">
 [class*="st-key-ips_page_header"],
 [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
@@ -96,10 +96,6 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
     pointer-events: none !important;
   }
 }
-[class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4):has(.st-key-header_date_range) {
-  flex: 1 1 560px !important;
-  min-width: 520px !important;
-}
 [class*="st-key-header_page_toolbar"] {
   width: 100% !important;
   margin-top: 12px !important;
@@ -139,10 +135,60 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   display: flex !important;
   flex-wrap: nowrap !important;
   justify-content: flex-end !important;
-  align-items: flex-start !important;
-  gap: 6px !important;
+  align-items: stretch !important;
+  gap: 0 !important;
   width: 100% !important;
+  min-height: 40px !important;
   overflow: visible !important;
+}
+.st-key-header_bottom_actions,
+[class*="st-key-header_bottom_actions"] {
+  position: absolute !important;
+  bottom: 0 !important;
+  right: 0 !important;
+  flex: 0 0 auto !important;
+  min-width: max-content !important;
+  max-width: max-content !important;
+  z-index: 4 !important;
+}
+.st-key-header_bottom_actions [data-testid="stHorizontalBlock"],
+[class*="st-key-header_bottom_actions"] [data-testid="stHorizontalBlock"] {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 4px !important;
+  width: max-content !important;
+  max-width: max-content !important;
+  margin: 0 !important;
+}
+.st-key-header_bottom_actions [data-testid="column"],
+[class*="st-key-header_bottom_actions"] [data-testid="column"] {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  padding: 0 !important;
+}
+.st-key-header_bottom_actions .st-key-header_date_range,
+[class*="st-key-header_bottom_actions"] .st-key-header_date_range {
+  min-width: 190px !important;
+  max-width: 230px !important;
+  flex: 0 0 auto !important;
+}
+.st-key-header_bottom_actions .st-key-header_primary_action,
+[class*="st-key-header_bottom_actions"] .st-key-header_primary_action {
+  min-width: max-content !important;
+  max-width: none !important;
+  flex: 0 0 auto !important;
+}
+[class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) > [data-testid="stHorizontalBlock"] > [data-testid="column"]:has([class*="st-key-header_bottom_actions"]) {
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  flex: 0 0 0 !important;
 }
 .st-key-header_trailing_actions,
 [class*="st-key-header_trailing_actions"] {
@@ -217,11 +263,14 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
 }
 [class*="st-key-ips_page_header"]:has(.ips-assets-page-header-actions),
 [class*="st-key-ips_page_header"]:has(.ips-jobs-page-header-actions),
+[class*="st-key-ips_page_header"]:has(.ips-page-header-inline-actions) .st-key-header_bottom_actions .st-key-header_primary_action,
+[class*="st-key-ips_page_header"]:has(.ips-assets-page-header-actions) .st-key-header_bottom_actions .st-key-header_primary_action,
+[class*="st-key-ips_page_header"]:has(.ips-jobs-page-header-actions) .st-key-header_bottom_actions .st-key-header_primary_action,
 [class*="st-key-ips_page_header"]:has(.ips-page-header-inline-actions) .st-key-header_primary_action {
   min-width: max-content !important;
   flex: 0 0 auto !important;
   max-width: none !important;
-  margin-right: auto !important;
+  margin-right: 0 !important;
 }
 [class*="st-key-ips_page_header"]:has(.ips-assets-page-header-actions),
 [class*="st-key-ips_page_header"]:has(.ips-jobs-page-header-actions),
@@ -447,7 +496,7 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
 .st-key-header_date_range {
   min-width: 190px !important;
   max-width: 230px !important;
-  flex: 0 0 190px !important;
+  flex: 0 0 auto !important;
 }
 .st-key-header_refresh,
 .st-key-header_help,

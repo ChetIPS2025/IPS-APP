@@ -33,7 +33,8 @@ class PageHeaderSourceTests(unittest.TestCase):
         src = inspect.getsource(ui_page_header)
         render_src = inspect.getsource(ui_page_header.render_page_header)
         self.assertIn("back_col, logo_col, title_col, actions_col", render_src)
-        self.assertIn("header_primary_action", render_src)
+        self.assertIn("bottom_actions", render_src)
+        self.assertIn("_render_bottom_actions", src)
         self.assertIn("header_date_range", src)
         self.assertIn("height=56", render_src)
         self.assertIn("ips_page_header", render_src)
@@ -61,10 +62,11 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.ui.page_header_styles import inject_page_header_styles
 
         src = inspect.getsource(inject_page_header_styles)
-        self.assertIn("ips-page-header-styles-v19", src)
+        self.assertIn("ips-page-header-styles-v20", src)
         self.assertIn("border-radius: 50%", src)
         self.assertIn("st-key-header_avatar", src)
         self.assertIn("st-key-header_trailing_actions", src)
+        self.assertIn("st-key-header_bottom_actions", src)
         self.assertIn("translate(-50%, -50%)", src)
         self.assertIn("flex-direction: column", src)
         self.assertIn("ips-header-utility-icon-slot", src)
@@ -164,6 +166,15 @@ class PageHeaderSourceTests(unittest.TestCase):
         self.assertNotIn("translateY", src)
         self.assertNotIn("position: absolute", src)
 
+    def test_page_header_clusters_bottom_actions(self) -> None:
+        from app.ui import page_header as ui_page_header
+
+        src = inspect.getsource(ui_page_header._render_bottom_actions)
+        self.assertIn("header_bottom_actions", src)
+        self.assertIn("ips-header-bottom-actions-marker", src)
+        self.assertIn("_render_date_range", src)
+        self.assertIn("header_primary_action", src)
+
     def test_page_header_clusters_trailing_utilities(self) -> None:
         from app.ui import page_header as ui_page_header
 
@@ -180,7 +191,7 @@ class PageHeaderSourceTests(unittest.TestCase):
             has_secondary_action=True,
             has_primary_action=True,
         )
-        self.assertEqual(names, ["primary", "trailing"])
+        self.assertEqual(names, ["bottom_actions", "trailing"])
         self.assertEqual(len(ratios), 2)
 
     def test_page_header_uses_dynamic_action_slots_without_secondary(self) -> None:
@@ -220,8 +231,8 @@ class PageHeaderSourceTests(unittest.TestCase):
             has_primary_action=True,
             primary_action_width=5.8,
         )
-        self.assertEqual(names[0], "primary")
-        self.assertEqual(ratios[0], 5.8)
+        self.assertEqual(names, ["bottom_actions", "trailing"])
+        self.assertEqual(ratios[0], 0.01)
 
     def test_scroll_preserve_injects_from_sidebar(self) -> None:
         from app.ui.streamlit_perf import inject_scroll_preserve

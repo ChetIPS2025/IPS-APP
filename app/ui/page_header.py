@@ -21,8 +21,7 @@ _ActionFn = Callable[[], None]
 
 _MAIN_COLS = [0.35, 3.2, 3.5, 7.5]
 _ACTION_WIDTHS: dict[str, float] = {
-    "date": 2.05,
-    "primary": 1.55,
+    "bottom_actions": 0.01,
     "trailing": 2.2,
     "trailing_with_secondary": 3.0,
 }
@@ -36,11 +35,10 @@ def _action_slot_columns(
     has_primary_action: bool,
     primary_action_width: float | None = None,
 ) -> tuple[list[str], list[float]]:
+    _ = primary_action_width
     names: list[str] = []
-    if show_date_range:
-        names.append("date")
-    if has_primary_action:
-        names.append("primary")
+    if show_date_range or has_primary_action:
+        names.append("bottom_actions")
     trailing_width = (
         _ACTION_WIDTHS["trailing_with_secondary"]
         if has_secondary_action
@@ -49,11 +47,8 @@ def _action_slot_columns(
     if show_refresh and not has_secondary_action:
         trailing_width += 0.45
     names.append("trailing")
-    ratios = [_ACTION_WIDTHS[name] for name in names if name != "trailing"]
+    ratios = [_ACTION_WIDTHS["bottom_actions"]] * (len(names) - 1)
     ratios.append(trailing_width)
-    if has_primary_action and primary_action_width is not None:
-        primary_idx = names.index("primary")
-        ratios[primary_idx] = float(primary_action_width)
     return names, ratios
 
 
@@ -261,6 +256,44 @@ def _render_user_menu(
                 sign_out()
 
 
+def _render_bottom_actions(
+    *,
+    show_date_range: bool,
+    date_range_key: str,
+    date_range_value: tuple[date, date] | date | None,
+    on_date_range_change: Callable[[tuple[date, date]], None] | None,
+    primary_action: _ActionFn | None,
+) -> None:
+    """Cluster date range and primary actions at the bottom-right of the header."""
+    with st.container(key="header_bottom_actions"):
+        st.markdown(
+            '<span class="ips-header-bottom-actions-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        slot_names: list[str] = []
+        if show_date_range:
+            slot_names.append("date")
+        if primary_action is not None:
+            slot_names.append("primary")
+        if not slot_names:
+            return
+        slot_cols = st.columns([1.0] * len(slot_names), gap="small")
+        slots = dict(zip(slot_names, slot_cols))
+
+        if show_date_range:
+            with slots["date"]:
+                _render_date_range(
+                    key=date_range_key,
+                    value=date_range_value,
+                    on_change=on_date_range_change,
+                )
+
+        if primary_action is not None:
+            with slots["primary"]:
+                with st.container(key="header_primary_action"):
+                    primary_action()
+
+
 def _render_trailing_actions(
     *,
     header_key: str,
@@ -429,18 +462,15 @@ def render_page_header(
             )
             slots = dict(zip(slot_names, slot_cols))
 
-            if show_date_range:
-                with slots["date"]:
-                    _render_date_range(
-                        key=date_range_key,
-                        value=date_range_value,
-                        on_change=on_date_range_change,
+            if show_date_range or primary_action:
+                with slots["bottom_actions"]:
+                    _render_bottom_actions(
+                        show_date_range=show_date_range,
+                        date_range_key=date_range_key,
+                        date_range_value=date_range_value,
+                        on_date_range_change=on_date_range_change,
+                        primary_action=primary_action,
                     )
-
-            if primary_action:
-                with slots["primary"]:
-                    with st.container(key="header_primary_action"):
-                        primary_action()
 
             role, display, initials, sign_out_fn = _header_auth_context()
 
