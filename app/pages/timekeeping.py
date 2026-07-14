@@ -2664,26 +2664,25 @@ def _render_weekly_timekeeping_toolbar(week_start_d: date, week_end_d: date) -> 
             clear_timekeeping_list_caches()
             st.rerun()
     with week_col:
+        week_label = f"Week of {fmt_date(week_start_d)} – {fmt_date(week_end_d)}"
         with st.container(key="tk_week_range"):
-            picked = st.date_input(
-                "Week range",
-                value=(week_start_d, week_end_d),
-                key="tk_week_range_picker",
-                label_visibility="collapsed",
-                help="Select week range",
-                format=DATE_INPUT_FORMAT,
-            )
-        if isinstance(picked, tuple) and len(picked) == 2:
-            start_d = normalize_date(picked[0])
-            if start_d is not None:
-                new_start = week_start(start_d)
-                if new_start != week_start_d:
-                    st.session_state[_WEEK_KEY] = new_start
-                    reset_table_page(_TABLE_KEY)
-                    _clear_expanded_timecard()
-                    _clear_day_time_selection()
-                    clear_timekeeping_list_caches()
-                    st.rerun()
+            with st.popover(week_label, help="Pick a date to jump to that week", use_container_width=True):
+                picked = st.date_input(
+                    "Jump to week",
+                    value=week_start_d,
+                    key="tk_week_range_picker",
+                    label_visibility="collapsed",
+                    format=DATE_INPUT_FORMAT,
+                )
+        if isinstance(picked, date):
+            new_start = week_start(picked)
+            if new_start != week_start_d:
+                st.session_state[_WEEK_KEY] = new_start
+                reset_table_page(_TABLE_KEY)
+                _clear_expanded_timecard()
+                _clear_day_time_selection()
+                clear_timekeeping_list_caches()
+                st.rerun()
     with next_col:
         if st.button("›", key="tk_next_week", help="Next week", use_container_width=True):
             st.session_state[_WEEK_KEY] = week_start_d + timedelta(days=7)

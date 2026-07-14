@@ -5467,7 +5467,7 @@ def inject_timekeeping_module_css() -> None:
     with st.sidebar:
         st.markdown(
             f"""
-<style id="ips-timekeeping-module-v106">
+<style id="ips-timekeeping-module-v107">
 .ips-timekeeping-page {{
   background: #f1f5f9 !important;
 }}
@@ -5608,25 +5608,49 @@ def inject_timekeeping_module_css() -> None:
 .st-key-tk_week_range {{
   width: 100% !important;
 }}
+.st-key-tk_week_range [data-testid="stPopover"] {{
+  width: 100% !important;
+}}
+.st-key-tk_week_range [data-testid="stPopover"] > button {{
+  width: 100% !important;
+  min-height: 42px !important;
+  height: 42px !important;
+  padding: 8px 16px !important;
+  border: 1px solid #dbe3ef !important;
+  border-radius: 10px !important;
+  background: #f8fafc !important;
+  color: #334155 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  box-shadow: none !important;
+  justify-content: center !important;
+}}
+.st-key-tk_week_range [data-testid="stPopover"] > button:hover {{
+  border-color: #c7d2e3 !important;
+  background: #f1f5f9 !important;
+}}
+.st-key-tk_week_range [data-testid="stPopover"] > button p {{
+  margin: 0 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #334155 !important;
+  text-align: center !important;
+}}
 .st-key-tk_week_range [data-testid="stDateInput"] {{
   width: 100% !important;
 }}
 .st-key-tk_week_range [data-testid="stDateInput"] > div {{
-  min-height: 42px !important;
-  height: 42px !important;
+  min-height: 40px !important;
   border: 1px solid #dbe3ef !important;
-  border-radius: 10px !important;
-  background: #f8fafc !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
   box-shadow: none !important;
 }}
 .st-key-tk_week_range [data-testid="stDateInput"] input {{
-  min-height: 40px !important;
-  height: 40px !important;
-  text-align: center !important;
+  min-height: 38px !important;
   font-size: 14px !important;
   font-weight: 600 !important;
   color: #334155 !important;
-  background: transparent !important;
 }}
 .ips-timekeeping-page-range {{
   margin: 8px 0 0 0 !important;

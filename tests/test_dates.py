@@ -40,9 +40,10 @@ class StreamlitDateInputFormatTests(unittest.TestCase):
 
     def test_timekeeping_week_toolbar_uses_date_range_picker(self) -> None:
         src = inspect.getsource(tk._render_weekly_timekeeping_toolbar)
+        self.assertIn("st.popover", src)
         self.assertIn("st.date_input", src)
         self.assertIn("tk_week_range_picker", src)
-        self.assertIn("value=(week_start_d, week_end_d)", src)
+        self.assertIn("Week of", src)
         self.assertIn("format=DATE_INPUT_FORMAT", src)
         self.assertNotIn("ips-timekeeping-week-pill", src)
 
