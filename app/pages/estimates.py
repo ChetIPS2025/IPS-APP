@@ -1800,29 +1800,37 @@ def render() -> None:
         render_estimate_detail(str(st.session_state[SELECTED_ESTIMATE_KEY]))
         st.stop()
 
-    inject_estimates_module_css()
-    inject_estimates_page_layout_css()
+    rows = load_estimates()
+
+    def _estimates_header_actions() -> None:
+        st.markdown(
+            '<span class="ips-estimates-page-header-actions ips-page-header-inline-actions" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        export_col, new_col = st.columns(2, gap="small")
+        with export_col:
+            if st.button("Export", key="est_export", use_container_width=True):
+                st.session_state["est_export_ready"] = True
+        with new_col:
+            if st.button("+ New Estimate", key="est_new", type="primary", use_container_width=True):
+                clear_new_estimate_number_state()
+                st.session_state[_NEW_ESTIMATE_DIALOG_KEY] = True
+
+    from app.ui.page_header import render_page_header
+
+    render_page_header(
+        "Estimates",
+        "Track and manage estimates",
+        primary_action=_estimates_header_actions,
+        primary_action_width=2.4,
+    )
+
     st.markdown(
         '<span class="ips-estimates-page ips-page-shell-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
-    rows = load_estimates()
-
-    def _est_export() -> None:
-        if st.button("Export", key="est_export", use_container_width=True):
-            st.session_state["est_export_ready"] = True
-
-    def _est_new() -> None:
-        if st.button("+ New Estimate", key="est_new", type="primary", use_container_width=True):
-            clear_new_estimate_number_state()
-            st.session_state[_NEW_ESTIMATE_DIALOG_KEY] = True
-
-    render_page_brand_header(
-        "Estimates",
-        "Track and manage estimates",
-        actions=[_est_export, _est_new],
-        actions_column_ratio=(1.85, 1.15),
-    )
+    inject_estimates_module_css()
+    inject_estimates_page_layout_css()
 
     if st.session_state.get(_NEW_ESTIMATE_DIALOG_KEY):
         _show_new_estimate_dialog()
