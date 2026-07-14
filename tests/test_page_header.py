@@ -61,9 +61,10 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.ui.page_header_styles import inject_page_header_styles
 
         src = inspect.getsource(inject_page_header_styles)
-        self.assertIn("ips-page-header-styles-v17", src)
+        self.assertIn("ips-page-header-styles-v18", src)
         self.assertIn("border-radius: 50%", src)
         self.assertIn("st-key-header_avatar", src)
+        self.assertIn("st-key-header_trailing_actions", src)
         self.assertIn("translate(-50%, -50%)", src)
         self.assertIn("flex-direction: column", src)
         self.assertIn("ips-header-utility-icon-slot", src)
@@ -163,7 +164,14 @@ class PageHeaderSourceTests(unittest.TestCase):
         self.assertNotIn("translateY", src)
         self.assertNotIn("position: absolute", src)
 
-    def test_page_header_uses_dynamic_action_slots(self) -> None:
+    def test_page_header_clusters_trailing_utilities(self) -> None:
+        from app.ui import page_header as ui_page_header
+
+        src = inspect.getsource(ui_page_header._render_trailing_actions)
+        self.assertIn("header_trailing_actions", src)
+        self.assertIn("ips-header-trailing-actions-marker", src)
+        self.assertIn("_render_bell", src)
+        self.assertIn("_render_user_menu", src)
         from app.ui.page_header import _action_slot_columns
 
         names, ratios = _action_slot_columns(
@@ -172,8 +180,8 @@ class PageHeaderSourceTests(unittest.TestCase):
             has_secondary_action=True,
             has_primary_action=True,
         )
-        self.assertEqual(names, ["primary", "secondary", "notification", "help", "settings", "avatar"])
-        self.assertEqual(len(ratios), 6)
+        self.assertEqual(names, ["primary", "trailing"])
+        self.assertEqual(len(ratios), 2)
 
     def test_page_header_uses_dynamic_action_slots_without_secondary(self) -> None:
         from app.ui.page_header import _action_slot_columns
@@ -184,8 +192,8 @@ class PageHeaderSourceTests(unittest.TestCase):
             has_secondary_action=False,
             has_primary_action=False,
         )
-        self.assertEqual(names, ["notification", "help", "settings", "avatar"])
-        self.assertEqual(len(ratios), 4)
+        self.assertEqual(names, ["trailing"])
+        self.assertEqual(len(ratios), 1)
 
     def test_page_header_uses_slug_specific_container_key(self) -> None:
         from app.ui.page_header import render_page_header

@@ -22,13 +22,9 @@ _ActionFn = Callable[[], None]
 _MAIN_COLS = [0.35, 3.2, 3.5, 7.5]
 _ACTION_WIDTHS: dict[str, float] = {
     "date": 2.05,
-    "refresh": 0.5,
-    "secondary": 1.95,
     "primary": 1.55,
-    "notification": 0.55,
-    "help": 0.55,
-    "settings": 0.55,
-    "avatar": 0.55,
+    "trailing": 2.2,
+    "trailing_with_secondary": 3.0,
 }
 
 
@@ -43,14 +39,18 @@ def _action_slot_columns(
     names: list[str] = []
     if show_date_range:
         names.append("date")
-    if show_refresh:
-        names.append("refresh")
     if has_primary_action:
         names.append("primary")
-    if has_secondary_action:
-        names.append("secondary")
-    names.extend(["notification", "help", "settings", "avatar"])
-    ratios = [_ACTION_WIDTHS[name] for name in names]
+    trailing_width = (
+        _ACTION_WIDTHS["trailing_with_secondary"]
+        if has_secondary_action
+        else _ACTION_WIDTHS["trailing"]
+    )
+    if show_refresh and not has_secondary_action:
+        trailing_width += 0.45
+    names.append("trailing")
+    ratios = [_ACTION_WIDTHS[name] for name in names if name != "trailing"]
+    ratios.append(trailing_width)
     if has_primary_action and primary_action_width is not None:
         primary_idx = names.index("primary")
         ratios[primary_idx] = float(primary_action_width)
@@ -261,6 +261,61 @@ def _render_user_menu(
                 sign_out()
 
 
+def _render_trailing_actions(
+    *,
+    header_key: str,
+    role: str,
+    display: str,
+    initials: str,
+    sign_out: Callable[[], None],
+    show_refresh: bool,
+    refresh_key: str,
+    on_refresh: Callable[[], None] | None,
+    secondary_action: _ActionFn | None,
+) -> None:
+    """Cluster header utilities at the far right with minimal spacing."""
+    with st.container(key="header_trailing_actions"):
+        st.markdown(
+            '<span class="ips-header-trailing-actions-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        slot_names: list[str] = []
+        if secondary_action is not None:
+            slot_names.append("secondary")
+        if show_refresh:
+            slot_names.append("refresh")
+        slot_names.extend(["notification", "help", "settings", "avatar"])
+        slot_cols = st.columns([1.0] * len(slot_names), gap="small")
+        slots = dict(zip(slot_names, slot_cols))
+
+        if secondary_action is not None:
+            with slots["secondary"]:
+                with st.container(key="header_secondary_action"):
+                    secondary_action()
+
+        if show_refresh:
+            with slots["refresh"]:
+                _render_refresh(key=refresh_key, on_refresh=on_refresh)
+
+        with slots["notification"]:
+            _render_bell(header_key=header_key, role=role)
+
+        with slots["help"]:
+            _render_help(header_key=header_key)
+
+        with slots["settings"]:
+            _render_settings(header_key=header_key, role=role)
+
+        with slots["avatar"]:
+            _render_user_menu(
+                header_key=header_key,
+                role=role,
+                display=display,
+                initials=initials,
+                sign_out=sign_out,
+            )
+
+
 def render_page_header(
     title: str,
     subtitle: str | None = None,
@@ -382,38 +437,24 @@ def render_page_header(
                         on_change=on_date_range_change,
                     )
 
-            if show_refresh:
-                with slots["refresh"]:
-                    _render_refresh(key=refresh_key, on_refresh=on_refresh)
-
             if primary_action:
                 with slots["primary"]:
                     with st.container(key="header_primary_action"):
                         primary_action()
 
-            if secondary_action:
-                with slots["secondary"]:
-                    with st.container(key="header_secondary_action"):
-                        secondary_action()
-
             role, display, initials, sign_out_fn = _header_auth_context()
 
-            with slots["notification"]:
-                _render_bell(header_key=header_key, role=role)
-
-            with slots["help"]:
-                _render_help(header_key=header_key)
-
-            with slots["settings"]:
-                _render_settings(header_key=header_key, role=role)
-
-            with slots["avatar"]:
-                _render_user_menu(
+            with slots["trailing"]:
+                _render_trailing_actions(
                     header_key=header_key,
                     role=role,
                     display=display,
                     initials=initials,
                     sign_out=sign_out_fn,
+                    show_refresh=show_refresh,
+                    refresh_key=refresh_key,
+                    on_refresh=on_refresh,
+                    secondary_action=secondary_action,
                 )
 
         if extra_actions:

@@ -70,12 +70,12 @@ def _profit_pct_summary_class(value: float) -> str:
 
 
 def inject_jobs_page_layout_css() -> None:
-    if not inject_css_once("ips-jobs-page-layout-v24"):
+    if not inject_css_once("ips-jobs-page-layout-v25"):
         return
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-jobs-page-layout-v24">
+<style id="ips-jobs-page-layout-v25">
 section[data-testid="stMain"]:has(.ips-jobs-page) {
   background: #ffffff !important;
 }
@@ -85,38 +85,37 @@ section[data-testid="stMain"]:has(.ips-jobs-page) .block-container {
 section[data-testid="stMain"]:has(.ips-jobs-page) [data-testid="stVerticalBlock"] {
   gap: 0 !important;
 }
-section[data-testid="stMain"]:has(.ips-jobs-page) [class*="st-key-header_primary_action"]:has(.ips-jobs-page-header-actions) {
-  flex: 1 1 auto !important;
+section[data-testid="stMain"]:has(.ips-jobs-page) [class*="st-key-header_primary_action"] {
+  flex: 0 0 auto !important;
   min-width: max-content !important;
   max-width: none !important;
 }
-section[data-testid="stMain"]:has(.ips-jobs-page) [class*="st-key-header_primary_action"]:has(.ips-jobs-page-header-actions) [data-testid="stHorizontalBlock"] {
+section[data-testid="stMain"]:has(.ips-jobs-page) [class*="st-key-header_primary_action"] [data-testid="stHorizontalBlock"] {
   display: flex !important;
   flex-wrap: nowrap !important;
   align-items: center !important;
-  justify-content: flex-end !important;
+  justify-content: flex-start !important;
   gap: 0.45rem !important;
   width: max-content !important;
   max-width: 100% !important;
-  margin-left: auto !important;
 }
-section[data-testid="stMain"]:has(.ips-jobs-page) [class*="st-key-header_primary_action"]:has(.ips-jobs-page-header-actions) .stButton,
-section[data-testid="stMain"]:has(.ips-jobs-page) [class*="st-key-header_primary_action"]:has(.ips-jobs-page-header-actions) [data-testid="stDownloadButton"] {
+section[data-testid="stMain"]:has(.ips-jobs-page) [class*="st-key-header_primary_action"] .stButton,
+section[data-testid="stMain"]:has(.ips-jobs-page) [class*="st-key-header_primary_action"] [data-testid="stDownloadButton"] {
   margin: 0 !important;
   width: auto !important;
 }
-section[data-testid="stMain"]:has(.ips-jobs-page) [class*="st-key-header_primary_action"]:has(.ips-jobs-page-header-actions) .stButton > button {
+section[data-testid="stMain"]:has(.ips-jobs-page) [class*="st-key-header_primary_action"] .stButton > button {
   width: auto !important;
   min-width: max-content !important;
   max-width: none !important;
   white-space: nowrap !important;
 }
-section[data-testid="stMain"]:has(.ips-jobs-page) [class*="st-key-header_primary_action"]:has(.ips-jobs-page-header-actions) [class*="st-key-jobs_export"] .stButton > button {
+section[data-testid="stMain"]:has(.ips-jobs-page) [class*="st-key-header_trailing_actions"]:has(.ips-jobs-page-header-actions) [class*="st-key-jobs_export"] .stButton > button {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
   color: #374151 !important;
 }
-section[data-testid="stMain"]:has(.ips-jobs-page) [class*="st-key-header_primary_action"]:has(.ips-jobs-page-header-actions) [class*="st-key-jobs_new"] .stButton > button[kind="primary"] {
+section[data-testid="stMain"]:has(.ips-jobs-page) [class*="st-key-header_primary_action"] [class*="st-key-jobs_new"] .stButton > button[kind="primary"] {
   background: #3158e6 !important;
   border-color: #3158e6 !important;
   color: #ffffff !important;

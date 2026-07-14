@@ -2914,26 +2914,26 @@ def render() -> None:
 
 
 def _render_jobs_page() -> None:
-    def _jobs_header_actions() -> None:
+    def _jobs_export_action() -> None:
         st.markdown(
             '<span class="ips-jobs-page-header-actions ips-page-header-inline-actions" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        export_col, new_col = st.columns(2, gap="small")
-        with export_col:
-            st.button("Export", key="jobs_export", type="secondary", use_container_width=True)
-        with new_col:
-            if st.button("+ New Job", key="jobs_new", type="primary", use_container_width=True):
-                clear_new_job_number_state()
-                st.session_state["ips_job_form"] = True
+        st.button("Export", key="jobs_export", type="secondary", use_container_width=True)
+
+    def _jobs_new_job_action() -> None:
+        if st.button("+ New Job", key="jobs_new", type="primary", use_container_width=True):
+            clear_new_job_number_state()
+            st.session_state["ips_job_form"] = True
 
     from app.ui.page_header import render_page_header
 
     render_page_header(
         "Jobs",
         "Track and manage company jobs, assignments, and costing.",
-        primary_action=_jobs_header_actions,
-        primary_action_width=2.4,
+        primary_action=_jobs_new_job_action,
+        secondary_action=_jobs_export_action,
+        primary_action_width=1.55,
     )
 
     st.markdown(
