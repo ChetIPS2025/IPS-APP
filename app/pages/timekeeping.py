@@ -912,26 +912,30 @@ def _load_saved_allocations_by_date(employee_id: str, week_start_d: date) -> dic
         if st_h > 0 and ot_h > 0:
             by_date.setdefault(iso, []).append(
                 _new_allocation_line(
-                    line_id=line_id,
-                    job=job,
-                    hours=st_h,
-                    notes=notes,
-                    status=status,
-                    **meta,
-                    selected_time_type=selected,
-                    final_time_type="ST",
+                    **{
+                        **meta,
+                        "line_id": line_id,
+                        "job": job,
+                        "hours": st_h,
+                        "notes": notes,
+                        "status": status,
+                        "selected_time_type": selected,
+                        "final_time_type": "ST",
+                    }
                 )
             )
             by_date.setdefault(iso, []).append(
                 _new_allocation_line(
-                    line_id=line_id,
-                    job=job,
-                    hours=ot_h,
-                    notes=notes,
-                    status=status,
-                    **meta,
-                    selected_time_type=selected,
-                    final_time_type="OT",
+                    **{
+                        **meta,
+                        "line_id": line_id,
+                        "job": job,
+                        "hours": ot_h,
+                        "notes": notes,
+                        "status": status,
+                        "selected_time_type": selected,
+                        "final_time_type": "OT",
+                    }
                 )
             )
         elif st_h > 0 or ot_h > 0:
@@ -939,27 +943,31 @@ def _load_saved_allocations_by_date(employee_id: str, week_start_d: date) -> dic
             final_type = meta.get("final_time_type") or ("OT" if ot_h > 0 and st_h <= 0 else "ST")
             by_date.setdefault(iso, []).append(
                 _new_allocation_line(
-                    line_id=line_id,
-                    job=job,
-                    hour_type=final_type,
-                    hours=hours,
-                    notes=notes,
-                    status=status,
-                    **meta,
-                    selected_time_type=selected,
-                    final_time_type=final_type,
+                    **{
+                        **meta,
+                        "line_id": line_id,
+                        "job": job,
+                        "hour_type": final_type,
+                        "hours": hours,
+                        "notes": notes,
+                        "status": status,
+                        "selected_time_type": selected,
+                        "final_time_type": final_type,
+                    }
                 )
             )
         if st_h <= 0 and ot_h <= 0:
             by_date.setdefault(iso, []).append(
                 _new_allocation_line(
-                    line_id=line_id,
-                    job=job,
-                    hours=0.0,
-                    notes=notes,
-                    status=status,
-                    **meta,
-                    selected_time_type=selected,
+                    **{
+                        **meta,
+                        "line_id": line_id,
+                        "job": job,
+                        "hours": 0.0,
+                        "notes": notes,
+                        "status": status,
+                        "selected_time_type": selected,
+                    }
                 )
             )
     return by_date
