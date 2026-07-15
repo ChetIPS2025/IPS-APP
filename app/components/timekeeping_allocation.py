@@ -298,6 +298,7 @@ def _render_day_actions_bar(
     if (
         hours_editable
         and ctx.can_submit
+        and not ctx.modal_host
         and ctx.daily_total > 0
         and day_status in ("Draft", "Rejected")
         and str(ctx.alloc_state) == "complete"
@@ -308,16 +309,17 @@ def _render_day_actions_bar(
 
     status_col, add_col, actions_col = st.columns([1.2, 1.4, 1.4], gap="small", vertical_alignment="center")
     with status_col:
-        status_wrap_cls = ""
-        from app.services.timekeeping_day_ui import day_fully_approved_and_allocated
-        if day_fully_approved_and_allocated(str(ctx.alloc_state or ""), day_status):
-            status_wrap_cls = " timekeeping-alloc-day-actions-status-approved-complete"
-        st.markdown(
-            f'<div class="timekeeping-alloc-day-actions-status{status_wrap_cls}">'
-            f'<span class="timekeeping-alloc-day-actions-status-label">Status:</span> '
-            f"{deps.timecard_status_pill_html(day_status)}</div>",
-            unsafe_allow_html=True,
-        )
+        if not ctx.modal_host:
+            status_wrap_cls = ""
+            from app.services.timekeeping_day_ui import day_fully_approved_and_allocated
+            if day_fully_approved_and_allocated(str(ctx.alloc_state or ""), day_status):
+                status_wrap_cls = " timekeeping-alloc-day-actions-status-approved-complete"
+            st.markdown(
+                f'<div class="timekeeping-alloc-day-actions-status{status_wrap_cls}">'
+                f'<span class="timekeeping-alloc-day-actions-status-label">Status:</span> '
+                f"{deps.timecard_status_pill_html(day_status)}</div>",
+                unsafe_allow_html=True,
+            )
     with add_col:
         if "add" in action_slots:
             if st.button(
@@ -701,14 +703,12 @@ def render_day_allocation_card(
                 deps=deps,
                 hours_badge_text=ctx.daily_hours_label,
             )
-        if ctx.daily_total <= 0:
-            hint = (
-                "Enter daily total hours above to add assignments."
-                if ctx.modal_host
-                else "Enter hours for this day in the row above before assigning."
-            )
+        if ctx.daily_total <= 0 and not ctx.modal_host:
+            hint = "Enter hours for this day in the row above before assigning."
             st.caption(hint)
             return
+        if ctx.daily_total <= 0 and ctx.modal_host:
+            st.caption("Enter hours on each assignment row below.")
         st.markdown(
             '<span class="timekeeping-alloc-day-form-body-marker" aria-hidden="true"></span>',
             unsafe_allow_html=True,

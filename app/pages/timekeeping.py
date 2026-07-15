@@ -1279,6 +1279,32 @@ def _allocated_hours_sum(lines: list[dict[str, Any]]) -> float:
     return sum(_line_allocated_hours(line) for line in lines)
 
 
+def _daily_total_from_allocation_lines(lines: list[dict[str, Any]]) -> float:
+    """Sum of allocation row hours — used when the day editor has no separate daily total."""
+    return _allocated_hours_sum(lines)
+
+
+def _bootstrap_day_editor_allocation_lines(
+    by_date: dict[str, list[dict[str, Any]]],
+    *,
+    iso: str,
+    grid_row: dict,
+    job_opts: list[str],
+) -> list[dict[str, Any]]:
+    """Ensure at least one editable assignment row exists in the day editor."""
+    lines = list(by_date.get(iso) or [])
+    if not lines:
+        lines = [
+            _new_allocation_line(
+                job=_default_allocation_job(grid_row, job_opts),
+                hours=0.0,
+                status=_normalize_timecard_status(grid_row.get("status")),
+            )
+        ]
+        by_date[iso] = lines
+    return lines
+
+
 def _allocated_st_ot_sum(lines: list[dict[str, Any]]) -> tuple[float, float]:
     st_total = 0.0
     ot_total = 0.0
@@ -1334,7 +1360,12 @@ def _live_allocation_lines_for_day(
     return out
 
 
-def _get_day_allocation_state(day_total: float, allocations: list[dict[str, Any]]) -> dict[str, Any]:
+def _get_day_allocation_state(
+    day_total: float,
+    allocations: list[dict[str, Any]],
+    *,
+    allocation_is_source: bool = False,
+) -> dict[str, Any]:
     line_total = 0.0
     allocated_total = 0.0
     allocated_st = 0.0
@@ -1358,22 +1389,35 @@ def _get_day_allocation_state(day_total: float, allocations: list[dict[str, Any]
         else:
             allocated_st += hours
 
-    remaining = float(day_total or 0) - allocated_total
     has_invalid_assignment = placeholder_hours > _ALLOC_TOLERANCE
-    if day_total <= _ALLOC_TOLERANCE:
-        state = "no_hours"
-    elif line_total - day_total > _ALLOC_TOLERANCE:
-        state = "overallocated"
-    elif (
-        abs(remaining) <= _ALLOC_TOLERANCE
-        and allocated_total > _ALLOC_TOLERANCE
-        and not has_invalid_assignment
-    ):
-        state = "complete"
-    elif has_invalid_assignment:
-        state = "needs_assignment"
+    if allocation_is_source:
+        remaining = 0.0
+        effective_total = line_total
+        if line_total <= _ALLOC_TOLERANCE:
+            state = "no_hours"
+        elif has_invalid_assignment:
+            state = "needs_assignment"
+        elif allocated_total > _ALLOC_TOLERANCE:
+            state = "complete"
+        else:
+            state = "incomplete"
     else:
-        state = "incomplete"
+        effective_total = float(day_total or 0)
+        remaining = effective_total - allocated_total
+        if day_total <= _ALLOC_TOLERANCE:
+            state = "no_hours"
+        elif line_total - day_total > _ALLOC_TOLERANCE:
+            state = "overallocated"
+        elif (
+            abs(remaining) <= _ALLOC_TOLERANCE
+            and allocated_total > _ALLOC_TOLERANCE
+            and not has_invalid_assignment
+        ):
+            state = "complete"
+        elif has_invalid_assignment:
+            state = "needs_assignment"
+        else:
+            state = "incomplete"
 
     return {
         "state": state,
@@ -1382,6 +1426,7 @@ def _get_day_allocation_state(day_total: float, allocations: list[dict[str, Any]
         "allocated_ot": allocated_ot,
         "remaining": remaining,
         "line_total": line_total,
+        "effective_total": effective_total,
         "has_invalid_assignment": has_invalid_assignment,
         "placeholder_hours": placeholder_hours,
     }
@@ -1656,16 +1701,26 @@ def _allocation_lines_to_persist_grid(
 
     for day_ix, day_d in enumerate(week_dates(week_start_d)):
         iso = day_d.isoformat()
-        daily_total = _daily_total_from_list_row(
-            eid=eid,
-            week_sig=week_sig,
-            day_ix=day_ix,
-            grid_row=source_grid[day_ix] if day_ix < len(source_grid) else {},
-        )
-        lines = list(by_date.get(iso) or [])
         grid_row = source_grid[day_ix] if day_ix < len(source_grid) else {}
         if focus and iso != focus:
             continue
+        lines = list(by_date.get(iso) or [])
+        allocation_is_source = bool(focus and iso == focus)
+        if allocation_is_source:
+            lines = _live_allocation_lines_for_day(
+                lines,
+                eid=eid,
+                week_sig=week_sig,
+                iso=iso,
+            )
+            daily_total = _daily_total_from_allocation_lines(lines)
+        else:
+            daily_total = _daily_total_from_list_row(
+                eid=eid,
+                week_sig=week_sig,
+                day_ix=day_ix,
+                grid_row=grid_row,
+            )
         if daily_total <= 0:
             day_id = str(grid_row.get("day_id") or "").strip()
             if not day_id:
@@ -1705,14 +1760,14 @@ def _allocation_lines_to_persist_grid(
                 f"— No assignment — does not count as allocated time."
             )
             continue
-        if line_total > daily_total + 0.01:
+        if not allocation_is_source and line_total > daily_total + 0.01:
             errors.append(
                 f"{day_d.strftime('%A')}: allocated {_fmt_day_hours(line_total)} exceeds "
                 f"{_fmt_day_hours(daily_total)} entered in the row above."
             )
             continue
         remainder = round(daily_total - valid_allocated, 2)
-        if remainder > 0.01 and not allow_incomplete:
+        if not allocation_is_source and remainder > 0.01 and not allow_incomplete:
             errors.append(
                 f"{day_d.strftime('%A')}: assign the remaining "
                 f"{_fmt_day_hours(remainder)} to a job, subjob, Shop, Administrative, or Vacation."
@@ -1799,36 +1854,25 @@ def _save_allocation_week(
         if day_ix < 0:
             return False, "Invalid work date for this week."
         grid_row = grid[day_ix] if day_ix < len(grid) else {}
-        daily_total = _daily_total_from_list_row(
-            eid=eid,
-            week_sig=week_sig,
-            day_ix=day_ix,
-            grid_row=grid_row,
-        )
-        if daily_total <= _ALLOC_TOLERANCE:
-            return False, "Enter hours for this day before submitting."
         lines = _live_allocation_lines_for_day(
             list(by_date.get(focus) or []),
             eid=eid,
             week_sig=week_sig,
             iso=focus,
         )
-        alloc_state = _get_day_allocation_state(daily_total, lines)
+        daily_total = _daily_total_from_allocation_lines(lines)
+        if daily_total <= _ALLOC_TOLERANCE:
+            return False, "Enter hours for this day before submitting."
+        alloc_state = _get_day_allocation_state(
+            daily_total,
+            lines,
+            allocation_is_source=True,
+        )
         state = str(alloc_state.get("state") or "")
-        if state == "overallocated":
-            return (
-                False,
-                f"Allocated {_fmt_day_hours(alloc_state.get('line_total') or daily_total)} exceeds "
-                f"{_fmt_day_hours(daily_total)} entered in the row above.",
-            )
         if state == "needs_assignment":
             return False, "Select a valid assignment for all hours — — No assignment — is not allowed."
         if state != "complete":
-            remaining = max(0.0, float(alloc_state.get("remaining") or 0))
-            return (
-                False,
-                f"Assign the remaining {_fmt_day_hours(remaining)} before submitting.",
-            )
+            return False, "Enter hours and assign them to valid jobs before submitting."
     persist_rows, errors = _allocation_lines_to_persist_grid(
         by_date,
         week_start_d=week_start_d,
@@ -2625,6 +2669,7 @@ def _render_modal_day_stats_box(
     st_total: float,
     ot_total: float,
     daily_total: float,
+    show_remaining: bool = True,
 ) -> None:
     """Right-side allocation summary box in the day editor modal."""
     st.markdown(
@@ -2632,12 +2677,17 @@ def _render_modal_day_stats_box(
         unsafe_allow_html=True,
     )
     stats = [
-        ("Allocated", _fmt_day_hours(allocated)),
-        ("Remaining", _fmt_day_hours(remaining)),
+        ("Total Hours", _fmt_day_hours(daily_total)),
         ("S/T Total", _fmt_day_hours(st_total)),
         ("O/T Total", _fmt_day_hours(ot_total)),
-        ("Daily Total", _fmt_day_hours(daily_total)),
     ]
+    if show_remaining:
+        stats = [
+            ("Allocated", _fmt_day_hours(allocated)),
+            ("Remaining", _fmt_day_hours(remaining)),
+            *stats[1:],
+            ("Daily Total", _fmt_day_hours(daily_total)),
+        ]
     cells = "".join(
         f'<div class="timekeeping-modal-stat">'
         f'<span class="timekeeping-modal-stat-label">{html.escape(label)}</span>'
@@ -4346,23 +4396,19 @@ def _render_single_day_allocation_modal(
     day_d = week_dates(week_start_d)[day_ix]
     grid_row = grid[day_ix] if day_ix < len(grid) else {}
     day_status = _normalize_timecard_status(grid_row.get("status"))
-    daily_total = _daily_total_from_list_row(
-        eid=eid,
-        week_sig=week_sig,
-        day_ix=day_ix,
-        grid_row=grid_row,
-    )
-    lines = _ensure_day_allocation_lines(
+    lines = _bootstrap_day_editor_allocation_lines(
         by_date,
         iso=iso,
-        daily_total=daily_total,
         grid_row=grid_row,
         job_opts=job_opts,
-        eid=eid,
-        week_sig=week_sig,
     )
     live_lines = _live_allocation_lines_for_day(lines, eid=eid, week_sig=week_sig, iso=iso)
-    alloc_state = _get_day_allocation_state(daily_total, live_lines)
+    daily_total = _daily_total_from_allocation_lines(live_lines)
+    alloc_state = _get_day_allocation_state(
+        daily_total,
+        live_lines,
+        allocation_is_source=True,
+    )
     allocated = alloc_state["allocated_total"]
     st_part = alloc_state["allocated_st"]
     ot_part = alloc_state["allocated_ot"]
@@ -4401,7 +4447,7 @@ def _render_single_day_allocation_modal(
             day_status=day_status,
             include_notes=True,
             modal_host=True,
-            daily_hours_label="hrs entered",
+            daily_hours_label="total hrs",
         ),
         normalize_timecard_status=_normalize_timecard_status,
     )
@@ -4416,6 +4462,21 @@ def _discard_day_modal_edits(emp: dict, week_start_d: date) -> None:
     _ensure_weekly_grid(emp, week_start_d)
 
 
+def _sync_grid_row_from_allocation_lines(
+    grid_row: dict,
+    lines: list[dict[str, Any]],
+) -> None:
+    """Write allocation line totals back to the weekly grid row."""
+    alloc_state = _get_day_allocation_state(
+        0.0,
+        lines,
+        allocation_is_source=True,
+    )
+    grid_row["st"] = float(alloc_state.get("allocated_st") or 0)
+    grid_row["ot"] = float(alloc_state.get("allocated_ot") or 0)
+    grid_row["dt"] = 0.0
+
+
 def _save_day_from_modal(emp: dict, week_start_d: date, iso: str) -> bool:
     eid = str(emp.get("id") or emp.get("employee_id") or "")
     week_sig = week_start_d.isoformat()
@@ -4424,12 +4485,16 @@ def _save_day_from_modal(emp: dict, week_start_d: date, iso: str) -> bool:
         -1,
     )
     grid = _ensure_weekly_grid(emp, week_start_d)
+    by_date = _ensure_allocation_state(emp, week_start_d)
+    _sync_allocation_from_widgets(by_date, eid=eid, week_sig=week_sig)
+    live_lines = _live_allocation_lines_for_day(
+        list(by_date.get(iso) or []),
+        eid=eid,
+        week_sig=week_sig,
+        iso=iso,
+    )
     if day_ix >= 0 and day_ix < len(grid):
-        hours = max(
-            0.0,
-            float(st.session_state.get(_weekly_hours_widget_key(eid, iso), 0) or 0),
-        )
-        _set_day_job_hours(grid[day_ix], hours)
+        _sync_grid_row_from_allocation_lines(grid[day_ix], live_lines)
         st.session_state[_grid_key(eid)] = grid
     _set_alloc_autosave_status(eid, iso, "saving")
     ok, _msg = _save_allocation_week(
@@ -4493,12 +4558,7 @@ def _render_day_time_editor_core(emp: dict, week_start_d: date, iso: str) -> Non
     week_status = _resolved_week_status(emp, week_start_d, grid=grid)
     day_status = _normalize_timecard_status(grid_row.get("status"))
     hours_editable = _day_hours_editable(day_status, week_status)
-    daily_total = _daily_total_from_list_row(
-        eid=eid,
-        week_sig=week_sig,
-        day_ix=day_ix,
-        grid_row=grid_row,
-    )
+    job_opts = _assignment_options_for_timekeeping(week_start_d=week_start_d)
 
     unsaved_html = _alloc_autosave_status_html(eid, iso)
     if unsaved_html:
@@ -4506,42 +4566,32 @@ def _render_day_time_editor_core(emp: dict, week_start_d: date, iso: str) -> Non
 
     by_date_preview = _ensure_allocation_state(emp, week_start_d)
     _sync_allocation_from_widgets(by_date_preview, eid=eid, week_sig=week_sig)
+    _bootstrap_day_editor_allocation_lines(
+        by_date_preview,
+        iso=iso,
+        grid_row=grid_row,
+        job_opts=job_opts,
+    )
     lines_preview = list(by_date_preview.get(iso) or [])
     live_preview = _live_allocation_lines_for_day(lines_preview, eid=eid, week_sig=week_sig, iso=iso)
-    alloc_preview = _get_day_allocation_state(daily_total, live_preview)
+    daily_total = _daily_total_from_allocation_lines(live_preview)
+    alloc_preview = _get_day_allocation_state(
+        daily_total,
+        live_preview,
+        allocation_is_source=True,
+    )
 
-    hours_col, stats_col = st.columns([1.05, 1.35], gap="medium")
-    with hours_col:
-        st.markdown("**Daily Total Hours**")
-        if hours_editable:
-            daily_total = _render_list_day_hour_input(
-                value=daily_total,
-                emp_id=eid,
-                work_date=day_d,
-                day_label=day_d.strftime("%A"),
-                week_sig=week_sig,
-                day_ix=day_ix,
-                hour_autosave=False,
-            )
-            widget_key = _weekly_hours_widget_key(eid, day_d)
-            if widget_key in st.session_state and float(st.session_state[widget_key] or 0) != daily_total:
-                _mark_allocation_dirty(emp, week_start_d, iso)
-        else:
-            st.markdown(
-                f'<div class="timekeeping-hour-input timekeeping-hour-input-ro">'
-                f"{html.escape(_fmt_day_hours(daily_total))}</div>",
-                unsafe_allow_html=True,
-            )
-            if day_status == "Approved":
-                st.caption("This day is approved and locked.")
-    with stats_col:
-        _render_modal_day_stats_box(
-            allocated=float(alloc_preview.get("allocated_total") or 0),
-            remaining=max(0.0, float(alloc_preview.get("remaining") or 0)),
-            st_total=float(alloc_preview.get("allocated_st") or 0),
-            ot_total=float(alloc_preview.get("allocated_ot") or 0),
-            daily_total=daily_total,
-        )
+    if not hours_editable and day_status == "Approved":
+        st.caption("This day is approved and locked.")
+
+    _render_modal_day_stats_box(
+        allocated=float(alloc_preview.get("allocated_total") or 0),
+        remaining=max(0.0, float(alloc_preview.get("remaining") or 0)),
+        st_total=float(alloc_preview.get("allocated_st") or 0),
+        ot_total=float(alloc_preview.get("allocated_ot") or 0),
+        daily_total=float(alloc_preview.get("effective_total") or daily_total),
+        show_remaining=False,
+    )
 
     st.markdown(
         '<div class="timekeeping-modal-section-title">Time Allocations</div>',
