@@ -153,6 +153,8 @@ SELECTED_ASSET_KEY = "selected_asset_id"
 SELECTED_ASSET_IDS_KEY = "selected_asset_ids"
 SHOW_ASSET_MODAL_KEY = "show_asset_detail_modal"
 _ASSETS_MODAL_DIALOG_SHOWN_KEY = "_ips_assets_detail_modal_shown"
+_ASSETS_MAIN_TAB_KEY = "ips_assets_main_tab"
+_ASSETS_MAIN_TABS = ("Equipment", "Serialized Tools", "Small Tools")
 ASSET_DETAIL_TAB_FOCUS_KEY = "ast_detail_tab_focus"
 _SHOW_NEW_ASSET_FORM_KEY = "assets_show_new_asset_form"
 _ALL_ASSET_IDS_KEY = "_ips_assets_visible_ids"
@@ -2226,11 +2228,15 @@ def render() -> None:
         '<span class="ips-assets-main-tabs-anchor" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
-    tab_equipment, tab_serialized_tools, tab_hand_tools = st.tabs(
-        ["Equipment", "Serialized Tools", "Small Tools"]
+    from app.components.tabs import render_tabs
+
+    active_tab = render_tabs(
+        list(_ASSETS_MAIN_TABS),
+        session_key=_ASSETS_MAIN_TAB_KEY,
+        default=_ASSETS_MAIN_TABS[0],
     )
 
-    with tab_equipment:
+    if active_tab == "Equipment":
         with st.expander("Tool Trailers & Kits", expanded=False):
             if st.button("Load kit summary", key="ast_kit_summary_load", use_container_width=True):
                 st.session_state["ast_kit_summary_on"] = True
@@ -2239,14 +2245,12 @@ def render() -> None:
             else:
                 st.caption("Load kit accountability metrics on demand to speed up the assets page.")
         _render_equipment_list(rows)
-
-    with tab_serialized_tools:
+    elif active_tab == "Serialized Tools":
         st.caption(
             "Individual tools tracked by serial number — Milwaukee drills, impacts, grinders, saws, rotary hammers, and similar cordless tools."
         )
         _render_small_tools_list(rows)
-
-    with tab_hand_tools:
+    else:
         render_hand_tools_tab(rows, on_open_tool=_open_hand_tool_row)
 
     if st.session_state.get(SHOW_ASSET_MODAL_KEY):
