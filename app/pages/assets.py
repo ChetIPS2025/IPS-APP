@@ -502,7 +502,7 @@ def _on_small_tool_checkbox_change(
             if other_id != row_id:
                 st.session_state[_small_tool_select_key(other_id)] = False
         if row:
-            _prepare_open_small_tool_row(row, assets_by_id)
+            _open_small_tool_row(row, assets_by_id)
     elif row:
         modal_aid = _small_tool_modal_asset_id(row)
         if modal_aid and st.session_state.get(SELECTED_ASSET_KEY) == modal_aid:
@@ -532,7 +532,7 @@ def _open_hand_tool_row(row: dict) -> None:
 
 
 def _prepare_open_small_tool_row(row: dict, assets_by_id: dict[str, dict]) -> None:
-    """Set serialized tool detail state without rerunning."""
+    """Set serialized tool detail modal state (caller must app-rerun to show dialog)."""
     if str(row.get("row_type") or "") == "kit_item":
         parent_id = str(row.get("parent_asset_id") or "").strip()
         if parent_id:
@@ -545,6 +545,7 @@ def _prepare_open_small_tool_row(row: dict, assets_by_id: dict[str, dict]) -> No
 
 def _open_small_tool_row(row: dict, assets_by_id: dict[str, dict]) -> None:
     _prepare_open_small_tool_row(row, assets_by_id)
+    ips_app_rerun()
 
 
 def _render_serialized_tool_name_cell(
@@ -565,7 +566,7 @@ def _render_serialized_tool_name_cell(
         unsafe_allow_html=True,
     )
     if st.button(name, key=f"st_open_name_{rid}", type="tertiary"):
-        _prepare_open_small_tool_row(row, assets_by_id)
+        _open_small_tool_row(row, assets_by_id)
 
 
 def _small_tool_image_asset(row: dict, assets_by_id: dict[str, dict]) -> dict:
