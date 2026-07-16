@@ -312,13 +312,8 @@ def _render_hand_tool_name_cell(
             f'<span class="ips-hand-tools-name-anchor"{title_attr} aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        st.button(
-            name,
-            key=f"ht_open_name_{rid}",
-            type="tertiary",
-            on_click=on_open_tool,
-            args=(row,),
-        )
+        if st.button(name, key=f"ht_open_name_{rid}", type="tertiary"):
+            on_open_tool(row)
         return
     st.markdown(
         f'<div class="ips-assets-title ips-hand-tools-cell"{title_attr}>{html.escape(name)}</div>',

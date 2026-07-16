@@ -156,7 +156,6 @@ ASSET_DETAIL_TAB_FOCUS_KEY = "ast_detail_tab_focus"
 _SHOW_NEW_ASSET_FORM_KEY = "assets_show_new_asset_form"
 _ALL_ASSET_IDS_KEY = "_ips_assets_visible_ids"
 _ALL_SMALL_TOOL_IDS_KEY = "_ips_small_tools_visible_ids"
-_ASSETS_MODAL_APP_RERUN_KEY = "_ips_assets_modal_app_rerun"
 _TABLE_KEY = "assets_list"
 _SMALL_TOOLS_TABLE_KEY = "assets_small_tools_list"
 _SMALL_TOOL_COLS = [0.4, 0.8, 1.85, 0.95, 0.95, 1.25, 1.1, 0.9, 0.75]
@@ -483,13 +482,9 @@ def _clear_small_tool_selection(row_ids: list[str] | None = None) -> None:
             st.session_state[key] = False
 
 
-def _mark_assets_modal_app_rerun() -> None:
-    st.session_state[_ASSETS_MODAL_APP_RERUN_KEY] = True
-
-
-def _flush_assets_modal_app_rerun() -> None:
-    if st.session_state.pop(_ASSETS_MODAL_APP_RERUN_KEY, False):
-        ips_app_rerun()
+def _show_assets_modal_if_selected() -> None:
+    if st.session_state.get(SHOW_ASSET_MODAL_KEY):
+        show_modal_if_pending(_ASSETS_MODAL_KEY, _show_assets_detail_modal)
 
 
 def _on_small_tool_checkbox_change(
@@ -506,7 +501,6 @@ def _on_small_tool_checkbox_change(
                 st.session_state[_small_tool_select_key(other_id)] = False
         if row:
             _prepare_open_small_tool_row(row, assets_by_id)
-            _mark_assets_modal_app_rerun()
     elif row:
         modal_aid = _small_tool_modal_asset_id(row)
         if modal_aid and st.session_state.get(SELECTED_ASSET_KEY) == modal_aid:
@@ -555,7 +549,6 @@ def _prepare_open_small_tool_row(row: dict, assets_by_id: dict[str, dict]) -> No
 
 def _open_small_tool_row(row: dict, assets_by_id: dict[str, dict]) -> None:
     _prepare_open_small_tool_row(row, assets_by_id)
-    _mark_assets_modal_app_rerun()
 
 
 def _render_serialized_tool_name_cell(
@@ -575,13 +568,8 @@ def _render_serialized_tool_name_cell(
         '<span class="ips-serialized-tools-name-anchor" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
-    st.button(
-        name,
-        key=f"st_open_name_{rid}",
-        type="tertiary",
-        on_click=_open_small_tool_row,
-        args=(row, assets_by_id),
-    )
+    if st.button(name, key=f"st_open_name_{rid}", type="tertiary"):
+        _prepare_open_small_tool_row(row, assets_by_id)
 
 
 def _small_tool_image_asset(row: dict, assets_by_id: dict[str, dict]) -> dict:
@@ -1098,7 +1086,7 @@ def _render_equipment_list(
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
     _render_custom_assets_table(page_rows, filter_options=filter_options)
     render_table_pagination_footer(len(filtered), _TABLE_KEY)
-    _flush_assets_modal_app_rerun()
+    _show_assets_modal_if_selected()
 
 
 @fragment
@@ -1189,7 +1177,7 @@ def _render_small_tools_list(rows: list[dict]) -> None:
         jobs_by_id=jobs_by_id,
     )
     render_table_pagination_footer(len(filtered), _SMALL_TOOLS_TABLE_KEY)
-    _flush_assets_modal_app_rerun()
+    _show_assets_modal_if_selected()
 
 
 def _apply_assets_search_filter(rows: list[dict], q: str) -> list[dict]:
@@ -2107,20 +2095,29 @@ def render() -> None:
             '<span class="ips-assets-page-header-actions ips-page-header-inline-actions" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        st.button("Export", key="ast_export")
-        st.download_button(
-            "CSV Template",
-            data=hand_tool_csv_template_bytes(),
-            file_name="small_hand_tools_import_template.csv",
-            mime="text/csv",
-            key="ast_hand_tool_csv_template",
+        export_col, template_col, import_col, quick_col, new_col = st.columns(
+            [0.85, 1.15, 1.0, 1.35, 1.05],
+            gap="small",
         )
-        if st.button("Import CSV", key="ast_hand_tool_import"):
-            open_hand_tool_import_dialog()
-        if st.button("+ Quick Add Tool", key="ast_quick_add", type="primary"):
-            open_quick_add_tool_dialog()
-        if st.button("+ New Asset", key="ast_new", type="secondary"):
-            st.session_state[_SHOW_NEW_ASSET_FORM_KEY] = True
+        with export_col:
+            st.button("Export", key="ast_export")
+        with template_col:
+            st.download_button(
+                "CSV Template",
+                data=hand_tool_csv_template_bytes(),
+                file_name="small_hand_tools_import_template.csv",
+                mime="text/csv",
+                key="ast_hand_tool_csv_template",
+            )
+        with import_col:
+            if st.button("Import CSV", key="ast_hand_tool_import"):
+                open_hand_tool_import_dialog()
+        with quick_col:
+            if st.button("+ Quick Add Tool", key="ast_quick_add", type="primary"):
+                open_quick_add_tool_dialog()
+        with new_col:
+            if st.button("+ New Asset", key="ast_new", type="secondary"):
+                st.session_state[_SHOW_NEW_ASSET_FORM_KEY] = True
 
     from app.ui.page_header import render_page_header
 
@@ -2243,4 +2240,4 @@ def render() -> None:
         render_hand_tools_tab(rows, on_open_tool=_open_hand_tool_row)
 
     if st.session_state.get(SHOW_ASSET_MODAL_KEY):
-        show_modal_if_pending(_ASSETS_MODAL_KEY, _show_assets_detail_modal)
+        _show_assets_modal_if_selected()
