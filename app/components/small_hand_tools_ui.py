@@ -14,12 +14,19 @@ from app.components.record_modal import (
     detail_field_html,
     dialog_card_html,
     get_modal_record,
+    is_edit_mode,
     open_record_modal,
+    record_session_key,
+    render_compact_modal_header,
+    render_edit_form_header,
     render_missing_record,
     render_modal_header,
     render_modal_meta_grid,
     render_modal_shell,
+    render_save_cancel_actions,
     safe_value,
+    set_edit_mode,
+    set_view_mode,
     show_modal_if_pending,
 )
 from app.components.table_filters import (
@@ -176,7 +183,160 @@ def _clear_hand_tool_detail_modal() -> None:
     )
 
 
+def _trailer_label_for_id(container_id: object, trailer_map: dict[str, str]) -> str:
+    cid = str(container_id or "").strip()
+    if not cid:
+        return "— None —"
+    for label, tid in trailer_map.items():
+        if tid == cid:
+            return label
+    return "— None —"
+
+
+def _job_label_for_id(job_id: object, job_map: dict[str, str]) -> str:
+    jid = str(job_id or "").strip()
+    if not jid:
+        return "— None —"
+    for label, j in job_map.items():
+        if j == jid:
+            return label
+    return "— None —"
+
+
+def _seed_hand_tool_edit_form(tool: dict) -> None:
+    rid = str(tool.get("id") or "").strip()
+    if not rid:
+        return
+    trailer_labels, trailer_map = _trailer_options()
+    job_labels, job_map = _job_options()
+    storage = str(tool.get("storage_type") or "Warehouse")
+    trailer_label = _trailer_label_for_id(tool.get("container_asset_id"), trailer_map)
+    if trailer_label not in trailer_labels:
+        trailer_label = "— None —"
+    job_label = _job_label_for_id(tool.get("assigned_job_id"), job_map)
+    if job_label not in job_labels:
+        job_label = "— None —"
+
+    st.session_state[f"ht_edit_name_{rid}"] = str(tool.get("tool_name") or "")
+    st.session_state[f"ht_edit_category_{rid}"] = str(tool.get("category") or "Other")
+    st.session_state[f"ht_edit_model_{rid}"] = str(tool.get("model_number") or "")
+    st.session_state[f"ht_edit_serial_{rid}"] = str(tool.get("serial_number") or "")
+    st.session_state[f"ht_edit_qty_{rid}"] = float(tool.get("quantity_on_hand") or 0)
+    st.session_state[f"ht_edit_qty_exp_{rid}"] = float(tool.get("quantity_expected") or tool.get("quantity_on_hand") or 0)
+    st.session_state[f"ht_edit_value_{rid}"] = float(tool.get("unit_value") or 0)
+    st.session_state[f"ht_edit_storage_{rid}"] = storage if storage in STORAGE_TYPES else "Warehouse"
+    st.session_state[f"ht_edit_trailer_{rid}"] = trailer_label
+    st.session_state[f"ht_edit_location_{rid}"] = str(tool.get("storage_location") or "")
+    st.session_state[f"ht_edit_job_{rid}"] = job_label
+    st.session_state[f"ht_edit_status_{rid}"] = str(tool.get("status") or "Available")
+    st.session_state[f"ht_edit_condition_{rid}"] = str(tool.get("condition") or "Good")
+    st.session_state[f"ht_edit_notes_{rid}"] = str(tool.get("notes") or "")
+
+
+def _set_hand_tool_edit_mode(tool: dict) -> None:
+    _seed_hand_tool_edit_form(tool)
+    set_edit_mode(_HAND_TOOL_MOD, record_session_key(tool, "id"))
+
+
+def _render_hand_tool_edit_form(tool: dict) -> None:
+    rid = str(tool.get("id") or "").strip()
+    record_key = record_session_key(tool, "id")
+    if not rid:
+        return
+    if f"ht_edit_name_{rid}" not in st.session_state:
+        _seed_hand_tool_edit_form(tool)
+
+    trailer_labels, trailer_map = _trailer_options()
+    job_labels, job_map = _job_options()
+
+    render_edit_form_header("Edit Small Hand Tool")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.text_input("Tool name", key=f"ht_edit_name_{rid}")
+        st.selectbox("Category", HAND_TOOL_CATEGORIES, key=f"ht_edit_category_{rid}")
+        st.text_input("Model #", key=f"ht_edit_model_{rid}")
+        st.text_input("Serial #", key=f"ht_edit_serial_{rid}")
+    with c2:
+        st.selectbox("Status", HAND_TOOL_STATUSES, key=f"ht_edit_status_{rid}")
+        st.selectbox("Condition", HAND_TOOL_CONDITIONS, key=f"ht_edit_condition_{rid}")
+        st.number_input("Quantity on hand", min_value=0.0, step=1.0, key=f"ht_edit_qty_{rid}")
+        st.number_input("Expected quantity", min_value=0.0, step=1.0, key=f"ht_edit_qty_exp_{rid}")
+
+    st.markdown("##### Financial")
+    f1, f2 = st.columns(2)
+    with f1:
+        st.number_input(
+            "Unit value",
+            min_value=0.0,
+            step=1.0,
+            format="%.2f",
+            key=f"ht_edit_value_{rid}",
+            help="Used to calculate total value and Tool Trailer kit totals.",
+        )
+    with f2:
+        qty = float(st.session_state.get(f"ht_edit_qty_{rid}") or 0)
+        unit_val = float(st.session_state.get(f"ht_edit_value_{rid}") or 0)
+        st.metric("Total value", fmt_currency(qty * unit_val))
+
+    st.markdown("##### Storage & assignment")
+    s1, s2 = st.columns(2)
+    with s1:
+        st.selectbox("Storage", STORAGE_TYPES, key=f"ht_edit_storage_{rid}")
+        storage = str(st.session_state.get(f"ht_edit_storage_{rid}") or "Warehouse")
+        if storage == "Tool Trailer":
+            st.selectbox("Tool Trailer", trailer_labels, key=f"ht_edit_trailer_{rid}")
+        st.text_input("Shop / warehouse location", key=f"ht_edit_location_{rid}")
+    with s2:
+        st.selectbox("Assigned job", job_labels, key=f"ht_edit_job_{rid}")
+        st.text_area("Notes", key=f"ht_edit_notes_{rid}", height=80)
+
+    cancelled, saved = render_save_cancel_actions(
+        module=_HAND_TOOL_MOD,
+        record_key=record_key,
+        cancel_key=f"ht_modal_cancel_{record_key}",
+        save_key=f"ht_modal_save_{record_key}",
+    )
+    if cancelled:
+        st.rerun()
+    if not saved:
+        return
+
+    storage = str(st.session_state.get(f"ht_edit_storage_{rid}") or "Warehouse")
+    trailer_pick = str(st.session_state.get(f"ht_edit_trailer_{rid}") or "")
+    job_pick = str(st.session_state.get(f"ht_edit_job_{rid}") or "")
+    result = save_hand_tool(
+        {
+            "tool_name": st.session_state.get(f"ht_edit_name_{rid}"),
+            "category": st.session_state.get(f"ht_edit_category_{rid}"),
+            "model_number": st.session_state.get(f"ht_edit_model_{rid}"),
+            "serial_number": st.session_state.get(f"ht_edit_serial_{rid}"),
+            "quantity_on_hand": st.session_state.get(f"ht_edit_qty_{rid}"),
+            "quantity_expected": st.session_state.get(f"ht_edit_qty_exp_{rid}"),
+            "unit_value": st.session_state.get(f"ht_edit_value_{rid}"),
+            "storage_type": storage,
+            "container_asset_id": trailer_map.get(trailer_pick)
+            if storage == "Tool Trailer" and trailer_pick != "— None —"
+            else None,
+            "storage_location": st.session_state.get(f"ht_edit_location_{rid}"),
+            "assigned_job_id": job_map.get(job_pick) if job_pick != "— None —" else None,
+            "status": st.session_state.get(f"ht_edit_status_{rid}"),
+            "condition": st.session_state.get(f"ht_edit_condition_{rid}"),
+            "notes": st.session_state.get(f"ht_edit_notes_{rid}"),
+            "source_asset_id": tool.get("source_asset_id"),
+        },
+        row_id=rid,
+    )
+    if not result.ok:
+        st.error(result.error or "Could not save hand tool.")
+        return
+    set_view_mode(_HAND_TOOL_MOD, record_key)
+    st.success("Hand tool saved.")
+    st.rerun()
+
+
 def render_hand_tool_detail_dialog(tool: dict) -> None:
+    record_key = record_session_key(tool, "id")
     name = safe_value(tool.get("tool_name"))
     category = safe_value(tool.get("category"))
     status = safe_value(tool.get("status"))
@@ -190,9 +350,27 @@ def render_hand_tool_detail_dialog(tool: dict) -> None:
     serial = str(tool.get("serial_number") or "").strip()
     notes = str(tool.get("notes") or "").strip()
     editable = bool(tool.get("editable", True))
+    row_type = str(tool.get("row_type") or "hand_tool")
+    can_edit = editable and row_type == "hand_tool"
 
     render_modal_shell(compact=True)
-    render_modal_header(title=name, subtitle=category, status=status)
+
+    if is_edit_mode(_HAND_TOOL_MOD, record_key) and can_edit:
+        _render_hand_tool_edit_form(tool)
+        return
+
+    if can_edit:
+        render_compact_modal_header(
+            title=name,
+            subtitle=category,
+            status=status,
+            module=_HAND_TOOL_MOD,
+            record_key=record_key,
+            on_edit=lambda: _set_hand_tool_edit_mode(tool),
+            key_prefix=f"ht_modal_{record_key}",
+        )
+    else:
+        render_modal_header(title=name, subtitle=category, status=status)
 
     meta: list[tuple[str, object]] = []
     if model:
@@ -213,8 +391,15 @@ def render_hand_tool_detail_dialog(tool: dict) -> None:
     )
     render_modal_meta_grid(meta)
 
-    if not editable:
-        st.info("Trailer kit item — edit quantity in the Tool Trailer kit tab.")
+    if not can_edit:
+        trailer = safe_value(tool.get("container_label"))
+        if trailer and trailer != "—":
+            st.info(
+                f"Trailer kit item — edit quantity and unit value on the **Tool Trailer** "
+                f"({trailer}) kit tab so kit totals stay accurate."
+            )
+        else:
+            st.info("Trailer kit item — edit quantity and unit value in the Tool Trailer kit tab.")
 
     if notes and notes not in {"—", "-"}:
         st.markdown(
