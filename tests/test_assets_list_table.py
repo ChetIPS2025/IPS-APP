@@ -73,3 +73,13 @@ def test_handle_assets_table_action_opens_asset_and_reruns():
 
     assert opened == [("ast-1", {"id": "ast-1", "asset_name": "Generator"})]
     mock_rerun.assert_not_called()
+
+
+def test_assets_open_buttons_do_not_rerun_in_on_click() -> None:
+    import inspect
+
+    from app.components.assets_list_table import render_assets_table_open_buttons
+
+    src = inspect.getsource(render_assets_table_open_buttons)
+    assert "on_click=_open" in src
+    assert "ips_app_rerun()" not in src

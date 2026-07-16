@@ -359,7 +359,6 @@ def render_assets_table_open_buttons(
 
             def _open(_aid: str = aid, _asset: dict = asset) -> None:
                 open_asset_fn(_aid, _asset)
-                ips_app_rerun()
 
             st.button(
                 "Open asset",
