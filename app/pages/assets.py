@@ -152,7 +152,7 @@ _ASSETS_CACHE_KEY = "_ips_assets_modal_by_id"
 SELECTED_ASSET_KEY = "selected_asset_id"
 SELECTED_ASSET_IDS_KEY = "selected_asset_ids"
 SHOW_ASSET_MODAL_KEY = "show_asset_detail_modal"
-_ASSETS_MODAL_RENDERED_RUN_KEY = "_ips_assets_detail_modal_script_run"
+_ASSETS_MODAL_DIALOG_SHOWN_KEY = "_ips_assets_detail_modal_shown"
 ASSET_DETAIL_TAB_FOCUS_KEY = "ast_detail_tab_focus"
 _SHOW_NEW_ASSET_FORM_KEY = "assets_show_new_asset_form"
 _ALL_ASSET_IDS_KEY = "_ips_assets_visible_ids"
@@ -488,14 +488,9 @@ def _show_assets_modal_if_selected() -> None:
         return
     if not str(st.session_state.get(_ASSETS_MODAL_KEY) or "").strip():
         return
-    from streamlit.runtime.scriptrunner import get_script_run_ctx
-
-    ctx = get_script_run_ctx()
-    run_id = getattr(ctx, "script_run_id", None) if ctx else None
-    if run_id is not None:
-        if st.session_state.get(_ASSETS_MODAL_RENDERED_RUN_KEY) == run_id:
-            return
-        st.session_state[_ASSETS_MODAL_RENDERED_RUN_KEY] = run_id
+    if st.session_state.get(_ASSETS_MODAL_DIALOG_SHOWN_KEY):
+        return
+    st.session_state[_ASSETS_MODAL_DIALOG_SHOWN_KEY] = True
     show_modal_if_pending(_ASSETS_MODAL_KEY, _show_assets_detail_modal)
 
 
@@ -1226,6 +1221,7 @@ def _clear_assets_detail_modal() -> None:
     asset_ids = st.session_state.get(_ALL_ASSET_IDS_KEY) or []
     _clear_asset_selection([str(aid) for aid in asset_ids])
     clear_edit_modes(_MOD)
+    st.session_state.pop(_ASSETS_MODAL_DIALOG_SHOWN_KEY, None)
     clear_record_modal(
         table_key="assets_list",
         session_select_key=_SEL,
@@ -2101,6 +2097,7 @@ def render() -> None:
         return
     from app.services.asset_qr import apply_pending_asset_deeplink
     apply_pending_asset_deeplink()
+    st.session_state[_ASSETS_MODAL_DIALOG_SHOWN_KEY] = False
 
     def _assets_header_actions() -> None:
         st.markdown(
