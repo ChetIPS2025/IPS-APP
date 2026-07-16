@@ -101,7 +101,7 @@ from app.components.serialized_tools_ui import (
     render_serialized_tool_tracking_panel,
     render_serialized_tools_toolbar,
 )
-from app.components.small_hand_tools_ui import render_hand_tools_tab
+from app.components.small_hand_tools_ui import open_hand_tool_detail, render_hand_tools_tab
 from app.components.asset_reclassification_ui import (
     apply_tracking_bucket_change,
     render_asset_reclassification_panel,
@@ -507,6 +507,25 @@ def _on_small_tool_checkbox_change(
                 modal_key=_ASSETS_MODAL_KEY,
                 module=_MOD,
             )
+
+
+def _open_hand_tool_row(row: dict) -> None:
+    """Open hand tool detail, or parent Tool Trailer for kit-sourced rows."""
+    if not row.get("editable", True):
+        parent_id = str(row.get("container_asset_id") or row.get("parent_asset_id") or "").strip()
+        if parent_id:
+            cache = st.session_state.get(_ASSETS_CACHE_KEY)
+            asset = cache.get(parent_id) if isinstance(cache, dict) else None
+            if not asset:
+                asset = next(
+                    (a for a in load_assets() if str(a.get("id") or "").strip() == parent_id),
+                    None,
+                )
+            _open_assets_detail_modal(parent_id, asset, tab_focus="Kit")
+            ips_app_rerun()
+        return
+    open_hand_tool_detail(row)
+    ips_app_rerun()
 
 
 def _open_small_tool_row(row: dict, assets_by_id: dict[str, dict]) -> None:
@@ -2171,7 +2190,7 @@ def render() -> None:
         _render_small_tools_list(rows)
 
     with tab_hand_tools:
-        render_hand_tools_tab(rows)
+        render_hand_tools_tab(rows, on_open_tool=_open_hand_tool_row)
 
     if st.session_state.get(SHOW_ASSET_MODAL_KEY):
         show_modal_if_pending(_ASSETS_MODAL_KEY, _show_assets_detail_modal)

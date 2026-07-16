@@ -959,6 +959,44 @@ def inject_assets_page_styles() -> None:
             text-align: center !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_hand_tools_table_wrap
+        [data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:nth-child(3)
+        .stButton > button {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            color: #2563eb !important;
+            font-weight: 800 !important;
+            font-size: 0.8125rem !important;
+            padding: 0 !important;
+            min-height: auto !important;
+            height: auto !important;
+            text-align: left !important;
+            justify-content: flex-start !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            max-width: 100% !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_hand_tools_table_wrap
+        [data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:nth-child(3)
+        .stButton > button p,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_hand_tools_table_wrap
+        [data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:nth-child(3)
+        .stButton > button span,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_hand_tools_table_wrap
+        [data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:nth-child(3)
+        .stButton > button div {
+            color: #2563eb !important;
+            font-weight: 800 !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_hand_tools_table_wrap .ips-asset-status-pill {
             white-space: nowrap !important;
         }

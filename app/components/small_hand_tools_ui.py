@@ -3,10 +3,25 @@
 from __future__ import annotations
 
 import html
+from collections.abc import Callable
 from typing import Any
 
 import streamlit as st
 
+from app.components.record_modal import (
+    build_modal_cache,
+    clear_record_modal,
+    detail_field_html,
+    dialog_card_html,
+    get_modal_record,
+    open_record_modal,
+    render_missing_record,
+    render_modal_header,
+    render_modal_meta_grid,
+    render_modal_shell,
+    safe_value,
+    show_modal_if_pending,
+)
 from app.components.table_filters import (
     apply_column_filters,
     build_filter_options,
@@ -28,7 +43,14 @@ from app.services.small_hand_tool_service import (
     list_hand_tools,
     save_hand_tool,
 )
+from app.utils.formatting import fmt_currency
+
 _TABLE_KEY = "assets_hand_tools_list"
+_HAND_TOOL_MOD = "hand_tool"
+_HAND_TOOL_SEL = "ht_detail_sel"
+_HAND_TOOL_MODAL_KEY = "ht_detail_modal"
+_HAND_TOOL_CACHE_KEY = "ht_detail_cache"
+_HAND_TOOL_DETAIL_TABLE_KEY = "assets_hand_tools_detail"
 _COLS = [0.22, 0.42, 2.35, 1.0, 0.48, 0.48, 1.0, 0.92, 0.85, 0.78]
 _HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
@@ -130,6 +152,90 @@ def _render_add_hand_tool_form() -> None:
             st.error(result.error or "Could not save hand tool.")
 
 
+def open_hand_tool_detail(tool: dict) -> None:
+    """Open the small hand tool detail dialog for a table row."""
+    rid = str(tool.get("id") or "").strip()
+    if not rid:
+        return
+    open_record_modal(
+        rid,
+        tool,
+        session_select_key=_HAND_TOOL_SEL,
+        modal_key=_HAND_TOOL_MODAL_KEY,
+        module=_HAND_TOOL_MOD,
+        id_fields=("id",),
+    )
+
+
+def _clear_hand_tool_detail_modal() -> None:
+    clear_record_modal(
+        table_key=_HAND_TOOL_DETAIL_TABLE_KEY,
+        session_select_key=_HAND_TOOL_SEL,
+        modal_key=_HAND_TOOL_MODAL_KEY,
+        module=_HAND_TOOL_MOD,
+    )
+
+
+def render_hand_tool_detail_dialog(tool: dict) -> None:
+    name = safe_value(tool.get("tool_name"))
+    category = safe_value(tool.get("category"))
+    status = safe_value(tool.get("status"))
+    qty_exp = tool.get("quantity_expected") or 0
+    qty_act = tool.get("quantity_on_hand") or 0
+    location = safe_value(tool.get("location_display"))
+    storage = safe_value(tool.get("storage_type"))
+    condition = safe_value(tool.get("condition"))
+    job = safe_value(tool.get("job_label"))
+    model = str(tool.get("model_number") or "").strip()
+    serial = str(tool.get("serial_number") or "").strip()
+    notes = str(tool.get("notes") or "").strip()
+    editable = bool(tool.get("editable", True))
+
+    render_modal_shell(compact=True)
+    render_modal_header(title=name, subtitle=category, status=status)
+
+    meta: list[tuple[str, object]] = []
+    if model:
+        meta.append(("Model", model))
+    if serial:
+        meta.append(("Serial", serial))
+    meta.extend(
+        [
+            ("Expected", f"{qty_exp:g}"),
+            ("Actual", f"{qty_act:g}"),
+            ("Location", location),
+            ("Storage", storage),
+            ("Condition", condition),
+            ("Unit Value", fmt_currency(tool.get("unit_value"))),
+            ("Total Value", fmt_currency(tool.get("total_value"))),
+            ("Job", job),
+        ]
+    )
+    render_modal_meta_grid(meta)
+
+    if not editable:
+        st.info("Trailer kit item — edit quantity in the Tool Trailer kit tab.")
+
+    if notes and notes not in {"—", "-"}:
+        st.markdown(
+            dialog_card_html("Notes", detail_field_html("Notes", notes)),
+            unsafe_allow_html=True,
+        )
+
+
+@st.dialog("Small Tool Details", width="large", on_dismiss=_clear_hand_tool_detail_modal)
+def _show_hand_tool_detail_modal() -> None:
+    tool = get_modal_record(
+        cache_key=_HAND_TOOL_CACHE_KEY,
+        modal_key=_HAND_TOOL_MODAL_KEY,
+        session_select_key=_HAND_TOOL_SEL,
+    )
+    if not tool:
+        render_missing_record(_clear_hand_tool_detail_modal, close_key="ht_modal_missing_close")
+        return
+    render_hand_tool_detail_dialog(tool)
+
+
 def _hand_tool_status_pill_html(status: str) -> str:
     cls_map = {
         "Available": "ips-asset-status-available",
@@ -193,11 +299,39 @@ def _filter_rows(rows: list[dict], *, q: str = "") -> list[dict]:
     return apply_column_filters(out, _TABLE_KEY, _FILTER_SPECS)
 
 
+def _render_hand_tool_name_cell(
+    row: dict,
+    name: str,
+    *,
+    on_open_tool: Callable[[dict], None] | None,
+    title_attr: str = "",
+) -> None:
+    rid = str(row.get("id") or "").strip()
+    if on_open_tool and rid:
+        st.markdown(
+            f'<span class="ips-hand-tools-name-anchor"{title_attr} aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        st.button(
+            name,
+            key=f"ht_open_name_{rid}",
+            type="tertiary",
+            on_click=on_open_tool,
+            args=(row,),
+        )
+        return
+    st.markdown(
+        f'<div class="ips-assets-title ips-hand-tools-cell"{title_attr}>{html.escape(name)}</div>',
+        unsafe_allow_html=True,
+    )
+
+
 def _render_table(
     rows: list[dict],
     *,
     filter_options: dict[str, list[str]],
     image_context: CatalogImageContext,
+    on_open_tool: Callable[[dict], None] | None = None,
 ) -> None:
     if not rows:
         st.info("No small hand tools match your filters.")
@@ -259,9 +393,11 @@ def _render_table(
                     unsafe_allow_html=True,
                 )
             with cols[2]:
-                st.markdown(
-                    f'<div class="ips-assets-title ips-hand-tools-cell"{title_attr}>{html.escape(name)}</div>',
-                    unsafe_allow_html=True,
+                _render_hand_tool_name_cell(
+                    row,
+                    name,
+                    on_open_tool=on_open_tool,
+                    title_attr=title_attr,
                 )
             with cols[3]:
                 st.markdown(
@@ -297,7 +433,11 @@ def _render_table(
         st.markdown("</div>", unsafe_allow_html=True)
 
 
-def render_hand_tools_tab(all_assets: list[dict] | None = None) -> None:
+def render_hand_tools_tab(
+    all_assets: list[dict] | None = None,
+    *,
+    on_open_tool: Callable[[dict], None] | None = None,
+) -> None:
     """Quantity-based small hand tools — pliers, wrenches, etc."""
     import_msg = st.session_state.pop("ht_import_success_message", None)
     if import_msg:
@@ -372,5 +512,12 @@ def render_hand_tools_tab(all_assets: list[dict] | None = None) -> None:
 
     render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="tool")
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
-    _render_table(page_rows, filter_options=filter_options, image_context=image_context)
+    _render_table(
+        page_rows,
+        filter_options=filter_options,
+        image_context=image_context,
+        on_open_tool=on_open_tool,
+    )
     render_table_pagination_footer(len(filtered), _TABLE_KEY)
+    build_modal_cache(rows, cache_key=_HAND_TOOL_CACHE_KEY)
+    show_modal_if_pending(_HAND_TOOL_MODAL_KEY, _show_hand_tool_detail_modal)
