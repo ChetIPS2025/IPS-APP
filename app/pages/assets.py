@@ -38,7 +38,6 @@ from app.components.table_pagination import (
     reset_table_page,
 )
 from app.components.record_modal import (
-    build_modal_cache,
     clear_edit_modes,
     clear_record_modal,
     detail_field_html,
@@ -525,13 +524,7 @@ def _prepare_open_hand_tool_row(row: dict) -> None:
     if not row.get("editable", True):
         parent_id = str(row.get("container_asset_id") or row.get("parent_asset_id") or "").strip()
         if parent_id:
-            cache = st.session_state.get(_ASSETS_CACHE_KEY)
-            asset = cache.get(parent_id) if isinstance(cache, dict) else None
-            if not asset:
-                asset = next(
-                    (a for a in load_assets() if str(a.get("id") or "").strip() == parent_id),
-                    None,
-                )
+            asset = _cached_asset_for_modal(parent_id)
             _open_assets_detail_modal(parent_id, asset, tab_focus="Kit")
         return
     open_hand_tool_detail(row)
@@ -705,7 +698,7 @@ def _render_asset_photo_manager(asset: dict) -> None:
         clear_image=clear_asset_image,
         uploaded_by=_current_user_id(),
         cache_key=_ASSETS_CACHE_KEY,
-        on_change=clear_assets_cache,
+        on_change=_clear_assets_catalog_cache,
         readonly=is_demo_id(aid),
         preview_record=display,
     )
@@ -1075,7 +1068,7 @@ def _render_equipment_list(
             _get_selected_asset_ids(),
             assets_lookup,
             on_clear_selection=lambda: _clear_asset_selection(st.session_state.get(_ALL_ASSET_IDS_KEY)),
-            on_success_cache_clear=clear_assets_cache,
+            on_success_cache_clear=_clear_assets_catalog_cache,
         )
 
     filtered = _filter_rows(
@@ -1239,6 +1232,36 @@ def _put_asset_in_modal_cache(asset_id: str, asset: dict | None) -> None:
     st.session_state[_ASSETS_CACHE_KEY] = cache
 
 
+def _invalidate_assets_modal_cache() -> None:
+    st.session_state.pop(_ASSETS_CACHE_KEY, None)
+
+
+def _clear_assets_catalog_cache() -> None:
+    clear_assets_cache()
+    _invalidate_assets_modal_cache()
+
+
+def _cached_asset_for_modal(asset_id: str) -> dict | None:
+    """Resolve one asset for the detail modal without building a full-page cache."""
+    aid = str(asset_id or "").strip()
+    if not aid:
+        return None
+    cache = st.session_state.get(_ASSETS_CACHE_KEY)
+    if isinstance(cache, dict):
+        hit = cache.get(aid)
+        if isinstance(hit, dict):
+            return hit
+    from app.services.phase2_modules_service import normalize_asset
+    from app.services.repository import fetch_by_id
+
+    raw = fetch_by_id("assets", aid)
+    if not isinstance(raw, dict):
+        return None
+    asset = normalize_asset(raw)
+    _put_asset_in_modal_cache(aid, asset)
+    return asset
+
+
 def _open_assets_detail_modal(
     asset_id: str,
     asset: dict | None = None,
@@ -1375,7 +1398,7 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
         if st.button("Rebuild QR", key=f"ast_qr_rebuild_{aid}", use_container_width=True):
             result = rebuild_asset_qr(asset)
             if result.ok and isinstance(result.data, dict):
-                clear_assets_cache()
+                _clear_assets_catalog_cache()
                 st.session_state["ips_sel_assets"] = aid
                 st.success("QR label rebuilt. Download a label PNG when ready.")
                 st.rerun()
@@ -1734,14 +1757,14 @@ def _render_asset_edit_form(asset: dict) -> None:
             asset,
             prefix="ast_edit",
             serial_number=str(payload.get("serial_number") or ""),
-            on_success_cache_clear=clear_assets_cache,
+            on_success_cache_clear=_clear_assets_catalog_cache,
         )
         if not rc_ok:
             st.error(rc_msg or "Could not update tracking tab.")
         else:
             ok, msg = persist_asset(payload, row_id=aid)
             if ok:
-                clear_assets_cache()
+                _clear_assets_catalog_cache()
                 set_view_mode(_MOD, rk)
                 parts = [p for p in (rc_msg, msg or "Asset saved.") if p]
                 st.success(" ".join(parts))
@@ -2073,9 +2096,7 @@ def _show_assets_detail_modal() -> None:
     )
     if not asset:
         sel = str(st.session_state.get(_ASSETS_MODAL_KEY) or st.session_state.get(_SEL) or "").strip()
-        rows = st.session_state.get(_ASSETS_CACHE_KEY)
-        if isinstance(rows, dict) and sel:
-            asset = rows.get(sel)
+        asset = _cached_asset_for_modal(sel)
     if not asset:
         render_missing_record(_clear_assets_detail_modal, close_key="assets_modal_missing_close")
         return
@@ -2209,18 +2230,16 @@ def render() -> None:
                         )
                         if not upload_result.ok:
                             st.warning(upload_result.error or "Asset saved, but image upload failed.")
-                    clear_assets_cache()
+                    _clear_assets_catalog_cache()
                     st.session_state[_SHOW_NEW_ASSET_FORM_KEY] = False
                     st.success("Asset saved.")
                     st.rerun()
 
-    build_modal_cache(rows, cache_key=_ASSETS_CACHE_KEY)
-
     deeplink_sel = str(st.session_state.get(_SEL) or "").strip()
     if deeplink_sel and not str(st.session_state.get(_ASSETS_MODAL_KEY) or "").strip():
-        cached = st.session_state.get(_ASSETS_CACHE_KEY)
-        if isinstance(cached, dict) and deeplink_sel in cached:
-            _open_assets_detail_modal(deeplink_sel, cached[deeplink_sel])
+        deeplink_asset = _cached_asset_for_modal(deeplink_sel)
+        if deeplink_asset:
+            _open_assets_detail_modal(deeplink_sel, deeplink_asset)
 
     st.markdown(
         '<span class="ips-assets-main-tabs-anchor" aria-hidden="true"></span>',

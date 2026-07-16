@@ -231,6 +231,13 @@ def _clear_hand_tools_list_cache() -> None:
     clear_hand_tools_list_cache()
 
 
+def _clear_kit_derived_list_caches() -> None:
+    _clear_hand_tools_list_cache()
+    from app.services.asset_kits_service import clear_kit_items_list_cache
+
+    clear_kit_items_list_cache()
+
+
 def clear_data_cache_for_table(table: str) -> None:
     """Invalidate caches affected by a single-table write (narrower than clear_all)."""
     from app.perf_debug import perf_span
@@ -264,7 +271,7 @@ def clear_data_cache_for_table(table: str) -> None:
             "inventory_transactions": clear_inventory_catalog_cache,
             "assets": clear_assets_catalog_cache,
             "tool_transactions": clear_assets_catalog_cache,
-            "asset_kit_items": _clear_hand_tools_list_cache,
+            "asset_kit_items": _clear_kit_derived_list_caches,
             "small_hand_tools": _clear_hand_tools_list_cache,
             "customers": clear_customers_catalog_cache,
             "customer_locations": clear_customers_catalog_cache,
