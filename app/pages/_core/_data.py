@@ -811,6 +811,9 @@ def clear_assets_catalog_cache() -> None:
     clear_dashboard_page_data_cache()
     from app.services.pricing_guide_service import clear_pricing_guide_cache
     clear_pricing_guide_cache()
+    from app.services.assets_service import invalidate_assets_modal_cache
+
+    invalidate_assets_modal_cache()
 
 
 def clear_customers_catalog_cache() -> None:

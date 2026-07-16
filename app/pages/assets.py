@@ -72,6 +72,7 @@ from app.services.asset_images import (
 )
 from app.services.item_images import ITEM_IMAGE_UPLOAD_TYPES
 from app.services.assets_service import (
+    ASSETS_MODAL_CACHE_KEY,
     clear_assets_cache,
     generate_asset_qr_value,
     rebuild_asset_qr,
@@ -144,7 +145,7 @@ from app.utils.field_context import (
 _SEL = select_key("assets")
 _MOD = "assets"
 _ASSETS_MODAL_KEY = "ips_assets_detail_modal_id"
-_ASSETS_CACHE_KEY = "_ips_assets_modal_by_id"
+_ASSETS_CACHE_KEY = ASSETS_MODAL_CACHE_KEY
 SELECTED_ASSET_KEY = "selected_asset_id"
 SELECTED_ASSET_IDS_KEY = "selected_asset_ids"
 SHOW_ASSET_MODAL_KEY = "show_asset_detail_modal"
@@ -1233,7 +1234,9 @@ def _put_asset_in_modal_cache(asset_id: str, asset: dict | None) -> None:
 
 
 def _invalidate_assets_modal_cache() -> None:
-    st.session_state.pop(_ASSETS_CACHE_KEY, None)
+    from app.services.assets_service import invalidate_assets_modal_cache
+
+    invalidate_assets_modal_cache()
 
 
 def _clear_assets_catalog_cache() -> None:
@@ -1255,11 +1258,17 @@ def _cached_asset_for_modal(asset_id: str) -> dict | None:
     from app.services.repository import fetch_by_id
 
     raw = fetch_by_id("assets", aid)
-    if not isinstance(raw, dict):
-        return None
-    asset = normalize_asset(raw)
-    _put_asset_in_modal_cache(aid, asset)
-    return asset
+    if isinstance(raw, dict):
+        asset = normalize_asset(raw)
+        _put_asset_in_modal_cache(aid, asset)
+        return asset
+
+    for row in load_assets():
+        if str(row.get("id") or "").strip() == aid:
+            asset = normalize_asset(row)
+            _put_asset_in_modal_cache(aid, asset)
+            return asset
+    return None
 
 
 def _open_assets_detail_modal(
