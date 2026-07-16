@@ -149,7 +149,6 @@ _ASSETS_CACHE_KEY = ASSETS_MODAL_CACHE_KEY
 SELECTED_ASSET_KEY = "selected_asset_id"
 SELECTED_ASSET_IDS_KEY = "selected_asset_ids"
 SHOW_ASSET_MODAL_KEY = "show_asset_detail_modal"
-_ASSETS_MODAL_DIALOG_SHOWN_KEY = "_ips_assets_detail_modal_shown"
 _ASSETS_MAIN_TAB_KEY = "ips_assets_main_tab"
 _ASSETS_MAIN_TABS = ("Equipment", "Serialized Tools", "Small Tools")
 ASSET_DETAIL_TAB_FOCUS_KEY = "ast_detail_tab_focus"
@@ -487,9 +486,6 @@ def _show_assets_modal_if_selected() -> None:
         return
     if not str(st.session_state.get(_ASSETS_MODAL_KEY) or "").strip():
         return
-    if st.session_state.get(_ASSETS_MODAL_DIALOG_SHOWN_KEY):
-        return
-    st.session_state[_ASSETS_MODAL_DIALOG_SHOWN_KEY] = True
     show_modal_if_pending(_ASSETS_MODAL_KEY, _show_assets_detail_modal)
 
 
@@ -1082,7 +1078,6 @@ def _render_equipment_list(
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
     _render_custom_assets_table(page_rows, filter_options=filter_options)
     render_table_pagination_footer(len(filtered), _TABLE_KEY)
-    _show_assets_modal_if_selected()
 
 
 @fragment
@@ -1173,7 +1168,6 @@ def _render_small_tools_list(rows: list[dict]) -> None:
         jobs_by_id=jobs_by_id,
     )
     render_table_pagination_footer(len(filtered), _SMALL_TOOLS_TABLE_KEY)
-    _show_assets_modal_if_selected()
 
 
 def _apply_assets_search_filter(rows: list[dict], q: str) -> list[dict]:
@@ -1210,7 +1204,6 @@ def _clear_assets_detail_modal() -> None:
     asset_ids = st.session_state.get(_ALL_ASSET_IDS_KEY) or []
     _clear_asset_selection([str(aid) for aid in asset_ids])
     clear_edit_modes(_MOD)
-    st.session_state.pop(_ASSETS_MODAL_DIALOG_SHOWN_KEY, None)
     clear_record_modal(
         table_key="assets_list",
         session_select_key=_SEL,
@@ -1281,7 +1274,6 @@ def _open_assets_detail_modal(
     if not aid:
         return
     _put_asset_in_modal_cache(aid, asset)
-    st.session_state.pop(_ASSETS_MODAL_DIALOG_SHOWN_KEY, None)
     st.session_state[SELECTED_ASSET_KEY] = aid
     st.session_state[SHOW_ASSET_MODAL_KEY] = True
     if tab_focus:
@@ -2123,7 +2115,6 @@ def render() -> None:
         return
     from app.services.asset_qr import apply_pending_asset_deeplink
     apply_pending_asset_deeplink()
-    st.session_state[_ASSETS_MODAL_DIALOG_SHOWN_KEY] = False
 
     def _assets_header_actions() -> None:
         st.markdown(
@@ -2279,5 +2270,7 @@ def render() -> None:
     else:
         render_hand_tools_tab(rows, on_open_tool=_open_hand_tool_row)
 
-    if st.session_state.get(SHOW_ASSET_MODAL_KEY):
+    if st.session_state.get(SHOW_ASSET_MODAL_KEY) or str(
+        st.session_state.get(_ASSETS_MODAL_KEY) or ""
+    ).strip():
         _show_assets_modal_if_selected()
