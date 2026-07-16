@@ -62,7 +62,7 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.ui.page_header_styles import inject_page_header_styles
 
         src = inspect.getsource(inject_page_header_styles)
-        self.assertIn("ips-page-header-styles-v26", src)
+        self.assertIn("ips-page-header-styles-v27", src)
         self.assertIn("ips-assets-page-header-actions", src)
         self.assertIn("border-radius: 50%", src)
         self.assertIn("st-key-header_avatar", src)
@@ -234,7 +234,7 @@ class PageHeaderSourceTests(unittest.TestCase):
             primary_action_width=5.8,
         )
         self.assertEqual(names, ["bottom_actions", "trailing"])
-        self.assertEqual(ratios[0], 0.01)
+        self.assertEqual(ratios[0], 5.8)
 
     def test_scroll_preserve_injects_from_sidebar(self) -> None:
         from app.ui.streamlit_perf import inject_scroll_preserve

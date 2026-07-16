@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import unittest
+from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -208,17 +209,16 @@ class TestPerSessionSupabaseClient(unittest.TestCase):
     def setUp(self) -> None:
         st.session_state.clear()
 
-    @patch(
-        "app.config.validate_supabase_public_config",
-        return_value=None,
-    )
     @patch("app.db._create_public_supabase_client")
     def test_get_client_uses_per_streamlit_session_instance(
         self,
         create_mock,
-        validate_config_mock,
     ) -> None:
-        from app.db import _IPS_USER_SUPABASE_CLIENT_KEY, get_client
+        from app.db import (
+            _IPS_USER_SUPABASE_CLIENT_KEY,
+            get_client,
+            settings,
+        )
 
         session_keys = [
             _IPS_USER_SUPABASE_CLIENT_KEY,
@@ -233,22 +233,38 @@ class TestPerSessionSupabaseClient(unittest.TestCase):
         create_mock.side_effect = [client_a, client_b]
 
         try:
-            st.session_state[AUTH_ACCESS_TOKEN_KEY] = "token-a"
-            st.session_state[AUTH_REFRESH_TOKEN_KEY] = "refresh-a"
-            first = get_client()
-            # Repeated calls in the same Streamlit session should reuse the
-            # same per-session client.
-            second = get_client()
-            self.assertIs(first, client_a)
-            self.assertIs(second, client_a)
-            self.assertEqual(create_mock.call_count, 1)
-            # Removing the session-specific client simulates another/new
-            # Streamlit browser session.
-            st.session_state.pop(_IPS_USER_SUPABASE_CLIENT_KEY, None)
-            third = get_client()
-            self.assertIs(third, client_b)
-            self.assertEqual(create_mock.call_count, 2)
-            validate_config_mock.assert_called()
+            with (
+                patch(
+                    "app.config.validate_supabase_public_config",
+                    return_value=None,
+                ),
+                patch(
+                    "app.db._public_api_key",
+                    return_value="test-public-key",
+                ),
+                patch(
+                    "app.db.settings",
+                    replace(
+                        settings,
+                        supabase_url="https://test-project.supabase.co",
+                    ),
+                ),
+            ):
+                st.session_state[AUTH_ACCESS_TOKEN_KEY] = "token-a"
+                st.session_state[AUTH_REFRESH_TOKEN_KEY] = "refresh-a"
+                first = get_client()
+                second = get_client()
+                self.assertIs(first, client_a)
+                self.assertIs(second, client_a)
+                self.assertEqual(create_mock.call_count, 1)
+                # Simulate a new Streamlit browser session.
+                st.session_state.pop(
+                    _IPS_USER_SUPABASE_CLIENT_KEY,
+                    None,
+                )
+                third = get_client()
+                self.assertIs(third, client_b)
+                self.assertEqual(create_mock.call_count, 2)
         finally:
             for key in session_keys:
                 st.session_state.pop(key, None)

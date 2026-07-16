@@ -72,6 +72,7 @@ from app.services.asset_images import (
 )
 from app.services.item_images import ITEM_IMAGE_UPLOAD_TYPES
 from app.services.assets_service import (
+    ASSETS_MODAL_CACHE_KEY,
     clear_assets_cache,
     generate_asset_qr_value,
     rebuild_asset_qr,
@@ -144,11 +145,10 @@ from app.utils.field_context import (
 _SEL = select_key("assets")
 _MOD = "assets"
 _ASSETS_MODAL_KEY = "ips_assets_detail_modal_id"
-_ASSETS_CACHE_KEY = "_ips_assets_modal_by_id"
+_ASSETS_CACHE_KEY = ASSETS_MODAL_CACHE_KEY
 SELECTED_ASSET_KEY = "selected_asset_id"
 SELECTED_ASSET_IDS_KEY = "selected_asset_ids"
 SHOW_ASSET_MODAL_KEY = "show_asset_detail_modal"
-_ASSETS_MODAL_DIALOG_SHOWN_KEY = "_ips_assets_detail_modal_shown"
 _ASSETS_MAIN_TAB_KEY = "ips_assets_main_tab"
 _ASSETS_MAIN_TABS = ("Equipment", "Serialized Tools", "Small Tools")
 ASSET_DETAIL_TAB_FOCUS_KEY = "ast_detail_tab_focus"
@@ -486,9 +486,6 @@ def _show_assets_modal_if_selected() -> None:
         return
     if not str(st.session_state.get(_ASSETS_MODAL_KEY) or "").strip():
         return
-    if st.session_state.get(_ASSETS_MODAL_DIALOG_SHOWN_KEY):
-        return
-    st.session_state[_ASSETS_MODAL_DIALOG_SHOWN_KEY] = True
     show_modal_if_pending(_ASSETS_MODAL_KEY, _show_assets_detail_modal)
 
 
@@ -505,7 +502,7 @@ def _on_small_tool_checkbox_change(
             if other_id != row_id:
                 st.session_state[_small_tool_select_key(other_id)] = False
         if row:
-            _prepare_open_small_tool_row(row, assets_by_id)
+            _open_small_tool_row(row, assets_by_id)
     elif row:
         modal_aid = _small_tool_modal_asset_id(row)
         if modal_aid and st.session_state.get(SELECTED_ASSET_KEY) == modal_aid:
@@ -535,7 +532,7 @@ def _open_hand_tool_row(row: dict) -> None:
 
 
 def _prepare_open_small_tool_row(row: dict, assets_by_id: dict[str, dict]) -> None:
-    """Set serialized tool detail state without rerunning."""
+    """Set serialized tool detail modal state (caller must app-rerun to show dialog)."""
     if str(row.get("row_type") or "") == "kit_item":
         parent_id = str(row.get("parent_asset_id") or "").strip()
         if parent_id:
@@ -548,6 +545,7 @@ def _prepare_open_small_tool_row(row: dict, assets_by_id: dict[str, dict]) -> No
 
 def _open_small_tool_row(row: dict, assets_by_id: dict[str, dict]) -> None:
     _prepare_open_small_tool_row(row, assets_by_id)
+    ips_app_rerun()
 
 
 def _render_serialized_tool_name_cell(
@@ -568,7 +566,7 @@ def _render_serialized_tool_name_cell(
         unsafe_allow_html=True,
     )
     if st.button(name, key=f"st_open_name_{rid}", type="tertiary"):
-        _prepare_open_small_tool_row(row, assets_by_id)
+        _open_small_tool_row(row, assets_by_id)
 
 
 def _small_tool_image_asset(row: dict, assets_by_id: dict[str, dict]) -> dict:
@@ -1081,7 +1079,6 @@ def _render_equipment_list(
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
     _render_custom_assets_table(page_rows, filter_options=filter_options)
     render_table_pagination_footer(len(filtered), _TABLE_KEY)
-    _show_assets_modal_if_selected()
 
 
 @fragment
@@ -1172,7 +1169,6 @@ def _render_small_tools_list(rows: list[dict]) -> None:
         jobs_by_id=jobs_by_id,
     )
     render_table_pagination_footer(len(filtered), _SMALL_TOOLS_TABLE_KEY)
-    _show_assets_modal_if_selected()
 
 
 def _apply_assets_search_filter(rows: list[dict], q: str) -> list[dict]:
@@ -1209,7 +1205,6 @@ def _clear_assets_detail_modal() -> None:
     asset_ids = st.session_state.get(_ALL_ASSET_IDS_KEY) or []
     _clear_asset_selection([str(aid) for aid in asset_ids])
     clear_edit_modes(_MOD)
-    st.session_state.pop(_ASSETS_MODAL_DIALOG_SHOWN_KEY, None)
     clear_record_modal(
         table_key="assets_list",
         session_select_key=_SEL,
@@ -1233,7 +1228,9 @@ def _put_asset_in_modal_cache(asset_id: str, asset: dict | None) -> None:
 
 
 def _invalidate_assets_modal_cache() -> None:
-    st.session_state.pop(_ASSETS_CACHE_KEY, None)
+    from app.services.assets_service import invalidate_assets_modal_cache
+
+    invalidate_assets_modal_cache()
 
 
 def _clear_assets_catalog_cache() -> None:
@@ -1261,8 +1258,9 @@ def _cached_asset_for_modal(asset_id: str) -> dict | None:
         return asset
     for row in load_assets():
         if str(row.get("id") or "").strip() == aid:
-            _put_asset_in_modal_cache(aid, row)
-            return row
+            asset = normalize_asset(row)
+            _put_asset_in_modal_cache(aid, asset)
+            return asset
     return None
 
 
@@ -1276,7 +1274,6 @@ def _open_assets_detail_modal(
     if not aid:
         return
     _put_asset_in_modal_cache(aid, asset)
-    st.session_state.pop(_ASSETS_MODAL_DIALOG_SHOWN_KEY, None)
     st.session_state[SELECTED_ASSET_KEY] = aid
     st.session_state[SHOW_ASSET_MODAL_KEY] = True
     if tab_focus:
@@ -2118,7 +2115,6 @@ def render() -> None:
         return
     from app.services.asset_qr import apply_pending_asset_deeplink
     apply_pending_asset_deeplink()
-    st.session_state[_ASSETS_MODAL_DIALOG_SHOWN_KEY] = False
 
     def _assets_header_actions() -> None:
         st.markdown(
@@ -2274,5 +2270,7 @@ def render() -> None:
     else:
         render_hand_tools_tab(rows, on_open_tool=_open_hand_tool_row)
 
-    if st.session_state.get(SHOW_ASSET_MODAL_KEY):
+    if st.session_state.get(SHOW_ASSET_MODAL_KEY) or str(
+        st.session_state.get(_ASSETS_MODAL_KEY) or ""
+    ).strip():
         _show_assets_modal_if_selected()
