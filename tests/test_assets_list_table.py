@@ -41,5 +41,5 @@ def test_asset_thumb_link_html_wraps_catalog_thumbnail():
 def test_asset_link_html_uses_open_action():
     html_out = _asset_link_html("ast-2", "Dump Trailer", bridge_key="ast_bridge_open_ast_2")
     assert 'data-asset-action="open"' in html_out
-    assert 'role="button"' in html_out
+    assert 'type="button"' in html_out
     assert "Dump Trailer" in html_out

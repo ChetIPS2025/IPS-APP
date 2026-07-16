@@ -111,10 +111,9 @@ from app.components.asset_reclassification_ui import (
 )
 from app.components.asset_row_actions_ui import ASSET_OPEN_ACTIVITY_KEY, render_asset_activity_snippet
 from app.components.assets_list_table import (
-    ASSETS_TABLE_LAST_ACTION_KEY,
     apply_assets_table_bridge_action,
     build_assets_html_table,
-    render_assets_table_bridge,
+    render_assets_table_bridge_legacy,
     render_assets_table_open_buttons,
 )
 from app.components.assets_page_layout import (
@@ -807,17 +806,13 @@ def _render_custom_assets_table(
             filtered,
             open_asset_fn=_open_assets_table_item,
         )
-        bridge_action = render_assets_table_bridge(
+        render_assets_table_bridge_legacy(
+            assets_by_id,
             component_key="ips_assets_list_bridge",
             hook_key="ipsAssetsList::action",
-            field_mode=field_mode,
-        )
-        apply_assets_table_bridge_action(
-            bridge_action,
-            assets_by_id,
-            last_action_key=ASSETS_TABLE_LAST_ACTION_KEY,
             open_asset_fn=_open_assets_table_item,
             on_expand_fn=_on_assets_table_expand if field_mode else None,
+            field_mode=field_mode,
         )
 
         if field_mode and expanded_asset_id and expanded_asset_id in assets_by_id:

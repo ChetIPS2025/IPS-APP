@@ -147,7 +147,8 @@ section[data-testid="stMain"]:has(.ips-assets-page) .ips-assets-filter-bar-wrap 
 }
 .st-key-assets_table_wrap .ips-dash-est-link,
 .st-key-assets_table_wrap .ips-inventory-desc-link,
-.st-key-assets_table_wrap .ips-assets-open-link {
+.st-key-assets_table_wrap .ips-assets-open-link,
+.st-key-assets_table_wrap button.ips-assets-open-link {
   color: #2563eb !important;
   font-weight: 800 !important;
   font-size: 0.8125rem !important;

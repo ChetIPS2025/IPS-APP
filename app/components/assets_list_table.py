@@ -137,9 +137,9 @@ def _asset_link_html(
     if bridge_key:
         bridge_attr = f' data-bridge-key="{html.escape(bridge_key, quote=True)}"'
     return (
-        f'<span role="button" tabindex="0" class="{html.escape(cls)}" data-asset-action="open" '
+        f'<button type="button" class="{html.escape(cls)}" data-asset-action="open" '
         f'data-asset-id="{asset_id}" data-row-id="{asset_id}"{bridge_attr} '
-        f'title="{title}">{text}</span>'
+        f'title="{title}">{text}</button>'
     )
 
 
@@ -405,40 +405,36 @@ def render_assets_table_bridge(
     }}
   }}
 
-  function clickBridgeButton(bridgeKey) {{
-    if (!bridgeKey) return false;
-    const host = doc.querySelector(".st-key-" + bridgeKey);
-    const btn = host && host.querySelector('[data-testid="stButton"] > button');
-    if (!btn) return false;
-    btn.click();
-    return true;
-  }}
-
-  function openAsset(id, action, bridgeKey) {{
+  function openAsset(id, action) {{
     if (!id) return;
     const act = action || "open";
-    if (act === "open" && bridgeKey && clickBridgeButton(bridgeKey)) return;
     sendValue(act + ":" + id);
   }}
 
   function isInteractive(target) {{
     return !!(target && target.closest && target.closest(
-      "button, [role='button'], input, select, textarea, label, a, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox']"
+      "button:not(.ips-assets-open-link):not(.ips-inventory-open-link), input, select, textarea, label, a, [data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox'], [data-asset-action]:not([data-asset-action='open'])"
     ));
   }}
 
   function bindTargets() {{
-    doc.querySelectorAll(openSel).forEach(function (link) {{
-      if (link.dataset.ipsAssetsOpenBound === "1") return;
-      link.dataset.ipsAssetsOpenBound = "1";
-      link.addEventListener("click", function (e) {{
+    const wrap = doc.querySelector(wrapSel);
+    if (!wrap) return;
+    wrap.querySelectorAll(openSel).forEach(function (el) {{
+      if (el.dataset.ipsAssetsOpenBound === "1") return;
+      el.dataset.ipsAssetsOpenBound = "1";
+      function onActivate(e) {{
         e.preventDefault();
         e.stopPropagation();
-        const id = link.getAttribute("data-asset-id") || link.getAttribute("data-row-id");
-        openAsset(id, "open", link.getAttribute("data-bridge-key") || "");
-      }});
+        const id = el.getAttribute("data-asset-id") || el.getAttribute("data-row-id");
+        openAsset(id, "open");
+      }}
+      el.addEventListener("click", onActivate, true);
+      el.addEventListener("keydown", function (e) {{
+        if (e.key === "Enter" || e.key === " ") onActivate(e);
+      }}, true);
     }});
-    doc.querySelectorAll(rowSel).forEach(function (row) {{
+    wrap.querySelectorAll(rowSel).forEach(function (row) {{
       if (row.dataset.ipsAssetsRowBound === "1") return;
       row.dataset.ipsAssetsRowBound = "1";
       row.addEventListener("click", function (e) {{
@@ -447,11 +443,7 @@ def render_assets_table_bridge(
         if (!id) return;
         e.preventDefault();
         e.stopPropagation();
-        openAsset(
-          id,
-          fieldMode ? "expand" : "open",
-          row.getAttribute("data-bridge-key") || ""
-        );
+        openAsset(id, fieldMode ? "expand" : "open");
       }}, true);
     }});
   }}
@@ -468,7 +460,7 @@ def render_assets_table_bridge(
         e.preventDefault();
         e.stopPropagation();
         const id = link.getAttribute("data-asset-id") || link.getAttribute("data-row-id");
-        openAsset(id, "open", link.getAttribute("data-bridge-key") || "");
+        openAsset(id, "open");
         return;
       }}
       if (isInteractive(t)) return;
@@ -478,11 +470,7 @@ def render_assets_table_bridge(
       if (!id) return;
       e.preventDefault();
       e.stopPropagation();
-      openAsset(
-        id,
-        fieldMode ? "expand" : "open",
-        row.getAttribute("data-bridge-key") || ""
-      );
+      openAsset(id, fieldMode ? "expand" : "open");
     }}, true);
   }}
 
@@ -527,3 +515,31 @@ def apply_assets_table_bridge_action(
         on_expand_fn=on_expand_fn,
     )
     return raw.startswith("open:")
+
+
+def render_assets_table_bridge_legacy(
+    assets_by_id: dict[str, dict[str, Any]],
+    *,
+    component_key: str = "ips_assets_list_bridge",
+    hook_key: str = "ipsAssetsList::action",
+    last_action_key: str = ASSETS_TABLE_LAST_ACTION_KEY,
+    open_asset_fn: Callable[[str, dict[str, Any]], None],
+    on_expand_fn: Callable[[str, dict[str, Any]], None] | None = None,
+    field_mode: bool = False,
+) -> None:
+    st.markdown(
+        '<span class="ips-assets-table-link-bridge-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    picked = render_assets_table_bridge(
+        component_key=component_key,
+        hook_key=hook_key,
+        field_mode=field_mode,
+    )
+    apply_assets_table_bridge_action(
+        picked,
+        assets_by_id,
+        last_action_key=last_action_key,
+        open_asset_fn=open_asset_fn,
+        on_expand_fn=on_expand_fn,
+    )
