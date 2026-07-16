@@ -1233,7 +1233,9 @@ def _put_asset_in_modal_cache(asset_id: str, asset: dict | None) -> None:
 
 
 def _invalidate_assets_modal_cache() -> None:
-    st.session_state.pop(_ASSETS_CACHE_KEY, None)
+    from app.services.assets_service import invalidate_assets_modal_cache
+
+    invalidate_assets_modal_cache()
 
 
 def _clear_assets_catalog_cache() -> None:

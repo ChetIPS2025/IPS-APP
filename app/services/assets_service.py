@@ -136,6 +136,16 @@ __all__ = [
 
 
 
+ASSETS_MODAL_CACHE_KEY = "_ips_assets_modal_by_id"
+
+
+def invalidate_assets_modal_cache() -> None:
+    """Drop lazy-loaded asset detail rows after catalog mutations."""
+    import streamlit as st
+
+    st.session_state.pop(ASSETS_MODAL_CACHE_KEY, None)
+
+
 def clear_assets_cache() -> None:
     from app.services.repository import clear_data_cache_for_table
     clear_data_cache_for_table("assets")
