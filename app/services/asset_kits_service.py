@@ -6,6 +6,9 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import streamlit as st
+
+from app.pages._core._data import CATALOG_CACHE_TTL
 from app.services.repository import ServiceResult, delete_row, fetch_rows, insert_row, update_row
 
 _KIT_ITEMS = "asset_kit_items"
@@ -159,11 +162,24 @@ def infer_kit_type(asset: dict[str, Any]) -> str:
     return "Tool Trailer"
 
 
+@st.cache_data(ttl=CATALOG_CACHE_TTL, show_spinner=False)
+def _cached_kit_item_rows() -> tuple[dict[str, Any], ...]:
+    rows, _ = fetch_rows(_KIT_ITEMS, limit=10000, order_by="item_name")
+    out: list[dict[str, Any]] = []
+    for row in rows or []:
+        if isinstance(row, dict) and row.get("is_active") is not False:
+            out.append(dict(row))
+    return tuple(out)
+
+
+def clear_kit_items_list_cache() -> None:
+    _cached_kit_item_rows.clear()
+
+
 def list_all_kit_items_enriched(
     assets_by_id: dict[str, dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """All active kit items with parent asset context for cross-kit lists."""
-    rows, _ = fetch_rows(_KIT_ITEMS, limit=10000, order_by="item_name")
     if assets_by_id is None:
         from app.services.phase2_modules_service import list_assets, normalize_asset
         assets_by_id = {
@@ -172,9 +188,7 @@ def list_all_kit_items_enriched(
             if str(a.get("id") or "").strip()
         }
     out: list[dict[str, Any]] = []
-    for r in rows or []:
-        if not isinstance(r, dict) or r.get("is_active") is False:
-            continue
+    for r in _cached_kit_item_rows():
         item = normalize_kit_item(r)
         pid = str(item.get("parent_asset_id") or "").strip()
         parent = assets_by_id.get(pid) or {}

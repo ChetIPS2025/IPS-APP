@@ -36,10 +36,8 @@ def _inject_sidebar_css(style_id: str, css: str) -> None:
 
 def inject_assets_shell_css() -> None:
     """Shared page chrome — filter bar, header actions, tabs container."""
-    from app.ui.clean_table import inject_clean_table_css
     from app.ui.page_shell import inject_ips_dashboard_layout
 
-    inject_clean_table_css()
     inject_ips_dashboard_layout()
     _inject_sidebar_css(
         "ips-assets-shell-v1",
