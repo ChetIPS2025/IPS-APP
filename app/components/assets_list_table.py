@@ -8,7 +8,7 @@ from typing import Any
 
 import streamlit as st
 
-from app.ui.streamlit_perf import fragment_rerun
+from app.ui.streamlit_perf import fragment_rerun, ips_app_rerun
 
 from app.services.catalog_images import catalog_thumbnail_html
 from app.services.phase2_modules_service import asset_is_rentable
@@ -323,6 +323,7 @@ def handle_assets_table_action(
     if not asset:
         return
     open_asset_fn(asset_id, asset)
+    ips_app_rerun()
 
 
 def render_assets_table_bridge(
