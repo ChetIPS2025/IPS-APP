@@ -33,3 +33,18 @@ def test_clear_assets_catalog_cache_invalidates_modal_cache() -> None:
     mock_dash.assert_called_once()
     mock_pg.assert_called_once()
     mock_modal.assert_called_once()
+
+
+def test_cached_asset_for_modal_falls_back_to_load_assets() -> None:
+    demo_asset = {"id": "ast4", "asset_name": "Trailer - Utility 14ft", "asset_number": "AST-1004"}
+
+    with patch("app.services.repository.fetch_by_id", return_value=None):
+        with patch("app.pages.assets.load_assets", return_value=[demo_asset]):
+            with patch("app.pages.assets.st.session_state", {}, create=True):
+                from app.pages.assets import _cached_asset_for_modal
+
+                result = _cached_asset_for_modal("ast4")
+
+    assert result is not None
+    assert result.get("id") == "ast4"
+    assert result.get("asset_name") == "Trailer - Utility 14ft"
