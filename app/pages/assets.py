@@ -152,6 +152,7 @@ _ASSETS_CACHE_KEY = "_ips_assets_modal_by_id"
 SELECTED_ASSET_KEY = "selected_asset_id"
 SELECTED_ASSET_IDS_KEY = "selected_asset_ids"
 SHOW_ASSET_MODAL_KEY = "show_asset_detail_modal"
+_ASSETS_MODAL_RENDERED_RUN_KEY = "_ips_assets_detail_modal_script_run"
 ASSET_DETAIL_TAB_FOCUS_KEY = "ast_detail_tab_focus"
 _SHOW_NEW_ASSET_FORM_KEY = "assets_show_new_asset_form"
 _ALL_ASSET_IDS_KEY = "_ips_assets_visible_ids"
@@ -483,8 +484,19 @@ def _clear_small_tool_selection(row_ids: list[str] | None = None) -> None:
 
 
 def _show_assets_modal_if_selected() -> None:
-    if st.session_state.get(SHOW_ASSET_MODAL_KEY):
-        show_modal_if_pending(_ASSETS_MODAL_KEY, _show_assets_detail_modal)
+    if not st.session_state.get(SHOW_ASSET_MODAL_KEY):
+        return
+    if not str(st.session_state.get(_ASSETS_MODAL_KEY) or "").strip():
+        return
+    from streamlit.runtime.scriptrunner import get_script_run_ctx
+
+    ctx = get_script_run_ctx()
+    run_id = getattr(ctx, "script_run_id", None) if ctx else None
+    if run_id is not None:
+        if st.session_state.get(_ASSETS_MODAL_RENDERED_RUN_KEY) == run_id:
+            return
+        st.session_state[_ASSETS_MODAL_RENDERED_RUN_KEY] = run_id
+    show_modal_if_pending(_ASSETS_MODAL_KEY, _show_assets_detail_modal)
 
 
 def _on_small_tool_checkbox_change(
