@@ -113,6 +113,7 @@ from app.components.assets_list_table import (
     apply_assets_table_bridge_action,
     build_assets_html_table,
     render_assets_table_bridge_legacy,
+    render_assets_table_open_buttons,
 )
 from app.components.assets_page_layout import (
     close_assets_filter_bar_shell,
@@ -852,6 +853,10 @@ def _render_custom_assets_table(
                 expanded_asset_id=expanded_asset_id,
             ),
             unsafe_allow_html=True,
+        )
+        render_assets_table_open_buttons(
+            filtered,
+            open_asset_fn=_open_assets_table_item,
         )
         render_assets_table_bridge_legacy(
             assets_by_id,
