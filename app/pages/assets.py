@@ -515,10 +515,12 @@ def _open_small_tool_row(row: dict, assets_by_id: dict[str, dict]) -> None:
         parent_id = str(row.get("parent_asset_id") or "").strip()
         if parent_id:
             _open_assets_detail_modal(parent_id, assets_by_id.get(parent_id))
+            ips_app_rerun()
         return
     aid = str(row.get("id") or "").strip()
     if aid:
         _open_assets_detail_modal(aid, row)
+        ips_app_rerun()
 
 
 def _small_tool_image_asset(row: dict, assets_by_id: dict[str, dict]) -> dict:
@@ -765,7 +767,9 @@ def _on_assets_table_expand(asset_id: str, asset: dict) -> None:
 
 
 def _open_assets_table_item(asset_id: str, asset: dict) -> None:
+    """Set selected asset state; full rerun opens the detail dialog (fragment-safe)."""
     _handle_open_asset(asset)
+    ips_app_rerun()
 
 
 def _render_custom_assets_table(
