@@ -409,19 +409,9 @@ def render_inventory_table_bridge(
     }}
   }}
 
-  function clickBridgeButton(bridgeKey) {{
-    if (!bridgeKey) return false;
-    const host = doc.querySelector(".st-key-" + bridgeKey);
-    const btn = host && host.querySelector('[data-testid="stButton"] > button');
-    if (!btn) return false;
-    btn.click();
-    return true;
-  }}
-
-  function openItem(id, action, bridgeKey) {{
+  function openItem(id, action) {{
     if (!id) return;
     const act = action || "open";
-    if (act === "open" && bridgeKey && clickBridgeButton(bridgeKey)) return;
     sendValue(act + ":" + id);
   }}
 
@@ -441,7 +431,7 @@ def render_inventory_table_bridge(
         e.preventDefault();
         e.stopPropagation();
         const id = el.getAttribute("data-inventory-id") || el.getAttribute("data-row-id");
-        openItem(id, "open", el.getAttribute("data-bridge-key") || "");
+        openItem(id, "open");
       }}
       el.addEventListener("click", onActivate, true);
       el.addEventListener("keydown", function (e) {{
@@ -457,11 +447,7 @@ def render_inventory_table_bridge(
         if (!id) return;
         e.preventDefault();
         e.stopPropagation();
-        openItem(
-          id,
-          fieldMode ? "expand" : "open",
-          row.getAttribute("data-bridge-key") || ""
-        );
+        openItem(id, fieldMode ? "expand" : "open");
       }}, true);
     }});
   }}
@@ -478,7 +464,7 @@ def render_inventory_table_bridge(
         e.preventDefault();
         e.stopPropagation();
         const id = link.getAttribute("data-inventory-id") || link.getAttribute("data-row-id");
-        openItem(id, "open", link.getAttribute("data-bridge-key") || "");
+        openItem(id, "open");
         return;
       }}
       if (isInteractive(t)) return;
@@ -488,11 +474,7 @@ def render_inventory_table_bridge(
       if (!id) return;
       e.preventDefault();
       e.stopPropagation();
-      openItem(
-        id,
-        fieldMode ? "expand" : "open",
-        row.getAttribute("data-bridge-key") || ""
-      );
+      openItem(id, fieldMode ? "expand" : "open");
     }}, true);
   }}
 

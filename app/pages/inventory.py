@@ -26,7 +26,6 @@ from app.components.inventory_page_layout import (
 )
 from app.components.inventory_pricing_guide_actions import render_inventory_pricing_guide_actions
 from app.components.item_photo_manager import render_item_photo_manager
-from app.components.headers import render_page_brand_header
 from app.components.layout import render_filter_bar as layout_filter_bar
 from app.components.table_filters import (
     apply_column_filters,
@@ -93,7 +92,7 @@ from app.services.catalog_stock_policy_service import (
     passes_inventory_view_filter,
 )
 from app.styles import inject_inventory_module_css
-from app.ui.streamlit_perf import fragment, fragment_rerun, ips_app_rerun
+from app.ui.streamlit_perf import fragment, fragment_rerun
 from app.utils.formatting import fmt_currency, fmt_date
 from app.utils.inventory_quantity import format_inventory_quantity, inventory_qty_input_kwargs
 from app.utils.phone_helpers import format_phone_display
@@ -296,7 +295,7 @@ def _render_custom_inventory_table(
         )
         render_inventory_table_open_buttons(
             filtered,
-            open_item_fn=_open_inventory_table_item,
+            open_item_fn=_prepare_inventory_table_open,
         )
         render_inventory_table_bridge_legacy(
             items_by_id,
@@ -369,10 +368,14 @@ def _open_inventory_modal(record_id: str, record: dict | None) -> None:
     )
 
 
-def _open_inventory_table_item(item_id: str, item: dict | None = None) -> None:
-    """Set selected inventory state; the page render opens the dialog once."""
+def _prepare_inventory_table_open(item_id: str, item: dict | None = None) -> None:
+    """Set inventory detail modal state without triggering a rerun."""
     _open_inventory_modal(item_id, item)
-    ips_app_rerun()
+
+
+def _open_inventory_table_item(item_id: str, item: dict | None = None) -> None:
+    """Bridge handler during render — modal state plus full app rerun."""
+    _prepare_inventory_table_open(item_id, item)
 
 
 def _inventory_select_options(slug: str, current: str) -> list[str]:
@@ -814,6 +817,25 @@ def _render_inventory_items_fragment(
     render_table_pagination_footer(len(filtered), _TABLE_KEY)
 
 
+def _render_reorder_alert(reorder_count: int) -> None:
+    if not reorder_count:
+        return
+    st.markdown(
+        '<span class="ips-inventory-reorder-alert-marker" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    msg_col, action_col = st.columns([5.6, 1.1], gap="small", vertical_alignment="center")
+    with msg_col:
+        st.info(
+            f"{reorder_count} mandatory item(s) need reorder — use the Needs reorder view."
+        )
+    with action_col:
+        if st.button("Needs reorder", key="inv_alert_needs_reorder", type="tertiary"):
+            st.session_state["inv_stock_view"] = "Needs reorder"
+            reset_table_page(_TABLE_KEY)
+            st.rerun()
+
+
 def render() -> None:
     from app.pages._core._access import begin_module
     if not begin_module("inventory"):
@@ -834,8 +856,7 @@ def render() -> None:
     rows = load_enriched_inventory_rows()
     filter_options = build_filter_options(rows, _COLUMN_FILTER_SPECS)
     reorder_count = sum(1 for r in rows if inventory_needs_reorder(r))
-    if reorder_count:
-        st.info(f"{reorder_count} mandatory item(s) need reorder — use the **Needs reorder** view.")
+    _render_reorder_alert(reorder_count)
 
     filtered_export = _filter_rows(
         rows,
@@ -910,15 +931,22 @@ def render() -> None:
                 st.session_state[_EXPORT_CACHE_KEY] = export_cache_key
                 st.rerun()
 
-    def _inv_new() -> None:
+    def _inventory_header_actions() -> None:
+        st.markdown(
+            '<span class="ips-inventory-page-header-actions ips-page-header-inline-actions" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        _inv_export_header()
         if st.button("+ New Item", key="inv_new", type="primary"):
             st.session_state["ips_inv_form"] = True
 
-    render_page_brand_header(
+    from app.ui.page_header import render_page_header
+
+    render_page_header(
         "Inventory",
         "Track and manage all inventory items and stock levels.",
-        secondary_action=_inv_export_header,
-        primary_action=_inv_new,
+        primary_action=_inventory_header_actions,
+        primary_action_width=4.8,
     )
 
     if is_field_context():

@@ -8,13 +8,37 @@ from app.ui.css_inject import inject_css_once
 
 
 def inject_inventory_page_layout_css() -> None:
-    if not inject_css_once("ips-inventory-page-layout-v2"):
+    if not inject_css_once("ips-inventory-page-layout-v3"):
         return
     st.markdown(
         """
-<style id="ips-inventory-page-layout-v2">
+<style id="ips-inventory-page-layout-v3">
 section[data-testid="stMain"]:has(.ips-inventory-page) {
   background: #ffffff !important;
+}
+section[data-testid="stMain"]:has(.ips-inventory-page)
+[data-testid="stHorizontalBlock"]:has(.ips-inventory-reorder-alert-marker) {
+  align-items: center !important;
+  gap: 0.5rem !important;
+  margin: 0 0 0.5rem 0 !important;
+}
+section[data-testid="stMain"]:has(.ips-inventory-page)
+[data-testid="stHorizontalBlock"]:has(.ips-inventory-reorder-alert-marker)
+[data-testid="stAlert"] {
+  margin: 0 !important;
+}
+section[data-testid="stMain"]:has(.ips-inventory-page)
+[data-testid="stHorizontalBlock"]:has(.ips-inventory-reorder-alert-marker)
+.stButton > button[kind="tertiary"] {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #1d4ed8 !important;
+  font-weight: 800 !important;
+  text-decoration: underline !important;
+  padding: 0 !important;
+  min-height: auto !important;
+  height: auto !important;
 }
 .ips-inventory-filter-bar-wrap {
   background: #ffffff;
