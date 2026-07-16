@@ -1254,6 +1254,7 @@ def _open_assets_detail_modal(
     if not aid:
         return
     _put_asset_in_modal_cache(aid, asset)
+    st.session_state.pop(_ASSETS_MODAL_DIALOG_SHOWN_KEY, None)
     st.session_state[SELECTED_ASSET_KEY] = aid
     st.session_state[SHOW_ASSET_MODAL_KEY] = True
     if tab_focus:

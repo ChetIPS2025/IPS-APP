@@ -404,9 +404,19 @@ def render_assets_table_bridge(
     }}
   }}
 
-  function openAsset(id, action) {{
+  function clickBridgeButton(bridgeKey) {{
+    if (!bridgeKey) return false;
+    const host = doc.querySelector(".st-key-" + bridgeKey);
+    const btn = host && host.querySelector('[data-testid="stButton"] > button');
+    if (!btn) return false;
+    btn.click();
+    return true;
+  }}
+
+  function openAsset(id, action, bridgeKey) {{
     if (!id) return;
     const act = action || "open";
+    if (act === "open" && bridgeKey && clickBridgeButton(bridgeKey)) return;
     sendValue(act + ":" + id);
   }}
 
@@ -426,7 +436,7 @@ def render_assets_table_bridge(
         e.preventDefault();
         e.stopPropagation();
         const id = el.getAttribute("data-asset-id") || el.getAttribute("data-row-id");
-        openAsset(id, "open");
+        openAsset(id, "open", el.getAttribute("data-bridge-key") || "");
       }}
       el.addEventListener("click", onActivate, true);
       el.addEventListener("keydown", function (e) {{
@@ -442,7 +452,7 @@ def render_assets_table_bridge(
         if (!id) return;
         e.preventDefault();
         e.stopPropagation();
-        openAsset(id, fieldMode ? "expand" : "open");
+        openAsset(id, fieldMode ? "expand" : "open", row.getAttribute("data-bridge-key") || "");
       }}, true);
     }});
   }}
@@ -459,7 +469,7 @@ def render_assets_table_bridge(
         e.preventDefault();
         e.stopPropagation();
         const id = link.getAttribute("data-asset-id") || link.getAttribute("data-row-id");
-        openAsset(id, "open");
+        openAsset(id, "open", link.getAttribute("data-bridge-key") || "");
         return;
       }}
       if (isInteractive(t)) return;
@@ -469,7 +479,7 @@ def render_assets_table_bridge(
       if (!id) return;
       e.preventDefault();
       e.stopPropagation();
-      openAsset(id, fieldMode ? "expand" : "open");
+      openAsset(id, fieldMode ? "expand" : "open", row.getAttribute("data-bridge-key") || "");
     }}, true);
   }}
 
