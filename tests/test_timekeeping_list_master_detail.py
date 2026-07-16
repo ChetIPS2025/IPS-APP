@@ -68,16 +68,40 @@ class TestTimekeepingListMasterDetail(unittest.TestCase):
         self.assertEqual(len(tk._WEEKLY_TS_LIST_ROW_COLS), 12)
 
     @patch("app.pages.timekeeping._ensure_weekly_grid")
-    @patch("app.pages.timekeeping._ensure_week_days_by_employee")
-    def test_preload_warms_grids_for_visible_rows(self, week_mock, grid_mock) -> None:
-        week_mock.return_value = {}
-        rows = [
-            {"employee_id": "emp-1", "id": "emp-1", "timecard_id": "tc-1"},
-            {"employee_id": "emp-2", "id": "emp-2", "timecard_id": "tc-2"},
+    def test_collapsed_row_uses_list_display_not_session_grid(self, grid_mock) -> None:
+        source = inspect.getsource(tk._render_timekeeping_employee_row_collapsed)
+        self.assertIn("_list_row_day_rows_for_display", source)
+        self.assertNotIn("_ensure_weekly_grid", source)
+
+    @patch("app.services.timekeeping_service.list_timekeeping_days_for_week")
+    def test_list_display_day_rows_uses_batch_cache(self, fetch_mock) -> None:
+        fetch_mock.return_value = [
+            {
+                "employee_id": "emp-1",
+                "work_date": "2026-07-07",
+                "st_hours": 8,
+                "ot_hours": 0,
+                "dt_hours": 0,
+                "status": "Draft",
+            }
         ]
-        tk._preload_weekly_grids_for_rows(rows, date(2026, 7, 6))
-        week_mock.assert_called_once()
-        self.assertEqual(grid_mock.call_count, 2)
+        week = date(2026, 7, 6)
+        rows = tk._list_display_day_rows("emp-1", week)
+        self.assertEqual(len(rows), 7)
+        tuesday = next(r for r in rows if r.get("date") == "2026-07-07")
+        self.assertEqual(tuesday.get("st"), 8.0)
+        fetch_mock.assert_called_once_with(week)
+
+    @patch("app.pages.timekeeping._ensure_weekly_grid")
+    def test_open_day_editor_loads_session_grid(self, grid_mock) -> None:
+        week = date(2026, 7, 6)
+        tk._open_day_time_editor(
+            eid="emp-1",
+            work_date=date(2026, 7, 8),
+            timecard_id="tc-1",
+            week_start_d=week,
+        )
+        grid_mock.assert_called_once()
 
 
 if __name__ == "__main__":

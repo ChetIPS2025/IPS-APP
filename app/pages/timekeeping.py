@@ -425,6 +425,76 @@ def _day_rows_for_employee(employee_id: str, week_start_d: date) -> list[dict[st
     return list(_ensure_week_days_by_employee(week_start_d).get(eid, []))
 
 
+def _day_status_from_saved_rows(rows: list[dict[str, Any]]) -> str:
+    """Aggregate day status from saved allocation/day rows."""
+    if not rows:
+        return "Draft"
+    statuses = [_normalize_timecard_status(row.get("status")) for row in rows]
+    if any(s == "Rejected" for s in statuses):
+        return "Rejected"
+    if any(s == "Pending" for s in statuses):
+        return "Pending"
+    if all(s == "Approved" for s in statuses):
+        return "Approved"
+    return "Draft"
+
+
+def _list_display_day_rows(employee_id: str, week_start_d: date) -> list[dict[str, Any]]:
+    """Lightweight 7-day rows for list UI — reads batch week cache, no session grid."""
+    eid = str(employee_id or "").strip()
+    days = week_dates(week_start_d)
+    if not eid:
+        return [
+            {"date": day.isoformat(), "st": 0.0, "ot": 0.0, "dt": 0.0, "status": "Draft"}
+            for day in days
+        ]
+
+    saved_rows = _day_rows_for_employee(eid, week_start_d)
+    if not saved_rows:
+        return [
+            {"date": day.isoformat(), "st": 0.0, "ot": 0.0, "dt": 0.0, "status": "Draft"}
+            for day in days
+        ]
+
+    by_date: dict[str, list[dict[str, Any]]] = {}
+    for row in saved_rows:
+        iso = str(row.get("work_date") or "")[:10]
+        if iso:
+            by_date.setdefault(iso, []).append(row)
+
+    out: list[dict[str, Any]] = []
+    for day in days:
+        iso = day.isoformat()
+        day_rows = by_date.get(iso) or []
+        if not day_rows:
+            out.append({"date": iso, "st": 0.0, "ot": 0.0, "dt": 0.0, "status": "Draft"})
+            continue
+        out.append(
+            {
+                "date": iso,
+                "st": sum(float(r.get("st_hours") or 0) for r in day_rows),
+                "ot": sum(float(r.get("ot_hours") or 0) for r in day_rows),
+                "dt": sum(float(r.get("dt_hours") or 0) for r in day_rows),
+                "status": _day_status_from_saved_rows(day_rows),
+            }
+        )
+    return out
+
+
+def _list_row_day_rows_for_display(employee_id: str, week_start_d: date) -> list[dict[str, Any]]:
+    """Day rows for a list row — use loaded session grid when that employee is being edited."""
+    eid = str(employee_id or "").strip()
+    week_sig = week_start_d.isoformat()
+    selected_eid = str(st.session_state.get(SELECTED_TIME_EMPLOYEE_ID_KEY) or "").strip()
+    if eid and selected_eid == eid:
+        gk = _grid_key(eid)
+        if st.session_state.get(f"{gk}_week") == week_sig:
+            grid = st.session_state.get(gk)
+            if isinstance(grid, list) and grid:
+                return grid
+    return _list_display_day_rows(eid, week_start_d)
+
+
 def _assignment_options_for_timekeeping(*, week_start_d: date | None = None) -> list[str]:
     """Assignable jobs from the jobs table, their subjobs, Shop, Administrative, and Vacation."""
     sig = _assignment_options_cache_sig(week_start_d=week_start_d)
@@ -2632,15 +2702,6 @@ def _render_list_day_hour_stepper(
     return max(0.0, float(hours))
 
 
-def _preload_weekly_grids_for_rows(rows: list[dict], week_start_d: date) -> None:
-    """Warm weekly grids for visible list rows using the batch week day cache."""
-    _ensure_week_days_by_employee(week_start_d)
-    for row in rows:
-        eid = str(row.get("employee_id") or row.get("id") or "").strip()
-        if eid:
-            _ensure_weekly_grid(_emp_from_timecard_row(row), week_start_d)
-
-
 def _render_collapsed_list_day_cell(
     *,
     day_d: date,
@@ -4223,6 +4284,7 @@ def _open_day_time_editor(
     eid: str,
     work_date: date,
     timecard_id: str,
+    week_start_d: date | None = None,
 ) -> None:
     eid_s = str(eid or "").strip()
     iso = work_date.isoformat()
@@ -4231,6 +4293,9 @@ def _open_day_time_editor(
     st.session_state[TIMEKEEPING_MODAL_EMPLOYEE_ID_KEY] = eid_s
     st.session_state[TIMEKEEPING_MODAL_DATE_KEY] = iso
     st.session_state[TIMEKEEPING_MODAL_TIMECARD_KEY] = str(timecard_id or "").strip()
+    ws = week_start_d or week_start(work_date)
+    if eid_s:
+        _ensure_weekly_grid({"id": eid_s, "employee_id": eid_s}, ws)
     if _is_narrow_viewport():
         st.session_state[SHOW_TIMEKEEPING_DAY_MODAL_KEY] = True
     else:
@@ -4740,7 +4805,12 @@ def _render_clickable_list_day_cell(
         use_container_width=True,
         help=f"Open {day_d.strftime('%A %m/%d')} time entry",
     ):
-        _open_day_time_editor(eid=eid, work_date=day_d, timecard_id=timecard_id)
+        _open_day_time_editor(
+            eid=eid,
+            work_date=day_d,
+            timecard_id=timecard_id,
+            week_start_d=week_start_d,
+        )
         _timekeeping_app_rerun()
 
 
@@ -4759,11 +4829,9 @@ def _render_timekeeping_employee_row_collapsed(
     ot_total = float(row.get("ot_total") or 0)
     total_hours = float(row.get("total_hours") or 0)
     status = _normalize_timecard_status(row.get("status"))
-    grid: list[dict] | None = None
+    day_rows: list[dict] | None = None
     if eid:
-        grid = _ensure_weekly_grid(emp, week_start_d)
-        st_total, ot_total, total_hours = _row_totals_from_grid(grid)
-        status = _week_status_from_grid(grid)
+        day_rows = _list_row_day_rows_for_display(eid, week_start_d)
 
     with st.container(key=f"tk_row_{timecard_id}"):
         st.markdown(
@@ -4778,9 +4846,9 @@ def _render_timekeeping_employee_row_collapsed(
                 unsafe_allow_html=True,
             )
 
-        if eid and grid is not None:
+        if eid and day_rows is not None:
             for day_ix, (col, day_d) in enumerate(zip(row_cols[1:8], days)):
-                day_row = grid[day_ix] if day_ix < len(grid) else {}
+                day_row = day_rows[day_ix] if day_ix < len(day_rows) else {}
                 with col:
                     _render_clickable_list_day_cell(
                         day_d=day_d,
@@ -4925,8 +4993,6 @@ def _render_custom_timekeeping_table(
 
         _render_timekeeping_employee_filter_header(filter_options, days=days)
 
-        _preload_weekly_grids_for_rows(filtered, week_start_d)
-
         for row in filtered:
             _render_timekeeping_employee_row_fragment(row, week_start_d=week_start_d, days=days)
 
@@ -4973,7 +5039,6 @@ def render() -> None:
     )
 
     summaries = _filter_summaries_for_field_user(load_timekeeping_summaries(ws))
-    _ensure_week_days_by_employee(ws)
     built_rows = [_build_timecard_row(row, ws) for row in summaries]
     filter_options = build_filter_options(built_rows, _TK_COLUMN_FILTER_SPECS)
 
