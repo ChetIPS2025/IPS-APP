@@ -218,38 +218,6 @@ section[data-testid="stMain"]:has(.ips-assets-page) .ips-assets-filter-bar-wrap 
   width: 100% !important;
   max-width: 100% !important;
 }
-.st-key-assets_open_button_harness,
-.st-key-assets_open_button_harness [data-testid="stVerticalBlock"],
-.st-key-assets_open_button_harness [data-testid="stElementContainer"] {
-  display: block !important;
-  width: 0 !important;
-  height: 0 !important;
-  min-height: 0 !important;
-  max-height: 0 !important;
-  overflow: hidden !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: none !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-}
-.st-key-assets_open_button_harness [class*="st-key-ast_bridge_open_"] {
-  position: absolute !important;
-  width: 1px !important;
-  height: 1px !important;
-  overflow: hidden !important;
-  clip: rect(0, 0, 0, 0) !important;
-  pointer-events: auto !important;
-}
-.st-key-assets_open_button_harness [class*="st-key-ast_bridge_open_"] button {
-  width: 1px !important;
-  height: 1px !important;
-  min-height: 0 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  opacity: 0 !important;
-  pointer-events: auto !important;
-}
 .st-key-assets_table_wrap .ips-dash-est-desc-link {
   display: inline-block !important;
   max-width: 100% !important;

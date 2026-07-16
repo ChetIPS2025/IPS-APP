@@ -32,14 +32,13 @@ def test_asset_thumb_link_html_wraps_catalog_thumbnail():
     html_out = _asset_thumb_link_html(
         "ast-1",
         {"id": "ast-1", "asset_name": "Generator"},
-        bridge_key="ast_bridge_open_ast_1",
     )
     assert "ips-inventory-thumb-cell-link" in html_out
     assert 'data-asset-id="ast-1"' in html_out
 
 
 def test_asset_link_html_uses_open_action():
-    html_out = _asset_link_html("ast-2", "Dump Trailer", bridge_key="ast_bridge_open_ast_2")
+    html_out = _asset_link_html("ast-2", "Dump Trailer")
     assert 'data-asset-action="open"' in html_out
     assert 'type="button"' in html_out
     assert "Dump Trailer" in html_out

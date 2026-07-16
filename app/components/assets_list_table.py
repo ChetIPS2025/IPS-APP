@@ -17,12 +17,6 @@ from app.utils.formatting import fmt_date
 ASSETS_TABLE_LAST_ACTION_KEY = "assets_list_last_action"
 
 
-def assets_bridge_button_key(asset: dict[str, Any]) -> str:
-    raw = str(asset.get("id") or asset.get("asset_number") or "asset").strip()
-    safe = "".join(ch if ch.isalnum() else "_" for ch in raw) or "asset"
-    return f"ast_bridge_open_{safe}"
-
-
 ASSETS_TABLE_HEADERS: tuple[tuple[str, str], ...] = (
     ("image", "IMAGE"),
     ("name", "ASSET NAME"),
@@ -124,7 +118,6 @@ def _asset_link_html(
     label: str,
     *,
     extra_class: str = "",
-    bridge_key: str = "",
 ) -> str:
     asset_id = html.escape(str(aid or "").strip(), quote=True)
     text = html.escape(label)
@@ -133,12 +126,9 @@ def _asset_link_html(
         "ips-row-open-link ips-dash-est-link ips-inventory-desc-link ips-inventory-open-link "
         f"ips-assets-open-link {extra_class}"
     ).strip()
-    bridge_attr = ""
-    if bridge_key:
-        bridge_attr = f' data-bridge-key="{html.escape(bridge_key, quote=True)}"'
     return (
         f'<button type="button" class="{html.escape(cls)}" data-asset-action="open" '
-        f'data-asset-id="{asset_id}" data-row-id="{asset_id}"{bridge_attr} '
+        f'data-asset-id="{asset_id}" data-row-id="{asset_id}" '
         f'title="{title}">{text}</button>'
     )
 
@@ -146,8 +136,6 @@ def _asset_link_html(
 def _asset_thumb_link_html(
     aid: str,
     asset: dict[str, Any],
-    *,
-    bridge_key: str = "",
 ) -> str:
     asset_id = html.escape(str(aid or "").strip(), quote=True)
     thumb = catalog_thumbnail_html(
@@ -157,12 +145,9 @@ def _asset_thumb_link_html(
         cell_class="ips-inventory-image-cell",
         alt="Asset image",
     )
-    bridge_attr = ""
-    if bridge_key:
-        bridge_attr = f' data-bridge-key="{html.escape(bridge_key, quote=True)}"'
     return (
         f'<button type="button" class="ips-inventory-thumb-cell-link ips-inventory-open-link ips-assets-open-link" '
-        f'data-asset-action="open" data-asset-id="{asset_id}" data-row-id="{asset_id}"{bridge_attr} '
+        f'data-asset-action="open" data-asset-id="{asset_id}" data-row-id="{asset_id}" '
         f'title="View asset" aria-label="View asset">{thumb}</button>'
     )
 
@@ -197,7 +182,6 @@ def build_assets_html_table(
         if not aid:
             continue
 
-        bridge_key = assets_bridge_button_key(asset)
         name = asset_name(asset)
         name_label = name if name and name != "—" else "View asset"
         number = asset_number(asset)
@@ -211,7 +195,6 @@ def build_assets_html_table(
             aid,
             name_label,
             extra_class="ips-dash-est-desc-link",
-            bridge_key=bridge_key,
         )
         if rentable_badge:
             name_inner += f'<div class="ips-assets-name-badges">{rentable_badge}</div>'
@@ -224,7 +207,7 @@ def build_assets_html_table(
                 "image",
                 "center",
                 _cell_wrapper(
-                    _asset_thumb_link_html(aid, asset, bridge_key=bridge_key),
+                    _asset_thumb_link_html(aid, asset),
                     extra_class="ips-inventory-image-td",
                     align="center",
                 ),
@@ -292,8 +275,7 @@ def build_assets_html_table(
         expanded_cls = " ips-inventory-row-expanded" if expanded else ""
         body_rows.append(
             f'<tr class="ips-dash-est-tr ips-dash-est-row-{row_parity}{expanded_cls}" '
-            f'data-asset-id="{html.escape(aid, quote=True)}" data-row-id="{html.escape(aid, quote=True)}" '
-            f'data-bridge-key="{html.escape(bridge_key, quote=True)}"{expand_attr}>'
+            f'data-asset-id="{html.escape(aid, quote=True)}" data-row-id="{html.escape(aid, quote=True)}"{expand_attr}>'
             f"{tds}"
             f"</tr>"
         )
@@ -343,29 +325,6 @@ def handle_assets_table_action(
     open_asset_fn(asset_id, asset)
 
 
-def render_assets_table_open_buttons(
-    assets: list[dict[str, Any]],
-    *,
-    open_asset_fn: Callable[[str, dict[str, Any]], None],
-) -> None:
-    with st.container(key="assets_open_button_harness"):
-        for asset in assets:
-            aid = str(asset.get("id") or "").strip()
-            if not aid:
-                continue
-            bridge_key = assets_bridge_button_key(asset)
-
-            def _open(_aid: str = aid, _asset: dict = asset) -> None:
-                open_asset_fn(_aid, _asset)
-
-            st.button(
-                "Open asset",
-                key=bridge_key,
-                type="tertiary",
-                on_click=_open,
-            )
-
-
 def render_assets_table_bridge(
     *,
     component_key: str = "ips_assets_list_bridge",
@@ -404,19 +363,9 @@ def render_assets_table_bridge(
     }}
   }}
 
-  function clickBridgeButton(bridgeKey) {{
-    if (!bridgeKey) return false;
-    const host = doc.querySelector(".st-key-" + bridgeKey);
-    const btn = host && host.querySelector('[data-testid="stButton"] > button');
-    if (!btn) return false;
-    btn.click();
-    return true;
-  }}
-
-  function openAsset(id, action, bridgeKey) {{
+  function openAsset(id, action) {{
     if (!id) return;
     const act = action || "open";
-    if (act === "open" && bridgeKey && clickBridgeButton(bridgeKey)) return;
     sendValue(act + ":" + id);
   }}
 
@@ -436,7 +385,7 @@ def render_assets_table_bridge(
         e.preventDefault();
         e.stopPropagation();
         const id = el.getAttribute("data-asset-id") || el.getAttribute("data-row-id");
-        openAsset(id, "open", el.getAttribute("data-bridge-key") || "");
+        openAsset(id, "open");
       }}
       el.addEventListener("click", onActivate, true);
       el.addEventListener("keydown", function (e) {{
@@ -452,7 +401,7 @@ def render_assets_table_bridge(
         if (!id) return;
         e.preventDefault();
         e.stopPropagation();
-        openAsset(id, fieldMode ? "expand" : "open", row.getAttribute("data-bridge-key") || "");
+        openAsset(id, fieldMode ? "expand" : "open");
       }}, true);
     }});
   }}
@@ -469,7 +418,7 @@ def render_assets_table_bridge(
         e.preventDefault();
         e.stopPropagation();
         const id = link.getAttribute("data-asset-id") || link.getAttribute("data-row-id");
-        openAsset(id, "open", link.getAttribute("data-bridge-key") || "");
+        openAsset(id, "open");
         return;
       }}
       if (isInteractive(t)) return;
@@ -479,7 +428,7 @@ def render_assets_table_bridge(
       if (!id) return;
       e.preventDefault();
       e.stopPropagation();
-      openAsset(id, fieldMode ? "expand" : "open", row.getAttribute("data-bridge-key") || "");
+      openAsset(id, fieldMode ? "expand" : "open");
     }}, true);
   }}
 
