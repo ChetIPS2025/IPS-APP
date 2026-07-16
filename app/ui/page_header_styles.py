@@ -6,8 +6,8 @@ import streamlit as st
 
 from app.ui.css_inject import inject_css_once
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v27"
-IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v27"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v28"
+IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v28"
 
 
 def inject_page_header_styles() -> None:
@@ -17,7 +17,7 @@ def inject_page_header_styles() -> None:
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-page-header-styles-v27">
+<style id="ips-page-header-styles-v28">
 [class*="st-key-ips_page_header"],
 [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
@@ -55,6 +55,7 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   width: 100% !important;
   flex-wrap: nowrap !important;
   overflow: visible !important;
+  position: relative !important;
 }
 [class*="st-key-ips_page_header"] [data-testid="stHorizontalBlock"] {
   align-items: center !important;
@@ -80,7 +81,7 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   margin-left: auto !important;
   overflow: visible !important;
 }
-@media (min-width: 768px) {
+@media (min-width: 600px) {
   [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(3) {
     position: absolute !important;
     left: 50% !important;
@@ -89,11 +90,12 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
     flex: 0 0 auto !important;
     width: max-content !important;
     min-width: 0 !important;
-    max-width: min(520px, 52vw) !important;
+    max-width: min(680px, 62vw) !important;
     display: flex !important;
     justify-content: center !important;
     align-items: center !important;
     pointer-events: none !important;
+    z-index: 2 !important;
   }
 }
 [class*="st-key-header_page_toolbar"] {
@@ -820,26 +822,27 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
   flex-direction: column !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 8px !important;
+  gap: 10px !important;
   min-width: 0 !important;
   overflow: visible !important;
   padding-bottom: 2px !important;
   text-align: center !important;
   width: 100% !important;
+  margin: 0 auto !important;
 }
 .ips-header-icon-wrap {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  width: 32px !important;
-  height: 32px !important;
+  width: 40px !important;
+  height: 40px !important;
   flex: 0 0 auto !important;
   margin-top: 0 !important;
 }
 .ips-header-icon-wrap .ips-app-header-icon-svg {
   display: block !important;
-  width: 24px !important;
-  height: 24px !important;
+  width: 30px !important;
+  height: 30px !important;
 }
 .ips-header-text {
   display: flex !important;
@@ -853,22 +856,25 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
 }
 .ips-header-title {
   margin: 0 !important;
-  font-size: clamp(24px, 2.1vw, 30px) !important;
-  line-height: 1.15 !important;
-  font-weight: 700 !important;
-  color: #111827 !important;
-  letter-spacing: -0.02em !important;
+  font-size: clamp(34px, 3.2vw, 48px) !important;
+  line-height: 1.08 !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+  letter-spacing: -0.03em !important;
   overflow: visible !important;
   text-overflow: clip !important;
+  text-align: center !important;
 }
 .ips-header-subtitle {
-  margin: 7px 0 0 0 !important;
-  font-size: 13px !important;
+  margin: 8px 0 0 0 !important;
+  font-size: 14px !important;
   color: #64748b !important;
-  line-height: 1.4 !important;
+  line-height: 1.45 !important;
   font-weight: 500 !important;
   overflow: visible !important;
   padding-bottom: 2px !important;
+  text-align: center !important;
+  max-width: 36rem !important;
 }
 .ips-header-badge {
   display: inline-flex !important;
@@ -899,10 +905,10 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
 @media (min-width: 1440px) {
   [class*="st-key-ips_page_header"],
   [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
-    min-height: 104px !important;
+    min-height: 112px !important;
   }
   .ips-header-title {
-    font-size: 30px !important;
+    font-size: 48px !important;
   }
 }
 @media (max-width: 1279px) and (min-width: 1100px) {
@@ -949,7 +955,7 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
     min-width: 220px !important;
   }
   .ips-header-title {
-    font-size: 26px !important;
+    font-size: 30px !important;
     white-space: normal !important;
   }
 }
@@ -967,11 +973,16 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
     width: 100% !important;
     max-width: 100% !important;
     pointer-events: auto !important;
+    display: flex !important;
+    justify-content: center !important;
   }
   [class*="st-key-ips_page_header"],
   [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
-    min-height: 96px !important;
+    min-height: 104px !important;
     padding: 16px 16px 18px !important;
+  }
+  .ips-header-title {
+    font-size: 32px !important;
   }
   .ips-header-subtitle {
     font-size: 12px !important;

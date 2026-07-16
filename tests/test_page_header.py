@@ -62,7 +62,7 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.ui.page_header_styles import inject_page_header_styles
 
         src = inspect.getsource(inject_page_header_styles)
-        self.assertIn("ips-page-header-styles-v27", src)
+        self.assertIn("ips-page-header-styles-v28", src)
         self.assertIn("ips-assets-page-header-actions", src)
         self.assertIn("border-radius: 50%", src)
         self.assertIn("st-key-header_avatar", src)
