@@ -541,6 +541,32 @@ def _open_small_tool_row(row: dict, assets_by_id: dict[str, dict]) -> None:
         ips_app_rerun()
 
 
+def _render_serialized_tool_name_cell(
+    row: dict,
+    name: str,
+    *,
+    assets_by_id: dict[str, dict],
+) -> None:
+    rid = _small_tool_row_id(row)
+    if not rid:
+        st.markdown(
+            f'<div class="ips-assets-title">{html.escape(name)}</div>',
+            unsafe_allow_html=True,
+        )
+        return
+    st.markdown(
+        '<span class="ips-serialized-tools-name-anchor" aria-hidden="true"></span>',
+        unsafe_allow_html=True,
+    )
+    st.button(
+        name,
+        key=f"st_open_name_{rid}",
+        type="tertiary",
+        on_click=_open_small_tool_row,
+        args=(row, assets_by_id),
+    )
+
+
 def _small_tool_image_asset(row: dict, assets_by_id: dict[str, dict]) -> dict:
     if str(row.get("row_type") or "") == "kit_item":
         child_id = str(row.get("child_asset_id") or "").strip()
@@ -928,9 +954,10 @@ def _render_small_tools_table(
             with cols[1]:
                 _render_asset_thumbnail(image_asset)
             with cols[2]:
-                st.markdown(
-                    f'<div class="ips-assets-title">{html.escape(name)}</div>',
-                    unsafe_allow_html=True,
+                _render_serialized_tool_name_cell(
+                    row,
+                    name,
+                    assets_by_id=assets_by_id,
                 )
             with cols[3]:
                 st.markdown(

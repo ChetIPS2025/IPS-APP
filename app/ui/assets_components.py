@@ -158,6 +158,44 @@ def inject_assets_page_styles() -> None:
             background: #ffffff !important;
         }
         section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_small_tools_table_wrap
+        [data-testid="stHorizontalBlock"]:not(:has(.ips-assets-table-header-marker)) > [data-testid="column"]:nth-child(3)
+        .stButton > button {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            color: #2563eb !important;
+            font-weight: 800 !important;
+            font-size: 0.8125rem !important;
+            padding: 0 !important;
+            min-height: auto !important;
+            height: auto !important;
+            text-align: left !important;
+            justify-content: flex-start !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            max-width: 100% !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_small_tools_table_wrap
+        [data-testid="stHorizontalBlock"]:not(:has(.ips-assets-table-header-marker)) > [data-testid="column"]:nth-child(3)
+        .stButton > button p,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_small_tools_table_wrap
+        [data-testid="stHorizontalBlock"]:not(:has(.ips-assets-table-header-marker)) > [data-testid="column"]:nth-child(3)
+        .stButton > button span,
+        section[data-testid="stMain"]:has(.ips-assets-page)
+        .st-key-assets_small_tools_table_wrap
+        [data-testid="stHorizontalBlock"]:not(:has(.ips-assets-table-header-marker)) > [data-testid="column"]:nth-child(3)
+        .stButton > button div {
+            color: #2563eb !important;
+            font-weight: 800 !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+        section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.ips-assets-equipment-table-header),
         section[data-testid="stMain"]:has(.ips-assets-page)
         .st-key-assets_table_wrap [data-testid="stHorizontalBlock"]:has(.assets-table-header),
