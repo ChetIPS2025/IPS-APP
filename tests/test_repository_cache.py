@@ -75,6 +75,20 @@ def test_delete_row_invalidates_table_cache() -> None:
     mock_clear.assert_called_once_with("jobs")
 
 
+def test_clear_data_cache_for_table_small_hand_tools_clears_hand_tools_list() -> None:
+    with patch("app.services.repository._clear_db_read_caches"):
+        with patch("app.services.repository._clear_hand_tools_list_cache") as mock_clear:
+            clear_data_cache_for_table("small_hand_tools")
+    mock_clear.assert_called_once()
+
+
+def test_clear_data_cache_for_table_asset_kit_items_clears_hand_tools_list() -> None:
+    with patch("app.services.repository._clear_db_read_caches"):
+        with patch("app.services.repository._clear_hand_tools_list_cache") as mock_clear:
+            clear_data_cache_for_table("asset_kit_items")
+    mock_clear.assert_called_once()
+
+
 def test_insert_row_admin_invalidates_table_cache() -> None:
     payload = {"tool_name": "Hammer", "quantity_on_hand": 1}
     with patch("app.services.repository.table_column_names", return_value=frozenset(payload)):

@@ -861,6 +861,8 @@ def clear_all_catalog_list_caches() -> None:
     clear_user_profiles_cache()
     clear_labor_rates_cache()
     clear_tasks_list_cache()
+    from app.services.small_hand_tool_service import clear_hand_tools_list_cache
+    clear_hand_tools_list_cache()
     from app.services.pricing_guide_service import clear_pricing_guide_cache
     clear_pricing_guide_cache()
 

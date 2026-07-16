@@ -5,7 +5,14 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from app.services.asset_kits_service import asset_is_kit, get_asset_kit_items, list_all_kit_items_enriched
+import streamlit as st
+
+from app.pages._core._data import CATALOG_CACHE_TTL
+from app.services.asset_kits_service import (
+    asset_is_kit,
+    get_asset_kit_items,
+    normalize_kit_item,
+)
 from app.services.repository import (
     ServiceResult,
     delete_row,
@@ -124,15 +131,16 @@ def _location_display(tool: dict[str, Any]) -> str:
     return loc or storage or "—"
 
 
-def list_hand_tools(
-    *,
-    assets_by_id: dict[str, dict[str, Any]] | None = None,
-    jobs_by_id: dict[str, dict[str, Any]] | None = None,
-    include_kit_items: bool = True,
-) -> list[dict[str, Any]]:
-    """All quantity small tools from DB plus non-serialized kit lines in trailers."""
+_KIT_ITEMS_TABLE = "asset_kit_items"
+
+
+def _resolve_catalog_maps(
+    assets_by_id: dict[str, dict[str, Any]] | None,
+    jobs_by_id: dict[str, dict[str, Any]] | None,
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
     if assets_by_id is None:
         from app.services.phase2_modules_service import list_assets, normalize_asset
+
         assets_by_id = {
             str(a.get("id") or "").strip(): normalize_asset(a)
             for a in list_assets()
@@ -140,15 +148,46 @@ def list_hand_tools(
         }
     if jobs_by_id is None:
         from app.pages._core._data import load_jobs
+
         jobs_by_id = {
             str(j.get("id") or "").strip(): j for j in load_jobs() if str(j.get("id") or "").strip()
         }
+    return assets_by_id, jobs_by_id
 
+
+@st.cache_data(ttl=CATALOG_CACHE_TTL, show_spinner=False)
+def _cached_hand_tools_sources(*, include_kit_items: bool) -> tuple[tuple[dict[str, Any], ...], tuple[dict[str, Any], ...]]:
+    """Cached DB rows for hand tools and optional kit inventory lines."""
+    hand_rows: list[dict[str, Any]] = []
+    db_rows, _ = fetch_rows(_TABLE, limit=10000, order_by="tool_name")
+    for row in db_rows or []:
+        if isinstance(row, dict) and row.get("is_active") is not False:
+            hand_rows.append(dict(row))
+
+    kit_rows: list[dict[str, Any]] = []
+    if include_kit_items:
+        raw_kit, _ = fetch_rows(_KIT_ITEMS_TABLE, limit=10000, order_by="item_name")
+        for row in raw_kit or []:
+            if isinstance(row, dict) and row.get("is_active") is not False:
+                kit_rows.append(dict(row))
+
+    return tuple(hand_rows), tuple(kit_rows)
+
+
+def clear_hand_tools_list_cache() -> None:
+    _cached_hand_tools_sources.clear()
+
+
+def _build_hand_tools_list(
+    hand_rows: tuple[dict[str, Any], ...],
+    kit_rows: tuple[dict[str, Any], ...],
+    *,
+    assets_by_id: dict[str, dict[str, Any]],
+    jobs_by_id: dict[str, dict[str, Any]],
+    include_kit_items: bool,
+) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
-    rows, _ = fetch_rows(_TABLE, limit=10000, order_by="tool_name")
-    for row in rows or []:
-        if not isinstance(row, dict) or row.get("is_active") is False:
-            continue
+    for row in hand_rows:
         norm = normalize_hand_tool({**row, "row_type": "hand_tool"})
         cid = norm.get("container_asset_id")
         jid = norm.get("assigned_job_id")
@@ -160,13 +199,15 @@ def list_hand_tools(
         out.append(norm)
 
     if include_kit_items:
-        for item in list_all_kit_items_enriched(assets_by_id):
+        for raw in kit_rows:
+            item = normalize_kit_item(raw)
             if _has_serial(item.get("serial_number")):
                 continue
             if _clean_text(item.get("child_asset_id")):
                 continue
             parent_id = _clean_text(item.get("parent_asset_id"))
             parent = assets_by_id.get(parent_id) or {}
+            parent_loc = _clean_text(parent.get("location") or "—") or "—"
             norm = normalize_hand_tool(
                 {
                     **item,
@@ -177,7 +218,7 @@ def list_hand_tools(
                     "storage_type": "Tool Trailer",
                     "container_asset_id": parent_id,
                     "container_label": _container_label_from_map(assets_by_id, parent_id),
-                    "storage_location": _clean_text(item.get("parent_location") or parent.get("location")),
+                    "storage_location": parent_loc,
                     "assigned_job_id": parent.get("assigned_job_id"),
                     "job_label": _job_label_from_map(jobs_by_id, parent.get("assigned_job_id")),
                     "kit_item_id": item.get("id"),
@@ -188,6 +229,24 @@ def list_hand_tools(
             out.append(norm)
 
     return sorted(out, key=lambda r: (str(r.get("tool_name") or "").casefold(), str(r.get("location_display") or "")))
+
+
+def list_hand_tools(
+    *,
+    assets_by_id: dict[str, dict[str, Any]] | None = None,
+    jobs_by_id: dict[str, dict[str, Any]] | None = None,
+    include_kit_items: bool = True,
+) -> list[dict[str, Any]]:
+    """All quantity small tools from DB plus non-serialized kit lines in trailers."""
+    assets_by_id, jobs_by_id = _resolve_catalog_maps(assets_by_id, jobs_by_id)
+    hand_rows, kit_rows = _cached_hand_tools_sources(include_kit_items=include_kit_items)
+    return _build_hand_tools_list(
+        hand_rows,
+        kit_rows if include_kit_items else (),
+        assets_by_id=assets_by_id,
+        jobs_by_id=jobs_by_id,
+        include_kit_items=include_kit_items,
+    )
 
 
 def _hand_tool_payload_from_ui(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceResult:
@@ -359,6 +418,7 @@ __all__ = [
     "HAND_TOOL_STATUSES",
     "STORAGE_TYPES",
     "adjust_hand_tool_quantity",
+    "clear_hand_tools_list_cache",
     "delete_hand_tool",
     "list_hand_tools",
     "normalize_hand_tool",
