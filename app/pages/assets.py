@@ -2040,29 +2040,23 @@ def render() -> None:
 
     def _assets_header_actions() -> None:
         st.markdown(
-            '<span class="ips-assets-page-header-actions" aria-hidden="true"></span>',
+            '<span class="ips-assets-page-header-actions ips-page-header-inline-actions" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        export_col, template_col, import_col, quick_col, new_col = st.columns(5, gap="small")
-        with export_col:
-            st.button("Export", key="ast_export")
-        with template_col:
-            st.download_button(
-                "CSV Template",
-                data=hand_tool_csv_template_bytes(),
-                file_name="small_hand_tools_import_template.csv",
-                mime="text/csv",
-                key="ast_hand_tool_csv_template",
-            )
-        with import_col:
-            if st.button("Import CSV", key="ast_hand_tool_import"):
-                open_hand_tool_import_dialog()
-        with quick_col:
-            if st.button("+ Quick Add Tool", key="ast_quick_add", type="primary"):
-                open_quick_add_tool_dialog()
-        with new_col:
-            if st.button("+ New Asset", key="ast_new"):
-                st.session_state[_SHOW_NEW_ASSET_FORM_KEY] = True
+        st.button("Export", key="ast_export")
+        st.download_button(
+            "CSV Template",
+            data=hand_tool_csv_template_bytes(),
+            file_name="small_hand_tools_import_template.csv",
+            mime="text/csv",
+            key="ast_hand_tool_csv_template",
+        )
+        if st.button("Import CSV", key="ast_hand_tool_import"):
+            open_hand_tool_import_dialog()
+        if st.button("+ Quick Add Tool", key="ast_quick_add", type="primary"):
+            open_quick_add_tool_dialog()
+        if st.button("+ New Asset", key="ast_new"):
+            st.session_state[_SHOW_NEW_ASSET_FORM_KEY] = True
 
     from app.ui.page_header import render_page_header
 

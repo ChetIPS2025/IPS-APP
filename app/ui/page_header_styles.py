@@ -6,8 +6,8 @@ import streamlit as st
 
 from app.ui.css_inject import inject_css_once
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v25"
-IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v25"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v26"
+IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v26"
 
 
 def inject_page_header_styles() -> None:
@@ -17,7 +17,7 @@ def inject_page_header_styles() -> None:
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-page-header-styles-v25">
+<style id="ips-page-header-styles-v26">
 [class*="st-key-ips_page_header"],
 [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
@@ -475,6 +475,39 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
   color: #374151 !important;
+}
+[class*="st-key-ips_page_header"]:has(.ips-assets-page-header-actions) .st-key-header_primary_action > div > div > [data-testid="stVerticalBlock"],
+[class*="st-key-ips_page_header"]:has(.ips-assets-page-header-actions) .st-key-header_primary_action [data-testid="stVerticalBlockBorderWrapper"] > div > [data-testid="stVerticalBlock"] {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  width: max-content !important;
+  max-width: max-content !important;
+}
+[class*="st-key-ips_page_header"]:has(.ips-assets-page-header-actions) .st-key-header_primary_action > div > div > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"],
+[class*="st-key-ips_page_header"]:has(.ips-assets-page-header-actions) .st-key-header_primary_action [data-testid="stVerticalBlockBorderWrapper"] > div > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: max-content !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+[class*="st-key-ips_page_header"]:has(.ips-assets-page-header-actions) .st-key-header_primary_action > div > div > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has(.ips-assets-page-header-actions),
+[class*="st-key-ips_page_header"]:has(.ips-assets-page-header-actions) .st-key-header_primary_action [data-testid="stVerticalBlockBorderWrapper"] > div > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:has(.ips-assets-page-header-actions) {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  flex: 0 0 0 !important;
+  overflow: hidden !important;
+}
+[class*="st-key-ips_page_header"]:has(.ips-assets-page-header-actions) .st-key-header_bottom_actions .st-key-header_primary_action,
+[class*="st-key-ips_page_header"]:has(.ips-assets-page-header-actions) .st-key-header_primary_action {
+  min-width: max-content !important;
+  max-width: max-content !important;
 }
 [class*="st-key-ips_page_header"] > div > div > [data-testid="stHorizontalBlock"] > [data-testid="column"]:nth-child(4) [data-testid="column"]:not(:has([class*="st-key-header_bottom_actions"])):not(:has([class*="st-key-header_trailing_actions"])) {
   flex: 0 0 auto !important;
