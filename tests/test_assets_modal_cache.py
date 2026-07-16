@@ -35,6 +35,19 @@ def test_clear_assets_catalog_cache_invalidates_modal_cache() -> None:
     mock_modal.assert_called_once()
 
 
+def test_clear_assets_cache_invalidates_modal_cache() -> None:
+    session_state = {ASSETS_MODAL_CACHE_KEY: {"ast-1": {"id": "ast-1"}}}
+
+    with patch("streamlit.session_state", session_state, create=True):
+        with patch("app.services.repository.clear_data_cache_for_table"):
+            with patch("app.services.assets_service.clear_asset_image_url_cache"):
+                from app.services.assets_service import clear_assets_cache
+
+                clear_assets_cache()
+
+    assert ASSETS_MODAL_CACHE_KEY not in session_state
+
+
 def test_cached_asset_for_modal_falls_back_to_load_assets() -> None:
     demo_asset = {"id": "ast4", "asset_name": "Trailer - Utility 14ft", "asset_number": "AST-1004"}
 

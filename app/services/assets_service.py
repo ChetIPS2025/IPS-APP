@@ -156,6 +156,7 @@ def clear_assets_cache() -> None:
         clear_catalog_image_maps_cache()
     except ImportError:
         pass
+    invalidate_assets_modal_cache()
 
 
 def can_manage_asset_actions() -> bool:

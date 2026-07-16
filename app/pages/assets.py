@@ -72,6 +72,7 @@ from app.services.asset_images import (
 )
 from app.services.item_images import ITEM_IMAGE_UPLOAD_TYPES
 from app.services.assets_service import (
+    ASSETS_MODAL_CACHE_KEY,
     clear_assets_cache,
     generate_asset_qr_value,
     rebuild_asset_qr,
@@ -144,7 +145,7 @@ from app.utils.field_context import (
 _SEL = select_key("assets")
 _MOD = "assets"
 _ASSETS_MODAL_KEY = "ips_assets_detail_modal_id"
-_ASSETS_CACHE_KEY = "_ips_assets_modal_by_id"
+_ASSETS_CACHE_KEY = ASSETS_MODAL_CACHE_KEY
 SELECTED_ASSET_KEY = "selected_asset_id"
 SELECTED_ASSET_IDS_KEY = "selected_asset_ids"
 SHOW_ASSET_MODAL_KEY = "show_asset_detail_modal"
