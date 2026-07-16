@@ -104,6 +104,36 @@ TABLE_COLUMN_ALLOWLIST: dict[str, frozenset[str]] = {
             "updated_at",
         }
     ),
+    "small_hand_tools": frozenset(
+        {
+            "tool_name",
+            "category",
+            "description",
+            "model_number",
+            "serial_number",
+            "quantity_on_hand",
+            "quantity_expected",
+            "unit",
+            "unit_value",
+            "storage_type",
+            "container_asset_id",
+            "storage_location",
+            "assigned_job_id",
+            "status",
+            "condition",
+            "notes",
+            "source_asset_id",
+            "is_active",
+            "updated_at",
+            "image_path",
+            "image_url",
+            "image_file_name",
+            "image_mime_type",
+            "image_uploaded_at",
+            "image_uploaded_by",
+            "image_status",
+        }
+    ),
 }
 
 # Oldest deployed shape (062) when the table has no sample rows yet.

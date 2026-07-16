@@ -37,6 +37,7 @@ from app.components.table_filters import (
 from app.components.table_pagination import paginate_rows, render_table_pagination_footer, render_table_pagination_header, reset_table_page
 from app.components.table_filters import clear_table_filters
 from app.components.layout import render_filter_bar as layout_filter_bar
+from app.components.item_photo_manager import render_item_photo_manager
 from app.pages._core._data import load_assets, load_inventory
 from app.services.asset_kits_service import get_tool_trailers
 from app.services.catalog_images import CatalogImageContext, build_catalog_image_context, catalog_thumbnail_html
@@ -46,9 +47,15 @@ from app.services.small_hand_tool_service import (
     HAND_TOOL_STATUSES,
     STORAGE_TYPES,
     adjust_hand_tool_quantity,
+    clear_hand_tools_list_cache,
     delete_hand_tool,
     list_hand_tools,
     save_hand_tool,
+)
+from app.services.small_hand_tool_images import (
+    clear_small_hand_tool_image,
+    small_hand_tool_photo_preview_record,
+    upload_small_hand_tool_image,
 )
 from app.utils.formatting import fmt_currency
 
@@ -79,6 +86,33 @@ _FILTER_SPECS: list[tuple[str, object]] = [
     ("status", lambda r: str(r.get("status") or "")),
     ("condition", lambda r: str(r.get("condition") or "")),
 ]
+
+
+def _current_user_id() -> str | None:
+    from app.auth import current_profile
+
+    uid = str((current_profile() or {}).get("id") or "").strip()
+    return uid or None
+
+
+def _render_hand_tool_photo_manager(tool: dict) -> None:
+    rid = str(tool.get("id") or "").strip()
+    if not rid:
+        return
+    record_key = record_session_key(tool, "id")
+    preview = small_hand_tool_photo_preview_record(tool)
+    render_item_photo_manager(
+        tool,
+        record_id=rid,
+        session_prefix=f"ht_photo_{record_key}",
+        image_css_class="ips-asset-thumb-img",
+        upload_image=upload_small_hand_tool_image,
+        clear_image=clear_small_hand_tool_image,
+        uploaded_by=_current_user_id(),
+        cache_key=_HAND_TOOL_CACHE_KEY,
+        on_change=clear_hand_tools_list_cache,
+        preview_record=preview,
+    )
 
 
 def _trailer_options() -> tuple[list[str], dict[str, str]]:
@@ -251,6 +285,8 @@ def _render_hand_tool_edit_form(tool: dict) -> None:
 
     render_edit_form_header("Edit Small Hand Tool")
 
+    _render_hand_tool_photo_manager(tool)
+
     c1, c2 = st.columns(2)
     with c1:
         st.text_input("Tool name", key=f"ht_edit_name_{rid}")
@@ -371,6 +407,9 @@ def render_hand_tool_detail_dialog(tool: dict) -> None:
         )
     else:
         render_modal_header(title=name, subtitle=category, status=status)
+
+    if can_edit:
+        _render_hand_tool_photo_manager(tool)
 
     meta: list[tuple[str, object]] = []
     if model:

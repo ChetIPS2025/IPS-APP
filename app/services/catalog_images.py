@@ -119,6 +119,12 @@ def _resolve_small_tool_image_url(
     from app.services.asset_images import get_asset_image_url, get_asset_thumbnail_url
     from app.services.inventory_images import get_inventory_image_url
     from app.services.pricing_guide_images import get_pricing_guide_image_url
+    from app.services.small_hand_tool_images import get_small_hand_tool_owned_image_url
+
+    owned = get_small_hand_tool_owned_image_url(record, expires_in=expires_in)
+    if owned:
+        return owned
+
     asset_url = get_asset_thumbnail_url if thumbnail else get_asset_image_url
 
     sid = _clean_text(record.get("source_asset_id"))

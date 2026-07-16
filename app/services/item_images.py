@@ -186,6 +186,8 @@ def item_image_storage_path(entity_type: str, record_id: str, filename: str) -> 
         folder = "inventory"
     elif et in ("assets", "asset"):
         folder = "assets"
+    elif et in ("small_hand_tools", "small_hand_tool", "hand_tool", "hand_tools"):
+        folder = "small_hand_tools"
     else:
         folder = "pricing_guide"
     return f"{ITEM_IMAGES_PREFIX}/{folder}/{rid}/{ts}_{safe}"
