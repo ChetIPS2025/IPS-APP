@@ -6,8 +6,8 @@ import streamlit as st
 
 from app.ui.css_inject import inject_css_once
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v26"
-IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v26"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v27"
+IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v27"
 
 
 def inject_page_header_styles() -> None:
@@ -17,7 +17,7 @@ def inject_page_header_styles() -> None:
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-page-header-styles-v26">
+<style id="ips-page-header-styles-v27">
 [class*="st-key-ips_page_header"],
 [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
@@ -442,6 +442,20 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   width: auto !important;
   min-width: max-content !important;
   max-width: none !important;
+  padding: 0 12px !important;
+}
+[class*="st-key-ips_page_header"]:has(.ips-assets-page-header-actions) .st-key-header_primary_action .stButton > button,
+[class*="st-key-ips_page_header"]:has(.ips-page-header-inline-actions) .st-key-header_primary_action .stButton > button,
+[class*="st-key-ips_page_header"]:has(.ips-inventory-page-header-actions) .st-key-header_primary_action .stButton > button {
+  min-width: max-content !important;
+  width: auto !important;
+  padding: 0 12px !important;
+}
+[class*="st-key-ips_page_header"]:has(.ips-assets-page-header-actions) .st-key-header_primary_action [data-testid="stDownloadButton"] > button,
+[class*="st-key-ips_page_header"]:has(.ips-page-header-inline-actions) .st-key-header_primary_action [data-testid="stDownloadButton"] > button,
+[class*="st-key-ips_page_header"]:has(.ips-inventory-page-header-actions) .st-key-header_primary_action [data-testid="stDownloadButton"] > button {
+  min-width: max-content !important;
+  width: auto !important;
   padding: 0 12px !important;
 }
 [class*="st-key-ips_page_header"]:has(.ips-assets-page-header-actions),

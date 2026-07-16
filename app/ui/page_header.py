@@ -35,7 +35,6 @@ def _action_slot_columns(
     has_primary_action: bool,
     primary_action_width: float | None = None,
 ) -> tuple[list[str], list[float]]:
-    _ = primary_action_width
     names: list[str] = []
     if show_date_range or has_primary_action:
         names.append("bottom_actions")
@@ -47,9 +46,17 @@ def _action_slot_columns(
     if show_refresh and not has_secondary_action:
         trailing_width += 0.45
     names.append("trailing")
-    ratios = [_ACTION_WIDTHS["bottom_actions"]] * (len(names) - 1)
-    ratios.append(trailing_width)
-    return names, ratios
+
+    if len(names) == 1:
+        return names, [trailing_width]
+
+    bottom_width = _ACTION_WIDTHS["bottom_actions"]
+    if has_primary_action and primary_action_width:
+        bottom_width = float(primary_action_width)
+    elif has_primary_action and not show_date_range:
+        bottom_width = 4.0
+
+    return names, [bottom_width, trailing_width]
 
 
 def _resolve_icon(icon: str | None) -> str:

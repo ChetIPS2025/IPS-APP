@@ -156,6 +156,7 @@ ASSET_DETAIL_TAB_FOCUS_KEY = "ast_detail_tab_focus"
 _SHOW_NEW_ASSET_FORM_KEY = "assets_show_new_asset_form"
 _ALL_ASSET_IDS_KEY = "_ips_assets_visible_ids"
 _ALL_SMALL_TOOL_IDS_KEY = "_ips_small_tools_visible_ids"
+_ASSETS_MODAL_APP_RERUN_KEY = "_ips_assets_modal_app_rerun"
 _TABLE_KEY = "assets_list"
 _SMALL_TOOLS_TABLE_KEY = "assets_small_tools_list"
 _SMALL_TOOL_COLS = [0.4, 0.8, 1.85, 0.95, 0.95, 1.25, 1.1, 0.9, 0.75]
@@ -482,6 +483,15 @@ def _clear_small_tool_selection(row_ids: list[str] | None = None) -> None:
             st.session_state[key] = False
 
 
+def _mark_assets_modal_app_rerun() -> None:
+    st.session_state[_ASSETS_MODAL_APP_RERUN_KEY] = True
+
+
+def _flush_assets_modal_app_rerun() -> None:
+    if st.session_state.pop(_ASSETS_MODAL_APP_RERUN_KEY, False):
+        ips_app_rerun()
+
+
 def _on_small_tool_checkbox_change(
     row_id: str,
     all_row_ids: list[str],
@@ -495,7 +505,8 @@ def _on_small_tool_checkbox_change(
             if other_id != row_id:
                 st.session_state[_small_tool_select_key(other_id)] = False
         if row:
-            _open_small_tool_row(row, assets_by_id)
+            _prepare_open_small_tool_row(row, assets_by_id)
+            _mark_assets_modal_app_rerun()
     elif row:
         modal_aid = _small_tool_modal_asset_id(row)
         if modal_aid and st.session_state.get(SELECTED_ASSET_KEY) == modal_aid:
@@ -509,8 +520,8 @@ def _on_small_tool_checkbox_change(
             )
 
 
-def _open_hand_tool_row(row: dict) -> None:
-    """Open hand tool detail, or parent Tool Trailer for kit-sourced rows."""
+def _prepare_open_hand_tool_row(row: dict) -> None:
+    """Set hand tool or parent trailer detail state without rerunning."""
     if not row.get("editable", True):
         parent_id = str(row.get("container_asset_id") or row.get("parent_asset_id") or "").strip()
         if parent_id:
@@ -522,23 +533,29 @@ def _open_hand_tool_row(row: dict) -> None:
                     None,
                 )
             _open_assets_detail_modal(parent_id, asset, tab_focus="Kit")
-            ips_app_rerun()
         return
     open_hand_tool_detail(row)
-    ips_app_rerun()
 
 
-def _open_small_tool_row(row: dict, assets_by_id: dict[str, dict]) -> None:
+def _open_hand_tool_row(row: dict) -> None:
+    _prepare_open_hand_tool_row(row)
+
+
+def _prepare_open_small_tool_row(row: dict, assets_by_id: dict[str, dict]) -> None:
+    """Set serialized tool detail state without rerunning."""
     if str(row.get("row_type") or "") == "kit_item":
         parent_id = str(row.get("parent_asset_id") or "").strip()
         if parent_id:
             _open_assets_detail_modal(parent_id, assets_by_id.get(parent_id))
-            ips_app_rerun()
         return
     aid = str(row.get("id") or "").strip()
     if aid:
         _open_assets_detail_modal(aid, row)
-        ips_app_rerun()
+
+
+def _open_small_tool_row(row: dict, assets_by_id: dict[str, dict]) -> None:
+    _prepare_open_small_tool_row(row, assets_by_id)
+    _mark_assets_modal_app_rerun()
 
 
 def _render_serialized_tool_name_cell(
@@ -810,10 +827,14 @@ def _on_assets_table_expand(asset_id: str, asset: dict) -> None:
     toggle_field_expanded(FIELD_EXPANDED_ASSET_KEY, asset_id)
 
 
-def _open_assets_table_item(asset_id: str, asset: dict) -> None:
-    """Set selected asset state; full rerun opens the detail dialog (fragment-safe)."""
+def _prepare_open_assets_table_item(asset_id: str, asset: dict) -> None:
+    """Set selected asset state for the detail dialog."""
     _handle_open_asset(asset)
-    ips_app_rerun()
+
+
+def _open_assets_table_item(asset_id: str, asset: dict) -> None:
+    """Bridge handler during render — modal state only; rerun handled by bridge action."""
+    _prepare_open_assets_table_item(asset_id, asset)
 
 
 def _render_custom_assets_table(
@@ -849,7 +870,7 @@ def _render_custom_assets_table(
         )
         render_assets_table_open_buttons(
             filtered,
-            open_asset_fn=_open_assets_table_item,
+            open_asset_fn=_prepare_open_assets_table_item,
         )
         render_assets_table_bridge_legacy(
             assets_by_id,
@@ -1077,6 +1098,7 @@ def _render_equipment_list(
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
     _render_custom_assets_table(page_rows, filter_options=filter_options)
     render_table_pagination_footer(len(filtered), _TABLE_KEY)
+    _flush_assets_modal_app_rerun()
 
 
 @fragment
@@ -1167,6 +1189,7 @@ def _render_small_tools_list(rows: list[dict]) -> None:
         jobs_by_id=jobs_by_id,
     )
     render_table_pagination_footer(len(filtered), _SMALL_TOOLS_TABLE_KEY)
+    _flush_assets_modal_app_rerun()
 
 
 def _apply_assets_search_filter(rows: list[dict], q: str) -> list[dict]:
@@ -2096,7 +2119,7 @@ def render() -> None:
             open_hand_tool_import_dialog()
         if st.button("+ Quick Add Tool", key="ast_quick_add", type="primary"):
             open_quick_add_tool_dialog()
-        if st.button("+ New Asset", key="ast_new"):
+        if st.button("+ New Asset", key="ast_new", type="secondary"):
             st.session_state[_SHOW_NEW_ASSET_FORM_KEY] = True
 
     from app.ui.page_header import render_page_header
@@ -2105,7 +2128,7 @@ def render() -> None:
         "Assets",
         "Track and manage all company assets and equipment.",
         primary_action=_assets_header_actions,
-        primary_action_width=5.8,
+        primary_action_width=6.4,
     )
 
     inject_assets_page_styles()
