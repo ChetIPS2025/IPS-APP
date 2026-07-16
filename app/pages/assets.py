@@ -1255,11 +1255,15 @@ def _cached_asset_for_modal(asset_id: str) -> dict | None:
     from app.services.repository import fetch_by_id
 
     raw = fetch_by_id("assets", aid)
-    if not isinstance(raw, dict):
-        return None
-    asset = normalize_asset(raw)
-    _put_asset_in_modal_cache(aid, asset)
-    return asset
+    if isinstance(raw, dict):
+        asset = normalize_asset(raw)
+        _put_asset_in_modal_cache(aid, asset)
+        return asset
+    for row in load_assets():
+        if str(row.get("id") or "").strip() == aid:
+            _put_asset_in_modal_cache(aid, row)
+            return row
+    return None
 
 
 def _open_assets_detail_modal(
