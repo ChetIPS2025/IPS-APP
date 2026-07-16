@@ -64,7 +64,7 @@ from app.components.record_modal import (
 from app.pages._core._data import load_assets, lookup_options, persist_asset
 from app.pages._core._crud import apply_persist_feedback, is_demo_id
 from app.pages._core._session import select_key
-from app.styles import inject_assets_module_css
+from app.components.assets_css import inject_assets_page_css
 from app.services.asset_images import (
     asset_display_record,
     asset_image_is_inherited,
@@ -83,7 +83,6 @@ from app.services.assets_service import (
     upload_asset_image,
 )
 from app.ui.assets_components import (
-    inject_assets_page_styles,
     maintenance_table_html,
     status_badge_html,
     summary_card_html,
@@ -117,7 +116,6 @@ from app.components.assets_list_table import (
 )
 from app.components.assets_page_layout import (
     close_assets_filter_bar_shell,
-    inject_assets_page_layout_css,
     render_assets_filter_bar_shell,
 )
 from app.components.quick_add_tool_ui import (
@@ -2135,9 +2133,14 @@ def render() -> None:
         primary_action_width=6.4,
     )
 
-    inject_assets_page_styles()
-    inject_assets_module_css()
-    inject_assets_page_layout_css()
+    active_tab = str(st.session_state.get(_ASSETS_MAIN_TAB_KEY) or _ASSETS_MAIN_TABS[0]).strip()
+    if active_tab not in _ASSETS_MAIN_TABS:
+        active_tab = _ASSETS_MAIN_TABS[0]
+
+    inject_assets_page_css(
+        active_tab,
+        detail_open=bool(st.session_state.get(SHOW_ASSET_MODAL_KEY)),
+    )
     if is_field_context():
         inject_field_row_expand_css()
     st.markdown(

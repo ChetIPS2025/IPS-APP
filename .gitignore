@@ -23,6 +23,9 @@ build/
 .DS_Store
 Thumbs.db
 
+# Generated CSS capture artifacts (regenerate via scripts/extract_assets_css_mock.py)
+app/components/_assets_css_capture_*.txt
+
 build/
 dist/
 output/
