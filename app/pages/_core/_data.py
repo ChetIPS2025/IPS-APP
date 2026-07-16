@@ -810,9 +810,10 @@ def clear_assets_catalog_cache() -> None:
     clear_catalog_session_key("assets")
     clear_dashboard_page_data_cache()
     from app.services.pricing_guide_service import clear_pricing_guide_cache
-    clear_pricing_guide_cache()
     from app.services.assets_service import invalidate_assets_modal_cache
 
+    clear_pricing_guide_cache()
+    st.session_state.pop("_ips_assets_modal_by_id", None)
     invalidate_assets_modal_cache()
 
 
