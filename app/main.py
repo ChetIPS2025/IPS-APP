@@ -237,6 +237,8 @@ def main() -> None:
 
     persist_auth_cookies_if_pending()
     inject_authenticated_shell_css()
+    from app.ui.page_loading_indicator import inject_page_loading_indicator
+    inject_page_loading_indicator()
     from app.auth import render_auth_identity_debug_panel, verify_identity_binding_or_stop
     verify_identity_binding_or_stop()
     log_auth_state("app_authenticated")
