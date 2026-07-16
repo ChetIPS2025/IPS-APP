@@ -814,7 +814,10 @@ def clear_assets_catalog_cache() -> None:
 
     clear_pricing_guide_cache()
     st.session_state.pop("_ips_assets_modal_by_id", None)
+ cursor/asset-modal-cache-issues-8d75
+
     invalidate_assets_modal_cache()
+ main
 
 
 def clear_customers_catalog_cache() -> None:

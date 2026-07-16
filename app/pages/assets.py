@@ -1256,12 +1256,19 @@ def _cached_asset_for_modal(asset_id: str) -> dict | None:
         asset = normalize_asset(raw)
         _put_asset_in_modal_cache(aid, asset)
         return asset
+ cursor/asset-modal-cache-issues-8d75
+    for row in load_assets():
+        if str(row.get("id") or "").strip() == aid:
+            _put_asset_in_modal_cache(aid, row)
+            return row
+
 
     for row in load_assets():
         if str(row.get("id") or "").strip() == aid:
             asset = normalize_asset(row)
             _put_asset_in_modal_cache(aid, asset)
             return asset
+ main
     return None
 
 
