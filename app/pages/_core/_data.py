@@ -800,8 +800,6 @@ def clear_inventory_catalog_cache() -> None:
     clear_catalog_session_key("inventory")
     clear_inventory_page_data_cache()
     clear_dashboard_page_data_cache()
-    from app.services.pricing_guide_service import clear_pricing_guide_cache
-    clear_pricing_guide_cache()
 
 
 def clear_assets_catalog_cache() -> None:
@@ -809,10 +807,8 @@ def clear_assets_catalog_cache() -> None:
     clear_catalog_session_key("assets")
     clear_dashboard_page_data_cache()
     clear_page_data_cache_key("assets_serialized_context")
-    from app.services.pricing_guide_service import clear_pricing_guide_cache
     from app.services.assets_service import invalidate_assets_modal_cache
 
-    clear_pricing_guide_cache()
     invalidate_assets_modal_cache()
 
 

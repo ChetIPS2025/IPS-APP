@@ -105,3 +105,34 @@ def test_clear_all_catalog_list_caches_still_clears_page_data_cache() -> None:
 
     mock_catalog.assert_called_once()
     mock_page_cache.assert_called_once()
+
+
+def test_clear_inventory_catalog_cache_does_not_clear_pricing_guide() -> None:
+    with patch("app.pages._core._data.clear_inventory_list_cache"):
+        with patch("app.pages._core._data.clear_catalog_session_key"):
+            with patch("app.pages._core._data.clear_inventory_page_data_cache"):
+                with patch("app.pages._core._data.clear_dashboard_page_data_cache"):
+                    with patch(
+                        "app.services.pricing_guide_service.clear_pricing_guide_cache"
+                    ) as mock_pg:
+                        from app.pages._core._data import clear_inventory_catalog_cache
+
+                        clear_inventory_catalog_cache()
+
+    mock_pg.assert_not_called()
+
+
+def test_clear_assets_catalog_cache_does_not_clear_pricing_guide() -> None:
+    with patch("app.pages._core._data.clear_assets_list_cache"):
+        with patch("app.pages._core._data.clear_catalog_session_key"):
+            with patch("app.pages._core._data.clear_dashboard_page_data_cache"):
+                with patch("app.pages._core._data.clear_page_data_cache_key"):
+                    with patch("app.services.assets_service.invalidate_assets_modal_cache"):
+                        with patch(
+                            "app.services.pricing_guide_service.clear_pricing_guide_cache"
+                        ) as mock_pg:
+                            from app.pages._core._data import clear_assets_catalog_cache
+
+                            clear_assets_catalog_cache()
+
+    mock_pg.assert_not_called()

@@ -245,7 +245,6 @@ def clear_data_cache_for_table(table: str) -> None:
     with perf_span(f"repo.clear_data_cache:{name or 'unknown'}"):
         _clear_db_read_caches()
         from app.pages._core._data import (
-            clear_all_catalog_list_caches,
             clear_assets_catalog_cache,
             clear_customers_catalog_cache,
             clear_employees_catalog_cache,
@@ -297,10 +296,7 @@ def clear_data_cache_for_table(table: str) -> None:
         if handler is not None and callable(handler):
             handler()
             return
-        try:
-            clear_all_catalog_list_caches()
-        except Exception:
-            pass
+        # Unmapped tables only invalidate DB read caches (above); avoid nuclear catalog clears.
 
 
 def _db():

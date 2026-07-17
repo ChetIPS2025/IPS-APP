@@ -78,9 +78,8 @@ def _clean_text(value: object) -> str:
     return str(value or "").strip()
 
 
-def _clear_assets_cache_and_rerun() -> None:
-    from app.services.assets_service import clear_assets_cache
-    clear_assets_cache()
+def _finish_quick_add() -> None:
+    """Close wizard and rerun; repository writes already invalidate targeted caches."""
     st.rerun()
 
 
@@ -100,7 +99,7 @@ def _open_existing_asset(existing: dict[str, Any]) -> None:
     st.session_state[_ASSET_SELECT_KEY] = aid
     st.session_state.pop(_QAT_EXISTING_ASSET_KEY, None)
     close_quick_add_tool_dialog()
-    _clear_assets_cache_and_rerun()
+    _finish_quick_add()
 
 
 def _sync_existing_asset_for_serial(serial: str) -> dict[str, Any] | None:
@@ -214,7 +213,7 @@ def _render_existing_asset_panel(
                     _clear_photo_session(prefix)
                     st.session_state.pop(_QAT_EXISTING_ASSET_KEY, None)
                     close_quick_add_tool_dialog()
-                    _clear_assets_cache_and_rerun()
+                    _finish_quick_add()
                 else:
                     st.error(photo_result.error or "Could not attach photos.")
         with action_update:
@@ -232,7 +231,7 @@ def _render_existing_asset_panel(
                     )
                     st.session_state.pop(_QAT_EXISTING_ASSET_KEY, None)
                     close_quick_add_tool_dialog()
-                    _clear_assets_cache_and_rerun()
+                    _finish_quick_add()
                 else:
                     st.error(merge_result.error or "Could not update existing asset.")
 
@@ -281,7 +280,7 @@ def _render_needs_serial_new_tool_options(
             _clear_photo_session(prefix)
             st.session_state.pop(_QAT_EXISTING_ASSET_KEY, None)
             close_quick_add_tool_dialog()
-            _clear_assets_cache_and_rerun()
+            _finish_quick_add()
         else:
             st.error(result.error or "Could not create tool.")
     return needs_serial
@@ -578,7 +577,7 @@ def _manual_form(kind: str, *, prefix: str, trailer_id: str) -> None:
                 elif result.ok:
                     st.success(f"Added to {TOOL_KIND_LABELS[kind]}.")
                     close_quick_add_tool_dialog()
-                    _clear_assets_cache_and_rerun()
+                    _finish_quick_add()
                 else:
                     st.error(result.error or "Could not save tool.")
     elif st.button("Save tool", type="primary", key=f"{prefix}_save", use_container_width=True):
@@ -586,7 +585,7 @@ def _manual_form(kind: str, *, prefix: str, trailer_id: str) -> None:
         if result.ok:
             st.success(f"Added to {TOOL_KIND_LABELS[kind]}.")
             close_quick_add_tool_dialog()
-            _clear_assets_cache_and_rerun()
+            _finish_quick_add()
         else:
             st.error(result.error or "Could not save tool.")
 
@@ -774,7 +773,7 @@ def _photo_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str | N
                 _clear_photo_session(prefix)
                 st.session_state.pop(_QAT_EXISTING_ASSET_KEY, None)
                 close_quick_add_tool_dialog()
-                _clear_assets_cache_and_rerun()
+                _finish_quick_add()
     elif st.button("Save with photo", type="primary", key=f"{prefix}_photo_save", use_container_width=True):
         if not uploads:
             st.error("Upload at least one photo before saving.")
@@ -790,7 +789,7 @@ def _photo_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str | N
             return
         st.success(f"Added to {TOOL_KIND_LABELS[kind]}.")
         close_quick_add_tool_dialog()
-        _clear_assets_cache_and_rerun()
+        _finish_quick_add()
 
 
 def _receipt_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str | None) -> None:
@@ -885,7 +884,7 @@ def _receipt_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str |
                 st.success(f"Added to {TOOL_KIND_LABELS[kind]}.")
                 st.session_state.pop(_QAT_EXISTING_ASSET_KEY, None)
                 close_quick_add_tool_dialog()
-                _clear_assets_cache_and_rerun()
+                _finish_quick_add()
     elif st.button("Save with receipt", type="primary", key=f"{prefix}_rcpt_save", use_container_width=True):
         payload = {
             "tool_name": name,
@@ -905,7 +904,7 @@ def _receipt_form(kind: str, *, prefix: str, trailer_id: str, uploaded_by: str |
             return
         st.success(f"Added to {TOOL_KIND_LABELS[kind]}.")
         close_quick_add_tool_dialog()
-        _clear_assets_cache_and_rerun()
+        _finish_quick_add()
 
 
 def _bulk_import_preview_rows(rows: list[dict[str, Any]]) -> list[dict[str, str]]:
@@ -954,9 +953,7 @@ def _bulk_form(kind: str, *, prefix: str, trailer_id: str) -> None:
             for err in (data.get("errors") or [])[:5]:
                 st.warning(str(err))
             close_quick_add_tool_dialog()
-            from app.services.assets_service import clear_assets_cache
-            clear_assets_cache()
-            st.rerun()
+            _finish_quick_add()
         else:
             st.error(result.error or "Import failed.")
 

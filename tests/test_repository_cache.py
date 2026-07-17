@@ -27,12 +27,12 @@ def test_clear_data_cache_for_table_normalizes_table_name() -> None:
     mock_inv.assert_called_once()
 
 
-def test_clear_data_cache_for_table_unknown_table_falls_back_to_catalog_clear() -> None:
+def test_clear_data_cache_for_table_unknown_table_only_clears_db_reads() -> None:
     with patch("app.services.repository._clear_db_read_caches") as mock_db:
         with patch("app.pages._core._data.clear_all_catalog_list_caches") as mock_catalog:
             clear_data_cache_for_table("asset_documents")
     mock_db.assert_called_once()
-    mock_catalog.assert_called_once()
+    mock_catalog.assert_not_called()
 
 
 def test_clear_data_cache_for_table_estimate_line_items_clears_estimates() -> None:
