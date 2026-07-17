@@ -81,7 +81,7 @@ from app.services.customers_service import (
     update_customer_location,
 )
 from app.styles import inject_customers_module_css
-from app.ui.streamlit_perf import fragment, fragment_rerun
+from app.ui.streamlit_perf import fragment, fragment_rerun, ips_app_rerun
 _SEL = select_key("customers")
 _LOC_SEL = select_key("customer_locations")
 _CT_SEL = select_key("customer_contacts")
@@ -220,6 +220,14 @@ def _open_customer_detail(customer_id: str) -> None:
 def _prepare_open_customer_table_row(customer_id: str, _customer: dict) -> None:
     """Set customer detail navigation state (bridge escalates to app rerun)."""
     _open_customer_detail(customer_id)
+
+
+def _rerun_if_customers_detail_pending() -> None:
+    """Escalate fragment list interactions to a full app rerun for detail navigation."""
+    if st.session_state.get(CUSTOMERS_MODE_KEY) != "detail":
+        return
+    if str(st.session_state.get(CUSTOMERS_SELECTED_ID_KEY) or "").strip():
+        ips_app_rerun()
 
 
 def _render_customers_table_column_filters(
@@ -2498,6 +2506,7 @@ def _render_customers_catalog_fragment(
         search=search_q,
     )
     render_table_pagination_footer(len(filtered), _CUSTOMERS_TABLE_KEY)
+    _rerun_if_customers_detail_pending()
 
 
 def render() -> None:

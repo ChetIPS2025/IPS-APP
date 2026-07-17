@@ -50,3 +50,27 @@ def test_customers_list_table_uses_html_bridge() -> None:
     assert "render_customers_table_open_buttons" in table_block
     assert "customer_open_" not in table_block
     assert "customer_view_" not in table_block
+
+
+def test_customers_catalog_fragment_escalates_detail_to_app_rerun() -> None:
+    src = _customers_source().replace("\r\n", "\n")
+    fragment_block = src.split("@fragment\ndef _render_customers_catalog_fragment")[1].split(
+        "\ndef render("
+    )[0]
+    assert "_rerun_if_customers_detail_pending()" in fragment_block
+
+
+def test_estimates_catalog_fragment_escalates_detail_to_app_rerun() -> None:
+    src = _estimates_source().replace("\r\n", "\n")
+    fragment_block = src.split("@fragment\ndef _render_estimates_catalog_fragment")[1].split(
+        "\ndef render("
+    )[0]
+    assert "_rerun_if_estimates_detail_pending()" in fragment_block
+
+
+def test_estimates_approve_panel_uses_app_rerun_not_st_rerun() -> None:
+    from app.pages import estimates as estimates_page
+
+    src = inspect.getsource(estimates_page._render_approve_confirmation_panel)
+    assert "ips_app_rerun()" in src
+    assert "st.rerun()" not in src

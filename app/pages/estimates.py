@@ -636,6 +636,14 @@ def _prepare_open_estimate_table_row(eid: str, est: dict | None) -> None:
     _activate_estimate_detail_modal(eid, est)
 
 
+def _rerun_if_estimates_detail_pending() -> None:
+    """Escalate fragment list interactions to a full app rerun for detail navigation."""
+    if st.session_state.get(ESTIMATES_MODE_KEY) != "detail":
+        return
+    if str(st.session_state.get(SELECTED_ESTIMATE_KEY) or "").strip():
+        ips_app_rerun()
+
+
 def _render_estimates_table_column_filters(
     visible_headers: list[tuple[str, str | None]],
     *,
@@ -898,12 +906,12 @@ def _render_approve_confirmation_panel(rows_by_id: dict[str, dict]) -> None:
                 clear_data_cache_for_table("estimates")
                 st.session_state.pop(_PENDING_APPROVE_KEY, None)
                 st.success(res.message or "Estimate approved and linked job activated.")
-                st.rerun()
+                ips_app_rerun()
             st.error(res.message or "Could not approve estimate.")
     with b2:
         if st.button("Cancel", key=f"est_confirm_cancel_{eid}", use_container_width=True):
             st.session_state.pop(_PENDING_APPROVE_KEY, None)
-            st.rerun()
+            fragment_rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -1888,6 +1896,7 @@ def _render_estimates_catalog_fragment(rows: list[dict]) -> None:
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
     _render_custom_estimates_table(page_rows, filter_options=filter_options)
     render_estimates_pagination_footer(len(filtered), _TABLE_KEY)
+    _rerun_if_estimates_detail_pending()
 
 
 def render() -> None:
