@@ -334,9 +334,9 @@ def _sync_estimate_rollups_if_stale(estimate_id: str) -> None:
     try:
         if recalculate_and_save_estimate_totals(eid).ok:
             st.session_state[sync_key] = live
-            from app.pages._core._data import clear_estimates_list_cache, clear_catalog_session_datasets
+            from app.pages._core._data import clear_catalog_session_key, clear_estimates_list_cache
             clear_estimates_list_cache()
-            clear_catalog_session_datasets()
+            clear_catalog_session_key("estimates")
     except Exception:
         pass
 

@@ -31,8 +31,8 @@ def _catalog_session_get(name: str, loader):
 
 
 def clear_catalog_session_datasets() -> None:
+    """Drop mirrored catalog rows from session state only."""
     st.session_state.pop(_CATALOG_SESSION_KEY, None)
-    clear_page_data_cache()
 
 
 def clear_jobs_list_cost_cache() -> None:
@@ -786,8 +786,6 @@ def clear_jobs_catalog_cache() -> None:
     clear_jobs_list_cache()
     clear_catalog_session_key("jobs")
     clear_jobs_list_cost_cache()
-    clear_dashboard_page_data_cache()
-    clear_customers_page_data_cache()
 
 
 def clear_estimates_catalog_cache() -> None:
@@ -843,9 +841,11 @@ def clear_labor_rates_catalog_cache() -> None:
 
 
 def clear_timekeeping_catalog_cache() -> None:
-    """Timekeeping writes roll up to job costing — refresh jobs only."""
+    """Timekeeping writes roll up to job costing — refresh jobs list snapshots only."""
     clear_timekeeping_summaries_page_data_cache()
-    clear_jobs_catalog_cache()
+    clear_jobs_list_cache()
+    clear_catalog_session_key("jobs")
+    clear_jobs_list_cost_cache()
 
 
 def clear_pricing_guide_catalog_cache() -> None:
@@ -856,6 +856,7 @@ def clear_pricing_guide_catalog_cache() -> None:
 def clear_all_catalog_list_caches() -> None:
     """Invalidate Streamlit catalog caches after mutations."""
     clear_catalog_session_datasets()
+    clear_page_data_cache()
     clear_jobs_list_cost_cache()
     clear_inventory_list_cache()
     clear_assets_list_cache()

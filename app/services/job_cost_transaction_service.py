@@ -119,13 +119,13 @@ def equipment_internal_rate(asset: dict[str, Any] | None) -> tuple[float, str, f
 
 def _invalidate_jobs_list_cache() -> None:
     """Drop cached jobs catalog rows after actual_cost rollup changes."""
-    from app.pages._core._data import _cached_jobs_rows, clear_catalog_session_datasets
+    from app.pages._core._data import _cached_jobs_rows, clear_catalog_session_key
     try:
         _cached_jobs_rows.clear()
     except Exception:
         pass
     try:
-        clear_catalog_session_datasets()
+        clear_catalog_session_key("jobs")
     except Exception:
         pass
 
