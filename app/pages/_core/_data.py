@@ -793,7 +793,7 @@ def clear_jobs_catalog_cache() -> None:
 def clear_estimates_catalog_cache() -> None:
     clear_estimates_list_cache()
     clear_catalog_session_key("estimates")
-    clear_jobs_catalog_cache()
+    clear_dashboard_page_data_cache()
     clear_customers_page_data_cache()
 
 

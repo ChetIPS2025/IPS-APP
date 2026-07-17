@@ -115,6 +115,11 @@ from app.components.assets_list_table import (
     render_assets_table_bridge_legacy,
     render_assets_table_open_buttons,
 )
+from app.components.serialized_tools_list_table import (
+    build_serialized_tools_html_table,
+    render_serialized_tools_table_bridge_legacy,
+    render_serialized_tools_table_open_buttons,
+)
 from app.components.assets_page_layout import (
     close_assets_filter_bar_shell,
     render_assets_filter_bar_shell,
@@ -158,13 +163,8 @@ _ALL_ASSET_IDS_KEY = "_ips_assets_visible_ids"
 _ALL_SMALL_TOOL_IDS_KEY = "_ips_small_tools_visible_ids"
 _TABLE_KEY = "assets_list"
 _SMALL_TOOLS_TABLE_KEY = "assets_small_tools_list"
-_SMALL_TOOL_COLS = [0.4, 0.8, 1.85, 0.95, 0.95, 1.25, 1.1, 0.9, 0.75]
-_SMALL_TOOL_HEADER_SPECS: list[tuple[str, str | None]] = [
-    ("", None),
-    ("IMAGE", None),
-    ("TOOL", None),
+_SMALL_TOOL_FILTER_HEADER_SPECS: list[tuple[str, str]] = [
     ("MODEL #", "model_number"),
-    ("SERIAL", None),
     ("TRAILER", "trailer"),
     ("JOB", "job"),
     ("STATUS", "status"),
@@ -512,33 +512,6 @@ def _show_assets_modal_if_selected() -> None:
     show_modal_if_pending(_ASSETS_MODAL_KEY, _show_assets_detail_modal)
 
 
-def _on_small_tool_checkbox_change(
-    row_id: str,
-    all_row_ids: list[str],
-    row_by_id: dict[str, dict],
-    assets_by_id: dict[str, dict],
-) -> None:
-    key = _small_tool_select_key(row_id)
-    row = row_by_id.get(row_id)
-    if st.session_state.get(key):
-        for other_id in all_row_ids:
-            if other_id != row_id:
-                st.session_state[_small_tool_select_key(other_id)] = False
-        if row:
-            _prepare_open_small_tool_row(row, assets_by_id)
-    elif row:
-        modal_aid = _small_tool_modal_asset_id(row)
-        if modal_aid and st.session_state.get(SELECTED_ASSET_KEY) == modal_aid:
-            st.session_state[SELECTED_ASSET_KEY] = None
-            st.session_state[SHOW_ASSET_MODAL_KEY] = False
-            clear_record_modal(
-                table_key=_SMALL_TOOLS_TABLE_KEY,
-                session_select_key=_SEL,
-                modal_key=_ASSETS_MODAL_KEY,
-                module=_MOD,
-            )
-
-
 def _prepare_open_hand_tool_row(row: dict) -> None:
     """Set hand tool or parent trailer detail state without rerunning."""
     if not row.get("editable", True):
@@ -571,25 +544,75 @@ def _open_small_tool_row(row: dict, assets_by_id: dict[str, dict]) -> None:
     ips_app_rerun()
 
 
-def _render_serialized_tool_name_cell(
-    row: dict,
-    name: str,
+def _open_serialized_tool_table_row(_row_id: str, row: dict, assets_by_id: dict[str, dict]) -> None:
+    _prepare_open_small_tool_row(row, assets_by_id)
+
+
+def _select_serialized_tool_table_row(
+    row_id: str,
+    checked: bool,
     *,
+    all_row_ids: list[str],
+    row_by_id: dict[str, dict],
     assets_by_id: dict[str, dict],
 ) -> None:
-    rid = _small_tool_row_id(row)
-    if not rid:
-        st.markdown(
-            f'<div class="ips-assets-title">{html.escape(name)}</div>',
-            unsafe_allow_html=True,
-        )
+    st.session_state[_small_tool_select_key(row_id)] = checked
+    if checked:
+        for other_id in all_row_ids:
+            if other_id != row_id:
+                st.session_state[_small_tool_select_key(other_id)] = False
+        row = row_by_id.get(row_id)
+        if row:
+            _prepare_open_small_tool_row(row, assets_by_id)
         return
-    st.markdown(
-        '<span class="ips-serialized-tools-name-anchor" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
-    if st.button(name, key=f"st_open_name_{rid}", type="tertiary"):
-        _open_small_tool_row(row, assets_by_id)
+    row = row_by_id.get(row_id)
+    if not row:
+        return
+    modal_aid = _small_tool_modal_asset_id(row)
+    if modal_aid and st.session_state.get(SELECTED_ASSET_KEY) == modal_aid:
+        st.session_state[SELECTED_ASSET_KEY] = None
+        st.session_state[SHOW_ASSET_MODAL_KEY] = False
+        clear_record_modal(
+            table_key=_SMALL_TOOLS_TABLE_KEY,
+            session_select_key=_SEL,
+            modal_key=_ASSETS_MODAL_KEY,
+            module=_MOD,
+        )
+
+
+def _serialized_tool_display_rows(
+    filtered: list[dict],
+    *,
+    assets_by_id: dict[str, dict],
+    employees_by_id: dict[str, dict],
+    jobs_by_id: dict[str, dict],
+) -> list[dict]:
+    display_rows: list[dict] = []
+    for row in filtered:
+        rid = _small_tool_row_id(row)
+        if not rid:
+            continue
+        view = _small_tool_tracking_view(
+            row,
+            assets_by_id=assets_by_id,
+            employees_by_id=employees_by_id,
+            jobs_by_id=jobs_by_id,
+        )
+        display_rows.append(
+            {
+                **row,
+                "_row_id": rid,
+                "_display_name": _small_tool_name(row),
+                "_display_model": _small_tool_model_number(row, view=view),
+                "_display_serial": _small_tool_serial(row, view=view),
+                "_display_trailer": _small_tool_trailer_label(row, view=view),
+                "_display_job": _small_tool_job_label(row, view=view),
+                "_display_status": _small_tool_status(row),
+                "_display_condition": _small_tool_condition_label(row, view=view),
+                "_thumb_asset": _small_tool_image_asset(row, assets_by_id),
+            }
+        )
+    return display_rows
 
 
 def _small_tool_image_asset(row: dict, assets_by_id: dict[str, dict]) -> dict:
@@ -898,6 +921,26 @@ def _render_custom_assets_table(
     return all_asset_ids
 
 
+def _render_small_tools_table_column_filters(
+    *,
+    filter_options: dict[str, list[str]],
+) -> None:
+    if not _SMALL_TOOL_FILTER_HEADER_SPECS:
+        return
+    st.markdown('<div class="ips-assets-table-filter-toolbar">', unsafe_allow_html=True)
+    cols = st.columns(len(_SMALL_TOOL_FILTER_HEADER_SPECS), gap="small")
+    for col, (label, field) in zip(cols, _SMALL_TOOL_FILTER_HEADER_SPECS):
+        with col:
+            render_table_header_cell(
+                label,
+                table_key=_SMALL_TOOLS_TABLE_KEY,
+                filter_field=field,
+                filter_options=filter_options.get(field, []),
+                base_class="ips-assets-filter-toolbar-cell",
+            )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
 def _render_small_tools_table(
     filtered: list[dict],
     *,
@@ -911,111 +954,50 @@ def _render_small_tools_table(
         st.session_state[_ALL_SMALL_TOOL_IDS_KEY] = []
         return
 
-    all_row_ids = [
-        _small_tool_row_id(row) for row in filtered if _small_tool_row_id(row)
-    ]
+    display_rows = _serialized_tool_display_rows(
+        filtered,
+        assets_by_id=assets_by_id,
+        employees_by_id=employees_by_id,
+        jobs_by_id=jobs_by_id,
+    )
+    all_row_ids = [str(row.get("_row_id") or "") for row in display_rows if str(row.get("_row_id") or "")]
     st.session_state[_ALL_SMALL_TOOL_IDS_KEY] = all_row_ids
     row_by_id = {
-        _small_tool_row_id(row): row for row in filtered if _small_tool_row_id(row)
+        str(row.get("_row_id") or ""): row for row in display_rows if str(row.get("_row_id") or "")
     }
 
-    with st.container(key="assets_small_tools_table_wrap"):
-        st.markdown('<div class="ips-assets-table-wrap">', unsafe_allow_html=True)
+    def _is_row_selected(row_id: str) -> bool:
+        return bool(st.session_state.get(_small_tool_select_key(row_id)))
 
-        header_cols = st.columns(
-            _SMALL_TOOL_COLS,
-            gap="xxsmall",
-            vertical_alignment="center",
+    def _open_row(row_id: str, row: dict) -> None:
+        _open_serialized_tool_table_row(row_id, row, assets_by_id)
+
+    def _select_row(row_id: str, checked: bool) -> None:
+        _select_serialized_tool_table_row(
+            row_id,
+            checked,
+            all_row_ids=all_row_ids,
+            row_by_id=row_by_id,
+            assets_by_id=assets_by_id,
         )
-        for hidx, (col, (label, field)) in enumerate(zip(header_cols, _SMALL_TOOL_HEADER_SPECS)):
-            with col:
-                if hidx == 0:
-                    st.markdown(
-                        '<span class="ips-assets-table-header-marker" aria-hidden="true"></span>',
-                        unsafe_allow_html=True,
-                    )
-                if field:
-                    render_table_header_cell(
-                        label,
-                        table_key=_SMALL_TOOLS_TABLE_KEY,
-                        filter_field=field,
-                        filter_options=filter_options.get(field, []),
-                        base_class="ips-assets-header-row ips-assets-cell",
-                    )
-                else:
-                    render_table_header_cell(
-                        label,
-                        base_class="ips-assets-header-row ips-assets-cell",
-                    )
 
-        for row in filtered:
-            rid = _small_tool_row_id(row)
-            if not rid:
-                continue
-            name = _small_tool_name(row)
-            view = _small_tool_tracking_view(
-                row,
-                assets_by_id=assets_by_id,
-                employees_by_id=employees_by_id,
-                jobs_by_id=jobs_by_id,
-            )
-            model_no = _small_tool_model_number(row, view=view)
-            serial = _small_tool_serial(row, view=view)
-            trailer = _small_tool_trailer_label(row, view=view)
-            job_label = _small_tool_job_label(row, view=view)
-            status = _small_tool_status(row)
-            condition = _small_tool_condition_label(row, view=view)
-
-            cols = st.columns(
-                _SMALL_TOOL_COLS,
-                gap="xxsmall",
-                vertical_alignment="center",
-            )
-            image_asset = _small_tool_image_asset(row, assets_by_id)
-            with cols[0]:
-                st.checkbox(
-                    "",
-                    key=_small_tool_select_key(rid),
-                    label_visibility="collapsed",
-                    on_change=_on_small_tool_checkbox_change,
-                    args=(rid, all_row_ids, row_by_id, assets_by_id),
-                )
-            with cols[1]:
-                _render_asset_thumbnail(image_asset)
-            with cols[2]:
-                _render_serialized_tool_name_cell(
-                    row,
-                    name,
-                    assets_by_id=assets_by_id,
-                )
-            with cols[3]:
-                st.markdown(
-                    f'<div class="ips-assets-number ips-assets-cell">{html.escape(model_no)}</div>',
-                    unsafe_allow_html=True,
-                )
-            with cols[4]:
-                st.markdown(
-                    f'<div class="ips-assets-number ips-assets-cell">{html.escape(serial)}</div>',
-                    unsafe_allow_html=True,
-                )
-            with cols[5]:
-                st.markdown(
-                    f'<div class="ips-assets-muted ips-assets-cell">{html.escape(trailer)}</div>',
-                    unsafe_allow_html=True,
-                )
-            with cols[6]:
-                st.markdown(
-                    f'<div class="ips-assets-muted ips-assets-cell">{html.escape(job_label)}</div>',
-                    unsafe_allow_html=True,
-                )
-            with cols[7]:
-                st.markdown(_asset_status_pill_html(status), unsafe_allow_html=True)
-            with cols[8]:
-                st.markdown(
-                    f'<div class="ips-assets-muted ips-assets-cell">{html.escape(condition)}</div>',
-                    unsafe_allow_html=True,
-                )
-
+    with st.container(key="assets_small_tools_table_wrap"):
+        st.markdown(
+            '<span class="ips-assets-table-header-marker ips-serialized-tools-table-anchor" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        st.markdown('<div class="ips-assets-table-wrap">', unsafe_allow_html=True)
+        _render_small_tools_table_column_filters(filter_options=filter_options)
+        st.markdown(
+            build_serialized_tools_html_table(display_rows, is_row_selected=_is_row_selected),
+            unsafe_allow_html=True,
+        )
+        render_serialized_tools_table_open_buttons(display_rows, open_row_fn=_open_row)
+        render_serialized_tools_table_bridge_legacy(
+            row_by_id,
+            open_row_fn=_open_row,
+            select_row_fn=_select_row,
+        )
         st.markdown("</div>", unsafe_allow_html=True)
 
 

@@ -11,23 +11,30 @@ def _assets_source() -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_serialized_tool_name_click_uses_app_rerun() -> None:
+def test_serialized_tool_table_open_prepares_modal() -> None:
     from app.pages import assets as assets_page
 
-    src = inspect.getsource(assets_page._open_small_tool_row)
-    assert "ips_app_rerun()" in src
+    src = inspect.getsource(assets_page._open_serialized_tool_table_row)
+    assert "_prepare_open_small_tool_row(" in src
+    assert "ips_app_rerun()" not in src
 
 
-def test_serialized_tool_checkbox_prepares_modal_without_callback_rerun() -> None:
+def test_serialized_tool_table_select_prepares_modal_without_callback_rerun() -> None:
     from app.pages import assets as assets_page
 
-    checkbox_src = inspect.getsource(assets_page._on_small_tool_checkbox_change)
-    name_src = inspect.getsource(assets_page._render_serialized_tool_name_cell)
+    select_src = inspect.getsource(assets_page._select_serialized_tool_table_row)
+    assert "_prepare_open_small_tool_row(" in select_src
+    assert "ips_app_rerun()" not in select_src
 
-    assert "_prepare_open_small_tool_row(" in checkbox_src
-    assert "_open_small_tool_row(" not in checkbox_src.replace("_prepare_open_small_tool_row(", "")
-    assert "_open_small_tool_row(" in name_src
-    assert "_prepare_open_small_tool_row(" not in name_src
+
+def test_serialized_tools_table_uses_html_bridge() -> None:
+    src = _assets_source()
+    assert "build_serialized_tools_html_table" in src
+    assert "render_serialized_tools_table_bridge_legacy" in src
+    table_block = src.split("def _render_small_tools_table(")[1].split("def _equipment_summary_counts")[0]
+    assert "_render_serialized_tool_name_cell" not in src
+    assert "_on_small_tool_checkbox_change" not in src
+    assert "render_serialized_tools_table_open_buttons" in table_block
 
 
 def test_asset_fragments_escalate_modal_to_app_rerun() -> None:
