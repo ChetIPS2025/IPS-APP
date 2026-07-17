@@ -12,6 +12,7 @@ from app.pages._core.page_data_cache import (
     clear_dashboard_page_data_cache,
     clear_inventory_page_data_cache,
     clear_page_data_cache,
+    clear_page_data_cache_key,
     clear_timekeeping_summaries_page_data_cache,
     page_data_cache_get,
 )
@@ -809,10 +810,11 @@ def clear_assets_catalog_cache() -> None:
     clear_assets_list_cache()
     clear_catalog_session_key("assets")
     clear_dashboard_page_data_cache()
+    clear_page_data_cache_key("assets_serialized_context")
     from app.services.pricing_guide_service import clear_pricing_guide_cache
     from app.services.assets_service import invalidate_assets_modal_cache
+
     clear_pricing_guide_cache()
-    st.session_state.pop("_ips_assets_modal_by_id", None)
     invalidate_assets_modal_cache()
 
 

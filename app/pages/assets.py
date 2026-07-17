@@ -239,14 +239,28 @@ def _is_serialized_tab_asset(row: dict) -> bool:
 
 
 def _small_tool_context_maps(rows: list[dict]) -> tuple[dict[str, dict], dict[str, dict], dict[str, dict]]:
+    from app.pages._core._data import load_employees, load_jobs
+    from app.pages._core.page_data_cache import page_data_cache_get
+
     assets_by_id = {
         str(a.get("id") or "").strip(): a for a in rows if str(a.get("id") or "").strip()
     }
-    from app.pages._core._data import load_employees, load_jobs
-    employees_by_id = {
-        str(e.get("id") or "").strip(): e for e in load_employees() if str(e.get("id") or "").strip()
-    }
-    jobs_by_id = {str(j.get("id") or "").strip(): j for j in load_jobs() if str(j.get("id") or "").strip()}
+
+    def _load_reference_maps() -> tuple[dict[str, dict], dict[str, dict]]:
+        employees_by_id = {
+            str(e.get("id") or "").strip(): e
+            for e in load_employees()
+            if str(e.get("id") or "").strip()
+        }
+        jobs_by_id = {
+            str(j.get("id") or "").strip(): j for j in load_jobs() if str(j.get("id") or "").strip()
+        }
+        return employees_by_id, jobs_by_id
+
+    employees_by_id, jobs_by_id = page_data_cache_get(
+        "assets_serialized_context",
+        _load_reference_maps,
+    )
     return assets_by_id, employees_by_id, jobs_by_id
 
 
@@ -1242,15 +1256,8 @@ def _put_asset_in_modal_cache(asset_id: str, asset: dict | None) -> None:
     st.session_state[_ASSETS_CACHE_KEY] = cache
 
 
-def _invalidate_assets_modal_cache() -> None:
-    from app.services.assets_service import invalidate_assets_modal_cache
-
-    invalidate_assets_modal_cache()
-
-
 def _clear_assets_catalog_cache() -> None:
     clear_assets_cache()
-    _invalidate_assets_modal_cache()
 
 
 def _cached_asset_for_modal(asset_id: str) -> dict | None:

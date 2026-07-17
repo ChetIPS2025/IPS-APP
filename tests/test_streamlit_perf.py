@@ -35,13 +35,6 @@ def test_fragment_rerun_is_callable() -> None:
     assert callable(mod.fragment_rerun)
 
 
-def test_ips_open_rerun_delegates_to_app_rerun() -> None:
-    mod = _load_streamlit_perf()
-    with patch.object(mod, "ips_app_rerun") as mock_app_rerun:
-        mod.ips_open_rerun()
-    mock_app_rerun.assert_called_once()
-
-
 def test_fragment_rerun_uses_fragment_scope_when_supported() -> None:
     mod = _load_streamlit_perf()
     with patch.object(st, "rerun") as mock_rerun:

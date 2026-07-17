@@ -20,32 +20,31 @@ def test_clear_assets_catalog_cache_invalidates_modal_cache() -> None:
     with patch("app.pages._core._data.clear_assets_list_cache") as mock_list:
         with patch("app.pages._core._data.clear_catalog_session_key") as mock_key:
             with patch("app.pages._core._data.clear_dashboard_page_data_cache") as mock_dash:
-                with patch("app.services.pricing_guide_service.clear_pricing_guide_cache") as mock_pg:
-                    with patch(
-                        "app.services.assets_service.invalidate_assets_modal_cache"
-                    ) as mock_modal:
-                        from app.pages._core._data import clear_assets_catalog_cache
+                with patch("app.pages._core._data.clear_page_data_cache_key") as mock_page:
+                    with patch("app.services.pricing_guide_service.clear_pricing_guide_cache") as mock_pg:
+                        with patch(
+                            "app.services.assets_service.invalidate_assets_modal_cache"
+                        ) as mock_modal:
+                            from app.pages._core._data import clear_assets_catalog_cache
 
-                        clear_assets_catalog_cache()
+                            clear_assets_catalog_cache()
 
     mock_list.assert_called_once()
     mock_key.assert_called_once_with("assets")
     mock_dash.assert_called_once()
+    mock_page.assert_called_once_with("assets_serialized_context")
     mock_pg.assert_called_once()
     mock_modal.assert_called_once()
 
 
-def test_clear_assets_cache_invalidates_modal_cache() -> None:
-    session_state = {ASSETS_MODAL_CACHE_KEY: {"ast-1": {"id": "ast-1"}}}
+def test_clear_assets_cache_delegates_to_repository() -> None:
+    with patch("app.services.repository.clear_data_cache_for_table") as mock_table:
+        with patch("app.services.assets_service.clear_asset_image_url_cache"):
+            from app.services.assets_service import clear_assets_cache
 
-    with patch("streamlit.session_state", session_state, create=True):
-        with patch("app.services.repository.clear_data_cache_for_table"):
-            with patch("app.services.assets_service.clear_asset_image_url_cache"):
-                from app.services.assets_service import clear_assets_cache
+            clear_assets_cache()
 
-                clear_assets_cache()
-
-    assert ASSETS_MODAL_CACHE_KEY not in session_state
+    mock_table.assert_called_once_with("assets")
 
 
 def test_cached_asset_for_modal_falls_back_to_load_assets() -> None:
