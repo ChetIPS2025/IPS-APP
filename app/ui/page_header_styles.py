@@ -6,8 +6,8 @@ import streamlit as st
 
 from app.ui.css_inject import inject_css_once
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v28"
-IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v28"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v29"
+IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v29"
 
 
 def inject_page_header_styles() -> None:
@@ -17,13 +17,13 @@ def inject_page_header_styles() -> None:
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-page-header-styles-v28">
+<style id="ips-page-header-styles-v29">
 [class*="st-key-ips_page_header"],
 [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
   margin: 0 0 14px 0 !important;
-  padding: clamp(10px, 1.2vw, 14px) clamp(12px, 1.5vw, 20px) clamp(16px, 2vw, 22px) !important;
-  min-height: 96px !important;
+  padding: clamp(6px, 0.8vw, 10px) clamp(12px, 1.5vw, 20px) clamp(10px, 1.2vw, 14px) !important;
+  min-height: 78px !important;
   background: #ffffff !important;
   border: 1px solid #e5e7eb !important;
   border-bottom: 2px solid #3158e6 !important;
@@ -822,37 +822,36 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
   flex-direction: column !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 10px !important;
+  gap: 4px !important;
   min-width: 0 !important;
   overflow: visible !important;
-  padding-bottom: 2px !important;
+  padding-bottom: 0 !important;
   text-align: center !important;
   width: 100% !important;
   margin: 0 auto !important;
+}
+.ips-header-title-row {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
 }
 .ips-header-icon-wrap {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  width: 40px !important;
-  height: 40px !important;
+  width: auto !important;
+  height: auto !important;
   flex: 0 0 auto !important;
-  margin-top: 0 !important;
+  margin: 0 !important;
 }
 .ips-header-icon-wrap .ips-app-header-icon-svg {
   display: block !important;
   width: 30px !important;
   height: 30px !important;
-}
-.ips-header-text {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  min-width: 0 !important;
-  overflow: visible !important;
-  padding-bottom: 4px !important;
-  text-align: center !important;
-  width: 100% !important;
 }
 .ips-header-title {
   margin: 0 !important;
@@ -864,15 +863,16 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
   overflow: visible !important;
   text-overflow: clip !important;
   text-align: center !important;
+  white-space: nowrap !important;
 }
 .ips-header-subtitle {
-  margin: 8px 0 0 0 !important;
+  margin: 2px 0 0 0 !important;
   font-size: 14px !important;
   color: #64748b !important;
-  line-height: 1.45 !important;
+  line-height: 1.35 !important;
   font-weight: 500 !important;
   overflow: visible !important;
-  padding-bottom: 2px !important;
+  padding-bottom: 0 !important;
   text-align: center !important;
   max-width: 36rem !important;
 }
@@ -905,7 +905,7 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
 @media (min-width: 1440px) {
   [class*="st-key-ips_page_header"],
   [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
-    min-height: 112px !important;
+    min-height: 88px !important;
   }
   .ips-header-title {
     font-size: 48px !important;
@@ -978,15 +978,16 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
   }
   [class*="st-key-ips_page_header"],
   [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
-    min-height: 104px !important;
-    padding: 16px 16px 18px !important;
+    min-height: 82px !important;
+    padding: 10px 16px 12px !important;
   }
   .ips-header-title {
     font-size: 32px !important;
+    white-space: normal !important;
   }
   .ips-header-subtitle {
     font-size: 12px !important;
-    margin-top: 6px !important;
+    margin-top: 2px !important;
   }
   .ips-header-logo {
     width: clamp(180px, 58vw, 280px) !important;

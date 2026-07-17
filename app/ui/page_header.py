@@ -405,13 +405,16 @@ def render_page_header(
         if resolved_icon
         else ""
     )
+    title_row = (
+        f'{icon_html}<h1 class="ips-header-title">{html.escape(str(title or "").strip())}</h1>'
+        if resolved_icon
+        else f'<h1 class="ips-header-title">{html.escape(str(title or "").strip())}</h1>'
+    )
     title_html = (
         f'<div class="ips-header-title-block">'
-        f"{icon_html}"
-        f'<div class="ips-header-text">'
-        f'<h1 class="ips-header-title">{html.escape(str(title or "").strip())}</h1>'
+        f'<div class="ips-header-title-row">{title_row}</div>'
         f"{sub_html}"
-        f"</div></div>"
+        f"</div>"
     )
 
     extra_actions: list[_ActionFn] = []
