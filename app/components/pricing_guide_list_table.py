@@ -311,7 +311,8 @@ def handle_pricing_guide_table_action(
     if not row:
         return
     open_item_fn(row_id, row)
-    st.rerun()
+    from app.ui.streamlit_perf import ips_app_rerun
+    ips_app_rerun()
 
 
 def render_pricing_guide_table_open_buttons(

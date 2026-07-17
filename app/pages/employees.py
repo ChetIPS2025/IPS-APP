@@ -94,6 +94,7 @@ from app.services.users_service import (
     resolve_employee_auth_login,
 )
 from app.styles import inject_users_module_css
+from app.ui.streamlit_perf import fragment, fragment_rerun, ips_app_rerun
 from app.utils.constants import DEPARTMENTS, SESSION_NAV_KEY
 from app.utils.dates import DATE_INPUT_FORMAT
 from app.utils.formatting import fmt_date
@@ -358,7 +359,7 @@ def _clear_user_selection(user_ids: list[str] | None = None) -> None:
             st.session_state[key] = False
 
 
-def _open_user_from_list(user: dict) -> None:
+def _prepare_open_user_from_list(user: dict) -> None:
     uid = str(user.get("id") or "").strip()
     if not uid:
         return
@@ -379,19 +380,28 @@ def _open_user_from_list(user: dict) -> None:
         id_fields=("id", "email"),
     )
     st.session_state[ACTIVE_EMPLOYEE_KEY] = uid
-    from app.ui.streamlit_perf import ips_app_rerun
+
+
+def _open_user_from_list(user: dict) -> None:
+    _prepare_open_user_from_list(user)
     ips_app_rerun()
 
 
+def _rerun_if_user_modal_pending() -> None:
+    """Escalate fragment list interactions to a full app rerun for @st.dialog."""
+    if st.session_state.get(SHOW_MODAL_KEY) or str(st.session_state.get(MODAL_KEY) or "").strip():
+        ips_app_rerun()
+
+
 def _open_users_table_user(user_id: str, user: dict | None = None) -> None:
-    """Set selected user state; the page render opens the dialog once."""
+    """Set selected user state (bridge escalates to app rerun)."""
     uid = str(user_id or (user or {}).get("id") or "").strip()
     if not uid:
         return
     row = user if isinstance(user, dict) else None
     cache = st.session_state.get(CACHE_KEY) or {}
     cached = cache.get(uid) if isinstance(cache, dict) else None
-    _open_user_from_list(cached or row or {"id": uid})
+    _prepare_open_user_from_list(cached or row or {"id": uid})
 
 
 def _render_users_table_column_filters(
@@ -1123,6 +1133,61 @@ def _show_employee_modal() -> None:
     render_employee_detail_dialog(emp)
 
 
+@fragment
+def _render_users_catalog_fragment(
+    all_emp: list[dict],
+    *,
+    filter_options: dict[str, list[str]],
+) -> None:
+    """Users search, filters, and list table — local reruns for list interactions."""
+
+    def _filters() -> None:
+        c1, c2 = st.columns([5.4, 0.6])
+        with c1:
+            st.text_input(
+                "Search users",
+                placeholder="Search name, email, role, or status…",
+                key=_SEARCH_KEY,
+                label_visibility="collapsed",
+            )
+        with c2:
+            if st.button("Clear", key="users_clear_filters", use_container_width=True):
+                clear_table_filters(_TABLE_KEY, _FILTER_FIELDS, extra_keys=[_SEARCH_KEY])
+                reset_table_page(_TABLE_KEY)
+                _clear_user_selection(st.session_state.get(_ALL_USER_IDS_KEY))
+                st.session_state.pop(USERS_TABLE_LAST_ACTION_KEY, None)
+                fragment_rerun()
+
+    render_users_filter_bar_shell()
+    layout_filter_bar(_filters)
+    close_users_filter_bar_shell()
+
+    search_q = str(st.session_state.get(_SEARCH_KEY) or "").strip()
+    filtered = _filter_employees(all_emp, search=search_q)
+
+    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="user")
+    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
+
+    modal_cache = build_modal_cache(filtered, cache_key=CACHE_KEY)
+    selected_user_id = str(st.session_state.get(SELECTED_USER_KEY) or "").strip()
+    if selected_user_id and st.session_state.get(SHOW_MODAL_KEY):
+        for emp in all_emp:
+            if str(emp.get("id") or "").strip() == selected_user_id:
+                modal_cache[selected_user_id] = emp
+                st.session_state[CACHE_KEY] = modal_cache
+                break
+
+    _render_custom_users_table(
+        page_rows,
+        filter_options=filter_options,
+        total_count=len(all_emp),
+        search=search_q,
+    )
+
+    render_table_pagination_footer(len(filtered), _TABLE_KEY)
+    _rerun_if_user_modal_pending()
+
+
 def render() -> None:
     from app.pages._core._access import begin_module
     if not begin_module("employees"):
@@ -1250,50 +1315,7 @@ def render() -> None:
                     st.session_state["users_action_flash"] = (flash_kind, flash_msg)
                     st.rerun()
 
-    def _filters() -> None:
-        c1, c2 = st.columns([5.4, 0.6])
-        with c1:
-            st.text_input(
-                "Search users",
-                placeholder="Search name, email, role, or status…",
-                key=_SEARCH_KEY,
-                label_visibility="collapsed",
-            )
-        with c2:
-            if st.button("Clear", key="users_clear_filters", use_container_width=True):
-                clear_table_filters(_TABLE_KEY, _FILTER_FIELDS, extra_keys=[_SEARCH_KEY])
-                reset_table_page(_TABLE_KEY)
-                _clear_user_selection(st.session_state.get(_ALL_USER_IDS_KEY))
-                st.session_state.pop(USERS_TABLE_LAST_ACTION_KEY, None)
-                st.rerun()
-
-    render_users_filter_bar_shell()
-    layout_filter_bar(_filters)
-    close_users_filter_bar_shell()
-
-    search_q = str(st.session_state.get(_SEARCH_KEY) or "").strip()
-    filtered = _filter_employees(all_emp, search=search_q)
-
-    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="user")
-    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
-
-    modal_cache = build_modal_cache(filtered, cache_key=CACHE_KEY)
-    selected_user_id = str(st.session_state.get(SELECTED_USER_KEY) or "").strip()
-    if selected_user_id and st.session_state.get(SHOW_MODAL_KEY):
-        for emp in all_emp:
-            if str(emp.get("id") or "").strip() == selected_user_id:
-                modal_cache[selected_user_id] = emp
-                st.session_state[CACHE_KEY] = modal_cache
-                break
-
-    _render_custom_users_table(
-        page_rows,
-        filter_options=filter_options,
-        total_count=len(all_emp),
-        search=search_q,
-    )
-
-    render_table_pagination_footer(len(filtered), _TABLE_KEY)
+    _render_users_catalog_fragment(all_emp, filter_options=filter_options)
 
     if st.session_state.get(SHOW_MODAL_KEY) or str(st.session_state.get(MODAL_KEY) or "").strip():
         show_modal_if_pending(MODAL_KEY, _show_employee_modal)

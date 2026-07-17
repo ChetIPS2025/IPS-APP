@@ -99,6 +99,7 @@ from app.services.pricing_guide_images import (
 )
 from app.services.item_images import ITEM_IMAGE_UPLOAD_TYPES
 from app.styles import inject_pricing_guide_module_css
+from app.ui.streamlit_perf import fragment, fragment_rerun, ips_app_rerun
 from app.utils.formatting import fmt_currency
 _SEL = select_key("pricing_guide")
 _MODULE = "pricing_guide"
@@ -258,8 +259,8 @@ def _open_modal(row_id: str, row: dict | None = None) -> None:
     )
 
 
-def _open_pg_table_item(row_id: str, row: dict | None = None) -> None:
-    """Set selected pricing item state; the page render opens the dialog once."""
+def _prepare_open_pg_table_item(row_id: str, row: dict | None = None) -> None:
+    """Set selected pricing item state (bridge escalates to app rerun)."""
     rid = str(row_id or "").strip()
     if not rid:
         return
@@ -267,6 +268,16 @@ def _open_pg_table_item(row_id: str, row: dict | None = None) -> None:
     cached = cache.get(rid) if isinstance(cache, dict) else None
     record = cached if isinstance(cached, dict) else row
     _open_modal(rid, record)
+
+
+def _open_pg_table_item(row_id: str, row: dict | None = None) -> None:
+    _prepare_open_pg_table_item(row_id, row)
+
+
+def _rerun_if_pg_modal_pending() -> None:
+    """Escalate fragment list interactions to a full app rerun for @st.dialog."""
+    if st.session_state.get(SHOW_PG_MODAL_KEY) or str(st.session_state.get(_MODAL_KEY) or "").strip():
+        ips_app_rerun()
 
 
 def _clear_pg_selection() -> None:
@@ -902,6 +913,51 @@ def _show_detail_modal() -> None:
         _render_item_tabs(row)
 
 
+@fragment
+def _render_pricing_guide_catalog_fragment(
+    rows: list[dict],
+    *,
+    filter_options: dict[str, list[str]],
+) -> None:
+    """Pricing guide search, filters, and catalog table — local reruns for list interactions."""
+
+    def _filters() -> None:
+        c1, c2 = st.columns([5, 0.6])
+        with c1:
+            st.text_input(
+                "Search",
+                placeholder="Search description, class, category, vendor, SKU, model #…",
+                key="pg_search",
+                label_visibility="collapsed",
+            )
+        with c2:
+            if st.button("Clear", key="pg_clear", use_container_width=True):
+                clear_table_filters(
+                    _TABLE_KEY,
+                    _FILTER_FIELDS,
+                    extra_keys=["pg_search"],
+                )
+                _clear_pg_selection()
+                reset_table_page(_TABLE_KEY)
+                fragment_rerun()
+
+    render_pricing_guide_filter_bar_shell()
+    layout_filter_bar(_filters)
+    close_pricing_guide_filter_bar_shell()
+
+    filtered = _filter_rows(
+        rows,
+        q=str(st.session_state.get("pg_search") or "").strip(),
+    )
+
+    build_modal_cache(filtered, cache_key=_CACHE_KEY)
+    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="item")
+    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
+    _render_custom_pricing_guide_table(page_rows, filter_options=filter_options)
+    render_table_pagination_footer(len(filtered), _TABLE_KEY)
+    _rerun_if_pg_modal_pending()
+
+
 def render() -> None:
     from app.pages._core._access import begin_module
     if not begin_module("pricing_guide"):
@@ -945,41 +1001,7 @@ def render() -> None:
     if st.session_state.get("pg_add_form"):
         _render_add_form()
 
-    def _filters() -> None:
-        c1, c2 = st.columns([5, 0.6])
-        with c1:
-            st.text_input(
-                "Search",
-                placeholder="Search description, class, category, vendor, SKU, model #…",
-                key="pg_search",
-                label_visibility="collapsed",
-            )
-        with c2:
-            if st.button("Clear", key="pg_clear", use_container_width=True):
-                clear_table_filters(
-                    _TABLE_KEY,
-                    _FILTER_FIELDS,
-                    extra_keys=["pg_search"],
-                )
-                _clear_pg_selection()
-                reset_table_page(_TABLE_KEY)
-                st.rerun()
+    _render_pricing_guide_catalog_fragment(rows, filter_options=filter_options)
 
-    render_pricing_guide_filter_bar_shell()
-    layout_filter_bar(_filters)
-    close_pricing_guide_filter_bar_shell()
-
-    filtered = _filter_rows(
-        rows,
-        q=str(st.session_state.get("pg_search") or "").strip(),
-    )
-
-    build_modal_cache(filtered, cache_key=_CACHE_KEY)
-    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="item")
-    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
-    _render_custom_pricing_guide_table(page_rows, filter_options=filter_options)
-    render_table_pagination_footer(len(filtered), _TABLE_KEY)
-
-    selected_id = st.session_state.get(SELECTED_PG_KEY)
-    if selected_id and st.session_state.get(SHOW_PG_MODAL_KEY):
+    if st.session_state.get(SHOW_PG_MODAL_KEY) or str(st.session_state.get(_MODAL_KEY) or "").strip():
         _show_detail_modal()
