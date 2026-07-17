@@ -113,6 +113,7 @@ from app.components.assets_list_table import (
     apply_assets_table_bridge_action,
     build_assets_html_table,
     render_assets_table_bridge_legacy,
+    render_assets_table_open_buttons,
 )
 from app.components.assets_page_layout import (
     close_assets_filter_bar_shell,
@@ -481,6 +482,14 @@ def _clear_small_tool_selection(row_ids: list[str] | None = None) -> None:
             st.session_state[key] = False
 
 
+def _rerun_if_assets_modal_pending() -> None:
+    """Escalate fragment widget interactions to a full app rerun for @st.dialog."""
+    if st.session_state.get(SHOW_ASSET_MODAL_KEY) or str(
+        st.session_state.get(_ASSETS_MODAL_KEY) or ""
+    ).strip():
+        ips_app_rerun()
+
+
 def _show_assets_modal_if_selected() -> None:
     if not st.session_state.get(SHOW_ASSET_MODAL_KEY):
         return
@@ -502,7 +511,7 @@ def _on_small_tool_checkbox_change(
             if other_id != row_id:
                 st.session_state[_small_tool_select_key(other_id)] = False
         if row:
-            _open_small_tool_row(row, assets_by_id)
+            _prepare_open_small_tool_row(row, assets_by_id)
     elif row:
         modal_aid = _small_tool_modal_asset_id(row)
         if modal_aid and st.session_state.get(SELECTED_ASSET_KEY) == modal_aid:
@@ -853,6 +862,10 @@ def _render_custom_assets_table(
             ),
             unsafe_allow_html=True,
         )
+        render_assets_table_open_buttons(
+            filtered,
+            open_asset_fn=_open_assets_table_item,
+        )
         render_assets_table_bridge_legacy(
             assets_by_id,
             component_key="ips_assets_list_bridge",
@@ -1079,6 +1092,7 @@ def _render_equipment_list(
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
     _render_custom_assets_table(page_rows, filter_options=filter_options)
     render_table_pagination_footer(len(filtered), _TABLE_KEY)
+    _rerun_if_assets_modal_pending()
 
 
 @fragment
@@ -1169,6 +1183,7 @@ def _render_small_tools_list(rows: list[dict]) -> None:
         jobs_by_id=jobs_by_id,
     )
     render_table_pagination_footer(len(filtered), _SMALL_TOOLS_TABLE_KEY)
+    _rerun_if_assets_modal_pending()
 
 
 def _apply_assets_search_filter(rows: list[dict], q: str) -> list[dict]:
