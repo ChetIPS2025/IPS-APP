@@ -72,12 +72,13 @@ from app.components.estimates_page_layout import (
 )
 from app.components.estimates_list_table import (
     ESTIMATES_MODE_KEY,
+    ESTIMATES_TABLE_LAST_ACTION_KEY,
     build_approve_flags,
     build_approved_flags,
+    build_estimates_html_table,
     filter_waiting_approval_rows,
     open_estimate_detail,
-    render_estimates_list_table_body,
-    render_estimates_list_table_header,
+    render_estimates_table_bridge,
 )
 from app.components.headers import render_page_brand_header
 from app.components.layout import render_filter_bar as layout_filter_bar
@@ -630,6 +631,11 @@ def _open_estimate_from_list(est: dict) -> None:
     ips_app_rerun()
 
 
+def _prepare_open_estimate_table_row(eid: str, est: dict | None) -> None:
+    """Set estimate detail navigation state (bridge escalates to app rerun)."""
+    _activate_estimate_detail_modal(eid, est)
+
+
 def _render_estimates_table_column_filters(
     visible_headers: list[tuple[str, str | None]],
     *,
@@ -669,18 +675,33 @@ def _render_custom_estimates_table(
 
     approve_flags = build_approve_flags(filtered)
     approved_flags = build_approved_flags(filtered)
+    estimates_by_id = {
+        str(est.get("id") or "").strip(): est
+        for est in filtered
+        if str(est.get("id") or "").strip()
+    }
 
     with st.container(key="estimates_table_wrap"):
         _render_estimates_table_column_filters(
             estimates_list_header_specs(),
             filter_options=filter_options,
         )
-        render_estimates_list_table_header()
-        render_estimates_list_table_body(
-            filtered,
-            approve_flags=approve_flags,
-            approved_flags=approved_flags,
+        st.markdown(
+            build_estimates_html_table(
+                filtered,
+                approve_flags=approve_flags,
+                approved_flags=approved_flags,
+                layout="list",
+            ),
+            unsafe_allow_html=True,
+        )
+        render_estimates_table_bridge(
+            estimates_by_id,
+            component_key="ips_estimates_list_bridge",
+            hook_key="ipsEstList::action",
+            last_action_key=ESTIMATES_TABLE_LAST_ACTION_KEY,
             pending_approve_key=_PENDING_APPROVE_KEY,
+            open_estimate_fn=_prepare_open_estimate_table_row,
         )
 
     return all_estimate_ids

@@ -10,10 +10,10 @@ import streamlit as st
 
 from app.components.headers import render_page_brand_header
 from app.components.customers_list_table import (
-    customer_avatar_html,
-    customer_count_cell_html,
-    customer_status_pill_html,
+    build_customers_html_table,
     normalize_customer_status,
+    render_customers_table_bridge_legacy,
+    render_customers_table_open_buttons,
 )
 from app.components.customers_page_layout import (
     close_customers_filter_bar_shell,
@@ -136,7 +136,6 @@ SELECTED_CUSTOMER_KEY = "selected_customer_id"
 CUSTOMERS_MODE_KEY = "customers_mode"
 CUSTOMERS_SELECTED_ID_KEY = "customers_selected_id"
 SHOW_CUSTOMER_MODAL_KEY = "show_customer_detail_modal"
-_CUSTOMER_LIST_COLS = [0.72, 2.45, 0.92, 1.0, 1.24, 1.05, 0.82]
 _ALL_CUSTOMER_IDS_KEY = "_ips_customers_visible_ids"
 _CUSTOMER_FILTER_SPECS: list[tuple[str, str]] = [
     ("STATUS", "status"),
@@ -218,6 +217,11 @@ def _open_customer_detail(customer_id: str) -> None:
     st.session_state[SHOW_CUSTOMER_MODAL_KEY] = False
 
 
+def _prepare_open_customer_table_row(customer_id: str, _customer: dict) -> None:
+    """Set customer detail navigation state (bridge escalates to app rerun)."""
+    _open_customer_detail(customer_id)
+
+
 def _render_customers_table_column_filters(
     *,
     filter_options: dict[str, list[str]],
@@ -245,26 +249,13 @@ def _render_customers_list_table(
     total_count: int,
     search: str,
 ) -> list[str]:
-    """Customer list rows with Streamlit open buttons."""
+    """Customer list rows rendered as HTML table with click bridge."""
     return _render_custom_customers_table(
         filtered,
         filter_options=filter_options,
         total_count=total_count,
         search=search,
     )
-
-
-def _render_customers_table_header_row() -> None:
-    head_cols = st.columns(_CUSTOMER_LIST_COLS, gap="small")
-    labels = ["", "CUSTOMER", "CONTACTS", "OPEN JOBS", "OPEN ESTIMATES", "STATUS", "ACTIONS"]
-    aligns = ["center", "left", "right", "right", "right", "center", "center"]
-    for col, label, align in zip(head_cols, labels, aligns):
-        with col:
-            st.markdown(
-                f'<div class="ips-customers-native-head-cell ips-customers-native-head-{align}">'
-                f"{html.escape(label)}</div>",
-                unsafe_allow_html=True,
-            )
 
 
 def _render_custom_customers_table(
@@ -294,67 +285,20 @@ def _render_custom_customers_table(
         if str(c.get("id") or "").strip()
     }
 
+    def _open_row(customer_id: str, customer: dict) -> None:
+        _prepare_open_customer_table_row(customer_id, customer)
+
     with st.container(key="customers_table_wrap"):
         _render_customers_table_column_filters(filter_options=filter_options)
-        st.markdown('<div class="ips-customers-native-table">', unsafe_allow_html=True)
-        _render_customers_table_header_row()
-        for customer in filtered:
-            cid = str(customer.get("id") or "").strip()
-            if not cid:
-                continue
-            row = customers_by_id.get(cid, customer)
-            name = _customer_list_name(row)
-            status = normalize_customer_status(row.get("status"))
-            row_cols = st.columns(_CUSTOMER_LIST_COLS, gap="small")
-            with row_cols[0]:
-                st.markdown(
-                    f'<div class="ips-customers-native-cell ips-customers-native-cell-center">'
-                    f"{customer_avatar_html(row)}</div>",
-                    unsafe_allow_html=True,
-                )
-            with row_cols[1]:
-                if st.button(
-                    name,
-                    key=f"customer_open_{cid}",
-                    type="tertiary",
-                    use_container_width=True,
-                ):
-                    _open_customer_detail(cid)
-                    st.rerun()
-            with row_cols[2]:
-                st.markdown(
-                    f'<div class="ips-customers-native-cell ips-customers-native-cell-right">'
-                    f"{customer_count_cell_html(row.get('contact_count') or 0)}</div>",
-                    unsafe_allow_html=True,
-                )
-            with row_cols[3]:
-                st.markdown(
-                    f'<div class="ips-customers-native-cell ips-customers-native-cell-right">'
-                    f"{customer_count_cell_html(row.get('open_jobs') or 0)}</div>",
-                    unsafe_allow_html=True,
-                )
-            with row_cols[4]:
-                st.markdown(
-                    f'<div class="ips-customers-native-cell ips-customers-native-cell-right">'
-                    f"{customer_count_cell_html(row.get('open_estimates') or 0)}</div>",
-                    unsafe_allow_html=True,
-                )
-            with row_cols[5]:
-                st.markdown(
-                    f'<div class="ips-customers-native-cell ips-customers-native-cell-center">'
-                    f"{customer_status_pill_html(status)}</div>",
-                    unsafe_allow_html=True,
-                )
-            with row_cols[6]:
-                if st.button(
-                    "View",
-                    key=f"customer_view_{cid}",
-                    type="tertiary",
-                    use_container_width=True,
-                ):
-                    _open_customer_detail(cid)
-                    st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown(
+            build_customers_html_table(filtered),
+            unsafe_allow_html=True,
+        )
+        render_customers_table_open_buttons(filtered, open_item_fn=_open_row)
+        render_customers_table_bridge_legacy(
+            customers_by_id,
+            open_item_fn=_open_row,
+        )
 
     return all_customer_ids
 
