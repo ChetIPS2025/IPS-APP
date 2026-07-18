@@ -34,7 +34,7 @@ def test_serialized_tools_table_uses_html_bridge() -> None:
     table_block = src.split("def _render_small_tools_table(")[1].split("def _equipment_summary_counts")[0]
     assert "_render_serialized_tool_name_cell" not in src
     assert "_on_small_tool_checkbox_change" not in src
-    assert "render_serialized_tools_table_open_buttons" in table_block
+    assert "render_serialized_tools_table_bridge_legacy" in table_block
 
 
 def test_asset_fragments_escalate_modal_to_app_rerun() -> None:

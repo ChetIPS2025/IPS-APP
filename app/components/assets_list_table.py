@@ -406,20 +406,10 @@ def render_assets_table_bridge(
     }}
   }}
 
-  function openAsset(id, action, bridgeKey) {{
+  function openAsset(id, action) {{
     if (!id) return;
     const act = action || "open";
-    if (act === "open" && bridgeKey && clickBridgeButton(bridgeKey)) return;
     sendValue(act + ":" + id);
-  }}
-
-  function clickBridgeButton(bridgeKey) {{
-    if (!bridgeKey) return false;
-    const host = doc.querySelector(".st-key-" + bridgeKey);
-    const btn = host && host.querySelector('[data-testid="stButton"] > button');
-    if (!btn) return false;
-    btn.click();
-    return true;
   }}
 
   function isInteractive(target) {{
@@ -438,7 +428,7 @@ def render_assets_table_bridge(
         e.preventDefault();
         e.stopPropagation();
         const id = el.getAttribute("data-asset-id") || el.getAttribute("data-row-id");
-        openAsset(id, "open", el.getAttribute("data-bridge-key") || "");
+        openAsset(id, "open");
       }}
       el.addEventListener("click", onActivate, true);
       el.addEventListener("keydown", function (e) {{
@@ -454,7 +444,7 @@ def render_assets_table_bridge(
         if (!id) return;
         e.preventDefault();
         e.stopPropagation();
-        openAsset(id, fieldMode ? "expand" : "open", row.getAttribute("data-bridge-key") || "");
+        openAsset(id, fieldMode ? "expand" : "open");
       }}, true);
     }});
   }}
@@ -471,7 +461,7 @@ def render_assets_table_bridge(
         e.preventDefault();
         e.stopPropagation();
         const id = link.getAttribute("data-asset-id") || link.getAttribute("data-row-id");
-        openAsset(id, "open", link.getAttribute("data-bridge-key") || "");
+        openAsset(id, "open");
         return;
       }}
       if (isInteractive(t)) return;
@@ -481,7 +471,7 @@ def render_assets_table_bridge(
       if (!id) return;
       e.preventDefault();
       e.stopPropagation();
-      openAsset(id, fieldMode ? "expand" : "open", row.getAttribute("data-bridge-key") || "");
+      openAsset(id, fieldMode ? "expand" : "open");
     }}, true);
   }}
 

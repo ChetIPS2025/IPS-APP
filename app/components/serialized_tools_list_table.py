@@ -313,18 +313,8 @@ def render_serialized_tools_table_bridge(
     }}
   }}
 
-  function clickBridgeButton(bridgeKey) {{
-    if (!bridgeKey) return false;
-    const host = doc.querySelector(".st-key-" + bridgeKey);
-    const btn = host && host.querySelector('[data-testid="stButton"] > button');
-    if (!btn) return false;
-    btn.click();
-    return true;
-  }}
-
-  function openRow(id, bridgeKey) {{
+  function openRow(id) {{
     if (!id) return;
-    if (bridgeKey && clickBridgeButton(bridgeKey)) return;
     sendValue("open:" + id);
   }}
 
@@ -338,7 +328,7 @@ def render_serialized_tools_table_bridge(
         e.preventDefault();
         e.stopPropagation();
         const id = el.getAttribute("data-row-id");
-        openRow(id, el.getAttribute("data-bridge-key") || "");
+        openRow(id);
       }}
       el.addEventListener("click", onActivate, true);
       el.addEventListener("keydown", function (e) {{
@@ -368,7 +358,7 @@ def render_serialized_tools_table_bridge(
       if (link && wrap.contains(link)) {{
         e.preventDefault();
         e.stopPropagation();
-        openRow(link.getAttribute("data-row-id"), link.getAttribute("data-bridge-key") || "");
+        openRow(link.getAttribute("data-row-id"));
       }}
     }}, true);
   }}
