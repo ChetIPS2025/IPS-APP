@@ -85,14 +85,13 @@ def test_assets_open_buttons_use_callback_without_manual_rerun() -> None:
     assert "ips_app_rerun()" not in src
 
 
-def test_assets_bridge_prefers_hidden_button() -> None:
+def test_assets_bridge_uses_send_value_for_open() -> None:
     from app.components.assets_list_table import render_assets_table_bridge
 
     src = inspect.getsource(render_assets_table_bridge)
-    assert "clickBridgeButton" in src
-    assert "CSS.escape(bridgeKey)" in src
-    assert 'getAttribute("data-bridge-key")' in src
     assert "sendValue(act + \":\" + id)" in src
+    assert 'if (act === "open")' in src
+    assert "clickBridgeButton" in src
 
 
 def test_prepare_open_assets_table_item_opens_detail_modal() -> None:

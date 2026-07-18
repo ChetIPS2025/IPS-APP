@@ -313,20 +313,8 @@ def render_serialized_tools_table_bridge(
     }}
   }}
 
-  function clickBridgeButton(bridgeKey) {{
-    if (!bridgeKey) return false;
-    const host = doc.querySelector(".st-key-" + CSS.escape(bridgeKey));
-    const btn = host && host.querySelector('[data-testid="stButton"] > button');
-    if (!btn) return false;
-    btn.click();
-    return true;
-  }}
-
   function openRow(id, bridgeKey) {{
     if (!id) return;
-    if (bridgeKey && clickBridgeButton(bridgeKey)) {{
-      return;
-    }}
     sendValue("open:" + id);
   }}
 

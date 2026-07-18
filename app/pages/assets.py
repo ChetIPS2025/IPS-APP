@@ -907,7 +907,7 @@ def _render_custom_assets_table(
             assets_by_id,
             component_key="ips_assets_list_bridge",
             hook_key="ipsAssetsList::action",
-            open_asset_fn=_open_assets_table_item,
+            open_asset_fn=_prepare_open_assets_table_item,
             on_expand_fn=_on_assets_table_expand if field_mode else None,
             field_mode=field_mode,
         )

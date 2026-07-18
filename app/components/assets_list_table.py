@@ -408,14 +408,16 @@ def render_assets_table_bridge(
 
   function clickBridgeButton(bridgeKey) {{
     if (!bridgeKey) return false;
-    const host = doc.querySelector(".st-key-" + CSS.escape(bridgeKey));
+    const harness = doc.querySelector(".st-key-assets_open_button_harness");
+    const host =
+      doc.querySelector(".st-key-" + CSS.escape(bridgeKey))
+      || (harness && harness.querySelector('[class*="st-key-' + CSS.escape(bridgeKey) + '"]'))
+      || (harness && harness.querySelector('[class*="' + bridgeKey + '"]'));
     if (!host) {{
-      console.warn("IPS asset bridge host not found:", bridgeKey);
       return false;
     }}
     const btn = host.querySelector('[data-testid="stButton"] > button');
     if (!btn) {{
-      console.warn("IPS asset bridge button not found:", bridgeKey);
       return false;
     }}
     btn.click();
@@ -425,7 +427,13 @@ def render_assets_table_bridge(
   function openAsset(id, action, bridgeKey) {{
     if (!id) return;
     const act = action || "open";
-    if (act === "open" && bridgeKey && clickBridgeButton(bridgeKey)) {{
+    if (act === "open") {{
+      // Primary path: component value -> handle_assets_table_action -> ips_app_rerun().
+      // Matches Estimates/Inventory; do not block on synthetic hidden-button clicks.
+      sendValue(act + ":" + id);
+      return;
+    }}
+    if (bridgeKey && clickBridgeButton(bridgeKey)) {{
       return;
     }}
     sendValue(act + ":" + id);
@@ -438,9 +446,7 @@ def render_assets_table_bridge(
   }}
 
   function bindTargets() {{
-    const wrap = doc.querySelector(wrapSel);
-    if (!wrap) return;
-    wrap.querySelectorAll(openSel).forEach(function (el) {{
+    doc.querySelectorAll(openSel).forEach(function (el) {{
       if (el.dataset.ipsAssetsOpenBound === "1") return;
       el.dataset.ipsAssetsOpenBound = "1";
       function onActivate(e) {{
@@ -455,6 +461,8 @@ def render_assets_table_bridge(
         if (e.key === "Enter" || e.key === " ") onActivate(e);
       }}, true);
     }});
+    const wrap = doc.querySelector(wrapSel);
+    if (!wrap) return;
     wrap.querySelectorAll(rowSel).forEach(function (row) {{
       if (row.dataset.ipsAssetsRowBound === "1") return;
       row.dataset.ipsAssetsRowBound = "1";
@@ -501,6 +509,9 @@ def render_assets_table_bridge(
   if (!doc.ipsAssetsTableRegistry) doc.ipsAssetsTableRegistry = {{}};
   doc.ipsAssetsTableRegistry[hookKey] = {{ bind: bindTargets }};
   bindTargets();
+  setTimeout(bindTargets, 0);
+  setTimeout(bindTargets, 120);
+  setTimeout(bindTargets, 400);
   if (!doc.ipsAssetsTableBindObserver) {{
     doc.ipsAssetsTableBindObserver = new MutationObserver(function () {{
       Object.values(doc.ipsAssetsTableRegistry || {{}}).forEach(function (cfg) {{
