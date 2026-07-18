@@ -19,11 +19,6 @@ from app.services.weekly_job_timesheet_service import (
     save_timesheet,
     signed_url_for_timesheet,
 )
-from app.services.weekly_timesheet_export_service import (
-    export_data_to_pdf,
-    export_weekly_timesheet_to_excel,
-    export_weekly_timesheet_to_pdf,
-)
 _SHEET_TABLE = TIMESHEET_TABLE
 _LOCKED = frozenset({"Approved", "Signed", "Voided"})
 
@@ -107,14 +102,20 @@ def create_weekly_timesheet_lines(timesheet_id: str, lines: list[TimesheetLine])
 
 
 def generate_weekly_timesheet_excel(timesheet_id: str) -> bytes:
+    from app.services.weekly_timesheet_export_service import export_weekly_timesheet_to_excel
+
     return export_weekly_timesheet_to_excel(timesheet_id)
 
 
 def generate_weekly_timesheet_pdf(timesheet_id: str) -> bytes:
+    from app.services.weekly_timesheet_export_service import export_weekly_timesheet_to_pdf
+
     return export_weekly_timesheet_to_pdf(timesheet_id)
 
 
 def generate_weekly_timesheet_pdf_from_data(data: WeeklyJobTimesheetData) -> bytes:
+    from app.services.weekly_timesheet_export_service import export_data_to_pdf
+
     return export_data_to_pdf(data)
 
 

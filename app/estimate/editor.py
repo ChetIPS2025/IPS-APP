@@ -12,9 +12,11 @@ import logging
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import pandas as pd
+if TYPE_CHECKING:
+    import pandas as pd
+
 import streamlit as st
 from app.branding import render_header
 
@@ -176,8 +178,15 @@ def _materials_rows_for_editor(rows: list | None, *, materials_options: list[str
     return out
 
 
+def _pandas():
+    import pandas as pd
+
+    return pd
+
+
 def _materials_catalog_to_add_dataframe(materials_catalog: list[dict[str, Any]]) -> pd.DataFrame:
     """Normalize ``estimate_materials`` catalog rows for category → material cascading."""
+    pd = _pandas()
     rows: list[dict[str, Any]] = []
     for m in materials_catalog:
         if not isinstance(m, dict):
@@ -1823,7 +1832,7 @@ def render_estimate_editor(*, embedded: bool = False) -> None:
                         }
                     )
             if ref_rows:
-                st.dataframe(pd.DataFrame(ref_rows), hide_index=True, use_container_width=True)
+                st.dataframe(_pandas().DataFrame(ref_rows), hide_index=True, use_container_width=True)
             else:
                 st.caption("Select equipment with a name that matches an Asset Database **Equipment** row to see rates.")
 

@@ -6,9 +6,11 @@ import base64
 import html
 from datetime import date, timedelta
 from io import BytesIO
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import pandas as pd
+if TYPE_CHECKING:
+    import pandas as pd
+
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -34,13 +36,20 @@ from app.services.job_updates_service import (
     DAILY_UPDATES_MISSING_MSG,
     daily_updates_table_available,
 )
-from app.services.weekly_timesheet_export_service import export_data_to_excel_bytes
 from app.services.weekly_timesheet_service import (
     mark_timesheet_sent,
     timesheet_is_locked,
     void_timesheet,
 )
 from app.utils.permissions import can_manage_weekly_timesheets
+
+
+def _pandas():
+    import pandas as pd
+
+    return pd
+
+
 try:
     from streamlit_drawable_canvas import st_canvas
 except ImportError:
@@ -122,6 +131,7 @@ def _week_picker_changed(key_prefix: str) -> None:
 
 
 def _lines_to_labor_df(lines: list[TimesheetLine]) -> pd.DataFrame:
+    pd = _pandas()
     rows = []
     for ln in lines:
         if ln.line_type not in {"labor", "equipment"}:
@@ -147,6 +157,7 @@ def _lines_to_labor_df(lines: list[TimesheetLine]) -> pd.DataFrame:
 
 
 def _lines_to_material_df(lines: list[TimesheetLine]) -> pd.DataFrame:
+    pd = _pandas()
     rows = []
     for ln in lines:
         if ln.line_type not in {"material", "expense"}:
@@ -204,6 +215,7 @@ def _signature_from_canvas(canvas_result) -> str:
 
 
 def _compose_data_from_session(job_id: str, week_start: date) -> WeeklyJobTimesheetData | None:
+    pd = _pandas()
     key = _session_data_key(job_id, week_start)
     raw = st.session_state.get(key)
     if not isinstance(raw, dict):
@@ -671,6 +683,8 @@ def render_weekly_timesheet_builder(
         key=f"{kp}_pdf",
     )
     try:
+        from app.services.weekly_timesheet_export_service import export_data_to_excel_bytes
+
         xls_bytes = export_data_to_excel_bytes(data)
     except Exception:
         xls_bytes = b""
