@@ -207,10 +207,14 @@ def get_customer_location(location_id: str) -> dict[str, Any] | None:
     lid = str(location_id or "").strip()
     if not lid:
         return None
-    for customer in get_customers(enrich=False):
-        for loc in get_customer_locations(str(customer.get("id") or "")):
-            if str(loc.get("id")) == lid:
-                return loc
+    from app.services.repository import fetch_by_id
+
+    row = fetch_by_id("customer_locations", lid, normalize=normalize_customer_location)
+    if row:
+        return row
+    for loc in _demo_locations():
+        if str(loc.get("id")) == lid:
+            return normalize_customer_location(loc)
     return None
 
 
@@ -239,20 +243,47 @@ def get_customer_contacts(customer_id: str, location_id: str | None = None) -> l
     return rows
 
 
+def _fetch_customer_contact_by_id(contact_id: str) -> dict[str, Any] | None:
+    from app.services.repository import fetch_by_id
+
+    for table in ("customer_contacts", "contacts"):
+        row = fetch_by_id(table, contact_id, normalize=normalize_customer_contact)
+        if row:
+            return row
+    for contact in _demo_contacts():
+        if str(contact.get("id")) == contact_id:
+            return normalize_customer_contact(contact)
+    return None
+
+
 def get_customer_contact(contact_id: str) -> dict[str, Any] | None:
     cid = str(contact_id or "").strip()
     if not cid:
         return None
-    for customer in get_customers(enrich=False):
-        for contact in get_customer_contacts(str(customer.get("id") or "")):
-            if str(contact.get("id")) == cid:
-                contact = dict(contact)
-                contact["customer_name"] = str(customer.get("customer_name") or "")
-                loc = get_customer_location(str(contact.get("location_id") or ""))
-                if loc:
-                    contact["location_name"] = str(loc.get("location_name") or loc.get("site_name") or "")
-                return contact
-    return None
+    row = _fetch_customer_contact_by_id(cid)
+    if not row:
+        return None
+    contact = dict(row)
+    cust_id = str(contact.get("customer_id") or "").strip()
+    if cust_id:
+        from app.services.repository import fetch_by_id
+
+        customer = fetch_by_id("customers", cust_id, normalize=normalize_customer)
+        if customer:
+            contact["customer_name"] = str(customer.get("customer_name") or "")
+        else:
+            fallback = next(
+                (c for c in get_customers(enrich=False) if str(c.get("id")) == cust_id),
+                None,
+            )
+            if fallback:
+                contact["customer_name"] = str(fallback.get("customer_name") or "")
+    loc_id = str(contact.get("location_id") or contact.get("customer_location_id") or "").strip()
+    if loc_id:
+        loc = get_customer_location(loc_id)
+        if loc:
+            contact["location_name"] = str(loc.get("location_name") or loc.get("site_name") or "")
+    return contact
 
 
 def create_customer_contact(customer_id: str, location_id: str, data: dict[str, Any]):

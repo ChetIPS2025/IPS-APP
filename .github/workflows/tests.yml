@@ -20,5 +20,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt -r requirements-dev.txt
 
+      - name: Verify no secrets tracked
+        run: python scripts/verify_no_secrets_tracked.py
+
       - name: Run tests
         run: python -m pytest tests/ -q
