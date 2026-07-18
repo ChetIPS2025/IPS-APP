@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 import streamlit as st
 import streamlit.components.v1 as components
 
-from app.auth import current_profile, current_role, effective_role
+from app.auth import current_profile, effective_role
 from app.components.status import status_pill_html
 from app.services.job_weekly_timesheets import monday_of_week, week_bounds
 from app.services.weekly_job_timesheet_service import (

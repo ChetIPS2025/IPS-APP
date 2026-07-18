@@ -7,7 +7,6 @@ from typing import Any
 
 import streamlit as st
 
-from app.auth import current_role
 from app.services.jobs_service import can_manage_job_actions
 from app.ui.streamlit_perf import ips_app_rerun
 def _confirm_state_key(job_id: str, action: str) -> str:

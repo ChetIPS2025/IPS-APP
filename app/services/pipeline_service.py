@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 from typing import Any
 
 from app.services.shared_sequence import parse_number_parts, quote_number_to_job_number

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 from app.services.repository import (
@@ -18,7 +18,6 @@ from app.services.repository import (
     update_row,
 )
 from app.utils.estimate_calculations import (
-    TRAVEL_TYPES,
     calc_equipment_line,
     calc_labor_line,
     calc_material_line,

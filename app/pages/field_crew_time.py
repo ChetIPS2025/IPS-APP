@@ -6,11 +6,10 @@ from datetime import date, datetime
 
 import streamlit as st
 
-from app.auth import current_profile, current_role, effective_role
+from app.auth import effective_role
 
 from app.components.headers import render_page_brand_header
 from app.data_cache import fetch_table_for_session
-from app.db import fetch_jobs_with_order_fallback
 from app.mobile_ui import ensure_narrow_viewport_detected
 from app.services.field_crew_time import (
     TIME_TYPES,
@@ -22,8 +21,6 @@ from app.services.field_crew_time import (
     submit_batch,
     upsert_crew_time_batch,
 )
-from app.services.job_service import sort_jobs_by_number_then_name
-from app.utils.field_context import render_field_job_bar
 def _admin() -> bool:
     return effective_role() in {"admin", "manager"}
 

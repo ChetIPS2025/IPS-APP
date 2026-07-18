@@ -45,7 +45,6 @@ def get_header_logo_path() -> Path | None:
     for name in (
         "ips_logo_header.png",
         "IPS Icon.png",
-        "company_logo.png",
         "ips_logo_round.png",
     ):
         path = _ASSETS_DIR / name

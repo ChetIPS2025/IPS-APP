@@ -12,8 +12,6 @@ from app.auth import current_profile
 from app.db import (
     create_signed_url,
     fetch_by_match_admin,
-    insert_row_admin,
-    update_rows_admin,
     upload_bytes_admin,
 )
 from app.services.coupling_inspection_specs import (
@@ -25,7 +23,7 @@ from app.services.coupling_inspection_specs import (
     normalize_torque_rows,
     specs_for_model,
 )
-from app.services.repository import ServiceResult, clear_data_cache_for_table, fetch_by_id
+from app.services.repository import ServiceResult, fetch_by_id
 from app.services.task_photos import compress_image_bytes
 _LOG = logging.getLogger(__name__)
 

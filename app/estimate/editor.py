@@ -7,9 +7,7 @@ The primary **Save Estimate** control stays a standalone ``st.button`` because S
 nested ``st.form`` blocks; this module already nests multiple forms (materials, labor, equipment, travel, …).
 """
 
-import json
 import logging
-import re
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -24,18 +22,15 @@ from app.auth import current_profile, current_role
 from app.db import (
     create_signed_url,
     fetch_by_match,
-    fetch_by_match_admin,
     fetch_jobs_with_order_fallback,
     fetch_one,
     fetch_table,
     fetch_table_admin,
-    fetch_table_with_order_fallback,
     insert_row_admin,
     next_quote_number,
-    update_rows_admin,
     upload_bytes,
 )
-from app.services.job_service import job_number_display, job_row_select_label, sort_jobs_by_number_then_name
+from app.services.job_service import job_number_display, sort_jobs_by_number_then_name
 from app.utils.formatters import job_display_label
 
 from app.estimate.calculations import (
@@ -63,20 +58,15 @@ from app.estimate.defaults import (
     _estimate_table_column_names,
     _fetch_prepared_by_choices,
     _normalize_prepared_by_id_value,
-    _payload_prepared_by_for_db,
     blank_estimate,
-    coalesce_imported_estimate,
     ensure_numeric_defaults,
     merge_estimate_narrative_scalars_from_row,
     merge_estimate_row_scalar_fields_into_editor,
-    parse_estimate_json_bytes,
 )
 from app.estimate.equipment import (
     build_equipment_picker_maps,
     enrich_equipment_rows_from_assets,
     load_estimate_equipment_from_assets,
-    _equipment_core_with_picker_labels,
-    _equipment_rows_core_for_editor,
 )
 from app.services.estimate_materials_catalog import cached_estimate_materials_catalog_rows
 from app.estimate.job_scope import (
@@ -92,10 +82,7 @@ from app.estimate.job_scope import (
 from app.estimate.persistence import (
     _duplicate_quote_message,
     attach_pending_pdf_import_source,
-    insert_imported_estimate,
     persist_estimate,
-    upload_generated_export,
-    validate_import_customer_id,
 )
 from app.estimate.proposal_exports import (
     build_proposal_view_bundle,

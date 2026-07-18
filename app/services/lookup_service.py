@@ -220,7 +220,7 @@ def sync_lookup_for_label(label: str, entries: list[dict[str, Any]]) -> tuple[bo
     if not clean:
         return False, "Add at least one value."
 
-    from app.services.repository import ServiceResult, fetch_rows, insert_row, update_row
+    from app.services.repository import fetch_rows, insert_row, update_row
     table_id, err = _resolve_table_id(slug, label)
     if not table_id:
         return False, f"{err or 'Lookup tables not available.'} Values kept in this session only."

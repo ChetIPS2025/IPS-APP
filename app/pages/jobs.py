@@ -53,7 +53,6 @@ from app.components.job_cost_tab import render_job_cost_tab
 from app.components.job_costing_tab import render_job_costing_tab
 from app.components.job_cost_summary_cards import (
     render_job_cost_breakdown,
-    render_job_cost_summary_cards,
 )
 from app.services.job_financial_ui import (
     BILLING_TYPE_OPTIONS,
@@ -2261,7 +2260,7 @@ def _render_job_equipment_tab(job: dict) -> None:
 
 
 def _field_admin_read() -> bool:
-    from app.auth import current_role, effective_role
+    from app.auth import effective_role
     return effective_role() in {"admin", "manager"}
 
 

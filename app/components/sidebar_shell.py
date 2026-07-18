@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import html
 import json
-from pathlib import Path
-from typing import Any
 
 import streamlit as st
 
@@ -573,13 +571,6 @@ def inject_sidebar_shell() -> None:
         inject_mobile_nav_menu_button()
 
     st.session_state[IPS_SIDEBAR_SHELL_KEY] = True
-
-
-def inject_sidebar_nav_override_css() -> None:
-    """Inject flat sidebar nav overrides last so they beat global button + theme CSS."""
-    if not inject_css_once("ips-sidebar-nav-override-v10"):
-        return
-    st.markdown(_sidebar_nav_override_css(), unsafe_allow_html=True)
 
 
 def _sidebar_nav_override_css() -> str:

@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-from app.auth import current_role, effective_role
+from app.auth import effective_role
 from app.components.headers import render_page_brand_header
 from app.components.layout import render_filter_bar as layout_filter_bar
 from app.components.table_pagination import paginate_rows, reset_table_page

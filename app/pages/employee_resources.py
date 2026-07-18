@@ -7,7 +7,7 @@ from typing import Any
 
 import streamlit as st
 
-from app.auth import current_role, effective_role
+from app.auth import effective_role
 from app.components.headers import render_page_header
 from app.pages._core._access import begin_module
 from app.services.employee_resources_service import (
@@ -16,7 +16,6 @@ from app.services.employee_resources_service import (
     delete_employee_resource,
     list_all_employee_resources_admin,
     list_employee_resources,
-    normalize_resource,
     resource_open_url,
     save_employee_resource,
 )

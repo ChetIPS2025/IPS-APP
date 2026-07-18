@@ -10,7 +10,6 @@ from app.services.item_images import (
     clear_item_image,
     clear_item_image_url_cache,
     has_stored_item_image,
-    persist_item_image,
     record_has_item_image,
     resolve_item_image_url,
     resolve_stored_item_image_url,

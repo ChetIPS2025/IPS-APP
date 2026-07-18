@@ -15,7 +15,6 @@ from app.services.catalog_import_service import (
 )
 from app.services.item_images import (
     IMAGE_STATUS_APPROVED,
-    IMAGE_STATUS_MISSING,
     build_uploaded_image_index,
     find_image_match_for_row,
     is_image_approved,

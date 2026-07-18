@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-from app.auth import current_profile, current_role, effective_role
+from app.auth import current_profile, effective_role
 from app.components.headers import render_page_header
 from app.pages._core._access import begin_module
 from app.pages._core._data import get_employee

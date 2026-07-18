@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 import streamlit as st
@@ -20,7 +20,6 @@ from app.services.rental_equipment_inspection_service import (
     inspection_type_label,
     new_inspection_payload,
     pdf_export_filename,
-    photo_view_url,
     save_rental_inspection,
     upload_inspection_photo,
     validate_for_complete,

@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import html
 
 import streamlit as st
 
-from app.auth import current_role, effective_role
+from app.auth import effective_role
 from app.components.action_styles import success_solid_button
 from app.components.clickable_table import render_clickable_table
 from app.components.headers import render_page_brand_header

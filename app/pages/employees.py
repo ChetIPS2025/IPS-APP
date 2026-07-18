@@ -8,7 +8,7 @@ from collections.abc import Callable
 
 import streamlit as st
 
-from app.auth import current_profile, current_role
+from app.auth import current_role
 from app.components.user_actions import (
     is_user_action_confirm_open,
     render_user_action_button_row,
@@ -27,7 +27,6 @@ from app.components.users_list_table import (
     build_users_html_table,
     render_users_table_bridge_legacy,
     render_users_table_open_buttons,
-    user_status_pill_html,
 )
 from app.components.users_page_layout import (
     close_users_filter_bar_shell,
@@ -66,16 +65,14 @@ from app.components.record_modal import (
     status_pill_html,
 )
 from app.components.tables import render_data_table
-from app.components.status import status_pill_html as legacy_status_pill_html
 from app.pages._core._data import (
     ACTIVE_EMPLOYEE_KEY,
     clear_employees_catalog_cache,
     load_employee_documents,
     load_employees,
-    lookup_options,
     persist_employee,
 )
-from app.pages._core._crud import apply_persist_feedback, is_demo_id
+from app.pages._core._crud import is_demo_id
 from app.pages._core._session import select_key
 from app.config import settings
 from app.db import invite_auth_user, resend_invite_by_email

@@ -10,9 +10,8 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-from app.auth import current_profile, current_role, effective_role
+from app.auth import current_profile, effective_role
 from app.ui.page_shell import render_page_header
-from app.branding import render_header
 
 from app.db import create_signed_url, fetch_jobs_with_order_fallback
 from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name

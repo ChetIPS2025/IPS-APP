@@ -11,7 +11,6 @@ from app.services.quick_add_tool_service import (
     TOOL_KIND_LABELS,
     TOOL_KINDS,
     analyze_tool_photos,
-    attach_tool_photo,
     attach_tool_photos_bundle,
     attach_tool_receipt,
     bulk_import_tools,

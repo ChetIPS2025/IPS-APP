@@ -6,17 +6,16 @@ from datetime import date
 
 import streamlit as st
 
-from app.auth import current_profile, current_role, effective_role
+from app.auth import current_profile, effective_role
 
 from app.components.cards import render_kpi_card
 from app.components.headers import render_dashboard_quick_actions, render_page_brand_header
 from app.data_cache import fetch_table_for_session
 from app.db import fetch_jobs_with_order_fallback
 from app.mobile_ui import ensure_narrow_viewport_detected
-from app.navigation import set_nav_slug
 from app.services.field_dashboard import field_dashboard_snapshot
 from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
-from app.utils.field_context import navigate_to_field_page, navigate_to_field_day, open_job_detail
+from app.utils.field_context import navigate_to_field_day, open_job_detail
 def _admin_read() -> bool:
     return effective_role() in {"admin", "manager"}
 

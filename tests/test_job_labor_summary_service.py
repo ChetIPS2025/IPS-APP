@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import unittest
-from datetime import date
 from unittest.mock import patch
 
 from app.services.job_labor_summary_service import get_job_labor_summary

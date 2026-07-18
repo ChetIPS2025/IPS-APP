@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.estimate.proposal_document_layout import render_proposal_preview_page_html
 from app.estimate.proposal_exports import (
     PROPOSAL_PDF_UNAVAILABLE_SHORT,
     _lookup_prepared_by_phone,

@@ -22,7 +22,6 @@ from app.services.job_cost_transaction_service import (
     COST_RENTAL,
     COST_SUBCONTRACT,
     SOURCE_MANUAL_ADJUSTMENT,
-    build_job_cost_summary,
     cached_job_cost_summary,
     can_manage_manual_cost_adjustments,
     create_manual_cost_adjustment,

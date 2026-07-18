@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import html
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
 import streamlit as st
@@ -57,7 +57,6 @@ from app.pages._core._data import (
     persist_timekeeping_day_submit_for_date,
     persist_timekeeping_reject,
     persist_timekeeping_submit,
-    persist_timekeeping_week,
 )
 from app.pages._core._session import select_key
 from app.styles import (
@@ -65,7 +64,7 @@ from app.styles import (
     inject_timekeeping_module_css,
 )
 from app.utils.dates import DATE_INPUT_FORMAT, normalize_date, week_dates, week_end, week_start
-from app.utils.field_context import get_field_job_id, is_field_context, is_field_mode, render_field_job_bar
+from app.utils.field_context import get_field_job_id, is_field_context, render_field_job_bar
 from app.utils.formatting import fmt_date
 from app.ui.streamlit_perf import (
     fragment,
@@ -191,14 +190,6 @@ def _apply_hours_widget_to_row(
     )
     if value is not None:
         _set_day_job_hours(row, value)
-
-
-def _render_timekeeping_list_spacer_cell() -> None:
-    """Legacy spacer marker — list grid no longer reserves a spacer column."""
-    st.markdown(
-        '<span class="timekeeping-list-spacer-marker" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
 
 
 def _render_timekeeping_inline_html(html_content: str) -> None:
@@ -691,7 +682,7 @@ def _render_horizontal_week_grid(
 
 def _filter_summaries_for_current_user(summaries: list[dict]) -> list[dict]:
     """Supervisors see all crew; employees see only their own timecard."""
-    from app.auth import current_profile, current_role, effective_role
+    from app.auth import current_profile, effective_role
     from app.utils.permissions import can_submit_timekeeping
     if can_submit_timekeeping(effective_role()):
         return summaries
@@ -745,7 +736,7 @@ def _day_is_editable(status: str) -> bool:
 
 
 def _can_admin_edit_approved_timekeeping() -> bool:
-    from app.auth import current_role, effective_role
+    from app.auth import effective_role
     from app.utils.permissions import can_admin_edit_approved_timekeeping
     return can_admin_edit_approved_timekeeping(effective_role())
 
@@ -870,13 +861,13 @@ def _current_user_name() -> str:
 
 
 def _can_approve_timekeeping() -> bool:
-    from app.auth import current_role, effective_role
+    from app.auth import effective_role
     from app.utils.permissions import can_approve_timekeeping
     return can_approve_timekeeping(effective_role())
 
 
 def _can_submit_timekeeping() -> bool:
-    from app.auth import current_role, effective_role
+    from app.auth import effective_role
     from app.utils.permissions import can_submit_timekeeping
     return can_submit_timekeeping(effective_role())
 
@@ -5064,7 +5055,7 @@ def render() -> None:
     if is_field_context():
         from app.db import fetch_jobs_with_order_fallback
         from app.services.job_service import sort_jobs_by_number_then_name
-        from app.auth import current_role, effective_role as _tk_role
+        from app.auth import effective_role as _tk_role
         if _tk_role() in {"admin", "manager", "supervisor", "project manager", "pm"}:
             jobs = sort_jobs_by_number_then_name(
                 list(fetch_jobs_with_order_fallback(limit=3000, use_admin=True) or [])
@@ -5113,7 +5104,7 @@ def render() -> None:
 
     show_modal_if_pending(SHOW_TIMEKEEPING_DAY_MODAL_KEY, _show_day_time_dialog)
 
-    from app.auth import current_role, effective_role
+    from app.auth import effective_role
     from app.utils.permissions import role_can_access_page
     if role_can_access_page(effective_role(), "jobs"):
         st.divider()

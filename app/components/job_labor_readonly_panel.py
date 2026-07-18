@@ -11,7 +11,7 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
-from app.auth import current_profile, current_role, effective_role
+from app.auth import current_profile, effective_role
 from app.components.status import status_pill_html
 from app.services.job_labor_summary_service import get_job_labor_summary
 from app.services.job_weekly_timesheets import monday_of_week, week_bounds

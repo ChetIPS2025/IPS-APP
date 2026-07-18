@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Any
 
-from app.db import delete_rows, fetch_by_match, fetch_table, fetch_table_admin, insert_row, update_rows
+from app.db import delete_rows, fetch_by_match, fetch_table, fetch_table_admin
 from app.services.job_service import sort_jobs_by_number_then_name
 # Closed job statuses excluded from matrix rows (case-insensitive); see pm_matrix_service.
 _PM_CLOSED_STATUSES = frozenset(

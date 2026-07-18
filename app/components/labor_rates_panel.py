@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from app.auth import current_role, effective_role
+from app.auth import effective_role
 from app.confirm_delete import (
     close_destructive_confirmation,
     destructive_confirm_open_key,
@@ -13,7 +13,7 @@ from app.confirm_delete import (
     render_destructive_confirmation,
 )
 from app.pages._core._data import load_labor_rates
-from app.db import delete_rows_admin, fetch_one, fetch_table, update_rows_admin
+from app.db import delete_rows_admin, fetch_one, update_rows_admin
 from app.ips_crud_list_styles import (
     IPS_CRUD_LIST_PAGE_GAP,
     IPS_CRUD_LIST_PAGE_SPLIT,

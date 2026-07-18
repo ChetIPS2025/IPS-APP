@@ -7,11 +7,11 @@ from typing import Any
 
 import streamlit as st
 
-from app.auth import current_profile, current_role, effective_role
+from app.auth import current_profile, effective_role
 from app.components.qr_scan_history_ui import inject_qr_scan_history_css
 from app.pages._core._data import load_recent_qr_scans, load_tasks
 from app.services.management_reminders_service import due_date_badge, filter_dashboard_reminders
-from app.utils.formatting import fmt_date, fmt_datetime
+from app.utils.formatting import fmt_date
 def _nav_slug(slug: str) -> None:
     from app.navigation import set_nav_slug
     set_nav_slug(slug)

@@ -15,7 +15,6 @@ from app.navigation import (
     JOBS_DETAIL_FOCUS_TAB_KEY,
     TK_PREFILL_JOB_KEY,
     TK_PREFILL_WEEK_KEY,
-    WJT_PREFILL_JOB_KEY,
     WJT_PREFILL_WEEK_KEY,
     apply_pending_navigation,
     navigate_to_estimate_detail,

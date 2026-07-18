@@ -27,7 +27,6 @@ from app.components.record_modal import (
     safe_value,
     set_edit_mode,
     set_view_mode,
-    show_modal_if_pending,
     status_pill_html as modal_status_pill_html,
 )
 from app.components.tabs import render_tabs
@@ -49,7 +48,6 @@ from app.pages._core._data import (
     customer_id_for_name,
     customer_location_select_options,
     get_estimate,
-    load_assets,
     load_documents_hub,
     load_estimates,
     load_inventory,
@@ -106,7 +104,7 @@ from app.services.estimates_service import (
     estimate_visible_in_rejected_view,
     estimate_visible_in_sent_view,
 )
-from app.auth import current_role, effective_role
+from app.auth import effective_role
 from app.components.quote_job_number_autofill import (
     clear_new_estimate_number_state,
     linked_job_number_preview,

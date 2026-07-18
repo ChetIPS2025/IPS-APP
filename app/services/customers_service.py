@@ -46,8 +46,6 @@ CONTACT_ROLE_TYPES = [
 
 def _demo_customers() -> list[dict[str, Any]]:
     from app.pages._core._data import (
-        _DEMO_CUSTOMER_CONTACTS,
-        _DEMO_CUSTOMER_LOCATIONS,
         _DEMO_CUSTOMERS,
     )
     return list(_DEMO_CUSTOMERS)

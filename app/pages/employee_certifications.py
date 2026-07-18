@@ -43,7 +43,6 @@ from app.pages._core._data import (
 )
 from app.components.action_styles import danger_outline, danger_solid
 from app.services.certification_helpers import (
-    CERT_STATUS_VALUES,
     can_delete_employee_certifications,
     can_manage_employee_certifications,
     can_view_certification_attachment,
@@ -375,7 +374,7 @@ def _current_user_id() -> str | None:
 
 
 def _effective_role() -> str:
-    from app.auth import current_role, effective_role
+    from app.auth import effective_role
     return effective_role()
 
 

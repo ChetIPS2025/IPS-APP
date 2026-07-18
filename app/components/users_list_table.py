@@ -481,25 +481,3 @@ def render_users_table_bridge_legacy(
         last_action_key=last_action_key,
         open_user_fn=open_user_fn,
     )
-
-
-def render_users_table_link_bridge(
-    users_by_id: dict[str, dict[str, Any]],
-    *,
-    component_key: str = "ips_users_list_bridge",
-    hook_key: str = "ipsUsersList::action",
-    last_action_key: str = USERS_TABLE_LAST_ACTION_KEY,
-    open_user_fn: Callable[[dict[str, Any]], None],
-) -> None:
-    """Backward-compatible bridge wrapper for legacy open_user_fn(user) callbacks."""
-
-    def _open(uid: str, row: dict[str, Any]) -> None:
-        open_user_fn(row)
-
-    render_users_table_bridge_legacy(
-        users_by_id,
-        component_key=component_key,
-        hook_key=hook_key,
-        last_action_key=last_action_key,
-        open_user_fn=_open,
-    )

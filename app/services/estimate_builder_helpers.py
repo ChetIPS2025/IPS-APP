@@ -7,7 +7,6 @@ from typing import Any
 from app.pages._core._data import load_assets, load_inventory
 from app.services.asset_rental_service import (
     normalize_rental_rate_unit,
-    primary_rental_rate_from_asset,
 )
 from app.services.phase2_modules_service import asset_is_rentable
 from app.services.repository import fetch_rows

@@ -2,4 +2,3 @@
 
 from __future__ import annotations
 
-from app.pages.admin import render

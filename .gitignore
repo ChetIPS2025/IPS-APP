@@ -34,3 +34,7 @@ tmp/
 *.exe
 *.pkg
 *.zip
+
+# Local import profiling artifacts
+importtime.txt
+importtime_lazy.txt

@@ -4,17 +4,15 @@ from __future__ import annotations
 
 import html
 import re
-import urllib.parse
 from datetime import datetime, timezone
 from typing import Any
 
 import streamlit as st
 
-from app.auth import current_profile, current_role, effective_role, is_authenticated
+from app.auth import current_profile, effective_role, is_authenticated
 from app.services.assets_service import (
     create_asset_inspection,
     create_asset_issue,
-    generate_asset_qr_value,
     get_asset_by_qr,
     get_asset_document_view_url,
     get_asset_documents_grouped,

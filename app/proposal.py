@@ -51,7 +51,6 @@ IPS_DEFAULT_QUOTE_FOOTER_PHONE = "(337) 577-3944"
 # Standard company logo for proposals (first existing file wins). Same folder as the app ``assets``.
 # Optional Word placeholder: ``{{COMPANY_LOGO}}`` in header/body/footer — replaced with this image when present.
 COMPANY_LOGO_CANDIDATE_FILENAMES: tuple[str, ...] = (
-    "company_logo.png",
     "company_logo.jpg",
     "company_logo.jpeg",
     "ips_logo_wide.png",

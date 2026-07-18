@@ -4,10 +4,10 @@ Estimates module — Supabase reads/writes and costing helpers.
 
 from __future__ import annotations
 
+from app.utils.estimate_calculations import TRAVEL_TYPES
 from app.services.estimate_costing_service import (
     DURATION_UNITS,
     LABOR_ROLE_TYPES,
-    TRAVEL_TYPES,
     add_estimate_equipment,
     add_estimate_equipment_batch,
     add_estimate_labor,
@@ -68,7 +68,6 @@ from app.services.phase2_modules_service import (
 from app.services.estimate_job_workflow_service import (
     approve_estimate_and_job,
     approve_estimate_and_sync_job,
-    award_job_and_sync_estimate,
     can_approve_estimates,
     can_revise_approved_estimates,
     estimate_status_approvable,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from app.auth import current_profile, current_role, effective_role
+from app.auth import current_profile, effective_role
 
 from app.components.headers import render_page_brand_header
 from app.db import fetch_jobs_with_order_fallback

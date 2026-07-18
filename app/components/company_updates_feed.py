@@ -15,7 +15,7 @@ import streamlit as st
 
 from app.utils.formatting import fmt_date
 from app.utils.permissions import can_manage_company_updates
-from app.auth import current_role, effective_role
+from app.auth import effective_role
 _CATEGORY_DISPLAY: dict[str, str] = {
     "General": "Announcements",
     "Policy": "Announcements",

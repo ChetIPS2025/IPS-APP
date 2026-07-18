@@ -6,7 +6,7 @@ import html
 
 import streamlit as st
 
-from app.auth import current_role, current_user_display_name, effective_role, sign_out
+from app.auth import current_user_display_name, effective_role, sign_out
 from app.components.sidebar_nav_icons import nav_icon_for_slug
 from app.components.sidebar_shell import (
     IPS_SIDEBAR_COLLAPSED_LOGO_PX,

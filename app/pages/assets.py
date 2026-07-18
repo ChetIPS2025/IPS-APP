@@ -45,13 +45,10 @@ from app.components.record_modal import (
     get_modal_record,
     is_edit_mode,
     open_record_modal,
-    placeholder_html,
     record_session_key,
     render_edit_form_header,
     render_missing_record,
-    render_modal_header,
     render_compact_modal_header,
-    render_modal_edit_button,
     render_modal_meta_grid,
     render_modal_shell,
     render_save_cancel_actions,
@@ -61,7 +58,7 @@ from app.components.record_modal import (
     show_modal_if_pending,
 )
 from app.pages._core._data import load_assets, lookup_options, persist_asset
-from app.pages._core._crud import apply_persist_feedback, is_demo_id
+from app.pages._core._crud import is_demo_id
 from app.pages._core._session import select_key
 from app.components.assets_css import inject_assets_page_css
 from app.services.asset_images import (
@@ -76,8 +73,6 @@ from app.services.assets_service import (
     clear_assets_cache,
     generate_asset_qr_value,
     rebuild_asset_qr,
-    get_asset_image_url,
-    get_asset_thumbnail_url,
     get_asset_inspections,
     get_asset_issues,
     upload_asset_image,
@@ -95,7 +90,7 @@ from app.services.asset_rental_service import (
     primary_rental_rate_from_asset,
 )
 from app.services.phase2_modules_service import asset_is_rentable
-from app.services.asset_kits_service import asset_is_kit, list_all_kit_items_enriched
+from app.services.asset_kits_service import list_all_kit_items_enriched
 from app.components.serialized_tools_ui import (
     render_serialized_tool_tracking_panel,
     render_serialized_tools_toolbar,
@@ -110,7 +105,6 @@ from app.components.asset_reclassification_ui import (
 )
 from app.components.asset_row_actions_ui import ASSET_OPEN_ACTIVITY_KEY, render_asset_activity_snippet
 from app.components.assets_list_table import (
-    apply_assets_table_bridge_action,
     build_assets_html_table,
     render_assets_table_bridge_legacy,
     render_assets_table_open_buttons,
@@ -135,7 +129,7 @@ from app.components.small_hand_tools_import_ui import (
     open_hand_tool_import_dialog,
     show_hand_tool_import_dialog,
 )
-from app.pages.asset_kits_ui import kit_badge_html, render_kit_accountability_summary, render_kit_contents_tab
+from app.pages.asset_kits_ui import render_kit_accountability_summary, render_kit_contents_tab
 from app.services.asset_classification_service import is_equipment_tab_asset, tracking_type_label
 from app.services.serialized_tool_service import is_serialized_tool_asset, serialized_tool_view
 from app.utils.field_context import (
@@ -144,7 +138,6 @@ from app.utils.field_context import (
     field_expanded_id,
     inject_field_row_expand_css,
     is_field_context,
-    is_field_mode,
     render_field_scan_bar,
     toggle_field_expanded,
 )
@@ -1420,7 +1413,7 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
 
 
 def _render_asset_documents_tab(asset: dict) -> None:
-    from app.auth import current_role, effective_role, is_authenticated
+    from app.auth import effective_role, is_authenticated
     include_restricted = is_authenticated() and str(effective_role() or "").lower() in {
         "admin",
         "supervisor",

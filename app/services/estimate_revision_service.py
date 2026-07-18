@@ -15,7 +15,7 @@ from app.services.estimate_job_workflow_service import (
     current_user_profile_id,
     estimate_visible_in_approved_view,
 )
-from app.services.repository import ServiceResult, fetch_by_id, filter_payload_to_table, update_row
+from app.services.repository import ServiceResult, fetch_by_id, filter_payload_to_table
 from app.db import fetch_by_match_admin, insert_row_admin, update_rows_admin
 _LOG = logging.getLogger(__name__)
 

@@ -26,7 +26,6 @@ from typing import Any
 
 from app.db import (
     delete_auth_user_admin,
-    fetch_by_match,
     fetch_by_match_admin,
     fetch_one,
     resolve_auth_user_id,
@@ -341,7 +340,7 @@ def admin_reset_employee_password(
 
 def can_manage_user_actions(actor: dict[str, Any] | None = None) -> bool:
     """Admin or supervisor may activate, deactivate, or archive users."""
-    from app.auth import current_role, effective_role
+    from app.auth import effective_role
     from app.utils.permissions import normalize_role
     _ = actor
     role = normalize_role(effective_role())

@@ -6,7 +6,6 @@ Schema assumptions: ``employee_timekeeping_weeks``, ``employee_timekeeping_days`
 
 from __future__ import annotations
 
-from datetime import date
 
 from app.services.phase2_modules_service import (
     approve_timekeeping_day,

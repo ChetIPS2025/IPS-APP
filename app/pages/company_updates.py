@@ -33,7 +33,6 @@ from app.components.record_modal import (
     render_modal_shell,
     render_missing_record,
     render_save_cancel_actions,
-    set_edit_mode,
     set_view_mode,
 )
 from app.pages._core._data import (
@@ -52,7 +51,7 @@ from app.utils.formatting import fmt_date, fmt_datetime
 from app.utils.permissions import can_manage_company_updates
 from app.components.company_updates_feed import PRIORITY_EDIT_OPTS, priority_for_form
 from app.services.updates_service import BANNER_UPLOAD_TYPES, resolve_company_update_banner_url
-from app.auth import current_role, effective_role
+from app.auth import effective_role
 _SEL = select_key("company_updates")
 _MODULE = "company_updates"
 _TABLE_KEY = "company_updates_list"

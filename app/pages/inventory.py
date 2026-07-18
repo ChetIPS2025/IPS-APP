@@ -62,7 +62,7 @@ from app.components.record_modal import (
     show_modal_if_pending,
     status_pill_html,
 )
-from app.pages._core._data import load_inventory, load_recent_qr_scans, lookup_options
+from app.pages._core._data import load_recent_qr_scans, lookup_options
 from app.pages._core._crud import is_demo_id
 from app.pages._core._session import select_key
 from app.services.inventory_display_helpers import (
@@ -79,14 +79,12 @@ from app.services.item_images import ITEM_IMAGE_UPLOAD_TYPES
 from app.services.inventory_service import (
     clear_inventory_cache,
     generate_inventory_qr_value,
-    get_inventory_image_url,
     get_inventory_transactions,
     update_inventory_item,
     upload_inventory_image,
 )
 from app.services.catalog_stock_policy_service import (
     INVENTORY_VIEW_FILTERS,
-    enrich_inventory_rows,
     load_enriched_inventory_rows,
     inventory_needs_reorder,
     passes_inventory_view_filter,
@@ -102,7 +100,6 @@ from app.utils.field_context import (
     field_expanded_id,
     inject_field_row_expand_css,
     is_field_context,
-    is_field_mode,
     render_field_scan_bar,
     toggle_field_expanded,
 )

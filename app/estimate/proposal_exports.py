@@ -8,7 +8,6 @@ from app.db import fetch_one
 from app.ui.css_inject import inject_css_once
 from app.proposal import (
     build_proposal_docx,
-    proposal_preview_page_html,
     try_convert_proposal_docx_to_pdf,
 )
 

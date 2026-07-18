@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import html
 
-import streamlit as st
 
 _STATUS_PILL: dict[str, tuple[str, str, str]] = {
     "in service": ("#15803d", "#dcfce7", "In Service"),

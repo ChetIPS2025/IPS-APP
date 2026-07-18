@@ -11,7 +11,6 @@ import streamlit.components.v1 as components
 from app.pages._core._crud import is_demo_id
 from app.services.asset_document_util import (
     ASSET_DOCUMENT_UPLOAD_TYPES,
-    delete_asset_document_record,
     file_type_label,
     is_image_document,
     is_pdf_document,

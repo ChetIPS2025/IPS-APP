@@ -5,7 +5,7 @@ import streamlit as st
 
 from app.ui.css_inject import inject_css_once
 
-from app.auth import current_profile, current_role, sign_out
+from app.auth import current_role, sign_out
 
 from app.mobile_ui import inject_ips_global_mobile_css, inject_sidebar_mobile_auto_collapse_once
 from app.pwa import render_install_app_sidebar_block

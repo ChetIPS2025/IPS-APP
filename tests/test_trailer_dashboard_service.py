@@ -12,7 +12,6 @@ from app.services.trailer_dashboard_service import (
     normalize_audit_item_status,
     select_spot_audit_items,
     validate_audit_item_line,
-    validate_audit_item_lines,
 )
 
 

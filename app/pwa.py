@@ -7,7 +7,6 @@ import re
 from typing import Any
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 from app.config import APP_VERSION
 _PWA_INJECTED_KEY = "ips_pwa_support_injected"

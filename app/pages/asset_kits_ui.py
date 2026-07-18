@@ -13,7 +13,6 @@ from app.auth import current_profile
 from app.ui.css_inject import inject_css_once
 from app.components.kit_audit_item_ui import clear_audit_item_photos, render_audit_item_fields
 from app.components.action_styles import danger_outline
-from app.components.status import status_pill_html
 from app.pages._core._data import load_assets, load_inventory, load_jobs
 from app.services.asset_kits_service import (
     CONDITIONS,
@@ -28,7 +27,6 @@ from app.services.asset_kits_service import (
     get_asset_kit_audits,
     get_asset_kit_items,
     get_asset_kit_summary,
-    get_asset_kit_transactions,
     get_missing_tools_report,
     get_overdue_kit_audits,
     get_tool_trailers,

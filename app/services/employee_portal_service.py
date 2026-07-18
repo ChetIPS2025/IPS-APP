@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import html
-from datetime import date
 from typing import Any
 
 _EMPLOYEE_JOB_KEYS = (

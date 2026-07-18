@@ -21,7 +21,6 @@ IPS_DASHBOARD_LAYOUT_STYLE_ID = "ips-dashboard-layout-v8"
 
 # Re-export column hiding standard (catalog / inventory / materials tables).
 from app.ui.catalog_inventory_display import (
-    HIDDEN_SYSTEM_COLUMNS,
     drop_hidden_system_columns,
     prepare_catalog_inventory_display_df,
 )

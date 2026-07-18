@@ -14,7 +14,6 @@ from app.services.item_images import (
     has_stored_item_image,
     persist_item_image,
     record_has_item_image,
-    resolve_item_image_url,
     resolve_stored_item_image_url,
 )
 from app.services.repository import ServiceResult

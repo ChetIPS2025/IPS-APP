@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import base64
 import html
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, timedelta, timezone
-from io import BytesIO
 from pathlib import Path
 from typing import Any
 
-from app.branding import get_header_logo_path, header_logo_html
+from app.branding import header_logo_html
 from app.utils.formatting import fmt_hours, fmt_money
 from app.db import (
     create_signed_url,

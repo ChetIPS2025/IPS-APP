@@ -636,33 +636,3 @@ def render_jobs_table_bridge_legacy(
         open_job_fn=open_job_fn,
         on_expand_fn=on_expand_fn,
     )
-
-
-def render_jobs_table_link_bridge(
-    jobs_by_id: dict[str, dict[str, Any]],
-    *,
-    component_key: str = "ips_jobs_list_bridge",
-    hook_key: str = "ipsJobsList::action",
-    last_action_key: str = JOBS_TABLE_LAST_ACTION_KEY,
-    open_job_fn: Callable[[str, dict[str, Any]], None],
-) -> None:
-    """Backward-compatible alias for the unified jobs table bridge."""
-    render_jobs_table_bridge_legacy(
-        jobs_by_id,
-        component_key=component_key,
-        hook_key=hook_key,
-        last_action_key=last_action_key,
-        open_job_fn=open_job_fn,
-    )
-
-
-def resolve_jobs_table_link_action(
-    action: str | None,
-    jobs_by_id: dict[str, dict[str, Any]],
-) -> dict[str, Any] | None:
-    job_id = str(action or "").strip()
-    if job_id.startswith("open:"):
-        job_id = job_id.split(":", 1)[1].strip()
-    if not job_id:
-        return None
-    return jobs_by_id.get(job_id)

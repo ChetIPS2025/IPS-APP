@@ -8,7 +8,7 @@ from typing import Any
 
 import streamlit as st
 
-from app.auth import current_profile, current_role, effective_role
+from app.auth import current_profile, effective_role
 from app.pages._core._crud import apply_persist_feedback, is_demo_id
 from app.pages._core._data import load_tasks, task_assignee_options
 from app.services.management_reminders_service import (

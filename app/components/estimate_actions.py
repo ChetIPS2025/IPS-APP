@@ -8,7 +8,7 @@ from typing import Any
 
 import streamlit as st
 
-from app.auth import current_role, effective_role
+from app.auth import effective_role
 from app.components.action_styles import danger_solid_button, success_solid_button
 from app.components.modal_delete import can_admin_mutate
 from app.pages._core._crud import is_demo_id

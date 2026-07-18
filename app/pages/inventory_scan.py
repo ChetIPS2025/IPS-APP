@@ -35,12 +35,10 @@ from app.device_label import (
     persist_device_label_to_browser,
     request_user_agent,
 )
-from app.auth import current_profile, current_role, effective_role, is_authenticated
+from app.auth import current_profile, effective_role, is_authenticated
 from app.ui.page_shell import render_page_header
 from app.ui.nav_permissions import role_can_open_page
 from app.db import (
-    create_signed_url,
-    delete_rows_admin,
     fetch_by_match_admin,
     fetch_table,
     fetch_table_admin,

@@ -10,7 +10,6 @@ from pathlib import Path
 
 # Keep in sync with ``proposal.COMPANY_LOGO_CANDIDATE_FILENAMES`` (same search order).
 _LOGO_FILENAMES: tuple[str, ...] = (
-    "company_logo.png",
     "company_logo.jpg",
     "company_logo.jpeg",
     "ips_logo_wide.png",

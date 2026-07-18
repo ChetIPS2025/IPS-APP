@@ -14,7 +14,7 @@ from app.services.employee_portal_service import (
     strip_job_for_employee,
     update_visible_to_role,
 )
-from app.utils.permissions import normalize_role, role_default_nav_slug
+from app.utils.permissions import role_default_nav_slug
 
 
 def test_employee_lands_on_portal():

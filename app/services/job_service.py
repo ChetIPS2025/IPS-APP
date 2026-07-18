@@ -39,7 +39,6 @@ def job_number_display(value: str | None) -> str:
     return s
 
 
-from app.utils.formatters import job_display_label
 
 
 def job_display_primary(j: dict[str, Any] | None) -> str:

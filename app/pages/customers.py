@@ -56,7 +56,6 @@ from app.components.record_modal import (
     safe_value,
     set_edit_mode,
     set_view_mode,
-    show_modal_if_pending,
     status_pill_html as modal_status_pill_html,
 )
 from app.components.status import status_pill_html

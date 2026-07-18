@@ -8,7 +8,7 @@ from typing import Any
 
 import streamlit as st
 
-from app.auth import current_profile, current_role, effective_role, is_authenticated
+from app.auth import current_profile, effective_role
 from app.pages._core._data import load_employees, load_inventory
 from app.services.inventory_service import get_inventory_transactions, list_inventory
 from app.services.job_materials_service import (
@@ -22,7 +22,6 @@ from app.services.job_materials_service import (
     resolve_inventory_by_scan_code,
 )
 from app.services.tasks_service import get_tasks_by_job
-from app.navigation import IPS_NAV_PENDING_KEY
 from app.utils.formatting import fmt_currency, fmt_date
 from app.utils.inventory_quantity import format_inventory_quantity, inventory_qty_input_kwargs
 _USAGE_SOURCE_LABELS = {

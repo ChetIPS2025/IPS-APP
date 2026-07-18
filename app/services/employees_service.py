@@ -9,7 +9,6 @@ from __future__ import annotations
 from typing import Any
 
 from app.services.certification_attachments_service import (
-    cert_has_attachment,
     get_certification_attachment_url,
     upload_certification_attachment,
 )

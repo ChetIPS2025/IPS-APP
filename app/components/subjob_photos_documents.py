@@ -50,7 +50,7 @@ def _scope_key(job_id: str, task_id: str) -> str:
 
 
 def _admin_read() -> bool:
-    from app.auth import current_role, effective_role
+    from app.auth import effective_role
     return effective_role() in {"admin", "manager"}
 
 

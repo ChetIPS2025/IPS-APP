@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from app.auth import current_role, effective_role
+from app.auth import effective_role
 from app.utils.permissions import role_can_access_page
 _DEMO_FLAG = "ips_showing_demo_data"
 _MODULE_SHELL_KEY = "_ips_module_page_shell_open"

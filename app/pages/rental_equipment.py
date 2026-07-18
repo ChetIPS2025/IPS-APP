@@ -2,22 +2,13 @@
 
 from __future__ import annotations
 
-import html
 from typing import Any
 
 import streamlit as st
 
 from app.components.rental_equipment_inspection_launcher import open_rental_inspection
-from app.pages._core._access import begin_module
-from app.pages.rental_equipment_dashboard import _render_damage_report, _render_history
-from app.services.assets_service import get_asset_image_url
 from app.services.rental_equipment_inspection_service import (
     create_auto_inspection,
-    get_rental_equipment_dashboard_summary,
-    inspection_type_label,
-    list_rental_equipment_assets,
-    list_rental_inspections_for_asset,
-    rental_inspection_dashboard_status,
 )
 _STATUS_COLORS = {
     "Checked Out": "#dbeafe",

@@ -5,19 +5,16 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from typing import Any
 
-from app.db import fetch_by_match_admin, insert_row_admin, update_rows_admin, upload_bytes_admin
+from app.db import fetch_by_match_admin, insert_row_admin, update_rows_admin
 from app.services.job_weekly_timesheets import monday_of_week, week_bounds
 from app.services.weekly_job_timesheet_service import (
     TIMESHEET_TABLE,
-    TIMESHEET_TABLE_MISSING_MSG,
     TimesheetLine,
     WeeklyJobTimesheetData,
     build_timesheet_data,
-    fetch_timesheet_by_job_week,
     list_timesheets_for_job,
     load_timesheet_data,
     save_timesheet,
-    signed_url_for_timesheet,
 )
 _SHEET_TABLE = TIMESHEET_TABLE
 _LOCKED = frozenset({"Approved", "Signed", "Voided"})

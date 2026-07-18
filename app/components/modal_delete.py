@@ -9,7 +9,7 @@ import streamlit as st
 
 from app.components.action_styles import danger_outline_button, danger_solid_button
 def can_admin_mutate() -> bool:
-    from app.auth import current_role, effective_role
+    from app.auth import effective_role
     return str(effective_role() or "").strip().lower() in {"admin", "manager", "supervisor"}
 
 

@@ -10,7 +10,6 @@ from typing import Any
 
 from app.data.handwritten_material_quote_source import (
     HANDWRITTEN_MATERIAL_QUOTE_ID,
-    HANDWRITTEN_MATERIAL_QUOTE_LINES,
     HANDWRITTEN_MATERIAL_QUOTE_NOTES,
     handwritten_material_quote_source_rows,
 )

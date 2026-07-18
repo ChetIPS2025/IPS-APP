@@ -9,7 +9,7 @@ from uuid import uuid4
 import streamlit as st
 
 from app.auth import current_role
-from app.components.record_modal import detail_field_html, dialog_card_html, safe_value
+from app.components.record_modal import detail_field_html, dialog_card_html
 from app.components.searchable_select import render_searchable_selectbox
 from app.pages._core._crud import is_demo_id
 from app.services.estimate_costing_service import (
@@ -48,7 +48,6 @@ from app.services.labor_rates_service import save_default_rates_from_lines
 from app.ui.streamlit_perf import fragment, ips_app_rerun
 from app.utils.estimate_calculations import TRAVEL_TYPES, calc_travel_line, calc_travel_total
 from app.services.proposal_pdf_service import build_customer_quote_bundle
-from app.services.pricing_guide_service import create_pricing_item_from_estimate_line
 from app.services.estimate_builder_helpers import (
     equipment_line_totals,
     labor_line_totals,
@@ -59,7 +58,7 @@ from app.services.estimate_builder_helpers import (
     travel_defaults,
 )
 from app.utils.estimate_calculations import margin_warning_class
-from app.utils.formatting import fmt_currency, fmt_date
+from app.utils.formatting import fmt_currency
 def _estimate_tax_rate(est: dict[str, Any]) -> float:
     return float(est.get("tax_rate") or 0)
 

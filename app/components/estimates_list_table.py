@@ -8,7 +8,7 @@ from typing import Any
 
 import streamlit as st
 
-from app.auth import current_role, effective_role
+from app.auth import effective_role
 from app.pages._core._crud import is_demo_id
 from app.ui.streamlit_perf import fragment_rerun, ips_app_rerun
 from app.services.estimate_job_workflow_service import (

@@ -57,10 +57,8 @@ from app.pages._core._crud import apply_persist_feedback, is_demo_id
 from app.pages._core._data import (
     load_employees,
     load_jobs,
-    lookup_options,
     persist_task,
     task_assignee_options,
-    task_estimate_options,
 )
 from app.pages._core._session import select_key
 from app.services.jobs_service import get_job_options
@@ -326,7 +324,7 @@ def _apply_field_task_filters(rows: list[dict], *, assignee_lookup: dict[str, st
     fid = get_field_job_id()
     if fid:
         out = [t for t in out if str(t.get("job_id") or "").strip() == fid]
-    from app.auth import current_role, effective_role
+    from app.auth import effective_role
     if str(effective_role() or "").strip().lower() == "employee":
         out = [t for t in out if _task_matches_field_assignee(t, assignee_lookup)]
     return out

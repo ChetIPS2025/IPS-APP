@@ -619,7 +619,7 @@ def _render_existing_list(ctx: dict[str, str | None]) -> str | None:
 def _render_context_picker() -> None:
     """Let users pick job/equipment when opening Coupling Inspection from the sidebar."""
     from app.components.coupling_inspection_launcher import open_coupling_inspection
-    from app.pages._core._data import load_assets, load_jobs
+    from app.pages._core._data import load_assets
     from app.services.jobs_service import job_row_select_label
     st.info("Select a job and/or equipment record, then continue.")
     assets = [a for a in load_assets() if str(a.get("id") or "").strip()]

@@ -7,7 +7,7 @@ from typing import Any
 
 import streamlit as st
 
-from app.auth import current_role, effective_role
+from app.auth import effective_role
 from app.components.catalog_presence_panel import render_catalog_presence_panel
 from app.components.catalog_stock_policy_panel import render_catalog_stock_policy_panel
 from app.components.pricing_guide_actions import render_pricing_guide_action_buttons
@@ -55,7 +55,6 @@ from app.components.record_modal import (
     render_modal_shell,
     render_save_cancel_actions,
     safe_value,
-    set_edit_mode,
     set_view_mode,
     status_pill_html as modal_status_pill_html,
 )
