@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import inspect
+from unittest.mock import patch
+
 from app.components.assets_list_table import (
     _asset_link_html,
     _asset_thumb_link_html,
@@ -46,8 +49,6 @@ def test_asset_link_html_uses_open_action():
 
 
 def test_handle_assets_table_action_opens_asset_and_reruns():
-    from unittest.mock import patch
-
     from app.components.assets_list_table import handle_assets_table_action
 
     opened: list[tuple[str, dict]] = []
@@ -75,11 +76,31 @@ def test_handle_assets_table_action_opens_asset_and_reruns():
     mock_rerun.assert_not_called()
 
 
-def test_assets_bridge_uses_component_value_not_hidden_buttons() -> None:
-    import inspect
+def test_assets_open_buttons_use_callback_without_manual_rerun() -> None:
+    from app.components.assets_list_table import render_assets_table_open_buttons
 
+    src = inspect.getsource(render_assets_table_open_buttons)
+    assert "on_click=_open" in src
+    assert "st.rerun()" not in src
+    assert "ips_app_rerun()" not in src
+
+
+def test_assets_bridge_prefers_hidden_button() -> None:
     from app.components.assets_list_table import render_assets_table_bridge
 
     src = inspect.getsource(render_assets_table_bridge)
-    assert "clickBridgeButton" not in src
+    assert "clickBridgeButton" in src
+    assert "CSS.escape(bridgeKey)" in src
+    assert 'getAttribute("data-bridge-key")' in src
     assert "sendValue(act + \":\" + id)" in src
+
+
+def test_prepare_open_assets_table_item_opens_detail_modal() -> None:
+    asset = {"id": "asset-id-1", "asset_name": "Test Asset"}
+
+    with patch("app.pages.assets._open_assets_detail_modal") as mock_open:
+        from app.pages.assets import _prepare_open_assets_table_item
+
+        _prepare_open_assets_table_item("asset-id-1", asset)
+
+    mock_open.assert_called_once_with("asset-id-1", asset)

@@ -406,9 +406,28 @@ def render_assets_table_bridge(
     }}
   }}
 
-  function openAsset(id, action) {{
+  function clickBridgeButton(bridgeKey) {{
+    if (!bridgeKey) return false;
+    const host = doc.querySelector(".st-key-" + CSS.escape(bridgeKey));
+    if (!host) {{
+      console.warn("IPS asset bridge host not found:", bridgeKey);
+      return false;
+    }}
+    const btn = host.querySelector('[data-testid="stButton"] > button');
+    if (!btn) {{
+      console.warn("IPS asset bridge button not found:", bridgeKey);
+      return false;
+    }}
+    btn.click();
+    return true;
+  }}
+
+  function openAsset(id, action, bridgeKey) {{
     if (!id) return;
     const act = action || "open";
+    if (act === "open" && bridgeKey && clickBridgeButton(bridgeKey)) {{
+      return;
+    }}
     sendValue(act + ":" + id);
   }}
 
@@ -428,7 +447,8 @@ def render_assets_table_bridge(
         e.preventDefault();
         e.stopPropagation();
         const id = el.getAttribute("data-asset-id") || el.getAttribute("data-row-id");
-        openAsset(id, "open");
+        const bridgeKey = el.getAttribute("data-bridge-key") || "";
+        openAsset(id, "open", bridgeKey);
       }}
       el.addEventListener("click", onActivate, true);
       el.addEventListener("keydown", function (e) {{
@@ -444,7 +464,8 @@ def render_assets_table_bridge(
         if (!id) return;
         e.preventDefault();
         e.stopPropagation();
-        openAsset(id, fieldMode ? "expand" : "open");
+        const bridgeKey = row.getAttribute("data-bridge-key") || "";
+        openAsset(id, fieldMode ? "expand" : "open", bridgeKey);
       }}, true);
     }});
   }}
@@ -461,7 +482,8 @@ def render_assets_table_bridge(
         e.preventDefault();
         e.stopPropagation();
         const id = link.getAttribute("data-asset-id") || link.getAttribute("data-row-id");
-        openAsset(id, "open");
+        const bridgeKey = link.getAttribute("data-bridge-key") || "";
+        openAsset(id, "open", bridgeKey);
         return;
       }}
       if (isInteractive(t)) return;
@@ -471,7 +493,8 @@ def render_assets_table_bridge(
       if (!id) return;
       e.preventDefault();
       e.stopPropagation();
-      openAsset(id, fieldMode ? "expand" : "open");
+      const bridgeKey = row.getAttribute("data-bridge-key") || "";
+      openAsset(id, fieldMode ? "expand" : "open", bridgeKey);
     }}, true);
   }}
 
