@@ -6,8 +6,8 @@ import streamlit as st
 
 from app.ui.css_inject import inject_css_once
 
-IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v29"
-IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v29"
+IPS_PAGE_HEADER_STYLES_KEY = "ips_page_header_styles_v30"
+IPS_PAGE_HEADER_STYLE_ID = "ips-page-header-styles-v30"
 
 
 def inject_page_header_styles() -> None:
@@ -17,7 +17,7 @@ def inject_page_header_styles() -> None:
     with st.sidebar:
         st.markdown(
             """
-<style id="ips-page-header-styles-v29">
+<style id="ips-page-header-styles-v30">
 [class*="st-key-ips_page_header"],
 [class*="st-key-ips_page_header"] [data-testid="stVerticalBlockBorderWrapper"] {
   width: 100% !important;
@@ -553,7 +553,6 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   box-sizing: border-box !important;
   overflow: visible !important;
 }
-.st-key-header_back .stButton > button,
 .st-key-header_menu .stButton > button,
 .st-key-header_refresh .stButton > button,
 .st-key-header_notifications .stButton > button,
@@ -570,7 +569,32 @@ section[data-testid="stMain"] [data-testid="stVerticalBlock"] > [data-testid="st
   line-height: 1 !important;
   box-shadow: none !important;
 }
-.st-key-header_back .stButton > button,
+.st-key-header_back .stButton > button {
+  width: auto !important;
+  min-width: max-content !important;
+  max-width: none !important;
+  padding: 0 12px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  box-shadow: none !important;
+  background: #2563eb !important;
+  border: 1px solid #2563eb !important;
+  color: #ffffff !important;
+}
+.st-key-header_back .stButton > button:hover,
+.st-key-header_back .stButton > button:focus,
+.st-key-header_back .stButton > button:focus-visible {
+  background: #1d4ed8 !important;
+  border-color: #1d4ed8 !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
 .st-key-header_menu .stButton > button {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
@@ -684,6 +708,13 @@ body.ips-authed-app section[data-testid="stMain"] [class*="st-key-ips_page_heade
 .st-key-header_menu .stButton > button p {
   margin: 0 !important;
   line-height: 1 !important;
+}
+.st-key-header_back .stButton > button p {
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+}
+.st-key-header_menu .stButton > button p {
   font-size: 1.05rem !important;
 }
 .st-key-header_notifications {

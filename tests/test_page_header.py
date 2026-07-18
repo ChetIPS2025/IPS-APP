@@ -62,7 +62,8 @@ class PageHeaderSourceTests(unittest.TestCase):
         from app.ui.page_header_styles import inject_page_header_styles
 
         src = inspect.getsource(inject_page_header_styles)
-        self.assertIn("ips-page-header-styles-v29", src)
+        self.assertIn("ips-page-header-styles-v30", src)
+        self.assertIn("background: #2563eb !important", src)
         self.assertIn("ips-assets-page-header-actions", src)
         self.assertIn("border-radius: 50%", src)
         self.assertIn("st-key-header_avatar", src)
@@ -85,6 +86,8 @@ class PageHeaderSourceTests(unittest.TestCase):
     def test_header_utility_buttons_use_icon_only_labels(self) -> None:
         from app.ui import page_header as ui_page_header
 
+        src = inspect.getsource(ui_page_header._render_back)
+        self.assertIn('"< BACK"', src)
         src = inspect.getsource(ui_page_header)
         self.assertIn('st.button("🔄"', src)
         self.assertIn('st.button("🔔"', src)

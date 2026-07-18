@@ -19,7 +19,7 @@ from app.ui.page_header_styles import inject_page_header_styles
 
 _ActionFn = Callable[[], None]
 
-_MAIN_COLS = [0.35, 3.2, 3.5, 7.5]
+_MAIN_COLS = [0.55, 3.0, 3.5, 7.5]
 _ACTION_WIDTHS: dict[str, float] = {
     "bottom_actions": 0.01,
     "trailing": 2.2,
@@ -169,7 +169,7 @@ def _render_back(*, header_key: str, can_back: bool, on_back: Callable[[], None]
     with st.container(key="header_back"):
         if can_back:
             if st.button(
-                "←",
+                "< BACK",
                 key=f"{header_key}_back",
                 help="Return to previous page",
                 use_container_width=True,
