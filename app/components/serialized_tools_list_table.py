@@ -240,7 +240,10 @@ def handle_serialized_tools_table_action(
         if row_id not in row_by_id:
             return
         select_row_fn(row_id, checked)
-        fragment_rerun()
+        if checked:
+            ips_app_rerun()
+        else:
+            fragment_rerun()
         return
 
     row_id = val.split(":", 1)[1].strip() if val.startswith("open:") else val
@@ -268,6 +271,7 @@ def render_serialized_tools_table_open_buttons(
 
             def _open(_row_id: str = row_id, _row: dict = row) -> None:
                 open_row_fn(_row_id, _row)
+                ips_app_rerun()
 
             st.button(
                 "Open tool",
@@ -313,8 +317,29 @@ def render_serialized_tools_table_bridge(
     }}
   }}
 
+  function clickBridgeButton(bridgeKey) {{
+    if (!bridgeKey) return false;
+    const harness = doc.querySelector(".st-key-serialized_tools_open_button_harness");
+    const host =
+      doc.querySelector(".st-key-" + CSS.escape(bridgeKey))
+      || (harness && harness.querySelector('[class*="st-key-' + CSS.escape(bridgeKey) + '"]'))
+      || (harness && harness.querySelector('[class*="' + bridgeKey + '"]'));
+    if (!host) {{
+      return false;
+    }}
+    const btn = host.querySelector('[data-testid="stButton"] > button');
+    if (!btn) {{
+      return false;
+    }}
+    btn.click();
+    return true;
+  }}
+
   function openRow(id, bridgeKey) {{
     if (!id) return;
+    if (bridgeKey && clickBridgeButton(bridgeKey)) {{
+      return;
+    }}
     sendValue("open:" + id);
   }}
 

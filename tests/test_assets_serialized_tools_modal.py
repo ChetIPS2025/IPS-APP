@@ -11,6 +11,22 @@ def _assets_source() -> str:
     return path.read_text(encoding="utf-8")
 
 
+def test_serialized_tools_bridge_clicks_hidden_button_before_send_value() -> None:
+    from app.components.serialized_tools_list_table import render_serialized_tools_table_bridge
+
+    src = inspect.getsource(render_serialized_tools_table_bridge)
+    assert "clickBridgeButton(bridgeKey)" in src
+    open_block = src.split("function openRow")[1].split("function bindTargets")[0]
+    assert open_block.index("clickBridgeButton") < open_block.index("sendValue")
+
+
+def test_serialized_tools_open_buttons_use_app_rerun_callback() -> None:
+    from app.components.serialized_tools_list_table import render_serialized_tools_table_open_buttons
+
+    src = inspect.getsource(render_serialized_tools_table_open_buttons)
+    assert "ips_app_rerun()" in src
+
+
 def test_serialized_tool_table_open_prepares_modal() -> None:
     from app.pages import assets as assets_page
 

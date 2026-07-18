@@ -76,22 +76,67 @@ def test_handle_assets_table_action_opens_asset_and_reruns():
     mock_rerun.assert_not_called()
 
 
-def test_assets_open_buttons_use_callback_without_manual_rerun() -> None:
+def test_build_assets_html_table_includes_matching_bridge_keys():
+    asset = {
+        "id": "ast-uuid-1",
+        "asset_name": "Generator",
+        "asset_number": "A-100",
+        "category": "Equipment",
+        "location": "Yard",
+        "status": "Available",
+    }
+    from app.components.assets_list_table import assets_bridge_button_key
+
+    bridge_key = assets_bridge_button_key(asset)
+    html_out = build_assets_html_table([asset])
+    assert f'data-bridge-key="{bridge_key}"' in html_out
+    assert bridge_key == "ast_bridge_open_ast_uuid_1"
+
+
+def test_assets_open_buttons_use_callback_with_app_rerun() -> None:
     from app.components.assets_list_table import render_assets_table_open_buttons
 
     src = inspect.getsource(render_assets_table_open_buttons)
     assert "on_click=_open" in src
-    assert "st.rerun()" not in src
-    assert "ips_app_rerun()" not in src
+    assert "ips_app_rerun()" in src
 
 
-def test_assets_bridge_uses_send_value_for_open() -> None:
+def test_assets_bridge_clicks_hidden_button_before_send_value() -> None:
     from app.components.assets_list_table import render_assets_table_bridge
 
     src = inspect.getsource(render_assets_table_bridge)
-    assert "sendValue(act + \":\" + id)" in src
+    assert "clickBridgeButton(bridgeKey)" in src
     assert 'if (act === "open")' in src
-    assert "clickBridgeButton" in src
+    assert "sendValue(act + \":\" + id)" in src
+    open_block = src.split('if (act === "open")')[1].split("function isInteractive")[0]
+    assert open_block.index("clickBridgeButton") < open_block.index("sendValue")
+
+
+def test_prepare_open_assets_table_item_sets_modal_session_keys() -> None:
+    import streamlit as st
+
+    from app.pages.assets import (
+        SELECTED_ASSET_KEY,
+        SHOW_ASSET_MODAL_KEY,
+        _ASSETS_CACHE_KEY,
+        _ASSETS_MODAL_KEY,
+        _SEL,
+        _prepare_open_assets_table_item,
+    )
+
+    class _SessionState(dict):
+        def get(self, key, default=None):
+            return dict.get(self, key, default)
+
+    st.session_state = _SessionState()
+    asset = {"id": "asset-id-1", "asset_name": "Test Asset", "asset_number": "T-1"}
+    _prepare_open_assets_table_item("asset-id-1", asset)
+
+    assert st.session_state.get(SELECTED_ASSET_KEY) == "asset-id-1"
+    assert st.session_state.get(SHOW_ASSET_MODAL_KEY) is True
+    assert st.session_state.get(_ASSETS_MODAL_KEY) == "asset-id-1"
+    assert st.session_state.get(_SEL) == "asset-id-1"
+    assert "asset-id-1" in (st.session_state.get(_ASSETS_CACHE_KEY) or {})
 
 
 def test_prepare_open_assets_table_item_opens_detail_modal() -> None:
