@@ -34,7 +34,7 @@ def test_importing_phase2_does_not_load_page_modules() -> None:
             for name in sys.modules
             if name.startswith("app.pages.")
             and not name.startswith("app.pages._core.")
-            and name not in {"app.pages", "app.pages._import_render"}
+            and name != "app.pages"
         ]
         assert loaded_pages == []
     finally:
