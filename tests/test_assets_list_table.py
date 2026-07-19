@@ -127,6 +127,17 @@ def test_assets_table_bridge_uses_keyed_hidden_buttons() -> None:
     assert "render_clean_table_click_bridge" not in src
     assert ".st-key-assets_table_wrap" in src
     assert "expand:" in src
+    assert 'getAttribute("data-asset-action")' in src
+    assert "rowExpandMode" in src
+    assert "if (fieldMode)" not in src
+
+
+def test_build_assets_html_table_marks_field_mode_rows_for_expand() -> None:
+    html_out = build_assets_html_table(
+        [{"id": "ast-1", "asset_name": "Generator", "asset_number": "A-1"}],
+        field_mode=True,
+    )
+    assert 'data-asset-action="expand"' in html_out
 
 
 def test_custom_assets_table_wires_open_buttons_before_bridge() -> None:

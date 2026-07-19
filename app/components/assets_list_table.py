@@ -447,6 +447,10 @@ def render_assets_table_bridge(
     ));
   }}
 
+  function rowExpandMode(row) {{
+    return !!(row && row.getAttribute("data-asset-action") === "expand");
+  }}
+
   if (!doc.ipsAssetsTableDocClick) {{
     doc.ipsAssetsTableDocClick = true;
     doc.addEventListener("click", function (e) {{
@@ -468,7 +472,7 @@ def render_assets_table_bridge(
       if (!id) return;
       e.preventDefault();
       e.stopPropagation();
-      if (fieldMode) {{
+      if (rowExpandMode(row)) {{
         sendValue("expand:" + id);
         return;
       }}
