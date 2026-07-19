@@ -24,17 +24,26 @@ from app.services.asset_kits_service import CONDITIONS, ITEM_STATUSES, ITEM_TYPE
 
 _ASSETS_NAV = "assets"
 _COLS = (
-    ("name", "Item", 2.0),
-    ("serial", "Serial", 1.0),
-    ("type", "Type", 0.85),
-    ("expected", "Expected", 0.55),
-    ("actual", "Actual", 0.55),
-    ("condition", "Condition", 0.95),
-    ("status", "Status", 0.95),
-    ("unit", "Unit Value", 0.8),
-    ("total", "Total Value", 0.8),
-    ("assigned", "Assigned To", 0.9),
+    ("name", "Item", 4.2),
+    ("serial", "Serial", 1.1),
+    ("type", "Type", 0.7),
+    ("expected", "Expected", 0.45),
+    ("actual", "Actual", 0.45),
+    ("condition", "Condition", 0.75),
+    ("status", "Status", 0.75),
+    ("unit", "Unit Value", 0.7),
+    ("total", "Total Value", 0.7),
+    ("assigned", "Assigned To", 0.75),
 )
+
+
+def _colgroup_html() -> str:
+    total = sum(w for _, _, w in _COLS)
+    cols = "".join(
+        f'<col class="ips-kit-col-{html.escape(key)}" style="width:{(weight / total) * 100:.2f}%;">'
+        for key, _label, weight in _COLS
+    )
+    return f"<colgroup>{cols}</colgroup>"
 
 
 def kit_item_detail_href(parent_asset_id: str, kit_item_id: str) -> str:
@@ -94,6 +103,7 @@ def build_kit_items_html_table(
     return (
         '<div class="ips-dash-est-table-scroll">'
         '<table class="ips-dash-est-html-table ips-kit-items-html-table">'
+        f"{_colgroup_html()}"
         f"<thead><tr>{head}</tr></thead><tbody>{''.join(body)}</tbody></table></div>"
     )
 

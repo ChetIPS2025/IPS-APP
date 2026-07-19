@@ -34,11 +34,11 @@ def kit_badge_html() -> str:
 
 
 def inject_kit_ui_styles() -> None:
-    if not inject_css_once("ips-kit-ui-styles-v2"):
+    if not inject_css_once("ips-kit-ui-styles-v3"):
         return
     st.markdown(
         """
-        <style id="ips-kit-ui-styles-v2">
+        <style id="ips-kit-ui-styles-v3">
         .ips-kit-badge {
             display: inline-block;
             margin-left: 0.35rem;
@@ -101,6 +101,35 @@ def inject_kit_ui_styles() -> None:
             border-bottom: 1px solid #e8edf4 !important;
             vertical-align: middle !important;
             font-size: 0.8125rem !important;
+        }
+        .st-key-asset_kit_table_wrap .ips-kit-td-name,
+        .st-key-asset_kit_table_wrap .ips-kit-th-name {
+            white-space: normal !important;
+            word-break: break-word !important;
+            line-height: 1.35 !important;
+        }
+        .st-key-asset_kit_table_wrap .ips-kit-td-expected,
+        .st-key-asset_kit_table_wrap .ips-kit-td-actual,
+        .st-key-asset_kit_table_wrap .ips-kit-td-unit,
+        .st-key-asset_kit_table_wrap .ips-kit-td-total,
+        .st-key-asset_kit_table_wrap .ips-kit-th-expected,
+        .st-key-asset_kit_table_wrap .ips-kit-th-actual,
+        .st-key-asset_kit_table_wrap .ips-kit-th-unit,
+        .st-key-asset_kit_table_wrap .ips-kit-th-total {
+            text-align: right !important;
+            white-space: nowrap !important;
+        }
+        .st-key-asset_kit_table_wrap .ips-kit-td-type,
+        .st-key-asset_kit_table_wrap .ips-kit-td-condition,
+        .st-key-asset_kit_table_wrap .ips-kit-td-status,
+        .st-key-asset_kit_table_wrap .ips-kit-th-type,
+        .st-key-asset_kit_table_wrap .ips-kit-th-condition,
+        .st-key-asset_kit_table_wrap .ips-kit-th-status {
+            white-space: nowrap !important;
+        }
+        .st-key-asset_kit_table_wrap .ips-kit-td-serial {
+            font-size: 0.75rem !important;
+            word-break: break-all !important;
         }
         .st-key-asset_kit_table_wrap .ips-kit-item-open-link {
             color: #2563eb !important;
