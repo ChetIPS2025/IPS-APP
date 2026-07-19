@@ -107,7 +107,6 @@ from app.components.asset_row_actions_ui import ASSET_OPEN_ACTIVITY_KEY, render_
 from app.components.assets_list_table import (
     build_assets_html_table,
     render_assets_table_bridge_legacy,
-    render_assets_table_open_buttons,
 )
 from app.components.serialized_tools_list_table import (
     build_serialized_tools_html_table,
@@ -147,6 +146,9 @@ _ASSETS_CACHE_KEY = ASSETS_MODAL_CACHE_KEY
 SELECTED_ASSET_KEY = "selected_asset_id"
 SELECTED_ASSET_IDS_KEY = "selected_asset_ids"
 SHOW_ASSET_MODAL_KEY = "show_asset_detail_modal"
+_ASSET_DETAIL_QUERY_KEY = "asset_detail"
+_LAST_ASSET_DETAIL_QUERY_KEY = "_ips_last_asset_detail_query"
+_ASSET_DETAIL_QUERY_ERROR_KEY = "_ips_asset_detail_query_error"
 _ASSETS_MAIN_TAB_KEY = "ips_assets_main_tab"
 _ASSETS_MAIN_TABS = ("Equipment", "Serialized Tools", "Small Tools")
 ASSET_DETAIL_TAB_FOCUS_KEY = "ast_detail_tab_focus"
@@ -891,18 +893,15 @@ def _render_custom_assets_table(
             ),
             unsafe_allow_html=True,
         )
-        render_assets_table_open_buttons(
-            filtered,
-            open_asset_fn=_prepare_open_assets_table_item,
-        )
-        render_assets_table_bridge_legacy(
-            assets_by_id,
-            component_key="ips_assets_list_bridge",
-            hook_key="ipsAssetsList::action",
-            open_asset_fn=_prepare_open_assets_table_item,
-            on_expand_fn=_on_assets_table_expand if field_mode else None,
-            field_mode=field_mode,
-        )
+        if field_mode:
+            render_assets_table_bridge_legacy(
+                assets_by_id,
+                component_key="ips_assets_list_bridge",
+                hook_key="ipsAssetsList::action",
+                open_asset_fn=_prepare_open_assets_table_item,
+                on_expand_fn=_on_assets_table_expand,
+                field_mode=True,
+            )
 
         if field_mode and expanded_asset_id and expanded_asset_id in assets_by_id:
             expanded_asset = assets_by_id[expanded_asset_id]
@@ -1216,6 +1215,44 @@ def _clear_assets_detail_modal() -> None:
         modal_key=_ASSETS_MODAL_KEY,
         module=_MOD,
     )
+    if _ASSET_DETAIL_QUERY_KEY in st.query_params:
+        del st.query_params[_ASSET_DETAIL_QUERY_KEY]
+
+
+def _capture_asset_detail_query() -> None:
+    requested_id = str(
+        st.query_params.get(_ASSET_DETAIL_QUERY_KEY)
+        or ""
+    ).strip()
+
+    if not requested_id:
+        return
+
+    current_modal_id = str(
+        st.session_state.get(_ASSETS_MODAL_KEY)
+        or ""
+    ).strip()
+
+    if requested_id == current_modal_id:
+        return
+
+    asset = _cached_asset_for_modal(requested_id)
+
+    if not asset:
+        st.session_state[_ASSET_DETAIL_QUERY_ERROR_KEY] = requested_id
+        if _ASSET_DETAIL_QUERY_KEY in st.query_params:
+            del st.query_params[_ASSET_DETAIL_QUERY_KEY]
+        return
+
+    _open_assets_detail_modal(
+        requested_id,
+        asset,
+    )
+
+
+def _show_asset_detail_query_error_if_any() -> None:
+    if st.session_state.pop(_ASSET_DETAIL_QUERY_ERROR_KEY, None):
+        st.warning("The selected asset could not be found.")
 
 
 def _put_asset_in_modal_cache(asset_id: str, asset: dict | None) -> None:
@@ -2113,6 +2150,8 @@ def render() -> None:
         return
     from app.services.asset_qr import apply_pending_asset_deeplink
     apply_pending_asset_deeplink()
+    _capture_asset_detail_query()
+    _show_asset_detail_query_error_if_any()
 
     def _assets_header_actions() -> None:
         st.markdown(
