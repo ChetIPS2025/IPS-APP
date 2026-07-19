@@ -2,56 +2,76 @@
 
 from __future__ import annotations
 
-import html
+from datetime import date, datetime
+from urllib.parse import urlparse
 
 import streamlit as st
 
+from app.components.company_update_detail_tabs import (
+    _COMPANY_UPDATE_DETAIL_TAB_KEY,
+    render_company_update_detail_tabs,
+)
+from app.components.company_updates_directory_table import (
+    build_company_updates_html_table,
+    company_update_detail_query_key,
+    company_update_tab_query_key,
+)
+from app.components.company_updates_feed import PRIORITY_EDIT_OPTS, priority_for_form
+from app.components.company_updates_permissions import (
+    CompanyUpdatesPermissions,
+    load_company_updates_permissions,
+)
 from app.components.headers import render_page_brand_header
 from app.components.layout import render_filter_bar as layout_filter_bar
-from app.components.table_filters import (
-    apply_column_filters,
-    build_filter_options,
-    clear_table_filters,
-    render_table_header_cell,
-)
 from app.components.record_modal import (
-    build_modal_cache,
     clear_edit_modes,
     clear_record_modal,
-    detail_field_html,
-    dialog_card_html,
     edit_mode_key,
     get_modal_record,
     is_edit_mode,
     open_record_modal,
-    placeholder_html,
     record_session_key,
     render_edit_form_header,
+    render_missing_record,
     render_modal_edit_button,
     render_modal_header,
     render_modal_meta_grid,
     render_modal_shell,
-    render_missing_record,
     render_save_cancel_actions,
     set_view_mode,
+    show_modal_if_pending,
 )
-from app.pages._core._data import (
-    delete_company_update,
-    load_company_updates,
-    load_employees,
-    persist_company_update,
-    persist_company_update_banner,
-    persist_company_update_record,
-    remove_company_update_banner_row,
+from app.components.table_filters import (
+    clear_table_filters,
+    get_column_filter_values,
+    render_table_header_cell,
+)
+from app.components.table_pagination import (
+    pagination_meta,
+    page_size_key,
+    render_table_pagination_footer,
+    render_table_pagination_header,
+    reset_table_page,
 )
 from app.pages._core._crud import apply_persist_feedback, is_demo_id
 from app.pages._core._session import select_key
+from app.services.company_update_detail_service import (
+    get_company_update_banner_preview,
+    get_company_update_detail,
+    put_update_in_modal_cache,
+)
+from app.services.company_updates_cache import invalidate_company_updates_cache
+from app.services.company_updates_directory_service import (
+    COMPANY_UPDATES_DEFAULT_PAGE_SIZE,
+    list_company_updates_page,
+    normalize_update_audience,
+    normalize_update_category,
+    normalize_update_status,
+)
+from app.services.updates_service import BANNER_UPLOAD_TYPES
 from app.styles import inject_updates_module_css
-from app.utils.formatting import fmt_date, fmt_datetime
-from app.utils.permissions import can_manage_company_updates
-from app.components.company_updates_feed import PRIORITY_EDIT_OPTS, priority_for_form
-from app.services.updates_service import BANNER_UPLOAD_TYPES, resolve_company_update_banner_url
-from app.auth import effective_role
+from app.ui.streamlit_perf import fragment, fragment_rerun, ips_app_rerun
+
 _SEL = select_key("company_updates")
 _MODULE = "company_updates"
 _TABLE_KEY = "company_updates_list"
@@ -59,23 +79,14 @@ _MODAL_KEY = "ips_cu_detail_modal_id"
 _CACHE_KEY = "_ips_cu_modal_by_id"
 SELECTED_UPDATE_KEY = "selected_update_id"
 SHOW_UPDATE_MODAL_KEY = "show_update_detail_modal"
-_ALL_UPDATE_IDS_KEY = "_ips_updates_visible_ids"
-_UPD_COLS = [0.35, 3.2, 1.5, 1.6, 1.2, 1.4, 1.7, 1.3]
-_UPD_HEADER_SPECS: list[tuple[str, str | None]] = [
-    ("", None),
-    ("TITLE", None),
+_DETAIL_QUERY_ERROR_KEY = "_ips_cu_detail_query_error"
+_NEW_UPDATE_DIALOG_KEY = "ips_cu_new_dialog_open"
+_FILTER_SNAPSHOT_KEY = "_cu_filter_snapshot"
+_FILTER_FIELDS = ["category", "audience", "status"]
+_COLUMN_FILTER_SPECS: list[tuple[str, str]] = [
     ("CATEGORY", "category"),
     ("AUDIENCE", "audience"),
     ("STATUS", "status"),
-    ("EVENT DATE", None),
-    ("CREATED BY", None),
-    ("CREATED", None),
-]
-_FILTER_FIELDS = ["category", "audience", "status"]
-_COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
-    ("category", lambda r: _normalize_update_category(r.get("category"))),
-    ("audience", lambda r: _normalize_audience(r.get("audience") or r.get("visibility"))),
-    ("status", lambda r: _normalize_update_status(r.get("status"), is_active=r.get("is_active"))),
 ]
 _CATEGORY_EDIT_OPTS = [
     "Announcement",
@@ -96,50 +107,150 @@ _AUDIENCE_EDIT_OPTS = [
     "Management",
 ]
 _SORT_OPTS = ("Newest First", "Oldest First", "Title A–Z")
+_DETAIL_TABS = (
+    "Overview",
+    "Audience",
+    "Attachments",
+    "Event Details",
+    "Read Status",
+    "Notes",
+    "Activity",
+)
 
 
-def _can_manage_company_updates() -> bool:
-    return can_manage_company_updates(effective_role())
+def _status_to_active(status: str) -> bool:
+    return status not in ("Archived", "Draft")
 
 
-def _update_banner_url(update: dict) -> str:
-    return str(update.get("banner_view_url") or resolve_company_update_banner_url(update) or "").strip()
+def _safe_attachment_url(url: str) -> bool:
+    text = str(url or "").strip()
+    if not text:
+        return True
+    parsed = urlparse(text)
+    return parsed.scheme in ("http", "https")
 
 
-@st.dialog("Banner image", width="large")
-def _show_banner_preview_dialog(url: str, caption: str = "") -> None:
-    st.image(url, use_container_width=True)
-    if caption:
-        st.caption(caption)
+def _parse_event_date(raw: object) -> date | None:
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    for fmt, length in (("%Y-%m-%d", 10), ("%Y-%m-%dT%H:%M:%S", 19), ("%Y-%m-%d %H:%M:%S", 19)):
+        try:
+            return datetime.strptime(text[:length], fmt).date()
+        except ValueError:
+            continue
+    return None
 
 
-def _render_cu_banner_view(update: dict) -> None:
-    url = _update_banner_url(update)
-    if not url:
+def _format_event_date_for_save(value: object) -> str:
+    if isinstance(value, date):
+        return value.isoformat()
+    return str(value or "").strip()
+
+
+def _company_updates_detail_pending() -> bool:
+    return bool(
+        st.session_state.get(SHOW_UPDATE_MODAL_KEY)
+        or str(st.session_state.get(_MODAL_KEY) or "").strip()
+    )
+
+
+def _set_company_update_detail_tab_from_query(tab: str) -> None:
+    raw = str(tab or "").strip()
+    if not raw:
         return
-    caption = str(update.get("banner_caption") or "").strip()
-    rk = record_session_key(update, "id")
-    alt = html.escape(caption or str(update.get("title") or "Update banner"))
-    figcaption = (
-        f"<figcaption class=\"ips-cu-banner-caption\">{html.escape(caption)}</figcaption>"
-        if caption
-        else ""
+    alias = {
+        "overview": "Overview",
+        "audience": "Audience",
+        "attachments": "Attachments",
+        "event": "Event Details",
+        "event details": "Event Details",
+        "read": "Read Status",
+        "read status": "Read Status",
+        "notes": "Notes",
+        "activity": "Activity",
+    }
+    resolved = alias.get(raw.lower(), raw)
+    if resolved in _DETAIL_TABS:
+        st.session_state[_COMPANY_UPDATE_DETAIL_TAB_KEY] = resolved
+
+
+def _open_company_update_modal(update_id: str, update: dict | None) -> None:
+    uid = str(update_id or "").strip()
+    if not uid:
+        return
+    st.session_state[SELECTED_UPDATE_KEY] = uid
+    st.session_state[SHOW_UPDATE_MODAL_KEY] = True
+    open_record_modal(
+        uid,
+        update if isinstance(update, dict) else None,
+        session_select_key=_SEL,
+        modal_key=_MODAL_KEY,
+        module=_MODULE,
+        id_fields=("id",),
     )
-    st.markdown(
-        f'<figure class="ips-cu-banner-figure">'
-        f'<a href="{html.escape(url)}" target="_blank" rel="noopener" class="ips-cu-banner-link">'
-        f'<img class="ips-cu-banner-detail" src="{html.escape(url)}" alt="{alt}" />'
-        f"</a>"
-        f"{figcaption}"
-        f"</figure>",
-        unsafe_allow_html=True,
+
+
+def _capture_company_update_detail_query(permissions: CompanyUpdatesPermissions) -> None:
+    from app.perf_debug import perf_span
+
+    detail_key = company_update_detail_query_key()
+    tab_key = company_update_tab_query_key()
+    with perf_span("company_updates.detail_lookup"):
+        requested_id = str(st.query_params.get(detail_key) or "").strip()
+        if not requested_id:
+            return
+        current_id = str(st.session_state.get(_MODAL_KEY) or st.session_state.get(SELECTED_UPDATE_KEY) or "").strip()
+        if requested_id == current_id and st.session_state.get(SHOW_UPDATE_MODAL_KEY):
+            tab_focus = str(st.query_params.get(tab_key) or "").strip()
+            if tab_focus:
+                _set_company_update_detail_tab_from_query(tab_focus)
+            return
+        detail = get_company_update_detail(
+            requested_id,
+            role=permissions.role,
+            user_id=permissions.user_id,
+        )
+        if not detail:
+            st.session_state[_DETAIL_QUERY_ERROR_KEY] = requested_id
+            if detail_key in st.query_params:
+                del st.query_params[detail_key]
+            if tab_key in st.query_params:
+                del st.query_params[tab_key]
+            return
+        put_update_in_modal_cache(requested_id, detail)
+        _open_company_update_modal(requested_id, detail)
+        st.session_state[_COMPANY_UPDATE_DETAIL_TAB_KEY] = "Overview"
+        tab_focus = str(st.query_params.get(tab_key) or "").strip()
+        if tab_focus:
+            _set_company_update_detail_tab_from_query(tab_focus)
+
+
+def _show_company_update_detail_query_error_if_any() -> None:
+    if st.session_state.pop(_DETAIL_QUERY_ERROR_KEY, None):
+        st.warning("The selected company update could not be found.")
+
+
+def _clear_update_modal() -> None:
+    st.session_state[SELECTED_UPDATE_KEY] = None
+    st.session_state[SHOW_UPDATE_MODAL_KEY] = False
+    clear_edit_modes(_MODULE)
+    clear_record_modal(
+        table_key=_TABLE_KEY,
+        session_select_key=_SEL,
+        modal_key=_MODAL_KEY,
+        module=_MODULE,
     )
-    if st.button("View full size", key=f"cu_banner_full_{rk}"):
-        _show_banner_preview_dialog(url, caption)
+    detail_key = company_update_detail_query_key()
+    tab_key = company_update_tab_query_key()
+    if detail_key in st.query_params:
+        del st.query_params[detail_key]
+    if tab_key in st.query_params:
+        del st.query_params[tab_key]
 
 
 def _render_cu_banner_admin_controls(update: dict, *, rk: str, prefix: str) -> None:
-    url = _update_banner_url(update)
+    url = get_company_update_banner_preview(update)
     st.markdown("##### Banner image (optional)")
     if url:
         st.image(url, caption=str(update.get("banner_caption") or "") or None, use_container_width=True)
@@ -160,238 +271,31 @@ def _render_cu_banner_admin_controls(update: dict, *, rk: str, prefix: str) -> N
         if not row_id:
             st.warning("Sample updates cannot change banner storage.")
         else:
+            from app.pages._core._data import remove_company_update_banner_row
+
             ok, msg = remove_company_update_banner_row(row_id, existing_row=update)
             if ok:
+                invalidate_company_updates_cache(row_id)
                 st.success(msg or "Banner removed.")
-                st.rerun()
+                ips_app_rerun()
             else:
                 st.error(msg or "Could not remove banner.")
-
-
-def _user_name_lookup() -> dict[str, str]:
-    lookup: dict[str, str] = {}
-    for emp in load_employees():
-        eid = str(emp.get("id") or "").strip()
-        name = str(emp.get("name") or "").strip()
-        if eid and name:
-            lookup[eid] = name
-        email = str(emp.get("email") or "").strip().lower()
-        if email and name:
-            lookup[email] = name
-    return lookup
-
-
-def _normalize_update_category(raw: object) -> str:
-    s = str(raw or "").strip().lower()
-    if s in ("", "general"):
-        return "General"
-    if "announcement" in s:
-        return "Announcement"
-    if "safety" in s:
-        return "Safety Alert"
-    if "event" in s:
-        return "Event"
-    if "hr" in s:
-        return "HR Update"
-    if "project" in s:
-        return "Project Update"
-    return "General"
-
-
-def _normalize_update_status(raw: object, *, is_active: object = None) -> str:
-    s = str(raw or "").strip().lower()
-    if s in ("published", "active"):
-        return "Published"
-    if s == "draft":
-        return "Draft"
-    if s == "scheduled":
-        return "Scheduled"
-    if s in ("archived", "inactive"):
-        return "Archived"
-    if is_active is False:
-        return "Archived"
-    return "Published"
-
-
-def _normalize_audience(raw: object) -> str:
-    s = str(raw or "").strip()
-    if not s:
-        return "All"
-    known = {
-        "all": "All",
-        "admin": "Admin",
-        "supervisors": "Supervisors",
-        "supervisor": "Supervisors",
-        "employees": "Employees",
-        "employee": "Employees",
-        "field crew": "Field Crew",
-        "field": "Field Crew",
-        "office": "Office",
-        "management": "Management",
-    }
-    return known.get(s.lower(), s)
-
-
-def _resolve_created_by(row: dict, lookup: dict[str, str]) -> str:
-    raw = row.get("created_by_name") or row.get("created_by") or row.get("author") or row.get("author_name")
-    if raw is None:
-        return "—"
-    text = str(raw).strip()
-    if not text:
-        return "—"
-    if text in lookup:
-        return lookup[text]
-    if len(text) >= 32 and text.count("-") >= 4:
-        return lookup.get(text, "—")
-    return text
-
-
-def _fmt_event_date(row: dict) -> str:
-    raw = row.get("event_date") or row.get("event_at") or row.get("event_datetime")
-    if not raw and _normalize_update_category(row.get("category")) == "Event":
-        raw = row.get("date")
-    if not raw:
-        return "—"
-    text = str(raw).strip()
-    if "T" in text or " " in text:
-        return fmt_datetime(text)
-    return fmt_date(text)
-
-
-def _fmt_created_date(row: dict) -> str:
-    return fmt_date(row.get("created_at") or row.get("created_date") or row.get("date"))
-
-
-def _build_update_row(row: dict, lookup: dict[str, str]) -> dict:
-    category = _normalize_update_category(row.get("category"))
-    status = _normalize_update_status(row.get("status"), is_active=row.get("is_active"))
-    audience = _normalize_audience(row.get("audience") or row.get("visibility"))
-    is_pinned = bool(row.get("pinned") or row.get("is_pinned"))
-    return {
-        **row,
-        "title": str(row.get("title") or row.get("subject") or "Untitled Update"),
-        "category": category,
-        "audience": audience,
-        "status": status,
-        "event_date_display": _fmt_event_date(row),
-        "created_by_display": _resolve_created_by(row, lookup),
-        "created_display": _fmt_created_date(row),
-        "is_pinned": is_pinned,
-    }
-
-
-def _category_pill_html(category: str) -> str:
-    cls_map = {
-        "Announcement": "ips-update-category-announcement",
-        "Safety Alert": "ips-update-category-safety-alert",
-        "Event": "ips-update-category-event",
-        "HR Update": "ips-update-category-hr-update",
-        "Project Update": "ips-update-category-project-update",
-        "General": "ips-update-category-general",
-    }
-    cls = cls_map.get(category, "ips-update-category-general")
-    return f'<span class="ips-update-pill {cls}">{html.escape(category)}</span>'
-
-
-def _status_pill_html(status: str) -> str:
-    cls_map = {
-        "Published": "ips-update-status-published",
-        "Draft": "ips-update-status-draft",
-        "Scheduled": "ips-update-status-scheduled",
-        "Archived": "ips-update-status-archived",
-    }
-    cls = cls_map.get(status, "ips-update-status-published")
-    return f'<span class="ips-update-pill {cls}">{html.escape(status)}</span>'
-
-
-def _title_cell_html(title: str, is_pinned: bool) -> str:
-    pinned = '<span class="ips-update-pinned">Pinned</span>' if is_pinned else ""
-    return f'<div class="ips-updates-title">{html.escape(title)}{pinned}</div>'
-
-
-def _sort_updates(rows: list[dict], sort: str) -> list[dict]:
-    out = list(rows)
-    if sort == "Oldest First":
-        return sorted(out, key=lambda u: str(u.get("created_display") or u.get("date") or ""))
-    if sort == "Title A–Z":
-        return sorted(out, key=lambda u: str(u.get("title") or "").lower())
-    return sorted(
-        out,
-        key=lambda u: str(u.get("created_display") or u.get("date") or ""),
-        reverse=True,
-    )
-
-
-def _update_select_key(update_id: str) -> str:
-    return f"update_select_{update_id}"
-
-
-def _clear_update_selection(update_ids: list[str] | None = None) -> None:
-    st.session_state[SELECTED_UPDATE_KEY] = None
-    st.session_state[SHOW_UPDATE_MODAL_KEY] = False
-    ids = list(update_ids or [])
-    for uid in ids:
-        st.session_state[_update_select_key(uid)] = False
-    for key in list(st.session_state.keys()):
-        if isinstance(key, str) and key.startswith("update_select_"):
-            st.session_state[key] = False
-
-
-def _on_update_checkbox_change(update_id: str, all_update_ids: list[str]) -> None:
-    key = _update_select_key(update_id)
-    if st.session_state.get(key):
-        for uid in all_update_ids:
-            if uid != update_id:
-                st.session_state[_update_select_key(uid)] = False
-        st.session_state[SELECTED_UPDATE_KEY] = update_id
-        st.session_state[SHOW_UPDATE_MODAL_KEY] = True
-        st.session_state[_MODAL_KEY] = update_id
-        cache = st.session_state.get(_CACHE_KEY) or {}
-        update = cache.get(update_id) if isinstance(cache, dict) else None
-        open_record_modal(
-            update_id,
-            update if isinstance(update, dict) else None,
-            session_select_key=_SEL,
-            modal_key=_MODAL_KEY,
-            module=_MODULE,
-            id_fields=("id",),
-        )
-    elif st.session_state.get(SELECTED_UPDATE_KEY) == update_id:
-        st.session_state[SELECTED_UPDATE_KEY] = None
-        st.session_state[SHOW_UPDATE_MODAL_KEY] = False
-
-
-def _clear_update_modal() -> None:
-    update_ids = st.session_state.get(_ALL_UPDATE_IDS_KEY) or []
-    _clear_update_selection([str(uid) for uid in update_ids])
-    clear_edit_modes(_MODULE)
-    clear_record_modal(
-        table_key=_TABLE_KEY,
-        session_select_key=_SEL,
-        modal_key=_MODAL_KEY,
-        module=_MODULE,
-    )
-
-
-def _status_to_active(status: str) -> bool:
-    return status not in ("Archived", "Draft")
 
 
 def _seed_cu_edit_form(update: dict) -> None:
     rk = record_session_key(update, "id")
     st.session_state[f"cu_edit_title_{rk}"] = str(update.get("title") or "")
     st.session_state[f"cu_edit_body_{rk}"] = str(update.get("body") or "")
-    st.session_state[f"cu_edit_cat_{rk}"] = _normalize_update_category(update.get("category"))
-    st.session_state[f"cu_edit_status_{rk}"] = _normalize_update_status(
+    st.session_state[f"cu_edit_cat_{rk}"] = normalize_update_category(update.get("category"))
+    st.session_state[f"cu_edit_status_{rk}"] = normalize_update_status(
         update.get("status"),
         is_active=update.get("is_active"),
     )
-    st.session_state[f"cu_edit_audience_{rk}"] = _normalize_audience(
+    st.session_state[f"cu_edit_audience_{rk}"] = normalize_update_audience(
         update.get("audience") or update.get("visibility")
     )
-    st.session_state[f"cu_edit_event_date_{rk}"] = str(
-        update.get("event_date") or update.get("date") or ""
-    )[:10]
+    event_date = _parse_event_date(update.get("event_date") or update.get("date"))
+    st.session_state[f"cu_edit_event_date_{rk}"] = event_date
     st.session_state[f"cu_edit_pinned_{rk}"] = bool(update.get("pinned") or update.get("is_pinned"))
     st.session_state[f"cu_edit_notes_{rk}"] = str(update.get("notes") or "")
     st.session_state[f"cu_edit_priority_{rk}"] = priority_for_form(update.get("priority"))
@@ -400,108 +304,20 @@ def _seed_cu_edit_form(update: dict) -> None:
     st.session_state[f"cu_edit_banner_caption_{rk}"] = str(update.get("banner_caption") or "")
 
 
-def _render_cu_view_tabs(update: dict) -> None:
-    category = _normalize_update_category(update.get("category"))
-    status = _normalize_update_status(update.get("status"), is_active=update.get("is_active"))
-    audience = _normalize_audience(update.get("audience") or update.get("visibility"))
-    is_pinned = bool(update.get("pinned") or update.get("is_pinned"))
-    body = str(update.get("body") or "").strip() or "No message body."
-    attachment_url = str(update.get("attachment_url") or "").strip()
-    attachment_name = str(update.get("attachment_file_name") or "").strip()
-    body_html = (
-        '<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
-        f"{html.escape(body)}"
-        "</p>"
+def _render_cu_edit_form(update: dict, *, permissions: CompanyUpdatesPermissions) -> None:
+    from app.pages._core._data import (
+        delete_company_update,
+        persist_company_update,
+        persist_company_update_banner,
     )
 
-    tab_overview, tab_audience, tab_attachments, tab_event, tab_read, tab_notes, tab_activity = st.tabs(
-        ["Overview", "Audience", "Attachments", "Event Details", "Read Status", "Notes", "Activity"]
-    )
-
-    with tab_overview:
-        _render_cu_banner_view(update)
-        overview_html = (
-            '<div class="ips-detail-grid">'
-            f"{detail_field_html('Title', update.get('title'))}"
-            f'{detail_field_html("Category", category, html_value=_category_pill_html(category))}'
-            f'{detail_field_html("Status", status, html_value=_status_pill_html(status))}'
-            f"{detail_field_html('Created By', update.get('created_by_display'))}"
-            f"{detail_field_html('Created', update.get('created_display'))}"
-            f"{detail_field_html('Priority', priority_for_form(update.get('priority')))}"
-            f"{detail_field_html('Pinned', 'Yes' if is_pinned else 'No')}"
-            "</div>"
-        )
-        st.markdown(dialog_card_html("Overview", overview_html), unsafe_allow_html=True)
-        st.markdown(dialog_card_html("Content", body_html), unsafe_allow_html=True)
-
-    with tab_audience:
-        audience_html = (
-            '<div class="ips-detail-grid">'
-            f"{detail_field_html('Audience', audience)}"
-            f"{detail_field_html('Departments / Roles', update.get('departments') or '—')}"
-            "</div>"
-        )
-        st.markdown(dialog_card_html("Audience", audience_html), unsafe_allow_html=True)
-
-    with tab_attachments:
-        if attachment_url:
-            label = attachment_name or "Download attachment"
-            st.markdown(
-                dialog_card_html(
-                    "Attachments",
-                    f'<a href="{html.escape(attachment_url)}" target="_blank" rel="noopener">'
-                    f"{html.escape(label)}</a>",
-                ),
-                unsafe_allow_html=True,
-            )
-        else:
-            placeholder_html("No attachments for this update.")
-
-    with tab_event:
-        if category == "Event" or update.get("event_date") or update.get("event_at"):
-            event_html = (
-                '<div class="ips-detail-grid">'
-                f"{detail_field_html('Event Date', update.get('event_date_display'))}"
-                f"{detail_field_html('Location', update.get('event_location') or update.get('location') or '—')}"
-                "</div>"
-            )
-            st.markdown(dialog_card_html("Event Details", event_html), unsafe_allow_html=True)
-        else:
-            st.caption("No event details for this update.")
-
-    with tab_read:
-        read_flag = "Unread" if update.get("is_new") else "Read"
-        st.markdown(
-            dialog_card_html(
-                "Read Status",
-                f'<div class="ips-detail-grid">{detail_field_html("Your Status", read_flag)}</div>',
-            ),
-            unsafe_allow_html=True,
-        )
-        placeholder_html("Read receipts and viewer history will appear here when connected to Supabase.")
-
-    with tab_notes:
-        notes = str(update.get("notes") or "").strip()
-        if notes:
-            st.markdown(
-                dialog_card_html(
-                    "Notes",
-                    f'<p style="margin:0;white-space:pre-wrap;">{html.escape(notes)}</p>',
-                ),
-                unsafe_allow_html=True,
-            )
-        else:
-            placeholder_html("Notes will appear here when added.")
-
-    with tab_activity:
-        placeholder_html("Created and updated activity will appear here when connected to Supabase.")
-
-
-def _render_cu_edit_form(update: dict) -> None:
     rk = record_session_key(update, "id")
     uid = str(update.get("id") or "")
-    if f"cu_edit_title_{rk}" not in st.session_state:
+    seed_key = f"_cu_edit_seeded_{rk}"
+    detail_version = f"{uid}:{update.get('updated_at') or update.get('created_at') or ''}"
+    if st.session_state.get(seed_key) != detail_version:
         _seed_cu_edit_form(update)
+        st.session_state[seed_key] = detail_version
 
     render_edit_form_header("Edit Update")
     st.text_input("Title", key=f"cu_edit_title_{rk}")
@@ -511,7 +327,7 @@ def _render_cu_edit_form(update: dict) -> None:
         st.selectbox("Status", _STATUS_EDIT_OPTS, key=f"cu_edit_status_{rk}")
     with ec2:
         st.selectbox("Audience", _AUDIENCE_EDIT_OPTS, key=f"cu_edit_audience_{rk}")
-        st.text_input("Event date", key=f"cu_edit_event_date_{rk}", placeholder="YYYY-MM-DD")
+        st.date_input("Event date", key=f"cu_edit_event_date_{rk}", value=None)
         st.selectbox("Priority", PRIORITY_EDIT_OPTS, key=f"cu_edit_priority_{rk}")
     st.text_area("Body / content", key=f"cu_edit_body_{rk}", height=120)
     st.text_area("Notes", key=f"cu_edit_notes_{rk}", height=80)
@@ -530,64 +346,105 @@ def _render_cu_edit_form(update: dict) -> None:
         save_key=f"cu_edit_save_{rk}",
     )
     if cancelled:
-        st.rerun()
+        ips_app_rerun()
     if saved:
+        title = str(st.session_state.get(f"cu_edit_title_{rk}") or "").strip()
+        if not title:
+            st.error("Title is required.")
+            return
+        attachment_url = str(st.session_state.get(f"cu_edit_attachment_url_{rk}") or "").strip()
+        if attachment_url and not _safe_attachment_url(attachment_url):
+            st.error("Attachment URL must use http or https.")
+            return
         status = str(st.session_state.get(f"cu_edit_status_{rk}") or "Published")
         ui = {
-            "title": st.session_state.get(f"cu_edit_title_{rk}"),
+            "title": title,
             "body": st.session_state.get(f"cu_edit_body_{rk}"),
             "category": st.session_state.get(f"cu_edit_cat_{rk}"),
             "pinned": st.session_state.get(f"cu_edit_pinned_{rk}"),
             "status": status,
             "audience": st.session_state.get(f"cu_edit_audience_{rk}"),
-            "event_date": st.session_state.get(f"cu_edit_event_date_{rk}"),
+            "event_date": _format_event_date_for_save(st.session_state.get(f"cu_edit_event_date_{rk}")),
             "notes": st.session_state.get(f"cu_edit_notes_{rk}"),
             "priority": st.session_state.get(f"cu_edit_priority_{rk}"),
-            "attachment_url": st.session_state.get(f"cu_edit_attachment_url_{rk}"),
+            "attachment_url": attachment_url,
             "attachment_file_name": st.session_state.get(f"cu_edit_attachment_name_{rk}"),
             "banner_caption": st.session_state.get(f"cu_edit_banner_caption_{rk}"),
             "is_active": _status_to_active(status),
         }
         row_id = None if is_demo_id(uid) else uid
-        ok, msg = persist_company_update(ui, row_id=row_id)
+        from app.perf_debug import perf_span
+
+        with perf_span("company_updates.save"):
+            ok, msg = persist_company_update(ui, row_id=row_id)
         if ok:
             uploaded = st.session_state.get(f"cu_edit_banner_upload_{rk}")
             if uploaded is not None and row_id:
-                ok_banner, msg_banner = persist_company_update_banner(
-                    row_id,
-                    uploaded,
-                    caption=str(st.session_state.get(f"cu_edit_banner_caption_{rk}") or ""),
-                    existing_row=update,
-                )
+                with perf_span("company_updates.banner_upload"):
+                    ok_banner, msg_banner = persist_company_update_banner(
+                        row_id,
+                        uploaded,
+                        caption=str(st.session_state.get(f"cu_edit_banner_caption_{rk}") or ""),
+                        existing_row=update,
+                    )
                 if not ok_banner:
                     st.warning(msg_banner or "Update saved, but banner upload failed.")
+            invalidate_company_updates_cache(row_id)
+            if row_id:
+                fresh = get_company_update_detail(row_id, role=permissions.role, user_id=permissions.user_id)
+                if fresh:
+                    put_update_in_modal_cache(row_id, fresh)
             set_view_mode(_MODULE, rk)
             st.success(msg or "Update saved.")
-            st.rerun()
+            ips_app_rerun()
         else:
             st.error(msg or "Could not save update.")
 
-    if uid and st.button("Delete update", key=f"cu_edit_delete_{rk}", type="secondary"):
-        row_id = None if is_demo_id(uid) else uid
-        if row_id:
-            ok, msg = delete_company_update(row_id)
-            if ok:
-                _clear_update_modal()
-                st.success(msg or "Update deleted.")
-                st.rerun()
-            else:
-                st.error(msg or "Could not delete update.")
-        else:
-            st.warning("Sample updates cannot be deleted.")
+    if not permissions.can_delete:
+        return
+
+    confirm_key = f"cu_delete_confirm_{rk}"
+    if st.session_state.get(confirm_key):
+        st.warning("Delete this update? This cannot be undone.")
+        dc1, dc2 = st.columns(2)
+        with dc1:
+            if st.button("Confirm Delete", key=f"cu_edit_delete_confirm_{rk}", type="primary"):
+                row_id = None if is_demo_id(uid) else uid
+                if row_id:
+                    from app.perf_debug import perf_span
+
+                    with perf_span("company_updates.delete"):
+                        ok, msg = delete_company_update(row_id)
+                    if ok:
+                        invalidate_company_updates_cache(row_id)
+                        _clear_update_modal()
+                        st.success(msg or "Update deleted.")
+                        ips_app_rerun()
+                    else:
+                        st.error(msg or "Could not delete update.")
+                else:
+                    st.warning("Sample updates cannot be deleted.")
+        with dc2:
+            if st.button("Cancel", key=f"cu_edit_delete_cancel_{rk}"):
+                st.session_state[confirm_key] = False
+                ips_app_rerun()
+    elif st.button("Delete update", key=f"cu_edit_delete_{rk}", type="secondary"):
+        st.session_state[confirm_key] = True
+        ips_app_rerun()
 
 
-def render_company_update_detail_dialog(update: dict) -> None:
+def render_company_update_detail_dialog(
+    update: dict,
+    *,
+    permissions: CompanyUpdatesPermissions | None = None,
+) -> None:
+    perms = permissions or load_company_updates_permissions()
     rk = record_session_key(update, "id")
     st.session_state.setdefault(edit_mode_key(_MODULE, rk), False)
     edit_mode = is_edit_mode(_MODULE, rk)
 
-    category = _normalize_update_category(update.get("category"))
-    status = _normalize_update_status(update.get("status"), is_active=update.get("is_active"))
+    category = normalize_update_category(update.get("category"))
+    status = normalize_update_status(update.get("status"), is_active=update.get("is_active"))
 
     render_modal_shell()
     render_modal_header(
@@ -595,7 +452,7 @@ def render_company_update_detail_dialog(update: dict) -> None:
         subtitle=category,
         status=status,
     )
-    if _can_manage_company_updates():
+    if perms.can_manage:
         render_modal_edit_button(
             module=_MODULE,
             record_key=rk,
@@ -604,20 +461,22 @@ def render_company_update_detail_dialog(update: dict) -> None:
     render_modal_meta_grid(
         [
             ("Category", category),
-            ("Audience", _normalize_audience(update.get("audience") or update.get("visibility"))),
+            ("Audience", normalize_update_audience(update.get("audience") or update.get("visibility"))),
             ("Created", update.get("created_display")),
             ("Event Date", update.get("event_date_display")),
         ]
     )
 
-    if edit_mode and _can_manage_company_updates():
-        _render_cu_edit_form(update)
+    if edit_mode and perms.can_edit:
+        _render_cu_edit_form(update, permissions=perms)
     else:
-        _render_cu_view_tabs(update)
+        default_tab = str(st.session_state.get(_COMPANY_UPDATE_DETAIL_TAB_KEY) or "Overview")
+        render_company_update_detail_tabs(update, permissions=perms, default_tab=default_tab)
 
 
 @st.dialog("Company Update Details", width="large", on_dismiss=_clear_update_modal)
 def _show_update_detail_modal() -> None:
+    permissions = load_company_updates_permissions()
     update = get_modal_record(
         cache_key=_CACHE_KEY,
         modal_key=_MODAL_KEY,
@@ -626,210 +485,128 @@ def _show_update_detail_modal() -> None:
     if not update:
         render_missing_record(_clear_update_modal, close_key="cu_modal_missing_close")
         return
-    render_company_update_detail_dialog(update)
+    render_company_update_detail_dialog(update, permissions=permissions)
 
 
-def _filter_updates(
-    updates: list[dict],
-    *,
-    q: str,
-    sort: str,
-) -> list[dict]:
-    rows = updates
-    if q:
-        ql = q.lower()
-        rows = [
-            r
-            for r in rows
-            if ql in str(r.get("title") or "").lower()
-            or ql in str(r.get("body") or "").lower()
-            or ql in str(r.get("category") or "").lower()
-            or ql in str(r.get("audience") or "").lower()
-            or ql in str(r.get("created_by_display") or "").lower()
-            or ql in str(r.get("status") or "").lower()
-        ]
-    rows = apply_column_filters(rows, _TABLE_KEY, _COLUMN_FILTER_SPECS)
-    return _sort_updates(rows, sort)
+@st.dialog("New Company Update", width="large")
+def _show_new_company_update_dialog() -> None:
+    from app.pages._core._data import persist_company_update_banner, persist_company_update_record
 
-
-def _render_custom_updates_table(
-    filtered: list[dict],
-    *,
-    filter_options: dict[str, list[str]],
-) -> list[str]:
-    if not filtered:
-        st.info("No updates match your filters.")
-        st.session_state[_ALL_UPDATE_IDS_KEY] = []
-        return []
-
-    all_update_ids = [
-        str(u.get("id") or "").strip() for u in filtered if str(u.get("id") or "").strip()
-    ]
-    st.session_state[_ALL_UPDATE_IDS_KEY] = all_update_ids
-
-    with st.container(key="updates_table_wrap"):
-        st.markdown('<div class="ips-updates-table-wrap">', unsafe_allow_html=True)
-
-        header_cols = st.columns(_UPD_COLS, gap="small", vertical_alignment="center")
-        for col, (label, field) in zip(header_cols, _UPD_HEADER_SPECS):
-            with col:
-                if field:
-                    render_table_header_cell(
-                        label,
-                        table_key=_TABLE_KEY,
-                        filter_field=field,
-                        filter_options=filter_options.get(field, []),
-                        base_class="ips-updates-header-row ips-updates-cell",
-                    )
-                else:
-                    render_table_header_cell(
-                        label,
-                        base_class="ips-updates-header-row ips-updates-cell",
-                    )
-
-        for update in filtered:
-            uid = str(update.get("id") or "").strip()
-            if not uid:
-                continue
-
-            title = str(update.get("title") or "Untitled Update")
-            category = _normalize_update_category(update.get("category"))
-            audience = _normalize_audience(update.get("audience") or update.get("visibility"))
-            status = _normalize_update_status(update.get("status"), is_active=update.get("is_active"))
-            is_pinned = bool(update.get("pinned") or update.get("is_pinned"))
-
-            cols = st.columns(_UPD_COLS, gap="small", vertical_alignment="center")
-
-            with cols[0]:
-                st.checkbox(
-                    "",
-                    key=_update_select_key(uid),
-                    label_visibility="collapsed",
-                    on_change=_on_update_checkbox_change,
-                    args=(uid, all_update_ids),
-                )
-
-            with cols[1]:
-                st.markdown(_title_cell_html(title, is_pinned), unsafe_allow_html=True)
-
-            with cols[2]:
-                st.markdown(_category_pill_html(category), unsafe_allow_html=True)
-
-            with cols[3]:
-                st.markdown(
-                    f'<div class="ips-updates-muted ips-updates-cell">{html.escape(audience)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[4]:
-                st.markdown(_status_pill_html(status), unsafe_allow_html=True)
-
-            with cols[5]:
-                st.markdown(
-                    f'<div class="ips-updates-cell">{html.escape(str(update.get("event_date_display") or "—"))}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[6]:
-                st.markdown(
-                    f'<div class="ips-updates-cell">{html.escape(str(update.get("created_by_display") or "—"))}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[7]:
-                st.markdown(
-                    f'<div class="ips-updates-muted ips-updates-cell">'
-                    f"{html.escape(str(update.get('created_display') or '—'))}</div>",
-                    unsafe_allow_html=True,
-                )
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    return all_update_ids
-
-
-def render() -> None:
-    from app.pages._core._access import begin_module
-    if not begin_module("company_updates"):
-        return
-
-    inject_updates_module_css()
-    st.markdown(
-        '<span class="ips-updates-page ips-page-shell-marker" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
+    st.text_input("Title", key="cu_new_title")
+    nc1, nc2 = st.columns(2)
+    with nc1:
+        st.selectbox("Category", _CATEGORY_EDIT_OPTS, key="cu_new_cat")
+        st.selectbox("Status", _STATUS_EDIT_OPTS, key="cu_new_status")
+    with nc2:
+        st.selectbox("Audience", _AUDIENCE_EDIT_OPTS, key="cu_new_audience")
+        st.date_input("Event date", key="cu_new_event_date", value=None)
+        st.selectbox("Priority", PRIORITY_EDIT_OPTS, key="cu_new_priority", index=2)
+    st.text_area("Body / content", key="cu_new_body", height=100)
+    st.text_area("Notes", key="cu_new_notes", height=60)
+    st.checkbox("Pinned", key="cu_new_pinned")
+    na1, na2 = st.columns(2)
+    with na1:
+        st.text_input("Attachment URL", key="cu_new_attachment_url", placeholder="https://…")
+    with na2:
+        st.text_input("Attachment label", key="cu_new_attachment_name", placeholder="File name")
+    st.text_input(
+        "Banner caption (optional)",
+        key="cu_new_banner_caption",
+        placeholder="Short caption shown below the banner",
     )
-
-    lookup = _user_name_lookup()
-
-    def _cu_new() -> None:
-        if st.button("+ New Update", key="cu_new", type="primary", use_container_width=True):
-            st.session_state["ips_cu_form"] = True
-
-    render_page_brand_header(
-        "Company Updates",
-        "Share announcements, safety alerts, events, and company news.",
-        actions=[_cu_new] if _can_manage_company_updates() else [],
+    st.file_uploader(
+        "Upload banner image",
+        type=list(BANNER_UPLOAD_TYPES),
+        key="cu_new_banner_upload",
+        help="JPG, PNG, or WEBP — max 5 MB.",
     )
+    btn1, btn2 = st.columns(2)
+    with btn1:
+        publish = st.button("Save / Publish", key="cu_save_new", type="primary", use_container_width=True)
+    with btn2:
+        cancel = st.button("Cancel", key="cu_new_cancel", use_container_width=True)
+    if cancel:
+        st.session_state[_NEW_UPDATE_DIALOG_KEY] = False
+        ips_app_rerun()
+    if publish:
+        title = str(st.session_state.get("cu_new_title") or "").strip()
+        if not title:
+            st.error("Title is required.")
+            return
+        attachment_url = str(st.session_state.get("cu_new_attachment_url") or "").strip()
+        if attachment_url and not _safe_attachment_url(attachment_url):
+            st.error("Attachment URL must use http or https.")
+            return
+        status = str(st.session_state.get("cu_new_status") or "Published")
+        ui = {
+            "title": title,
+            "body": st.session_state.get("cu_new_body"),
+            "category": st.session_state.get("cu_new_cat"),
+            "pinned": st.session_state.get("cu_new_pinned"),
+            "status": status,
+            "audience": st.session_state.get("cu_new_audience"),
+            "event_date": _format_event_date_for_save(st.session_state.get("cu_new_event_date")),
+            "notes": st.session_state.get("cu_new_notes"),
+            "priority": st.session_state.get("cu_new_priority"),
+            "attachment_url": attachment_url,
+            "attachment_file_name": st.session_state.get("cu_new_attachment_name"),
+            "banner_caption": st.session_state.get("cu_new_banner_caption"),
+            "is_active": _status_to_active(status),
+        }
+        from app.perf_debug import perf_span
 
-    if _can_manage_company_updates() and st.session_state.get("ips_cu_form"):
-        with st.expander("New company update", expanded=True):
-            st.text_input("Title", key="cu_new_title")
-            nc1, nc2 = st.columns(2)
-            with nc1:
-                st.selectbox("Category", _CATEGORY_EDIT_OPTS, key="cu_new_cat")
-                st.selectbox("Status", _STATUS_EDIT_OPTS, key="cu_new_status")
-            with nc2:
-                st.selectbox("Audience", _AUDIENCE_EDIT_OPTS, key="cu_new_audience")
-                st.text_input("Event date", key="cu_new_event_date", placeholder="YYYY-MM-DD")
-                st.selectbox("Priority", PRIORITY_EDIT_OPTS, key="cu_new_priority", index=2)
-            st.text_area("Body / content", key="cu_new_body", height=100)
-            st.text_area("Notes", key="cu_new_notes", height=60)
-            st.checkbox("Pinned", key="cu_new_pinned")
-            na1, na2 = st.columns(2)
-            with na1:
-                st.text_input("Attachment URL", key="cu_new_attachment_url", placeholder="https://…")
-            with na2:
-                st.text_input("Attachment label", key="cu_new_attachment_name", placeholder="File name")
-            st.text_input("Banner caption (optional)", key="cu_new_banner_caption", placeholder="Short caption shown below the banner")
-            st.file_uploader(
-                "Upload banner image",
-                type=list(BANNER_UPLOAD_TYPES),
-                key="cu_new_banner_upload",
-                help="JPG, PNG, or WEBP — max 5 MB.",
+        with perf_span("company_updates.save"):
+            ok, msg, saved = persist_company_update_record(ui)
+        if not ok:
+            st.error(msg or "Could not publish update.")
+            return
+        saved_id = str(saved.get("id") or "")
+        uploaded = st.session_state.get("cu_new_banner_upload")
+        if uploaded is not None and saved_id and not is_demo_id(saved_id):
+            with perf_span("company_updates.banner_upload"):
+                ok_banner, msg_banner = persist_company_update_banner(
+                    saved_id,
+                    uploaded,
+                    caption=str(st.session_state.get("cu_new_banner_caption") or ""),
+                )
+            if not ok_banner:
+                st.warning(msg_banner or "Update published, but banner upload failed.")
+        invalidate_company_updates_cache(saved_id or None)
+        st.session_state[_NEW_UPDATE_DIALOG_KEY] = False
+        if apply_persist_feedback(True, msg):
+            ips_app_rerun()
+
+
+def _maybe_reset_cu_page_on_filter_change() -> None:
+    current = (
+        str(st.session_state.get("cu_search") or ""),
+        str(st.session_state.get("cu_sort") or "Newest First"),
+        tuple(get_column_filter_values(_TABLE_KEY, field) for field in _FILTER_FIELDS),
+    )
+    prev = st.session_state.get(_FILTER_SNAPSHOT_KEY)
+    if prev is not None and prev != current:
+        reset_table_page(_TABLE_KEY)
+    st.session_state[_FILTER_SNAPSHOT_KEY] = current
+
+
+def _render_company_updates_table_column_filters(*, filter_options: dict[str, list[str]]) -> None:
+    st.markdown('<div class="ips-updates-table-filter-toolbar">', unsafe_allow_html=True)
+    cols = st.columns(len(_COLUMN_FILTER_SPECS), gap="small")
+    for col, (label, field) in zip(cols, _COLUMN_FILTER_SPECS):
+        with col:
+            render_table_header_cell(
+                label,
+                table_key=_TABLE_KEY,
+                filter_field=field,
+                filter_options=filter_options.get(field, []),
+                base_class="ips-updates-filter-toolbar-cell",
             )
-            if st.button("Publish", key="cu_save_new", type="primary"):
-                status = str(st.session_state.get("cu_new_status") or "Published")
-                ui = {
-                    "title": st.session_state.get("cu_new_title"),
-                    "body": st.session_state.get("cu_new_body"),
-                    "category": st.session_state.get("cu_new_cat"),
-                    "pinned": st.session_state.get("cu_new_pinned"),
-                    "status": status,
-                    "audience": st.session_state.get("cu_new_audience"),
-                    "event_date": st.session_state.get("cu_new_event_date"),
-                    "notes": st.session_state.get("cu_new_notes"),
-                    "priority": st.session_state.get("cu_new_priority"),
-                    "attachment_url": st.session_state.get("cu_new_attachment_url"),
-                    "attachment_file_name": st.session_state.get("cu_new_attachment_name"),
-                    "banner_caption": st.session_state.get("cu_new_banner_caption"),
-                    "is_active": _status_to_active(status),
-                }
-                ok, msg, saved = persist_company_update_record(ui)
-                if not ok:
-                    st.error(msg or "Could not publish update.")
-                else:
-                    saved_id = str(saved.get("id") or "")
-                    uploaded = st.session_state.get("cu_new_banner_upload")
-                    if uploaded is not None and saved_id and not is_demo_id(saved_id):
-                        ok_banner, msg_banner = persist_company_update_banner(
-                            saved_id,
-                            uploaded,
-                            caption=str(st.session_state.get("cu_new_banner_caption") or ""),
-                        )
-                        if not ok_banner:
-                            st.warning(msg_banner or "Update published, but banner upload failed.")
-                    if apply_persist_feedback(True, msg, clear_keys=("ips_cu_form",)):
-                        st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+@fragment
+def _render_company_updates_directory_fragment(permissions: CompanyUpdatesPermissions) -> None:
+    from app.perf_debug import perf_span
 
     def _filters() -> None:
         c1, c2, c3 = st.columns([5, 0.6, 1])
@@ -847,9 +624,9 @@ def render() -> None:
                     _FILTER_FIELDS,
                     extra_keys=["cu_search", "cu_sort"],
                 )
-                _clear_update_selection(st.session_state.get(_ALL_UPDATE_IDS_KEY))
                 st.session_state["cu_sort"] = "Newest First"
-                st.rerun()
+                reset_table_page(_TABLE_KEY)
+                fragment_rerun()
         with c3:
             st.selectbox(
                 "Sort",
@@ -858,21 +635,117 @@ def render() -> None:
                 label_visibility="collapsed",
             )
 
+    _maybe_reset_cu_page_on_filter_change()
     layout_filter_bar(_filters)
 
-    updates = load_company_updates(category="All Updates")
-    all_rows = [_build_update_row(u, lookup) for u in updates]
-    filter_options = build_filter_options(all_rows, _COLUMN_FILTER_SPECS)
-    filtered = _filter_updates(
-        all_rows,
-        q=str(st.session_state.get("cu_search") or "").strip(),
-        sort=str(st.session_state.get("cu_sort") or "Newest First"),
+    if page_size_key(_TABLE_KEY) not in st.session_state:
+        st.session_state[page_size_key(_TABLE_KEY)] = COMPANY_UPDATES_DEFAULT_PAGE_SIZE
+
+    search = str(st.session_state.get("cu_search") or "").strip()
+    sort = str(st.session_state.get("cu_sort") or "Newest First")
+    categories = get_column_filter_values(_TABLE_KEY, "category")
+    audiences = get_column_filter_values(_TABLE_KEY, "audience")
+    statuses = get_column_filter_values(_TABLE_KEY, "status")
+    page_num, page_size, _ = pagination_meta(
+        0,
+        _TABLE_KEY,
+        default_page_size=COMPANY_UPDATES_DEFAULT_PAGE_SIZE,
     )
 
-    st.caption(f"{len(filtered)} update(s)")
+    with perf_span("company_updates.list_query"):
+        cu_page = list_company_updates_page(
+            search=search,
+            categories=categories,
+            audiences=audiences,
+            statuses=statuses,
+            sort=sort,
+            page=page_num,
+            page_size=page_size,
+        )
 
-    build_modal_cache(filtered, cache_key=_CACHE_KEY)
-    _render_custom_updates_table(filtered, filter_options=filter_options)
+    page_num, page_size, _ = pagination_meta(
+        cu_page.total_count,
+        _TABLE_KEY,
+        default_page_size=COMPANY_UPDATES_DEFAULT_PAGE_SIZE,
+    )
+    if page_num != cu_page.page or page_size != cu_page.page_size:
+        with perf_span("company_updates.list_query"):
+            cu_page = list_company_updates_page(
+                search=search,
+                categories=categories,
+                audiences=audiences,
+                statuses=statuses,
+                sort=sort,
+                page=page_num,
+                page_size=page_size,
+            )
 
-    if st.session_state.get(SELECTED_UPDATE_KEY) and st.session_state.get(SHOW_UPDATE_MODAL_KEY):
-        _show_update_detail_modal()
+    if cu_page.warning:
+        st.caption(cu_page.warning)
+
+    with perf_span("company_updates.pagination"):
+        render_table_pagination_header(
+            cu_page.total_count,
+            _TABLE_KEY,
+            item_label="update",
+        )
+
+    page_rows = cu_page.rows
+    for row in page_rows:
+        put_update_in_modal_cache(str(row.get("id") or "").strip(), row)
+
+    with st.container(key="company_updates_table_wrap"):
+        if not page_rows:
+            st.info("No updates match your filters.")
+        else:
+            _render_company_updates_table_column_filters(filter_options=cu_page.filter_options)
+            with perf_span("company_updates.table_html"):
+                st.markdown(build_company_updates_html_table(page_rows), unsafe_allow_html=True)
+
+    render_table_pagination_footer(cu_page.total_count, _TABLE_KEY)
+
+
+def render() -> None:
+    from app.pages._core._access import begin_module
+    from app.perf_debug import perf_span
+
+    if not begin_module("company_updates"):
+        return
+
+    with perf_span("company_updates.page_shell"):
+        inject_updates_module_css()
+        st.markdown(
+            '<span class="ips-updates-page ips-page-shell-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+
+    with perf_span("company_updates.permissions"):
+        permissions = load_company_updates_permissions()
+
+    def _cu_new() -> None:
+        if st.button("+ New Update", key="cu_new", type="primary", use_container_width=True):
+            st.session_state[_NEW_UPDATE_DIALOG_KEY] = True
+            ips_app_rerun()
+
+    render_page_brand_header(
+        "Company Updates",
+        "Share announcements, safety alerts, events, and company news.",
+        actions=[_cu_new] if permissions.can_create else [],
+    )
+
+    _capture_company_update_detail_query(permissions)
+    _show_company_update_detail_query_error_if_any()
+
+    if _company_updates_detail_pending():
+        if st.session_state.get(_NEW_UPDATE_DIALOG_KEY):
+            _show_new_company_update_dialog()
+        show_modal_if_pending(_MODAL_KEY, _show_update_detail_modal)
+        return
+
+    if st.session_state.get(_NEW_UPDATE_DIALOG_KEY):
+        _show_new_company_update_dialog()
+
+    _render_company_updates_directory_fragment(permissions)
+
+    if _company_updates_detail_pending():
+        show_modal_if_pending(_MODAL_KEY, _show_update_detail_modal)

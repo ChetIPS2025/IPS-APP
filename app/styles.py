@@ -9159,17 +9159,54 @@ body:has(.timekeeping-allocation-panel-marker) div[data-baseweb="popover"] li di
 
 def inject_updates_module_css() -> None:
     """Company Updates list custom table styling."""
-    if not inject_css_once("ips-updates-module-v1"):
+    if not inject_css_once("ips-updates-module-v2"):
         return
     st.markdown(
         f"""
-<style id="ips-updates-module-v1">
+<style id="ips-updates-module-v2">
 .ips-updates-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
   overflow: hidden;
   margin-bottom: 0.5rem;
+}}
+.ips-updates-html-table {{
+  width: 100%;
+  border-collapse: collapse;
+}}
+.ips-updates-th {{
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: left;
+}}
+.ips-updates-td {{
+  border-bottom: 1px solid #e2e8f0;
+  padding: 10px;
+  vertical-align: middle;
+}}
+.ips-updates-tr:hover {{
+  background: #eef5ff;
+}}
+.ips-company-update-open-link {{
+  color: #0f172a;
+  text-decoration: none;
+  font-weight: 700;
+}}
+.ips-company-update-open-link:hover {{
+  color: #1d4ed8;
+  text-decoration: underline;
+}}
+.st-key-company_updates_table_wrap .ips-updates-table-filter-toolbar {{
+  padding: 8px 10px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
 }}
 .ips-updates-header-row {{
   background: #f8fafc;
