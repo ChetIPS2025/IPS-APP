@@ -70,7 +70,6 @@ from app.services.asset_images import (
 from app.services.item_images import ITEM_IMAGE_UPLOAD_TYPES
 from app.services.assets_service import (
     ASSETS_MODAL_CACHE_KEY,
-    clear_assets_cache,
     generate_asset_qr_value,
     rebuild_asset_qr,
     get_asset_inspections,
@@ -147,8 +146,9 @@ SELECTED_ASSET_KEY = "selected_asset_id"
 SELECTED_ASSET_IDS_KEY = "selected_asset_ids"
 SHOW_ASSET_MODAL_KEY = "show_asset_detail_modal"
 _ASSET_DETAIL_QUERY_KEY = "asset_detail"
-_LAST_ASSET_DETAIL_QUERY_KEY = "_ips_last_asset_detail_query"
 _ASSET_DETAIL_QUERY_ERROR_KEY = "_ips_asset_detail_query_error"
+_ASSET_DETAIL_ACTIVE_TAB_KEY = "ips_asset_detail_active_tab"
+_BULK_MOVE_OPEN_KEY = "ips_assets_bulk_move_open"
 _ASSETS_MAIN_TAB_KEY = "ips_assets_main_tab"
 _ASSETS_MAIN_TABS = ("Equipment", "Serialized Tools", "Small Tools")
 ASSET_DETAIL_TAB_FOCUS_KEY = "ast_detail_tab_focus"
@@ -309,11 +309,6 @@ def _small_tool_job_label(row: dict, *, view: dict | None = None) -> str:
     return str(v.get("current_job_label") or "").strip() or "—"
 
 
-def _small_tool_operator_label(row: dict, *, view: dict | None = None) -> str:
-    v = view or {}
-    return str(v.get("current_operator") or "").strip() or "—"
-
-
 def _small_tool_condition_label(row: dict, *, view: dict | None = None) -> str:
     v = view or {}
     return str(v.get("condition") or row.get("condition") or "Good").strip() or "Good"
@@ -329,12 +324,6 @@ def _small_tool_name(row: dict) -> str:
     if str(row.get("row_type") or "") == "kit_item":
         return str(row.get("item_name") or "—").strip() or "—"
     return _asset_name(row)
-
-
-def _small_tool_type(row: dict) -> str:
-    if str(row.get("row_type") or "") == "kit_item":
-        return str(row.get("item_type") or "Tool").strip() or "Tool"
-    return _asset_category(row)
 
 
 def _small_tool_asset_number(row: dict) -> str:
@@ -356,22 +345,10 @@ def _small_tool_parent_kit(row: dict) -> str:
     return "—"
 
 
-def _small_tool_location(row: dict) -> str:
-    if str(row.get("row_type") or "") == "kit_item":
-        return str(row.get("parent_location") or "—").strip() or "—"
-    return _asset_location(row)
-
-
 def _small_tool_status(row: dict) -> str:
     if str(row.get("row_type") or "") == "kit_item":
         return str(row.get("status") or "Present").strip() or "Present"
     return _normalize_asset_status(row.get("status"))
-
-
-def _small_tool_value(row: dict) -> str:
-    if str(row.get("row_type") or "") == "kit_item":
-        return fmt_currency(row.get("total_value") or 0)
-    return fmt_currency(row.get("value") or row.get("purchase_price") or 0)
 
 
 def _kit_item_has_serial(item: dict) -> bool:
@@ -658,68 +635,28 @@ def _asset_serial(row: dict) -> str:
     return val if val and val != "—" else "—"
 
 
-def _asset_status_pill_html(status: str) -> str:
-    tone_map = {
-        "Available": "green",
-        "In Service": "green",
-        "Active": "green",
-        "Out for Repair": "orange",
-        "Maintenance Due": "orange",
-        "Needs Serial": "orange",
-        "Assigned": "blue",
-        "Checked Out": "blue",
-        "Overdue": "red",
-        "Down": "red",
-        "Out of Service": "red",
-        "Lost": "red",
-        "Retired": "neutral",
-        "Sold": "neutral",
-    }
-    tone = tone_map.get(status, "green")
-    return (
-        f'<span class="ips-asset-status-pill ips-asset-status-{tone}">'
-        f"{html.escape(status)}</span>"
-    )
-
-
 def _asset_image_src(asset: dict) -> str | None:
     """Resolve a browser-safe thumbnail URL via the unified catalog image resolver."""
     from app.services.catalog_images import get_catalog_image_url
     return get_catalog_image_url(asset, kind="asset")
 
 
-def _asset_open_aria_label(asset: dict) -> str:
-    name = _asset_name(asset)
-    label = name if name and name != "—" else "asset"
-    return f"Open asset details for {label}"
-
-
-def _render_asset_thumbnail(asset: dict) -> None:
-    aid = str(asset.get("id") or "").strip()
-    aria = html.escape(_asset_open_aria_label(asset), quote=True)
-    image_url = _asset_image_src(asset)
-    if image_url:
-        inner = (
-            f'<img class="ips-asset-thumb-img" src="{html.escape(image_url, quote=True)}" '
-            f'alt="" aria-hidden="true" />'
-        )
-    else:
-        inner = '<span class="ips-asset-thumb-placeholder" aria-hidden="true">—</span>'
-    st.markdown(
-        (
-            f'<button type="button" class="ips-asset-thumb-cell ips-assets-thumb-cell-link" '
-            f'data-row-id="{html.escape(aid, quote=True)}" '
-            f'aria-label="{aria}" tabindex="0">'
-            f"{inner}"
-            f"</button>"
-        ),
-        unsafe_allow_html=True,
-    )
-
-
 def _current_user_id() -> str | None:
-    from app.auth import current_profile
-    uid = str((current_profile() or {}).get("id") or "").strip()
+    from app.auth import AUTH_USER_ID_KEY, CURRENT_USER_ID_KEY, CURRENT_USER_PROFILE_KEY
+
+    uid = str(
+        st.session_state.get(AUTH_USER_ID_KEY)
+        or st.session_state.get(CURRENT_USER_ID_KEY)
+        or ""
+    ).strip()
+    if uid:
+        return uid
+    prof = (
+        st.session_state.get("auth_profile")
+        or st.session_state.get(CURRENT_USER_PROFILE_KEY)
+        or {}
+    )
+    uid = str(prof.get("id") or prof.get("user_id") or "").strip()
     return uid or None
 
 
@@ -744,10 +681,6 @@ def _render_asset_photo_manager(asset: dict) -> None:
         st.caption("Photo from linked Pricing Guide or inventory record.")
 
 
-def _render_asset_detail_image(asset: dict) -> None:
-    _render_asset_photo_manager(asset)
-
-
 def _asset_select_key(asset_id: str) -> str:
     return f"asset_select_{asset_id}"
 
@@ -760,16 +693,6 @@ def _get_selected_asset_ids() -> list[str]:
     return [str(legacy).strip()] if legacy else []
 
 
-def _set_selected_asset_ids(asset_ids: list[str]) -> None:
-    st.session_state[SELECTED_ASSET_IDS_KEY] = {str(aid).strip() for aid in asset_ids if str(aid).strip()}
-
-
-def _sync_asset_checkbox_state(asset_ids: list[str]) -> None:
-    selected = set(_get_selected_asset_ids())
-    for aid in asset_ids:
-        st.session_state[_asset_select_key(aid)] = aid in selected
-
-
 def _clear_asset_selection(asset_ids: list[str] | None = None) -> None:
     st.session_state[SELECTED_ASSET_KEY] = None
     st.session_state[SELECTED_ASSET_IDS_KEY] = set()
@@ -780,16 +703,6 @@ def _clear_asset_selection(asset_ids: list[str] | None = None) -> None:
     for key in list(st.session_state.keys()):
         if isinstance(key, str) and key.startswith("asset_select_"):
             st.session_state[key] = False
-
-
-def _on_asset_checkbox_change(asset_id: str, all_asset_ids: list[str]) -> None:
-    key = _asset_select_key(asset_id)
-    selected = set(_get_selected_asset_ids())
-    if st.session_state.get(key):
-        selected.add(asset_id)
-    else:
-        selected.discard(asset_id)
-    st.session_state[SELECTED_ASSET_IDS_KEY] = selected
 
 
 def _render_asset_expand_panel(asset: dict) -> None:
@@ -855,11 +768,6 @@ def _on_assets_table_expand(asset_id: str, asset: dict) -> None:
 def _prepare_open_assets_table_item(asset_id: str, asset: dict) -> None:
     """Set selected asset state for the detail dialog."""
     _handle_open_asset(asset)
-
-
-def _open_assets_table_item(asset_id: str, asset: dict) -> None:
-    """Bridge handler during render — modal state only; rerun handled by bridge action."""
-    _prepare_open_assets_table_item(asset_id, asset)
 
 
 def _render_custom_assets_table(
@@ -1022,18 +930,35 @@ def _render_equipment_list(
 ) -> None:
     """Equipment tab filters and table — local reruns avoid full page reload."""
     from app.pages._core.page_data_cache import page_data_cache_get
+    from app.perf_debug import perf_span
 
-    def _equipment_rows() -> list[dict]:
-        return [r for r in rows if is_equipment_tab_asset(r)]
+    catalog_version = _assets_catalog_version()
 
-    equipment_rows = page_data_cache_get(
-        f"assets_equipment_tab_{len(rows)}",
-        _equipment_rows,
-    )
-    filter_options = build_filter_options(equipment_rows, _COLUMN_FILTER_SPECS)
-    status_options = sorted(
-        {_normalize_asset_status(r.get("status")) for r in equipment_rows if _normalize_asset_status(r.get("status"))}
-    )
+    with perf_span("assets.equipment_rows"):
+        def _equipment_rows() -> list[dict]:
+            return [r for r in rows if is_equipment_tab_asset(r)]
+
+        equipment_rows = page_data_cache_get(
+            f"assets_equipment_tab_{catalog_version}",
+            _equipment_rows,
+        )
+
+    with perf_span("assets.filter_metadata"):
+        def _filter_metadata() -> tuple[dict[str, list[str]], list[str]]:
+            options = build_filter_options(equipment_rows, _COLUMN_FILTER_SPECS)
+            statuses = sorted(
+                {
+                    _normalize_asset_status(r.get("status"))
+                    for r in equipment_rows
+                    if _normalize_asset_status(r.get("status"))
+                }
+            )
+            return options, statuses
+
+        filter_options, status_options = page_data_cache_get(
+            f"assets_equipment_filter_meta_{catalog_version}",
+            _filter_metadata,
+        )
 
     def _filters() -> None:
         c1, c2, c3 = st.columns([3.2, 2.2, 0.6])
@@ -1068,10 +993,15 @@ def _render_equipment_list(
     layout_filter_bar(_filters)
     close_assets_filter_bar_shell()
 
-    assets_lookup = {
-        str(a.get("id") or "").strip(): a for a in rows if str(a.get("id") or "").strip()
-    }
-    with st.expander("Bulk move tools", expanded=False):
+    bulk_col1, bulk_col2 = st.columns([1.2, 4])
+    with bulk_col1:
+        if st.button("Bulk move tools", key="ast_bulk_move_open", use_container_width=True):
+            st.session_state[_BULK_MOVE_OPEN_KEY] = True
+            fragment_rerun()
+    if st.session_state.get(_BULK_MOVE_OPEN_KEY):
+        assets_lookup = {
+            str(a.get("id") or "").strip(): a for a in rows if str(a.get("id") or "").strip()
+        }
         render_equipment_bulk_move_toolbar(
             _get_selected_asset_ids(),
             assets_lookup,
@@ -1079,19 +1009,19 @@ def _render_equipment_list(
             on_success_cache_clear=_clear_assets_catalog_cache,
         )
 
-    filtered = _filter_rows(
-        equipment_rows,
-        q=str(st.session_state.get("ast_search") or "").strip(),
-        status=str(st.session_state.get("ast_bar_status") or "All Statuses"),
-    )
+    with perf_span("assets.filter_rows"):
+        filtered = _filter_rows(
+            equipment_rows,
+            q=str(st.session_state.get("ast_search") or "").strip(),
+            status=str(st.session_state.get("ast_bar_status") or "All Statuses"),
+        )
 
-    from app.perf_debug import perf_span
-
-    with perf_span("assets.equipment_filter"):
+    with perf_span("assets.pagination"):
         render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="asset")
         page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
-        _render_custom_assets_table(page_rows, filter_options=filter_options)
         render_table_pagination_footer(len(filtered), _TABLE_KEY)
+
+    _render_custom_assets_table(page_rows, filter_options=filter_options)
     _rerun_if_assets_modal_pending()
 
 
@@ -1284,7 +1214,15 @@ def _put_asset_in_modal_cache(asset_id: str, asset: dict | None) -> None:
 
 
 def _clear_assets_catalog_cache() -> None:
-    clear_assets_cache()
+    from app.pages._core._data import clear_assets_catalog_cache
+
+    clear_assets_catalog_cache()
+
+
+def _assets_catalog_version() -> int:
+    from app.pages._core._data import assets_catalog_data_version
+
+    return assets_catalog_data_version()
 
 
 def _cached_asset_for_modal(asset_id: str) -> dict | None:
@@ -1325,11 +1263,20 @@ def _open_assets_detail_modal(
     aid = str(asset_id or "").strip()
     if not aid:
         return
+    prev_id = str(st.session_state.get(_ASSETS_MODAL_KEY) or "").strip()
     _put_asset_in_modal_cache(aid, asset)
     st.session_state[SELECTED_ASSET_KEY] = aid
     st.session_state[SHOW_ASSET_MODAL_KEY] = True
-    if tab_focus:
-        st.session_state[ASSET_DETAIL_TAB_FOCUS_KEY] = str(tab_focus).strip()
+    focus = str(tab_focus or "").strip()
+    if not focus:
+        focus = str(st.session_state.pop(ASSET_DETAIL_TAB_FOCUS_KEY, "") or "").strip()
+    resolved_focus = _resolve_asset_detail_tab_name(focus) if focus else None
+    if resolved_focus:
+        st.session_state[_ASSET_DETAIL_ACTIVE_TAB_KEY] = resolved_focus
+    elif aid != prev_id:
+        st.session_state[_ASSET_DETAIL_ACTIVE_TAB_KEY] = "Overview"
+        st.session_state.pop(_asset_qr_loaded_key(aid), None)
+        st.session_state.pop(_asset_doc_count_loaded_key(aid), None)
     open_record_modal(
         aid,
         asset,
@@ -1345,6 +1292,54 @@ def _handle_open_asset(asset: dict) -> None:
     aid = str(asset.get("id") or "").strip()
     if aid:
         _open_assets_detail_modal(aid, asset)
+
+
+def _asset_qr_loaded_key(asset_id: str) -> str:
+    return f"_ips_asset_qr_loaded_{asset_id}"
+
+
+def _asset_doc_count_loaded_key(asset_id: str) -> str:
+    return f"_ips_asset_doc_count_loaded_{asset_id}"
+
+
+def _resolve_asset_detail_tab_name(focus: str) -> str | None:
+    raw = str(focus or "").strip().lower()
+    if not raw:
+        return None
+    aliases = {
+        "overview": "Overview",
+        "kit": "Kit / Contents",
+        "kit / contents": "Kit / Contents",
+        "contents": "Kit / Contents",
+        "maintenance": "Maintenance",
+        "documents": "Documents",
+        "assignments": "Assignments",
+        "depreciation": "Depreciation",
+        "notes": "Notes",
+        "activity": "Activity",
+    }
+    if raw in aliases:
+        return aliases[raw]
+    for tab in _ASSET_TABS:
+        if tab.lower() == raw or tab.lower().startswith(raw):
+            return tab
+    return None
+
+
+def _asset_detail_tab_labels(asset: dict, *, include_doc_count: bool) -> list[str]:
+    labels = list(_ASSET_TABS)
+    if not include_doc_count:
+        return labels
+    aid = str(asset.get("id") or "").strip()
+    if not aid:
+        return labels
+    doc_count = asset_documents_count(aid)
+    if doc_count:
+        labels = [
+            f"Documents ({doc_count})" if name == "Documents" else name
+            for name in labels
+        ]
+    return labels
 
 
 def _maintenance_rows(asset: dict) -> list[dict[str, str]]:
@@ -1378,17 +1373,6 @@ def _maintenance_rows(asset: dict) -> list[dict[str, str]]:
             "status_html": status_badge_html("In Service").replace("In Service", "Completed"),
         },
     ]
-
-
-def _asset_image_html(asset: dict) -> str:
-    url = _asset_image_src(asset)
-    if url:
-        safe = html.escape(url, quote=True)
-        alt = html.escape(str(asset.get("asset_name") or "Asset image"), quote=True)
-        return f'<img class="ips-asset-detail-image" src="{safe}" alt="{alt}" />'
-    return (
-        '<p style="margin:0;color:#64748b;font-size:0.875rem;">No asset image uploaded.</p>'
-    )
 
 
 def _asset_for_qr(asset: dict) -> dict:
@@ -1462,6 +1446,16 @@ def _render_asset_qr_block(asset: dict, aid: str) -> None:
             basename=qr_label_download_basename(qr_asset),
             build_png=lambda size_key: qr_label_png_bytes(qr_asset, subject, size=size_key),
         )
+
+
+def _render_asset_qr_section(asset: dict, aid: str) -> None:
+    loaded_key = _asset_qr_loaded_key(aid)
+    if not st.session_state.get(loaded_key):
+        if st.button("Load QR Tools", key=f"ast_qr_load_{aid}", use_container_width=True):
+            st.session_state[loaded_key] = True
+            st.rerun()
+        return
+    _render_asset_qr_block(asset, aid)
 
 
 def _render_asset_documents_tab(asset: dict) -> None:
@@ -1827,129 +1821,136 @@ def _render_asset_edit_form(asset: dict) -> None:
 
 
 def _render_asset_detail_tabs(asset: dict) -> None:
+    from app.components.tabs import render_tabs
+    from app.perf_debug import perf_span
+
     aid = str(asset.get("id") or "")
     asset_number = safe_value(asset.get("asset_number"))
     asset_name = safe_value(asset.get("asset_name"))
     status = safe_value(asset.get("status"))
 
-    aid = str(asset.get("id") or "")
-    doc_count = asset_documents_count(aid) if aid else 0
-    tab_labels = [
-        f"Documents ({doc_count})" if name == "Documents" and doc_count else name
-        for name in _ASSET_TABS
-    ]
-    (
-        tab_overview,
-        tab_kit,
-        tab_maintenance,
-        tab_documents,
-        tab_assignments,
-        tab_depreciation,
-        tab_notes,
-        tab_activity,
-    ) = st.tabs(tab_labels)
+    focus = str(st.session_state.pop(ASSET_DETAIL_TAB_FOCUS_KEY, "") or "").strip()
+    resolved_focus = _resolve_asset_detail_tab_name(focus) if focus else None
+    if resolved_focus:
+        st.session_state[_ASSET_DETAIL_ACTIVE_TAB_KEY] = resolved_focus
 
-    with tab_overview:
-        c1, c2 = st.columns([1.2, 1])
-        with c1:
-            st.markdown(
-                summary_card_html(
-                    "Asset Details",
-                    [
-                        ("Asset Number", asset_number),
-                        ("Asset Name", asset_name),
-                        ("Category", str(asset.get("category") or "—")),
-                        ("Assets tab", tracking_type_label(asset)),
-                        ("Status", status_badge_html(str(asset.get("status") or ""))),
-                        ("Location", str(asset.get("location") or "—")),
-                        ("Department", str(asset.get("department") or "—")),
-                        ("Manufacturer", str(asset.get("manufacturer") or "—")),
-                        ("Model #", str(asset.get("model_number") or asset.get("model") or "—")),
-                        ("Serial Number", str(asset.get("serial_number") or "—")),
-                        (
-                            "Rentable",
-                            "Yes" if asset_is_rentable(asset) else "No",
-                        ),
-                        *(
-                            [
-                                (
-                                    "Rental rate",
-                                    fmt_currency(primary_rental_rate_from_asset(asset))
-                                    if primary_rental_rate_from_asset(asset)
-                                    else "—",
-                                ),
-                                (
-                                    "Rental rate unit",
-                                    normalize_rental_rate_unit(asset.get("rental_rate_unit")),
-                                ),
-                                (
-                                    "Default markup %",
-                                    str(asset.get("rental_default_markup_percent") or "0"),
-                                ),
-                                ("Rental notes", str(asset.get("rental_notes") or "—")),
-                            ]
-                            if asset_is_rentable(asset)
-                            else []
-                        ),
-                        ("Description", str(asset.get("description") or "—")),
-                    ],
-                    html_value_keys=frozenset({"Status"}),
-                ),
-                unsafe_allow_html=True,
-            )
-        with c2:
-            st.markdown(
-                summary_card_html(
-                    "Usage Information",
-                    [
-                        ("Current Operator", str(asset.get("operator") or "—")),
-                        ("Primary Use", str(asset.get("primary_use") or asset.get("description") or "Equipment Transport")),
-                        ("Hours/Miles", str(asset.get("hours_miles") or "—")),
-                        ("Last Used", str(asset.get("last_used") or "—")),
-                        ("Condition", str(asset.get("condition") or "Good")),
-                        ("Next Service Due", str(asset.get("next_service_due") or "—")),
-                    ],
-                ),
-                unsafe_allow_html=True,
-            )
+    include_doc_count = bool(
+        st.session_state.get(_asset_doc_count_loaded_key(aid))
+        or str(st.session_state.get(_ASSET_DETAIL_ACTIVE_TAB_KEY) or "Overview").startswith("Documents")
+    )
+    tab_labels = _asset_detail_tab_labels(asset, include_doc_count=include_doc_count)
+    active_tab = render_tabs(
+        tab_labels,
+        session_key=_ASSET_DETAIL_ACTIVE_TAB_KEY,
+        default="Overview",
+    )
+    active_base = str(active_tab).split(" (")[0].strip()
 
-        render_asset_reclassification_panel(asset)
+    if active_base == "Documents":
+        st.session_state[_asset_doc_count_loaded_key(aid)] = True
 
-        if is_serialized_tool_asset(asset):
-            render_serialized_tool_tracking_panel(asset)
+    if active_base == "Overview":
+        with perf_span("assets.modal.overview"):
+            c1, c2 = st.columns([1.2, 1])
+            with c1:
+                st.markdown(
+                    summary_card_html(
+                        "Asset Details",
+                        [
+                            ("Asset Number", asset_number),
+                            ("Asset Name", asset_name),
+                            ("Category", str(asset.get("category") or "—")),
+                            ("Assets tab", tracking_type_label(asset)),
+                            ("Status", status_badge_html(str(asset.get("status") or ""))),
+                            ("Location", str(asset.get("location") or "—")),
+                            ("Department", str(asset.get("department") or "—")),
+                            ("Manufacturer", str(asset.get("manufacturer") or "—")),
+                            ("Model #", str(asset.get("model_number") or asset.get("model") or "—")),
+                            ("Serial Number", str(asset.get("serial_number") or "—")),
+                            (
+                                "Rentable",
+                                "Yes" if asset_is_rentable(asset) else "No",
+                            ),
+                            *(
+                                [
+                                    (
+                                        "Rental rate",
+                                        fmt_currency(primary_rental_rate_from_asset(asset))
+                                        if primary_rental_rate_from_asset(asset)
+                                        else "—",
+                                    ),
+                                    (
+                                        "Rental rate unit",
+                                        normalize_rental_rate_unit(asset.get("rental_rate_unit")),
+                                    ),
+                                    (
+                                        "Default markup %",
+                                        str(asset.get("rental_default_markup_percent") or "0"),
+                                    ),
+                                    ("Rental notes", str(asset.get("rental_notes") or "—")),
+                                ]
+                                if asset_is_rentable(asset)
+                                else []
+                            ),
+                            ("Description", str(asset.get("description") or "—")),
+                        ],
+                        html_value_keys=frozenset({"Status"}),
+                    ),
+                    unsafe_allow_html=True,
+                )
+            with c2:
+                st.markdown(
+                    summary_card_html(
+                        "Usage Information",
+                        [
+                            ("Current Operator", str(asset.get("operator") or "—")),
+                            ("Primary Use", str(asset.get("primary_use") or asset.get("description") or "Equipment Transport")),
+                            ("Hours/Miles", str(asset.get("hours_miles") or "—")),
+                            ("Last Used", str(asset.get("last_used") or "—")),
+                            ("Condition", str(asset.get("condition") or "Good")),
+                            ("Next Service Due", str(asset.get("next_service_due") or "—")),
+                        ],
+                    ),
+                    unsafe_allow_html=True,
+                )
 
-        c3, c4 = st.columns([1, 1])
-        with c3:
-            st.markdown(
-                summary_card_html(
-                    "Financial Information",
-                    [
-                        ("Acquired Date", fmt_date(asset.get("acquired_date"))),
-                        ("Purchase Price", fmt_currency(asset.get("purchase_price") or asset.get("value"))),
-                        ("Current Value", fmt_currency(asset.get("value"))),
-                        ("Salvage Value", fmt_currency(asset.get("salvage_value"))),
-                        ("Depreciation Method", str(asset.get("depreciation_method") or "Straight Line")),
-                        ("Useful Life", str(asset.get("useful_life") or "7 years")),
-                        ("Annual Depreciation", fmt_currency(asset.get("annual_depreciation"))),
-                    ],
-                ),
-                unsafe_allow_html=True,
-            )
-        with c4:
-            st.markdown("#### Image")
-            _render_asset_photo_manager(asset)
-            _render_asset_qr_block(asset, aid)
+            render_asset_reclassification_panel(asset)
 
-    with tab_kit:
-        render_kit_contents_tab(asset)
+            c3, c4 = st.columns([1, 1])
+            with c3:
+                st.markdown(
+                    summary_card_html(
+                        "Financial Information",
+                        [
+                            ("Acquired Date", fmt_date(asset.get("acquired_date"))),
+                            ("Purchase Price", fmt_currency(asset.get("purchase_price") or asset.get("value"))),
+                            ("Current Value", fmt_currency(asset.get("value"))),
+                            ("Salvage Value", fmt_currency(asset.get("salvage_value"))),
+                            ("Depreciation Method", str(asset.get("depreciation_method") or "Straight Line")),
+                            ("Useful Life", str(asset.get("useful_life") or "7 years")),
+                            ("Annual Depreciation", fmt_currency(asset.get("annual_depreciation"))),
+                        ],
+                    ),
+                    unsafe_allow_html=True,
+                )
+            with c4:
+                st.markdown("#### Image")
+                _render_asset_photo_manager(asset)
+                _render_asset_qr_section(asset, aid)
 
-    with tab_maintenance:
-        _render_asset_maintenance_tab(asset)
+    elif active_base == "Kit / Contents":
+        with perf_span("assets.modal.kit"):
+            render_kit_contents_tab(asset)
 
-    with tab_documents:
-        _render_asset_documents_tab(asset)
+    elif active_base == "Maintenance":
+        with perf_span("assets.modal.maintenance"):
+            _render_asset_maintenance_tab(asset)
 
-    with tab_assignments:
+    elif active_base == "Documents":
+        with perf_span("assets.modal.documents"):
+            _render_asset_documents_tab(asset)
+
+    elif active_base == "Assignments":
         assign_html = (
             f'<div class="ips-detail-grid">'
             f"{detail_field_html('Current Operator', asset.get('operator'))}"
@@ -1960,7 +1961,7 @@ def _render_asset_detail_tabs(asset: dict) -> None:
         )
         st.markdown(dialog_card_html("Assignments", assign_html), unsafe_allow_html=True)
 
-    with tab_depreciation:
+    elif active_base == "Depreciation":
         dep_html = (
             f'<div class="ips-detail-grid">'
             f"{detail_field_html('Acquired Date', fmt_date(asset.get('acquired_date')))}"
@@ -1974,7 +1975,7 @@ def _render_asset_detail_tabs(asset: dict) -> None:
         )
         st.markdown(dialog_card_html("Depreciation", dep_html), unsafe_allow_html=True)
 
-    with tab_notes:
+    elif active_base == "Notes":
         notes_text = safe_value(asset.get("description"), "No notes entered.")
         notes_html = (
             f'<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
@@ -1983,14 +1984,17 @@ def _render_asset_detail_tabs(asset: dict) -> None:
         )
         st.markdown(dialog_card_html("Notes", notes_html), unsafe_allow_html=True)
 
-    with tab_activity:
-        if str(st.session_state.get(ASSET_OPEN_ACTIVITY_KEY) or "") == aid:
-            st.session_state.pop(ASSET_OPEN_ACTIVITY_KEY, None)
-        try:
-            render_asset_activity_snippet(asset)
-        except Exception:
-            st.info("No recent activity for this asset.")
-        st.caption("Checkout, audit, and document events will expand here as integrations are connected.")
+    elif active_base == "Activity":
+        with perf_span("assets.modal.activity"):
+            if str(st.session_state.get(ASSET_OPEN_ACTIVITY_KEY) or "") == aid:
+                st.session_state.pop(ASSET_OPEN_ACTIVITY_KEY, None)
+            try:
+                render_asset_activity_snippet(asset)
+            except Exception:
+                st.info("No recent activity for this asset.")
+            st.caption("Checkout, audit, and document events will expand here as integrations are connected.")
+            if is_serialized_tool_asset(asset):
+                render_serialized_tool_tracking_panel(asset)
 
 
 def _asset_action_callbacks() -> tuple[object, object]:
@@ -2103,40 +2107,12 @@ def render_asset_detail_dialog(asset: dict) -> None:
         _render_asset_edit_form(asset)
     else:
         _render_asset_detail_tabs(asset)
-        _focus_asset_detail_tab_if_requested()
 
 
-def _focus_asset_detail_tab_if_requested() -> None:
-    """Select an Asset Detail tab when opened from table row actions."""
-    focus = str(st.session_state.pop(ASSET_DETAIL_TAB_FOCUS_KEY, "") or "").strip()
-    if not focus:
-        return
-    focus_lower = focus.lower()
-    from app.ui.clean_table import _components_html
-    label_js = focus_lower.replace("\\", "\\\\").replace("'", "\\'")
-    _components_html(
-        f"""
-<script>
-(function () {{
-  const w = window.parent || window;
-  const doc = w.document;
-  const dialog = doc.querySelector('[data-testid="stDialog"]');
-  if (!dialog) return;
-  const want = '{label_js}';
-  const tabs = dialog.querySelectorAll('[data-testid="stTabs"] button[role="tab"]');
-  for (const tab of tabs) {{
-    const text = (tab.textContent || '').trim().toLowerCase();
-    const base = text.replace(/\\s*\\(\\d+\\)\\s*$/, '');
-    if (base === want || base.startsWith(want) || text.startsWith(want)) {{
-      tab.click();
-      return;
-    }}
-  }}
-}})();
-</script>
-        """,
-        component_key="ips_asset_detail_tab_focus",
-        height=0,
+def _detail_modal_pending() -> bool:
+    return bool(
+        st.session_state.get(SHOW_ASSET_MODAL_KEY)
+        or str(st.session_state.get(_ASSETS_MODAL_KEY) or "").strip()
     )
 
 
@@ -2169,6 +2145,14 @@ def render() -> None:
     apply_pending_asset_deeplink()
     _capture_asset_detail_query()
     _show_asset_detail_query_error_if_any()
+
+    deeplink_sel = str(st.session_state.get(_SEL) or "").strip()
+    if deeplink_sel and not str(st.session_state.get(_ASSETS_MODAL_KEY) or "").strip():
+        deeplink_asset = _cached_asset_for_modal(deeplink_sel)
+        if deeplink_asset:
+            _open_assets_detail_modal(deeplink_sel, deeplink_asset)
+
+    detail_pending = _detail_modal_pending()
 
     def _assets_header_actions() -> None:
         st.markdown(
@@ -2222,6 +2206,10 @@ def render() -> None:
         '<span class="ips-assets-page ips-page-shell-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
+
+    if detail_pending:
+        _show_assets_modal_if_selected()
+        return
 
     if st.session_state.get(QUICK_ADD_OPEN_KEY):
         show_quick_add_tool_dialog(uploaded_by=_current_user_id())
@@ -2288,12 +2276,6 @@ def render() -> None:
                     st.success("Asset saved.")
                     st.rerun()
 
-    deeplink_sel = str(st.session_state.get(_SEL) or "").strip()
-    if deeplink_sel and not str(st.session_state.get(_ASSETS_MODAL_KEY) or "").strip():
-        deeplink_asset = _cached_asset_for_modal(deeplink_sel)
-        if deeplink_asset:
-            _open_assets_detail_modal(deeplink_sel, deeplink_asset)
-
     st.markdown(
         '<span class="ips-assets-main-tabs-anchor" aria-hidden="true"></span>',
         unsafe_allow_html=True,
@@ -2326,8 +2308,3 @@ def render() -> None:
         _render_small_tools_list(rows)
     else:
         render_hand_tools_tab(on_open_tool=_open_hand_tool_row)
-
-    if st.session_state.get(SHOW_ASSET_MODAL_KEY) or str(
-        st.session_state.get(_ASSETS_MODAL_KEY) or ""
-    ).strip():
-        _show_assets_modal_if_selected()

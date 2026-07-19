@@ -19,7 +19,17 @@ from app.pages._core.page_data_cache import (
 
 CATALOG_CACHE_TTL = 300
 _CATALOG_SESSION_KEY = "_ips_catalog_datasets"
+_ASSETS_CATALOG_VERSION_KEY = "_ips_assets_catalog_version"
 _JOBS_LIST_COST_CACHE_KEY = "_ips_jobs_list_cost_by_id"
+
+
+def assets_catalog_data_version() -> int:
+    """Monotonic token bumped whenever the assets catalog cache is invalidated."""
+    return int(st.session_state.get(_ASSETS_CATALOG_VERSION_KEY) or 0)
+
+
+def _bump_assets_catalog_data_version() -> None:
+    st.session_state[_ASSETS_CATALOG_VERSION_KEY] = assets_catalog_data_version() + 1
 
 
 def _catalog_session_get(name: str, loader):
@@ -803,6 +813,7 @@ def clear_inventory_catalog_cache() -> None:
 
 
 def clear_assets_catalog_cache() -> None:
+    _bump_assets_catalog_data_version()
     clear_assets_list_cache()
     clear_catalog_session_key("assets")
     clear_dashboard_page_data_cache()
