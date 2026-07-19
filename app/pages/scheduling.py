@@ -47,7 +47,7 @@ from app.services.scheduling_service import (
     week_range,
     build_weekly_schedule_export_rows,
 )
-from app.ui.streamlit_perf import fragment, fragment_rerun, ips_app_rerun
+from app.ui.streamlit_perf import ips_app_rerun
 
 _MODULE = "scheduling"
 _VIEW_KEY = "scheduling_view_mode"
@@ -219,7 +219,6 @@ def _open_event(event_id: str) -> None:
     ips_app_rerun()
 
 
-@fragment
 def _render_filters(
     *,
     jobs: list[dict[str, Any]],
@@ -306,6 +305,26 @@ def render() -> None:
 
     inject_scheduling_css()
 
+    from app.ui.page_header import render_page_header
+
+    def _new_event() -> None:
+        open_new_schedule_dialog()
+        ips_app_rerun()
+
+    def _refresh() -> None:
+        clear_scheduling_cache()
+        ips_app_rerun()
+
+    render_page_header(
+        "Scheduling",
+        "Plan jobs, crews, travel, and equipment assignments.",
+        icon="📅",
+        primary_action=_new_event if _can_manage_scheduling() else None,
+        show_refresh=True,
+        on_refresh=_refresh,
+        primary_action_width=2.0,
+    )
+
     (
         jobs,
         employees,
@@ -321,70 +340,51 @@ def render() -> None:
     week_start, week_end = week_range(week_anchor)
     filt = _render_filters(jobs=jobs, employees=employees)
 
-    with perf_span("scheduling.query.events"):
-        events = list_schedule_events(week_start, week_end, filters=filt)
+    with st.spinner("Loading schedule…"):
+        with perf_span("scheduling.query.events"):
+            events = list_schedule_events(week_start, week_end, filters=filt)
 
-    emp_by_event, asset_by_event = _assignment_maps(week_start, week_end)
-    events = enrich_events(
-        events,
-        jobs_by_id=jobs_by_id,
-        employees_by_id=employees_by_id,
-        customers_by_id=customers_by_id,
-        employee_rows_by_event=emp_by_event,
-    )
-    events = _apply_client_filters(events, filt, jobs_by_id=jobs_by_id)
+        emp_by_event, asset_by_event = _assignment_maps(week_start, week_end)
+        events = enrich_events(
+            events,
+            jobs_by_id=jobs_by_id,
+            employees_by_id=employees_by_id,
+            customers_by_id=customers_by_id,
+            employee_rows_by_event=emp_by_event,
+        )
+        events = _apply_client_filters(events, filt, jobs_by_id=jobs_by_id)
 
-    pad_start = week_start - timedelta(days=14)
-    pad_end = week_end + timedelta(days=14)
-    with perf_span("scheduling.refs.certs"):
-        employee_certs = load_all_certifications()
-    conflict_ids = _conflict_event_ids(
-        events,
-        employee_rows_by_event=emp_by_event,
-        asset_rows_by_event=asset_by_event,
-        pad_start=pad_start,
-        pad_end=pad_end,
-        assets_by_id=assets_by_id,
-        employee_certs=employee_certs,
-        employees_by_id=employees_by_id,
-    )
-
-    from app.ui.page_header import render_page_header
-
-    def _new_event() -> None:
-        open_new_schedule_dialog()
-        ips_app_rerun()
-
-    def _refresh() -> None:
-        clear_scheduling_cache()
-        fragment_rerun()
-
-    render_page_header(
-        "Scheduling",
-        "Plan jobs, crews, travel, and equipment assignments.",
-        icon="📅",
-        primary_action=_new_event if _can_manage_scheduling() else None,
-        show_refresh=True,
-        on_refresh=_refresh,
-        primary_action_width=2.0,
-    )
+        pad_start = week_start - timedelta(days=14)
+        pad_end = week_end + timedelta(days=14)
+        with perf_span("scheduling.refs.certs"):
+            employee_certs = load_all_certifications()
+        conflict_ids = _conflict_event_ids(
+            events,
+            employee_rows_by_event=emp_by_event,
+            asset_rows_by_event=asset_by_event,
+            pad_start=pad_start,
+            pad_end=pad_end,
+            assets_by_id=assets_by_id,
+            employee_certs=employee_certs,
+            employees_by_id=employees_by_id,
+        )
 
     nav1, nav2, nav3, nav4 = st.columns(4)
 
     def _today() -> None:
         _set_week_anchor(date.today())
         st.session_state[_DAY_KEY] = date.today()
-        fragment_rerun()
+        ips_app_rerun()
 
     def _prev_week() -> None:
         _set_week_anchor(week_anchor - timedelta(days=7))
         _clamp_day_to_week()
-        fragment_rerun()
+        ips_app_rerun()
 
     def _next_week() -> None:
         _set_week_anchor(week_anchor + timedelta(days=7))
         _clamp_day_to_week()
-        fragment_rerun()
+        ips_app_rerun()
 
     with nav1:
         st.button("Today", key="sched_hdr_today", on_click=_today, use_container_width=True)
@@ -431,7 +431,7 @@ def render() -> None:
                 use_container_width=True,
             ):
                 st.session_state[_VIEW_KEY] = mode
-                fragment_rerun()
+                ips_app_rerun()
 
     mode = _view_mode()
     with st.container(key="scheduling_page_wrap"):
