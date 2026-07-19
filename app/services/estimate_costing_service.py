@@ -255,6 +255,7 @@ def normalize_material_line(row: dict[str, Any], estimate_id: str = "") -> dict[
     return {
         "id": _str(row.get("id")),
         "estimate_id": _str(row.get("estimate_id") or estimate_id),
+        "pricing_item_id": _str(row.get("pricing_item_id")) or None,
         "inventory_item_id": _str(row.get("inventory_item_id")) or None,
         "sku": _str(row.get("sku") or row.get("item_number")),
         "item_number": _str(row.get("item_number") or row.get("sku")),
@@ -274,6 +275,9 @@ def normalize_material_line(row: dict[str, Any], estimate_id: str = "") -> dict[
         "notes": _str(row.get("notes")),
         "sort_order": int(row.get("sort_order") or 0),
     }
+
+
+normalize_estimate_material_line = normalize_material_line
 
 
 def normalize_labor_line(row: dict[str, Any], estimate_id: str = "") -> dict[str, Any]:

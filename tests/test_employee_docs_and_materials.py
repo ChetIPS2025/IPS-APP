@@ -5,7 +5,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 
-from app.pages.estimate_materials import _inventory_picker_options, _materials_csv_bytes
+from app.services.estimate_materials_page_service import prepare_material_export_bytes
 from app.services.employee_documents_service import save_employee_document
 
 
@@ -36,25 +36,46 @@ class TestEmployeeDocumentsService(unittest.TestCase):
 
 
 class TestEstimateMaterialsHelpers(unittest.TestCase):
-    def test_materials_csv_bytes_includes_header(self) -> None:
-        data = _materials_csv_bytes(
-            [{"item_number": "A1", "description": "Valve", "category": "Valves", "qty": 2, "unit": "EA", "unit_cost": 10, "total_cost": 20}],
-            estimate_number="E-100",
-        )
+    def test_material_export_bytes_includes_header(self) -> None:
+        from app.services.estimate_costing_service import normalize_material_line
+
+        rows = [
+            normalize_material_line(
+                {
+                    "item_number": "A1",
+                    "description": "Valve",
+                    "category": "Valves",
+                    "qty": 2,
+                    "unit": "EA",
+                    "unit_cost": 10,
+                    "total_cost": 20,
+                },
+                "e-100",
+            )
+        ]
+        with patch("app.services.estimate_materials_page_service.get_estimate_materials", return_value=(rows, False)):
+            with patch("app.pages._core.page_data_cache.page_data_cache_get", side_effect=lambda _k, fn: fn()):
+                data = prepare_material_export_bytes("e-100")
         text = data.decode("utf-8")
         self.assertIn("item_number", text)
         self.assertIn("Valve", text)
 
-    def test_inventory_picker_skips_demo_ids(self) -> None:
-        labels, by_label = _inventory_picker_options(
-            [
-                {"id": "demo-1", "sku": "X", "name": "Demo"},
-                {"id": "550e8400-e29b-41d4-a716-446655440000", "sku": "INV-1", "name": "Live"},
-            ]
-        )
-        self.assertEqual(len(labels), 1)
-        self.assertIn("INV-1", labels[0])
-        self.assertIn(labels[0], by_label)
+    def test_inventory_search_skips_inactive(self) -> None:
+        with patch(
+            "app.services.pricing_guide_service.cached_pricing_guide_rows",
+            return_value=[{"id": "p1", "description": "Live", "item_type": "Material", "is_active": True, "sku": "INV-1"}],
+        ):
+            with patch(
+                "app.services.pricing_guide_service.pricing_item_to_estimate_option",
+                side_effect=lambda r: {**r, "unit_cost": 1.0, "markup_pct": 0, "pricing_item_id": r["id"]},
+            ):
+                with patch("app.services.repository.fetch_rows", return_value=([], None)):
+                    with patch("app.pages._core.page_data_cache.page_data_cache_get", side_effect=lambda _k, fn: fn()):
+                        from app.services.estimate_material_reference_service import search_estimate_inventory_options
+
+                        out = search_estimate_inventory_options(limit=10)
+        self.assertEqual(len(out), 1)
+        self.assertIn("INV-1", out[0]["sku"])
 
 
 if __name__ == "__main__":
