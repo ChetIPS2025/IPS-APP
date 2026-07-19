@@ -277,6 +277,20 @@ def render_serialized_tools_table_open_buttons(
                 ips_app_rerun()
 
 
+def render_serialized_tools_table_open_bridge(
+    *,
+    component_key: str = "ips_serialized_tools_open_bridge",
+) -> str | None:
+    """Return clicked serialized tool row id via the shared clean-table link bridge."""
+    from app.ui.clean_table import render_clean_table_click_bridge
+
+    return render_clean_table_click_bridge(
+        table_selector=".ips-serialized-tools-html-table",
+        row_selector=".ips-serialized-tools-html-table tbody tr[data-row-id]",
+        component_key=component_key,
+    )
+
+
 def render_serialized_tools_table_bridge(
     *,
     component_key: str = "ips_serialized_tools_list_bridge",
@@ -291,9 +305,7 @@ def render_serialized_tools_table_bridge(
   const w = window.parent || window;
   const doc = w.document;
   const hookKey = {hook_key!r};
-  const wrapSel = ".st-key-assets_small_tools_table_wrap";
-  const openSel = wrapSel + " [data-st-action='open'][data-row-id]";
-  const selectSel = wrapSel + " [data-st-action='select'][data-row-id]";
+  const selectSel = ".ips-serialized-tools-html-table [data-st-action='select'][data-row-id]";
 
   function sendValue(action) {{
     const payload = {{ type: "streamlit:setComponentValue", value: action }};
@@ -313,53 +325,8 @@ def render_serialized_tools_table_bridge(
     }}
   }}
 
-  function clickBridgeButton(bridgeKey) {{
-    if (!bridgeKey) return false;
-    const harness = doc.querySelector(".st-key-serialized_tools_open_button_harness");
-    const escaped = CSS.escape(bridgeKey);
-    const host =
-      doc.querySelector(".st-key-" + escaped)
-      || (harness && harness.querySelector(".st-key-" + escaped))
-      || (harness && harness.querySelector('[class*="st-key-' + escaped + '"]'))
-      || (harness && harness.querySelector('[class*="' + bridgeKey + '"]'))
-      || doc.querySelector('[class*="st-key-' + escaped + '"]');
-    if (!host) {{
-      return false;
-    }}
-    const btn = host.querySelector('[data-testid="stButton"] > button, button[kind="tertiary"]');
-    if (!btn) {{
-      return false;
-    }}
-    btn.click();
-    return true;
-  }}
-
-  function openRow(id, bridgeKey) {{
-    if (!id) return;
-    if (bridgeKey) {{
-      clickBridgeButton(bridgeKey);
-    }}
-    sendValue("open:" + id);
-  }}
-
   function bindTargets() {{
-    const wrap = doc.querySelector(wrapSel);
-    if (!wrap) return;
-    wrap.querySelectorAll(openSel).forEach(function (el) {{
-      if (el.dataset.ipsStOpenBound === "1") return;
-      el.dataset.ipsStOpenBound = "1";
-      function onActivate(e) {{
-        e.preventDefault();
-        e.stopPropagation();
-        const id = el.getAttribute("data-row-id");
-        openRow(id, el.getAttribute("data-bridge-key") || "");
-      }}
-      el.addEventListener("click", onActivate, true);
-      el.addEventListener("keydown", function (e) {{
-        if (e.key === "Enter" || e.key === " ") onActivate(e);
-      }}, true);
-    }});
-    wrap.querySelectorAll(selectSel).forEach(function (el) {{
+    doc.querySelectorAll(selectSel).forEach(function (el) {{
       if (el.dataset.ipsStSelectBound === "1") return;
       el.dataset.ipsStSelectBound = "1";
       el.addEventListener("change", function (e) {{
@@ -369,25 +336,6 @@ def render_serialized_tools_table_bridge(
         sendValue("select:" + id + ":" + (el.checked ? "1" : "0"));
       }}, true);
     }});
-  }}
-
-  if (!doc.ipsSerializedToolsTableDocClick) {{
-    doc.ipsSerializedToolsTableDocClick = true;
-    doc.addEventListener("click", function (e) {{
-      const t = e.target;
-      if (!t || !t.closest) return;
-      const wrap = doc.querySelector(wrapSel);
-      if (!wrap || !wrap.contains(t)) return;
-      const link = t.closest("[data-st-action='open'][data-row-id]");
-      if (link && wrap.contains(link)) {{
-        e.preventDefault();
-        e.stopPropagation();
-        openRow(
-          link.getAttribute("data-row-id"),
-          link.getAttribute("data-bridge-key") || ""
-        );
-      }}
-    }}, true);
   }}
 
   if (!doc.ipsSerializedToolsTableRegistry) doc.ipsSerializedToolsTableRegistry = {{}};
@@ -449,6 +397,19 @@ def render_serialized_tools_table_bridge_legacy(
         '<span class="ips-serialized-tools-table-link-bridge-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
+    picked_open = render_serialized_tools_table_open_bridge()
+    if picked_open:
+        row_id = str(picked_open).strip()
+        row = row_by_id.get(row_id)
+        if row:
+            handle_serialized_tools_table_action(
+                row_id,
+                row_by_id,
+                last_action_key=last_action_key,
+                open_row_fn=open_row_fn,
+                select_row_fn=select_row_fn,
+            )
+            return
     picked = render_serialized_tools_table_bridge(
         component_key=component_key,
         hook_key=hook_key,

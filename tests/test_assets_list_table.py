@@ -93,24 +93,12 @@ def test_build_assets_html_table_includes_matching_bridge_keys():
     assert bridge_key == "ast_bridge_open_ast_uuid_1"
 
 
-def test_assets_open_buttons_use_callback_with_app_rerun() -> None:
-    from app.components.assets_list_table import render_assets_table_open_buttons
-
-    src = inspect.getsource(render_assets_table_open_buttons)
-    assert "if st.button(" in src
-    assert "ips_app_rerun()" in src
-    assert "on_click=_open" not in src
-
-
-def test_assets_bridge_clicks_hidden_button_before_send_value() -> None:
+def test_assets_bridge_uses_clean_table_click_bridge() -> None:
     from app.components.assets_list_table import render_assets_table_bridge
 
     src = inspect.getsource(render_assets_table_bridge)
-    assert "clickBridgeButton(bridgeKey)" in src
-    assert 'if (act === "open")' in src
-    assert "sendValue(act + \":\" + id)" in src
-    open_block = src.split('if (act === "open")')[1].split("function isInteractive")[0]
-    assert open_block.index("clickBridgeButton") < open_block.index("sendValue")
+    assert "render_clean_table_click_bridge" in src
+    assert ".ips-assets-html-equipment-table" in src
 
 
 def test_prepare_open_assets_table_item_sets_modal_session_keys() -> None:

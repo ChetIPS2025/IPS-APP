@@ -107,12 +107,10 @@ from app.components.asset_row_actions_ui import ASSET_OPEN_ACTIVITY_KEY, render_
 from app.components.assets_list_table import (
     build_assets_html_table,
     render_assets_table_bridge_legacy,
-    render_assets_table_open_buttons,
 )
 from app.components.serialized_tools_list_table import (
     build_serialized_tools_html_table,
     render_serialized_tools_table_bridge_legacy,
-    render_serialized_tools_table_open_buttons,
 )
 from app.components.assets_page_layout import (
     close_assets_filter_bar_shell,
@@ -892,10 +890,6 @@ def _render_custom_assets_table(
             ),
             unsafe_allow_html=True,
         )
-        render_assets_table_open_buttons(
-            filtered,
-            open_asset_fn=_prepare_open_assets_table_item,
-        )
         render_assets_table_bridge_legacy(
             assets_by_id,
             component_key="ips_assets_list_bridge",
@@ -984,10 +978,6 @@ def _render_small_tools_table(
         st.markdown(
             build_serialized_tools_html_table(display_rows, is_row_selected=_is_row_selected),
             unsafe_allow_html=True,
-        )
-        render_serialized_tools_table_open_buttons(
-            display_rows,
-            open_row_fn=_open_row,
         )
         render_serialized_tools_table_bridge_legacy(
             row_by_id,

@@ -11,13 +11,12 @@ def _assets_source() -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_serialized_tools_bridge_clicks_hidden_button_before_send_value() -> None:
-    from app.components.serialized_tools_list_table import render_serialized_tools_table_bridge
+def test_serialized_tools_open_bridge_uses_clean_table() -> None:
+    from app.components.serialized_tools_list_table import render_serialized_tools_table_open_bridge
 
-    src = inspect.getsource(render_serialized_tools_table_bridge)
-    assert "clickBridgeButton(bridgeKey)" in src
-    open_block = src.split("function openRow")[1].split("function bindTargets")[0]
-    assert open_block.index("clickBridgeButton") < open_block.index("sendValue")
+    src = inspect.getsource(render_serialized_tools_table_open_bridge)
+    assert "render_clean_table_click_bridge" in src
+    assert ".ips-serialized-tools-html-table" in src
 
 
 def test_serialized_tools_open_buttons_use_app_rerun_callback() -> None:
@@ -50,18 +49,15 @@ def test_serialized_tools_table_uses_html_bridge() -> None:
     table_block = src.split("def _render_small_tools_table(")[1].split("def _equipment_summary_counts")[0]
     assert "_render_serialized_tool_name_cell" not in src
     assert "_on_small_tool_checkbox_change" not in src
-    assert "render_serialized_tools_table_open_buttons" in table_block
+    assert "render_serialized_tools_table_open_buttons" not in table_block
     assert "render_serialized_tools_table_bridge_legacy" in table_block
 
 
-def test_equipment_table_renders_open_buttons_before_bridge() -> None:
+def test_equipment_table_uses_clean_table_bridge() -> None:
     src = _assets_source()
     table_block = src.split("def _render_custom_assets_table(")[1].split("def _render_small_tools_table_column_filters")[0]
-    assert "render_assets_table_open_buttons" in table_block
+    assert "render_assets_table_open_buttons" not in table_block
     assert "render_assets_table_bridge_legacy" in table_block
-    assert table_block.index("render_assets_table_open_buttons") < table_block.index(
-        "render_assets_table_bridge_legacy"
-    )
     assert "open_asset_fn=_prepare_open_assets_table_item" in table_block
 
 
