@@ -189,3 +189,41 @@ def render_audit_item_fields(
         "photo_path": photo.get("photo_path"),
         "photo_url": photo.get("photo_url"),
     }
+
+
+def collect_audit_line_from_session(
+    it: dict[str, Any],
+    *,
+    trailer_id: str,
+    key_prefix: str,
+    show_quantity: bool = True,
+) -> dict[str, Any]:
+    """Build audit line payload from session state (supports paginated audit UI)."""
+    iid = str(it.get("id") or "")
+    status = st.session_state.get(
+        f"{key_prefix}_stat_{iid}",
+        str(it.get("status") or "Present"),
+    )
+    condition = st.session_state.get(
+        f"{key_prefix}_cond_{iid}",
+        str(it.get("condition") or "Good"),
+    )
+    default_qty = float(it.get("quantity_actual") or it.get("quantity_expected") or 1)
+    qty = (
+        float(st.session_state.get(f"{key_prefix}_qty_{iid}", default_qty))
+        if show_quantity
+        else default_qty
+    )
+    notes = str(st.session_state.get(f"{key_prefix}_note_{iid}", "") or "")
+    photo = get_audit_item_photo(trailer_id, iid)
+    return {
+        "kit_item_id": iid,
+        "item_name": str(it.get("item_name") or "Tool"),
+        "expected_quantity": it.get("quantity_expected") or 1,
+        "actual_quantity": qty,
+        "status": status,
+        "condition": condition,
+        "notes": notes,
+        "photo_path": photo.get("photo_path"),
+        "photo_url": photo.get("photo_url"),
+    }

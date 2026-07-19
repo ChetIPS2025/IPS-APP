@@ -168,7 +168,7 @@ def test_capture_asset_detail_query_opens_modal_without_rerun() -> None:
                     assets_page._capture_asset_detail_query()
 
     mock_cache.assert_called_once_with("asset-1")
-    mock_open.assert_called_once_with("asset-1", asset)
+    mock_open.assert_called_once_with("asset-1", asset, tab_focus=None)
     mock_rerun.assert_not_called()
     mock_ips_rerun.assert_not_called()
 
