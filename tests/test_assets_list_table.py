@@ -93,12 +93,39 @@ def test_build_assets_html_table_includes_matching_bridge_keys():
     assert bridge_key == "ast_bridge_open_ast_uuid_1"
 
 
-def test_assets_bridge_uses_clean_table_click_bridge() -> None:
+def test_assets_open_buttons_use_on_click_callback() -> None:
+    from app.components.assets_list_table import render_assets_table_open_buttons
+
+    src = inspect.getsource(render_assets_table_open_buttons)
+    assert "on_click=_open" in src
+    assert "st.rerun()" not in src
+    assert "ips_app_rerun()" not in src
+
+
+def test_assets_table_bridge_uses_keyed_hidden_buttons() -> None:
     from app.components.assets_list_table import render_assets_table_bridge
 
     src = inspect.getsource(render_assets_table_bridge)
-    assert "render_clean_table_click_bridge" in src
-    assert ".ips-assets-html-equipment-table" in src
+    assert "clickBridgeButton" in src
+    assert "data-bridge-key" in src
+    assert "CSS.escape" in src
+    assert "btn.click()" in src
+    assert "sendValue" in src
+    assert "render_clean_table_click_bridge" not in src
+    assert ".st-key-assets_table_wrap" in src
+    assert "expand:" in src
+
+
+def test_custom_assets_table_wires_open_buttons_before_bridge() -> None:
+    from pathlib import Path
+
+    src = Path(__file__).resolve().parents[1].joinpath("app", "pages", "assets.py").read_text(encoding="utf-8")
+    block = src.split("def _render_custom_assets_table(")[1].split("def _render_small_tools_table_column_filters")[0]
+    assert "render_assets_table_open_buttons" in block
+    assert "render_assets_table_bridge_legacy" in block
+    open_idx = block.index("render_assets_table_open_buttons")
+    bridge_idx = block.index("render_assets_table_bridge_legacy")
+    assert open_idx < bridge_idx
 
 
 def test_prepare_open_assets_table_item_sets_modal_session_keys() -> None:
