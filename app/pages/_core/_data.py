@@ -22,6 +22,7 @@ _CATALOG_SESSION_KEY = "_ips_catalog_datasets"
 _ASSETS_CATALOG_VERSION_KEY = "_ips_assets_catalog_version"
 _JOBS_CATALOG_VERSION_KEY = "_ips_jobs_catalog_version"
 _TASKS_CATALOG_VERSION_KEY = "_ips_tasks_catalog_version"
+_EMPLOYEES_CATALOG_VERSION_KEY = "_ips_employees_catalog_version"
 _JOBS_LIST_COST_CACHE_KEY = "_ips_jobs_list_cost_by_id"
 
 
@@ -40,6 +41,11 @@ def tasks_catalog_data_version() -> int:
     return int(st.session_state.get(_TASKS_CATALOG_VERSION_KEY) or 0)
 
 
+def employees_catalog_data_version() -> int:
+    """Monotonic token bumped whenever the employees/users catalog is invalidated."""
+    return int(st.session_state.get(_EMPLOYEES_CATALOG_VERSION_KEY) or 0)
+
+
 def _bump_assets_catalog_data_version() -> None:
     st.session_state[_ASSETS_CATALOG_VERSION_KEY] = assets_catalog_data_version() + 1
 
@@ -50,6 +56,10 @@ def _bump_jobs_catalog_data_version() -> None:
 
 def _bump_tasks_catalog_data_version() -> None:
     st.session_state[_TASKS_CATALOG_VERSION_KEY] = tasks_catalog_data_version() + 1
+
+
+def _bump_employees_catalog_data_version() -> None:
+    st.session_state[_EMPLOYEES_CATALOG_VERSION_KEY] = employees_catalog_data_version() + 1
 
 
 def _catalog_session_get(name: str, loader):
@@ -859,6 +869,9 @@ def clear_employees_catalog_cache() -> None:
     clear_catalog_session_key("employees")
     clear_timekeeping_summaries_page_data_cache()
     clear_dashboard_page_data_cache()
+    from app.services.people_directory_service import invalidate_people_directory_cache
+
+    invalidate_people_directory_cache()
 
 
 def clear_tasks_catalog_cache() -> None:

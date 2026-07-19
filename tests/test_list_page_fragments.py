@@ -24,13 +24,23 @@ def test_users_table_open_prepares_modal_without_rerun() -> None:
     assert "ips_app_rerun()" not in src
 
 
-def test_users_catalog_fragment_escalates_modal_to_app_rerun() -> None:
+def test_users_catalog_fragment_uses_native_detail_links() -> None:
     src = _employees_source().replace("\r\n", "\n")
     fragment_block = src.split("@fragment\ndef _render_users_catalog_fragment")[1].split(
-        "\ndef render("
+        "\ndef _maybe_seed_core_employees"
     )[0]
-    assert "_rerun_if_user_modal_pending()" in fragment_block
+    assert "list_people_page" in fragment_block
+    assert "_render_custom_users_table" in fragment_block
+    assert "render_users_table_open_buttons" not in src
+    assert "build_people_directory_table" in src
     assert "fragment_rerun()" in fragment_block
+
+
+def test_users_render_shows_modal_outside_fragment() -> None:
+    src = _employees_source().replace("\r\n", "\n")
+    render_block = src.split("\ndef render(")[1]
+    assert "show_modal_if_pending" in render_block
+    assert "_detail_pending()" in render_block
 
 
 def test_pricing_guide_table_open_prepares_modal_without_rerun() -> None:

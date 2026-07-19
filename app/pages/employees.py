@@ -16,17 +16,24 @@ from app.components.user_actions import (
 )
 from app.components.headers import render_page_brand_header
 from app.components.layout import render_filter_bar as layout_filter_bar
+from app.components.employee_detail_tabs import render_employee_detail_tabs, reset_employee_detail_tab
+from app.components.employee_login_admin import render_lazy_install_share, render_lazy_login_panel
+from app.components.people_directory_table import build_people_directory_table
 from app.components.table_pagination import (
-    paginate_rows,
     render_table_pagination_footer,
     render_table_pagination_header,
     reset_table_page,
 )
-from app.components.users_list_table import (
-    USERS_TABLE_LAST_ACTION_KEY,
-    build_users_html_table,
-    render_users_table_bridge_legacy,
-    render_users_table_open_buttons,
+from app.services.employee_detail_service import cache_person_modal, get_modal_person, get_person_detail
+from app.services.people_directory_service import (
+    PeoplePermissions,
+    USER_COLUMN_FILTER_SPECS,
+    build_people_permissions,
+    filter_people_rows,
+    filter_users_by_deleted_visibility,
+    list_people_page,
+    user_filter_status,
+    user_is_deleted,
 )
 from app.components.users_page_layout import (
     close_users_filter_bar_shell,
@@ -34,24 +41,17 @@ from app.components.users_page_layout import (
     render_users_filter_bar_shell,
 )
 from app.components.table_filters import (
-    apply_column_filters,
-    build_filter_options,
     clear_table_filters,
-    get_column_filter_values,
     has_active_column_filters,
     render_table_header_cell,
     sanitize_column_filters,
 )
 from app.components.record_modal import (
-    build_modal_cache,
     clear_edit_modes,
     clear_record_modal,
-    detail_field_html,
-    dialog_card_html,
     get_modal_record,
     is_edit_mode,
     open_record_modal,
-    placeholder_html,
     record_session_key,
     render_edit_form_header,
     render_missing_record,
@@ -62,14 +62,11 @@ from app.components.record_modal import (
     safe_value,
     set_view_mode,
     show_modal_if_pending,
-    status_pill_html,
 )
 from app.components.tables import render_data_table
 from app.pages._core._data import (
     ACTIVE_EMPLOYEE_KEY,
     clear_employees_catalog_cache,
-    load_employee_documents,
-    load_employees,
     persist_employee,
 )
 from app.pages._core._crud import is_demo_id
@@ -85,17 +82,14 @@ from app.services.employee_role_service import (
 from app.services.repository import clear_data_cache_for_table, get_last_fetch_error
 from app.services.users_service import (
     admin_reset_employee_password,
-    can_edit_employee_profile,
     can_manage_user_actions,
     get_user_delete_context,
     resolve_employee_auth_login,
 )
 from app.styles import inject_users_module_css
 from app.ui.streamlit_perf import fragment, fragment_rerun, ips_app_rerun
-from app.utils.constants import DEPARTMENTS, SESSION_NAV_KEY
 from app.utils.dates import DATE_INPUT_FORMAT
 from app.utils.formatting import fmt_date
-from app.utils.permissions import can_view_hr_documents, normalize_role
 _SEL = select_key("employees")
 _TABLE_KEY = "employees_list"
 _SEARCH_KEY = "employees_list_search"
@@ -105,6 +99,9 @@ MODAL_KEY = "ips_employees_detail_modal_id"
 CACHE_KEY = "_ips_employees_modal_by_id"
 SELECTED_USER_KEY = "selected_user_id"
 SHOW_MODAL_KEY = "show_user_detail_modal"
+_USER_DETAIL_QUERY_KEY = "user_detail"
+_USER_DETAIL_QUERY_ERROR_KEY = "_ips_user_detail_query_error"
+_EMPLOYEE_DETAIL_TAB_KEY = "ips_employee_detail_active_tab"
 _ALL_USER_IDS_KEY = "_ips_users_visible_ids"
 _USER_COLS = [3.25, 2.85, 1.45, 1.7, 1.35, 1.05, 0.95]
 _USER_TABLE_FILTER_SPECS: list[tuple[str, str]] = [
@@ -135,6 +132,29 @@ _EMPLOYEE_TABS = [
 ]
 
 
+def _user_is_deleted(user: dict) -> bool:
+    return user_is_deleted(user)
+
+
+def _user_filter_status(user: dict) -> str:
+    return user_filter_status(user)
+
+
+def _filter_users_by_deleted_visibility(
+    rows: list[dict],
+    *,
+    status_filter: list[str] | None = None,
+) -> list[dict]:
+    return filter_users_by_deleted_visibility(rows, status_filter=status_filter)
+
+
+def _filter_employees(rows: list[dict], *, search: str = "") -> list[dict]:
+    return filter_people_rows(rows, search=search)
+
+
+_USER_COLUMN_FILTER_SPECS = USER_COLUMN_FILTER_SPECS
+
+
 def _normalize_user_status(raw: object) -> str:
     s = str(raw or "").strip().lower()
     if s in ("", "active", "enabled"):
@@ -149,33 +169,6 @@ def _normalize_user_status(raw: object) -> str:
         return "Pending"
     label = str(raw or "").strip()
     return label if label else "Active"
-
-
-def _user_is_deleted(user: dict) -> bool:
-    if user.get("is_deleted") is True:
-        return True
-    if str(user.get("deleted_at") or "").strip():
-        return True
-    return _normalize_user_status(user.get("status")) == "Deleted"
-
-
-def _user_filter_status(user: dict) -> str:
-    if _user_is_deleted(user):
-        return "Deleted"
-    return _normalize_user_status(user.get("status"))
-
-
-def _filter_users_by_deleted_visibility(
-    rows: list[dict],
-    *,
-    status_filter: list[str] | None = None,
-) -> list[dict]:
-    selected = [str(v).strip() for v in (status_filter or []) if str(v).strip()]
-    if not selected:
-        return [row for row in rows if not _user_is_deleted(row)]
-    if "Deleted" in selected:
-        return list(rows)
-    return [row for row in rows if not _user_is_deleted(row)]
 
 
 def _user_display_name(user: dict) -> str:
@@ -292,32 +285,6 @@ def _user_status_pill_html(status: str) -> str:
     return f'<span class="ips-user-pill {cls}">{html.escape(status)}</span>'
 
 
-def _filter_employees(rows: list[dict], *, search: str = "") -> list[dict]:
-    out = _filter_users_by_deleted_visibility(
-        rows,
-        status_filter=get_column_filter_values(_TABLE_KEY, "status"),
-    )
-    q = str(search or "").strip().casefold()
-    if q:
-        filtered: list[dict] = []
-        for row in out:
-            haystack = " ".join(
-                [
-                    _user_display_name(row),
-                    _user_display_email(row),
-                    _user_display_phone(row),
-                    _user_display_billing_class(row),
-                    _user_display_permission_role(row),
-                    _employee_type_label(row),
-                    _user_filter_status(row),
-                ]
-            ).casefold()
-            if q in haystack:
-                filtered.append(row)
-        out = filtered
-    return apply_column_filters(out, _TABLE_KEY, _USER_COLUMN_FILTER_SPECS)
-
-
 def _users_load_error() -> str | None:
     err = get_last_fetch_error("employees")
     if not err:
@@ -360,14 +327,11 @@ def _prepare_open_user_from_list(user: dict) -> None:
     uid = str(user.get("id") or "").strip()
     if not uid:
         return
+    record = get_person_detail(uid) or user
+    cache_person_modal(record)
+    reset_employee_detail_tab()
     st.session_state[SELECTED_USER_KEY] = uid
     st.session_state[SHOW_MODAL_KEY] = True
-    cache = st.session_state.get(CACHE_KEY) or {}
-    cached = cache.get(uid) if isinstance(cache, dict) else None
-    record = cached if isinstance(cached, dict) else user
-    if isinstance(cache, dict):
-        cache[uid] = record
-        st.session_state[CACHE_KEY] = cache
     open_record_modal(
         uid,
         record,
@@ -431,6 +395,37 @@ def _clear_employee_modal() -> None:
         modal_key=MODAL_KEY,
         module=MODULE,
     )
+    if _USER_DETAIL_QUERY_KEY in st.query_params:
+        del st.query_params[_USER_DETAIL_QUERY_KEY]
+
+
+def _capture_user_detail_query() -> None:
+    from app.perf_debug import perf_span
+
+    with perf_span("people.query_capture"):
+        requested_id = str(st.query_params.get(_USER_DETAIL_QUERY_KEY) or "").strip()
+        if not requested_id:
+            return
+        current_modal_id = str(st.session_state.get(MODAL_KEY) or "").strip()
+        if requested_id == current_modal_id and st.session_state.get(SHOW_MODAL_KEY):
+            return
+        record = get_person_detail(requested_id)
+        if not record:
+            if not st.session_state.get(_USER_DETAIL_QUERY_ERROR_KEY):
+                st.warning("The selected user could not be found.")
+                st.session_state[_USER_DETAIL_QUERY_ERROR_KEY] = requested_id
+            if _USER_DETAIL_QUERY_KEY in st.query_params:
+                del st.query_params[_USER_DETAIL_QUERY_KEY]
+            return
+        st.session_state.pop(_USER_DETAIL_QUERY_ERROR_KEY, None)
+        _prepare_open_user_from_list(record)
+
+
+def _detail_pending() -> bool:
+    return bool(
+        st.session_state.get(SHOW_MODAL_KEY)
+        or str(st.session_state.get(MODAL_KEY) or "").strip()
+    )
 
 
 def _render_custom_users_table(
@@ -455,32 +450,22 @@ def _render_custom_users_table(
     st.session_state[_ALL_USER_IDS_KEY] = all_user_ids
 
     with st.container(key="users_table_wrap"):
+        from app.perf_debug import perf_span
+
         _render_users_table_column_filters(filter_options=filter_options)
-        st.markdown(
-            build_users_html_table(
-                filtered,
-                display_name_fn=_user_display_name,
-                display_email_fn=_user_display_email,
-                display_role_fn=_user_display_permission_role,
-                display_phone_fn=_user_display_phone,
-                display_last_login_fn=lambda u: _fmt_last_login(u.get("last_login")),
-                display_status_fn=_user_filter_status,
-            ),
-            unsafe_allow_html=True,
-        )
-        render_users_table_open_buttons(
-            filtered,
-            open_user_fn=_open_users_table_user,
-        )
-        users_by_id = {
-            str(u.get("id") or "").strip(): u
-            for u in filtered
-            if str(u.get("id") or "").strip()
-        }
-        render_users_table_bridge_legacy(
-            users_by_id,
-            open_user_fn=_open_users_table_user,
-        )
+        with perf_span("people.table_html"):
+            st.markdown(
+                build_people_directory_table(
+                    filtered,
+                    display_name_fn=_user_display_name,
+                    display_email_fn=_user_display_email,
+                    display_role_fn=_user_display_permission_role,
+                    display_phone_fn=_user_display_phone,
+                    display_last_login_fn=lambda u: _fmt_last_login(u.get("last_login")),
+                    display_status_fn=_user_filter_status,
+                ),
+                unsafe_allow_html=True,
+            )
 
     return all_user_ids
 
@@ -546,109 +531,17 @@ def _seed_employee_edit_form(emp: dict) -> None:
     st.session_state[f"emp_edit_hire_clear_{rk}"] = False
 
 
-def _render_employee_detail_tabs(emp: dict) -> None:
-    eid = str(emp.get("id") or "")
-    role_norm = normalize_role(current_role())
-    name = safe_value(emp.get("name"))
-    email = safe_value(emp.get("email"))
-    billing_class = safe_value(emp.get("billing_class") or emp.get("trade"))
-    permission_role = safe_value(emp.get("permission_role") or emp.get("role"))
-    dept = safe_value(emp.get("department"))
-    status = safe_value(emp.get("status"))
-
-    (
-        tab_overview,
-        tab_role,
-        tab_depts,
-        tab_jobs,
-        tab_certs,
-        tab_docs,
-        tab_time,
-        tab_notes,
-        tab_activity,
-    ) = st.tabs(_EMPLOYEE_TABS)
-
-    with tab_overview:
-        overview_html = (
-            f'<div class="ips-detail-grid">'
-            f"{detail_field_html('Full Name', name)}"
-            f"{detail_field_html('Employee #', emp.get('employee_number'))}"
-            f"{detail_field_html('Email', email)}"
-            f"{detail_field_html('Phone', _format_phone(_user_phone_raw(emp)))}"
-            f"{detail_field_html('Position', emp.get('position'))}"
-            f"{detail_field_html('Trade', emp.get('trade'))}"
-            f"{detail_field_html('Hire Date', fmt_date(emp.get('hire_date')))}"
-            f"{detail_field_html('Username', emp.get('username'))}"
-            f"{detail_field_html('Member Since', fmt_date(emp.get('member_since')))}"
-            f'{detail_field_html("Status", status, html_value=status_pill_html(status))}'
-            f"</div>"
-        )
-        st.markdown(dialog_card_html("User Information", overview_html), unsafe_allow_html=True)
-        security_html = (
-            f'<div class="ips-detail-grid">'
-            f"{detail_field_html('Last Login', emp.get('last_login'))}"
-            f"{detail_field_html('Two-Factor Auth', 'Enabled')}"
-            f"{detail_field_html('Failed Attempts', '0')}"
-            f"{detail_field_html('Account Locked', 'No')}"
-            f"</div>"
-        )
-        st.markdown(dialog_card_html("Security", security_html), unsafe_allow_html=True)
-
-    with tab_role:
-        role_html = (
-            f'<div class="ips-detail-grid">'
-            f"{detail_field_html('Billing classification', billing_class)}"
-            f"{detail_field_html('Permission role', permission_role)}"
-            f"{detail_field_html('Department', dept)}"
-            f"</div>"
-            f'<p style="margin:0.75rem 0 0;font-size:0.8125rem;color:#64748b;">'
-            f"View Dashboard · Create &amp; Edit Jobs · Manage Inventory"
-            f"</p>"
-        )
-        st.markdown(dialog_card_html("Role & Permissions", role_html), unsafe_allow_html=True)
-
-    with tab_depts:
-        dept_html = (
-            f'<div class="ips-detail-grid">'
-            f"{detail_field_html('Primary Department', dept)}"
-            f"</div>"
-        )
-        st.markdown(dialog_card_html("Departments", dept_html), unsafe_allow_html=True)
-        st.caption(f"Available departments: {', '.join(DEPARTMENTS)}")
-
-    with tab_jobs:
-        placeholder_html("Assigned jobs will load from Supabase in a later phase.")
-
-    with tab_certs:
-        _render_user_certifications_tab(emp)
-
-    with tab_docs:
-        docs = load_employee_documents(eid, role=role_norm)
-        if not can_view_hr_documents(role_norm):
-            st.caption("Restricted HR documents are visible to administrators only.")
-        _doc_table(docs)
-        if st.button("Open Documents Module", key=f"emp_open_docs_{eid}"):
-            st.session_state[ACTIVE_EMPLOYEE_KEY] = eid
-            st.session_state[SESSION_NAV_KEY] = "employee_documents"
-            st.rerun()
-
-    with tab_time:
-        placeholder_html("Time history will load from Supabase in a later phase.")
-
-    with tab_notes:
-        notes_text = safe_value(emp.get("notes"), "No notes entered.")
-        notes_html = (
-            f'<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
-            f"{html.escape(notes_text)}"
-            f"</p>"
-        )
-        st.markdown(dialog_card_html("Notes", notes_html), unsafe_allow_html=True)
-
-    with tab_activity:
-        placeholder_html("Activity log will load from Supabase in a later phase.")
+def _render_employee_detail_tabs(emp: dict, *, permissions: PeoplePermissions) -> None:
+    render_employee_detail_tabs(
+        emp,
+        permissions=permissions,
+        format_phone_fn=_format_phone,
+        display_phone_fn=_user_display_phone,
+        display_employee_number_fn=_user_display_employee_number,
+    )
 
 
-def _render_employee_edit_form(emp: dict) -> None:
+def _render_employee_edit_form(emp: dict, *, permissions: PeoplePermissions) -> None:
     rk = record_session_key(emp, "id")
     eid = str(emp.get("id") or "")
     if f"emp_edit_name_{rk}" not in st.session_state:
@@ -657,7 +550,7 @@ def _render_employee_edit_form(emp: dict) -> None:
     render_edit_form_header("Edit User")
     if is_demo_id(eid):
         st.caption("Demo records cannot be saved to the database.")
-    if not can_edit_employee_profile():
+    if not permissions.can_edit_profile:
         st.warning("You do not have permission to update employee profiles.")
         return
 
@@ -1062,15 +955,7 @@ def _employee_type_label(emp: dict) -> str:
     return "Employee" if emp.get("is_employee") is not False else "System User"
 
 
-_USER_COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
-    ("billing_class", _user_display_billing_class),
-    ("permission_role", _user_display_permission_role),
-    ("employee_type", _employee_type_label),
-    ("status", _user_filter_status),
-]
-
-
-def render_employee_detail_dialog(emp: dict) -> None:
+def render_employee_detail_dialog(emp: dict, *, permissions: PeoplePermissions) -> None:
     rk = record_session_key(emp, "id", "email")
     name = safe_value(emp.get("name"))
     email = safe_value(emp.get("email"))
@@ -1106,92 +991,117 @@ def render_employee_detail_dialog(emp: dict) -> None:
                 ("Status", status),
             ]
         )
-        _render_user_login_panel(emp, rk)
-        from app.components.install_share import render_install_share_user_details
-        render_install_share_user_details()
+        render_lazy_login_panel(emp, rk, permissions=permissions)
+        render_lazy_install_share(permissions=permissions)
         _render_user_actions_panel(emp, rk)
 
     if is_edit_mode(MODULE, rk):
-        _render_employee_edit_form(emp)
+        _render_employee_edit_form(emp, permissions=permissions)
     else:
-        _render_employee_detail_tabs(emp)
+        _render_employee_detail_tabs(emp, permissions=permissions)
 
 
 @st.dialog("User Details", width="large", on_dismiss=_clear_employee_modal)
 def _show_employee_modal() -> None:
-    emp = get_modal_record(
-        cache_key=CACHE_KEY,
-        modal_key=MODAL_KEY,
-        session_select_key=_SEL,
+    stored = st.session_state.get("_ips_people_permissions")
+    permissions = stored if isinstance(stored, PeoplePermissions) else build_people_permissions(
+        role=current_role()
     )
+    modal_id = str(st.session_state.get(MODAL_KEY) or "").strip()
+    emp = get_modal_person(modal_id) if modal_id else None
+    if not emp:
+        emp = get_modal_record(
+            cache_key=CACHE_KEY,
+            modal_key=MODAL_KEY,
+            session_select_key=_SEL,
+        )
     if not emp:
         render_missing_record(_clear_employee_modal, close_key="emp_modal_missing_close")
         return
-    render_employee_detail_dialog(emp)
+    render_employee_detail_dialog(emp, permissions=permissions)
 
 
 @fragment
-def _render_users_catalog_fragment(
-    all_emp: list[dict],
-    *,
-    filter_options: dict[str, list[str]],
-) -> None:
+def _render_users_catalog_fragment(*, permissions: PeoplePermissions) -> None:
     """Users search, filters, and list table — local reruns for list interactions."""
+    del permissions
 
     def _filters() -> None:
-        c1, c2 = st.columns([5.4, 0.6])
-        with c1:
-            st.text_input(
-                "Search users",
-                placeholder="Search name, email, role, or status…",
-                key=_SEARCH_KEY,
-                label_visibility="collapsed",
-            )
-        with c2:
-            if st.button("Clear", key="users_clear_filters", use_container_width=True):
-                clear_table_filters(_TABLE_KEY, _FILTER_FIELDS, extra_keys=[_SEARCH_KEY])
-                reset_table_page(_TABLE_KEY)
-                _clear_user_selection(st.session_state.get(_ALL_USER_IDS_KEY))
-                st.session_state.pop(USERS_TABLE_LAST_ACTION_KEY, None)
-                fragment_rerun()
+        with st.form("users_search_form", clear_on_submit=False):
+            c1, c2, c3 = st.columns([5.0, 0.8, 0.8])
+            with c1:
+                st.text_input(
+                    "Search users",
+                    placeholder="Search name, email, role, or status…",
+                    key=_SEARCH_KEY,
+                    label_visibility="collapsed",
+                )
+            with c2:
+                st.form_submit_button("Search", use_container_width=True)
+            with c3:
+                if st.form_submit_button("Clear", use_container_width=True):
+                    clear_table_filters(_TABLE_KEY, _FILTER_FIELDS, extra_keys=[_SEARCH_KEY])
+                    reset_table_page(_TABLE_KEY)
+                    _clear_user_selection(st.session_state.get(_ALL_USER_IDS_KEY))
+                    fragment_rerun()
 
     render_users_filter_bar_shell()
     layout_filter_bar(_filters)
     close_users_filter_bar_shell()
 
     search_q = str(st.session_state.get(_SEARCH_KEY) or "").strip()
-    filtered = _filter_employees(all_emp, search=search_q)
+    from app.perf_debug import perf_span
 
-    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="user")
-    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
+    with perf_span("people.pagination"):
+        people_page = list_people_page(search=search_q)
+    if people_page.warning:
+        st.warning(people_page.warning)
 
-    modal_cache = build_modal_cache(filtered, cache_key=CACHE_KEY)
-    selected_user_id = str(st.session_state.get(SELECTED_USER_KEY) or "").strip()
-    if selected_user_id and st.session_state.get(SHOW_MODAL_KEY):
-        for emp in all_emp:
-            if str(emp.get("id") or "").strip() == selected_user_id:
-                modal_cache[selected_user_id] = emp
-                st.session_state[CACHE_KEY] = modal_cache
-                break
+    if sanitize_column_filters(_TABLE_KEY, people_page.filter_options, filter_fields=_FILTER_FIELDS):
+        reset_table_page(_TABLE_KEY)
+        fragment_rerun()
 
+    render_table_pagination_header(people_page.total_count, _TABLE_KEY, item_label="user")
     _render_custom_users_table(
-        page_rows,
-        filter_options=filter_options,
-        total_count=len(all_emp),
+        people_page.rows,
+        filter_options=people_page.filter_options,
+        total_count=people_page.total_count,
         search=search_q,
     )
+    render_table_pagination_footer(people_page.total_count, _TABLE_KEY)
 
-    render_table_pagination_footer(len(filtered), _TABLE_KEY)
-    _rerun_if_user_modal_pending()
+
+def _maybe_seed_core_employees() -> None:
+    if st.session_state.get("_ips_core_employees_seeded"):
+        return
+    from app.config import settings
+
+    demo_mode = bool(getattr(settings, "demo_mode", False) or getattr(settings, "use_demo_data", False))
+    if not demo_mode:
+        st.session_state["_ips_core_employees_seeded"] = True
+        return
+    from app.services.employee_seed_service import ensure_core_employee_seed
+
+    result = ensure_core_employee_seed()
+    st.session_state["_ips_core_employees_seeded"] = True
+    updated = int((result.data or {}).get("updated") or 0) if result.ok else 0
+    if updated > 0:
+        clear_employees_catalog_cache()
 
 
 def render() -> None:
+    from app.auth import effective_role
     from app.pages._core._access import begin_module
+
     if not begin_module("employees"):
         return
     inject_users_module_css()
     inject_users_page_layout_css()
     st.markdown('<span class="ips-users-page ips-page-shell-marker" aria-hidden="true"></span>', unsafe_allow_html=True)
+
+    permissions = build_people_permissions(role=effective_role())
+    st.session_state["_ips_people_permissions"] = permissions
+
     flash = st.session_state.pop("users_action_flash", None)
     if flash:
         kind, message = flash
@@ -1199,18 +1109,8 @@ def render() -> None:
             st.warning(message)
         else:
             st.success(message)
-    if not st.session_state.get("_ips_core_employees_seeded"):
-        from app.services.employee_seed_service import ensure_core_employee_seed
-        ensure_core_employee_seed()
-        st.session_state["_ips_core_employees_seeded"] = True
-        clear_employees_catalog_cache()
-    all_emp = load_employees()
-    if not all_emp and not _users_load_error():
-        clear_employees_catalog_cache()
-        all_emp = load_employees()
-    filter_options = build_filter_options(all_emp, _USER_COLUMN_FILTER_SPECS)
-    if sanitize_column_filters(_TABLE_KEY, filter_options, filter_fields=_FILTER_FIELDS):
-        st.rerun()
+
+    _capture_user_detail_query()
 
     def _users_export() -> None:
         st.button("Export", key="users_export", use_container_width=True)
@@ -1224,6 +1124,10 @@ def render() -> None:
         "Manage system users, roles, and permissions.",
         actions=[_users_export, _users_new],
     )
+
+    if _detail_pending() and not st.session_state.get("ips_emp_form"):
+        show_modal_if_pending(MODAL_KEY, _show_employee_modal)
+        return
 
     if st.session_state.get("ips_emp_form"):
         with st.expander("New User", expanded=True):
@@ -1250,7 +1154,7 @@ def render() -> None:
                     key="emp_new_permission",
                     help="Controls which pages and actions this user can access in the app.",
                 )
-            if can_manage_user_actions():
+            if permissions.can_manage_actions:
                 st.text_input(
                     "Login password",
                     type="password",
@@ -1282,18 +1186,19 @@ def render() -> None:
                 if not ok:
                     st.error(msg or "Could not save employee.")
                 else:
+                    from app.services.people_directory_service import invalidate_people_directory_cache
+
                     st.session_state.pop("ips_emp_form", None)
+                    invalidate_people_directory_cache()
+                    clear_employees_catalog_cache()
                     flash_kind = "success"
                     flash_msg = msg or "Employee saved."
-                    if can_manage_user_actions() and new_email:
-                        fresh = next(
-                            (
-                                e
-                                for e in load_employees()
-                                if _norm_invite_email(e.get("email")) == _norm_invite_email(new_email)
-                            ),
-                            None,
-                        )
+                    if permissions.can_manage_actions and new_email:
+                        fresh = None
+                        for row in list_people_page(search=new_email, page_size=10).rows:
+                            if _norm_invite_email(row.get("email")) == _norm_invite_email(new_email):
+                                fresh = row
+                                break
                         if fresh:
                             if len(new_pw) >= 6:
                                 try:
@@ -1312,7 +1217,9 @@ def render() -> None:
                     st.session_state["users_action_flash"] = (flash_kind, flash_msg)
                     st.rerun()
 
-    _render_users_catalog_fragment(all_emp, filter_options=filter_options)
+    _maybe_seed_core_employees()
 
-    if st.session_state.get(SHOW_MODAL_KEY) or str(st.session_state.get(MODAL_KEY) or "").strip():
+    _render_users_catalog_fragment(permissions=permissions)
+
+    if _detail_pending():
         show_modal_if_pending(MODAL_KEY, _show_employee_modal)
