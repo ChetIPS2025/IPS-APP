@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
-import base64
 import html
+from dataclasses import dataclass
 
 import streamlit as st
 
 from app.components.inventory_actions import render_inventory_action_buttons
+from app.components.inventory_directory_table import inventory_detail_query_key
+from app.components.inventory_detail_tabs import (
+    inventory_detail_active_tab_key,
+    reset_inventory_detail_tab,
+    set_inventory_detail_tab_from_query,
+)
 from app.components.inventory_list_table import (
     INVENTORY_TABLE_LAST_ACTION_KEY,
     build_inventory_html_table,
@@ -34,10 +40,22 @@ from app.components.table_filters import (
     render_table_header_cell,
 )
 from app.components.table_pagination import (
-    paginate_rows,
+    pagination_meta,
     render_table_pagination_footer,
     render_table_pagination_header,
     reset_table_page,
+)
+from app.services.inventory_detail_service import (
+    get_inventory_item_detail,
+    get_item_from_modal_cache,
+    put_item_in_modal_cache,
+)
+from app.services.inventory_directory_service import (
+    build_export_request,
+    clear_prepared_export_bytes,
+    count_inventory_needing_reorder,
+    list_inventory_export_rows,
+    list_inventory_page,
 )
 from app.components.qr_scan_history_ui import inject_qr_scan_history_css, render_qr_scan_history_table
 from app.components.record_modal import (
@@ -109,6 +127,11 @@ _CACHE_KEY = "_ips_inventory_modal_by_id"
 _MODULE = "inventory"
 SELECTED_INVENTORY_KEY = "selected_inventory_id"
 SHOW_INVENTORY_MODAL_KEY = "show_inventory_detail_modal"
+_INVENTORY_DETAIL_QUERY_KEY = inventory_detail_query_key()
+_INVENTORY_DETAIL_QUERY_ERROR_KEY = "_ips_inventory_detail_query_error"
+_INVENTORY_TAB_QUERY_KEY = "inventory_tab"
+_INVENTORY_MAIN_TAB_KEY = "ips_inventory_main_tab"
+_INVENTORY_PHOTO_MANAGE_PREFIX = "ips_inventory_photo_manage_"
 _ALL_INVENTORY_IDS_KEY = "_ips_inventory_visible_ids"
 _TABLE_KEY = "inventory_list"
 _EXPORT_CACHE_KEY = "inv_label_export_cache_key"
@@ -178,10 +201,45 @@ def _inventory_qty(row: dict) -> str:
     return format_inventory_quantity(row.get("quantity_on_hand") or row.get("qty_on_hand") or row.get("quantity"))
 
 
+@dataclass(frozen=True)
+class InventoryPermissions:
+    role: str
+    user_id: str
+    user_name: str
+    can_edit: bool
+    can_delete: bool
+    can_manage_pricing: bool
+    can_issue_to_job: bool
+
+
+def _inventory_permissions() -> InventoryPermissions:
+    from app.auth import current_profile, effective_role
+    from app.components.modal_delete import can_admin_mutate
+    from app.services.inventory_service import can_manage_inventory_actions
+
+    profile = current_profile() or {}
+    role = str(effective_role() or "").strip()
+    uid = str(profile.get("id") or "").strip()
+    name = str(profile.get("name") or profile.get("full_name") or "").strip()
+    can_edit = can_manage_inventory_actions()
+    return InventoryPermissions(
+        role=role,
+        user_id=uid,
+        user_name=name,
+        can_edit=can_edit,
+        can_delete=can_admin_mutate(),
+        can_manage_pricing=can_edit,
+        can_issue_to_job=can_edit,
+    )
+
+
+def _inventory_photo_manage_key(item_id: str) -> str:
+    return f"{_INVENTORY_PHOTO_MANAGE_PREFIX}{str(item_id or '').strip() or 'item'}"
+
+
 def _current_user_id() -> str | None:
-    from app.auth import current_profile
-    uid = str((current_profile() or {}).get("id") or "").strip()
-    return uid or None
+    perms = _inventory_permissions()
+    return perms.user_id or None
 
 
 def _render_inventory_photo_manager(item: dict) -> None:
@@ -205,8 +263,21 @@ def _render_inventory_photo_manager(item: dict) -> None:
         st.caption("Photo from linked Pricing Guide or asset record.")
 
 
-def _render_inventory_detail_image(item: dict) -> None:
-    _render_inventory_photo_manager(item)
+def _render_inventory_detail_image(item: dict, *, manage_photo: bool = False) -> None:
+    iid = str(item.get("id") or "").strip()
+    manage_key = _inventory_photo_manage_key(iid)
+    if manage_photo or st.session_state.get(manage_key):
+        _render_inventory_photo_manager(item)
+        if not manage_photo and st.button("Hide photo tools", key=f"inv_photo_hide_{iid}"):
+            st.session_state.pop(manage_key, None)
+            st.rerun()
+        return
+    from app.services.inventory_images import inventory_thumbnail_html
+
+    st.markdown(inventory_thumbnail_html(item), unsafe_allow_html=True)
+    if st.button("Manage Photo", key=f"inv_photo_manage_{iid}", use_container_width=True):
+        st.session_state[manage_key] = True
+        st.rerun()
 
 
 def _clear_inventory_selection(item_ids: list[str] | None = None) -> None:
@@ -224,9 +295,9 @@ def _render_inventory_expand_panel(item: dict) -> None:
         f"{detail_field_html('Description', _inventory_description(item))}"
         f"{detail_field_html('Location', item.get('location'))}"
         f'{detail_field_html("Status", status, html_value=status_pill_html(status))}'
-        f"{detail_field_html('Qty On Hand', int(item.get('qty_on_hand') or 0))}"
+        f"{detail_field_html('Qty On Hand', _inventory_qty(item))}"
         f"{detail_field_html('Unit', _inventory_unit(item))}"
-        f"{detail_field_html('Reorder Point', int(item.get('reorder_point') or 0))}"
+        f"{detail_field_html('Reorder Point', format_inventory_quantity(item.get('reorder_point'), _inventory_unit(item)))}"
         f"</div>"
     )
     st.markdown(dialog_card_html("Stock at a glance", stock_html), unsafe_allow_html=True)
@@ -290,18 +361,19 @@ def _render_custom_inventory_table(
             ),
             unsafe_allow_html=True,
         )
-        render_inventory_table_open_buttons(
-            filtered,
-            open_item_fn=_prepare_inventory_table_open,
-        )
-        render_inventory_table_bridge_legacy(
-            items_by_id,
-            component_key="ips_inventory_list_bridge",
-            hook_key="ipsInvList::action",
-            open_item_fn=_open_inventory_table_item,
-            on_expand_fn=_on_inventory_table_expand if field_mode else None,
-            field_mode=field_mode,
-        )
+        if field_mode:
+            render_inventory_table_open_buttons(
+                filtered,
+                open_item_fn=_prepare_inventory_table_open,
+            )
+            render_inventory_table_bridge_legacy(
+                items_by_id,
+                component_key="ips_inventory_list_bridge",
+                hook_key="ipsInvList::action",
+                open_item_fn=_open_inventory_table_item,
+                on_expand_fn=_on_inventory_table_expand,
+                field_mode=True,
+            )
 
         if field_mode and expanded_item_id and expanded_item_id in items_by_id:
             expanded_item = items_by_id[expanded_item_id]
@@ -348,6 +420,50 @@ def _clear_inventory_modal() -> None:
         modal_key=_MODAL_KEY,
         module=_MODULE,
     )
+    if _INVENTORY_DETAIL_QUERY_KEY in st.query_params:
+        del st.query_params[_INVENTORY_DETAIL_QUERY_KEY]
+    if _INVENTORY_TAB_QUERY_KEY in st.query_params:
+        del st.query_params[_INVENTORY_TAB_QUERY_KEY]
+
+
+def _inventory_detail_pending() -> bool:
+    return bool(
+        st.session_state.get(SHOW_INVENTORY_MODAL_KEY)
+        or str(st.session_state.get(_MODAL_KEY) or "").strip()
+    )
+
+
+def _capture_inventory_detail_query() -> None:
+    from app.perf_debug import perf_span
+
+    with perf_span("inventory.detail_lookup"):
+        requested_id = str(st.query_params.get(_INVENTORY_DETAIL_QUERY_KEY) or "").strip()
+        if not requested_id:
+            return
+        current_modal_id = str(st.session_state.get(_MODAL_KEY) or "").strip()
+        if requested_id == current_modal_id and st.session_state.get(SHOW_INVENTORY_MODAL_KEY):
+            tab_focus = str(st.query_params.get(_INVENTORY_TAB_QUERY_KEY) or "").strip()
+            if tab_focus:
+                set_inventory_detail_tab_from_query(tab_focus)
+            return
+        item = get_inventory_item_detail(requested_id)
+        if not item:
+            st.session_state[_INVENTORY_DETAIL_QUERY_ERROR_KEY] = requested_id
+            if _INVENTORY_DETAIL_QUERY_KEY in st.query_params:
+                del st.query_params[_INVENTORY_DETAIL_QUERY_KEY]
+            if _INVENTORY_TAB_QUERY_KEY in st.query_params:
+                del st.query_params[_INVENTORY_TAB_QUERY_KEY]
+            return
+        tab_focus = str(st.query_params.get(_INVENTORY_TAB_QUERY_KEY) or "").strip()
+        _open_inventory_modal(requested_id, item)
+        reset_inventory_detail_tab(default="Overview")
+        if tab_focus:
+            set_inventory_detail_tab_from_query(tab_focus)
+
+
+def _show_inventory_detail_query_error_if_any() -> None:
+    if st.session_state.pop(_INVENTORY_DETAIL_QUERY_ERROR_KEY, None):
+        st.warning("The selected inventory item could not be found.")
 
 
 def _open_inventory_modal(record_id: str, record: dict | None) -> None:
@@ -388,229 +504,73 @@ def _inventory_select_options(slug: str, current: str) -> list[str]:
 
 
 def _seed_inventory_edit_form(item: dict) -> None:
+    from app.utils.inventory_quantity import read_inventory_quantity
+
     iid = str(item.get("id") or "")
     st.session_state[f"inv_edit_sku_{iid}"] = str(item.get("sku") or "")
     st.session_state[f"inv_edit_name_{iid}"] = str(item.get("name") or "")
     st.session_state[f"inv_edit_cat_{iid}"] = str(item.get("category") or "")
     st.session_state[f"inv_edit_status_{iid}"] = str(item.get("status") or "")
     st.session_state[f"inv_edit_loc_{iid}"] = str(item.get("location") or "")
-    st.session_state[f"inv_edit_qty_{iid}"] = int(item.get("qty_on_hand") or 0)
+    st.session_state[f"inv_edit_qty_{iid}"] = read_inventory_quantity(
+        item, "qty_on_hand", "quantity_on_hand", "quantity"
+    )
     st.session_state[f"inv_edit_cost_{iid}"] = float(item.get("unit_cost") or 0)
 
 
-def _render_inventory_qr_block(item: dict) -> None:
-    """Clickable QR, scan link, and printable label downloads."""
-    from app.components.qr_label_toolbar import render_qr_label_png_buttons
-    from app.services.inventory_qr_labels import (
-        inventory_label_download_basename,
-        inventory_label_png_bytes,
-        inventory_qr_subject,
+def _render_inventory_detail_overview(item: dict) -> None:
+    from app.components.inventory_qr_panel import render_inventory_qr_panel
+    from app.utils.inventory_quantity import read_inventory_quantity
+
+    status = str(item.get("status") or "")
+    unit = _inventory_unit(item)
+    on_hand = read_inventory_quantity(item, "qty_on_hand", "quantity_on_hand", "quantity")
+    allocated = read_inventory_quantity(item, "quantity_allocated")
+    media1, media2, details = st.columns([1.1, 0.9, 2.0])
+    with media1:
+        st.markdown("**Item Image**")
+        _render_inventory_detail_image(item)
+    with media2:
+        render_inventory_qr_panel(item)
+    with details:
+        details_html = (
+            f'<div class="ips-detail-grid">'
+            f"{detail_field_html('SKU', item.get('sku'))}"
+            f"{detail_field_html('Description', _inventory_description(item))}"
+            f"{detail_field_html('Category', item.get('category'))}"
+            f'{detail_field_html("Status", status, html_value=status_pill_html(status))}'
+            f"{detail_field_html('Location', item.get('location'))}"
+            f"{detail_field_html('Department', item.get('department'))}"
+            f"{detail_field_html('Vendor', item.get('vendor'))}"
+            f"</div>"
+        )
+        st.markdown(dialog_card_html("Item Details", details_html), unsafe_allow_html=True)
+
+    stock_html = (
+        f'<div class="ips-detail-grid">'
+        f"{detail_field_html('Qty On Hand', format_inventory_quantity(on_hand, unit))}"
+        f"{detail_field_html('Allocated to Jobs', format_inventory_quantity(allocated, unit))}"
+        f"{detail_field_html('Reorder Point', format_inventory_quantity(item.get('reorder_point'), unit))}"
+        f"{detail_field_html('Stock policy', item.get('stock_policy_label') or 'Not stocked')}"
+        f"{detail_field_html('Needs reorder', 'Yes' if inventory_needs_reorder(item) else 'No')}"
+        f"{detail_field_html('Unit', unit)}"
+        f"{detail_field_html('Unit Cost', fmt_currency(item.get('unit_cost')))}"
+        f"</div>"
     )
-    scan_url = generate_inventory_qr_value(item)
-    subject = inventory_qr_subject(item)
-    qr_png = inventory_qr_png_bytes(item)
-    iid = str(item.get("id") or "").strip() or "item"
-
-    with st.container(border=True):
-        st.markdown(
-            '<p style="margin:0 0 0.35rem;font-weight:700;font-size:0.9rem;">Inventory QR</p>',
-            unsafe_allow_html=True,
-        )
-        if qr_png and scan_url:
-            b64 = base64.b64encode(qr_png).decode("ascii")
-            safe_url = html.escape(scan_url, quote=True)
-            st.markdown(
-                f'<a href="{safe_url}" target="_self" title="Open use form">'
-                f'<img src="data:image/png;base64,{b64}" width="132" alt="Inventory QR code" '
-                f'style="display:block;border:1px solid #e2e8f0;border-radius:8px;" />'
-                f"</a>",
-                unsafe_allow_html=True,
-            )
-        elif qr_png:
-            st.image(qr_png, width=132)
-        else:
-            st.caption(str(item.get("qr_code_value") or "—"))
-        sku = resolve_inventory_sku(item)
-        st.caption(f"SKU: **{html.escape(sku)}**", unsafe_allow_html=True)
-        if scan_url:
-            st.caption("Scan with a phone or tap to record material use.")
-            st.link_button("Open Use Form", scan_url, use_container_width=True)
-            if scan_url.startswith("http"):
-                st.caption("Scan URL")
-                st.code(scan_url, language=None)
-        render_qr_label_png_buttons(
-            key_prefix=f"inv_qr_{iid}",
-            basename=inventory_label_download_basename(item),
-            build_png=lambda size_key: inventory_label_png_bytes(item, subject, size=size_key),
-        )
-
-
-def _txn_action_label(txn_type: str) -> str:
-    from app.services.inventory_service import inventory_action_label
-    return inventory_action_label(txn_type)
-
-
-def _render_inventory_issue_to_job_form(item: dict) -> None:
-    """Record use of this consumable on a job — updates stock and job costing."""
-    iid = str(item.get("id") or "").strip()
-    if not iid:
-        return
-    from app.pages._core._data import load_jobs
-    from app.services.job_materials_service import issue_inventory_to_job
-    from app.services.job_service import job_row_select_label, sort_jobs_by_number_then_name
-    jobs = sort_jobs_by_number_then_name([j for j in load_jobs() if j.get("id")])
-    job_labels = [job_row_select_label(j) for j in jobs]
-    job_map = {job_row_select_label(j): str(j.get("id") or "") for j in jobs}
-
-    st.markdown("**Use on Job**")
-    with st.form(f"inv_issue_job_{iid}", clear_on_submit=True):
-        job_pick = st.selectbox("Job", ["— Select job —", *job_labels], key=f"inv_issue_job_pick_{iid}")
-        qty = st.number_input(
-            "Quantity",
-            key=f"inv_issue_job_qty_{iid}",
-            **inventory_qty_input_kwargs(min_value=1, value=1),
-        )
-        notes = st.text_area("Notes", key=f"inv_issue_job_notes_{iid}", height=60)
-        submit = st.form_submit_button("Use on Job", type="primary", use_container_width=True)
-
-    if not submit:
-        return
-    jid = job_map.get(str(job_pick or "").strip())
-    if not jid:
-        st.error("Select a job.")
-        return
-    qv = int(qty or 0)
-    if qv <= 0:
-        st.error("Quantity must be greater than zero.")
-        return
-    result = issue_inventory_to_job(
-        job_id=jid,
-        inventory_item_id=iid,
-        quantity=qv,
-        transaction_type="consume_on_job",
-        notes=notes,
-        usage_source="manual_inventory",
-        source="inventory_detail",
-    )
-    if result.ok:
-        st.success("Material consumed on job. Stock and job costing updated.")
-        st.rerun()
-    else:
-        st.error(result.error or "Could not record material use.")
+    st.markdown(dialog_card_html("Stock", stock_html), unsafe_allow_html=True)
 
 
 def _render_inventory_transactions_tab(item: dict) -> None:
-    iid = str(item.get("id") or "")
-    _render_inventory_issue_to_job_form(item)
-    st.divider()
-    txns = get_inventory_transactions(inventory_id=iid, limit=100)
-    last_scan = "—"
-    if txns:
-        last_scan = fmt_date(txns[0].get("created_at"))
+    from app.components.inventory_transactions_panel import render_inventory_transactions_panel
 
-    c1, c2, c3 = st.columns(3, gap="small")
-    with c1:
-        st.metric("On Hand", int(item.get("qty_on_hand") or 0))
-    with c2:
-        st.metric("Allocated", int(float(item.get("quantity_allocated") or 0)))
-    with c3:
-        st.metric("Last use", last_scan)
-
-    scan_url = generate_inventory_qr_value(item)
-    if scan_url:
-        st.link_button("Open Use Form", scan_url, use_container_width=True)
-        st.code(scan_url, language=None)
-
-    if not txns:
-        st.caption("No scan transactions yet.")
-        return
-
-    head = (
-        '<div class="ips-inventory-txn-head">'
-        '<span>Date</span><span>Action</span><span>Qty</span><span>Job</span>'
-        '<span>Scanned By</span><span>Phone</span><span>Notes</span>'
-        "</div>"
-    )
-    rows_html = ""
-    for row in txns:
-        rows_html += (
-            '<div class="ips-inventory-txn-row">'
-            f'<span>{html.escape(fmt_date(row.get("created_at")))}</span>'
-            f'<span>{html.escape(_txn_action_label(row.get("transaction_type")))}</span>'
-            f'<span>{html.escape(format_inventory_quantity(row.get("quantity_display")))}</span>'
-            f'<span>{html.escape(str(row.get("job_label") or "—"))}</span>'
-            f'<span>{html.escape(str(row.get("scanned_by_name") or "—"))}</span>'
-            f'<span>{html.escape(format_phone_display(str(row.get("scanned_by_phone") or "")))}</span>'
-            f'<span>{html.escape(str(row.get("notes") or ""))}</span>'
-            "</div>"
-        )
-    st.markdown(f'<div class="ips-inventory-txn-table">{head}{rows_html}</div>', unsafe_allow_html=True)
+    perms = _inventory_permissions()
+    render_inventory_transactions_panel(item, permissions_user_id=perms.user_id or None)
 
 
 def _render_inventory_detail_tabs(item: dict) -> None:
-    status = str(item.get("status") or "")
-    (
-        tab_overview,
-        tab_stock,
-        tab_transactions,
-        tab_pos,
-        tab_vendors,
-        tab_notes,
-        tab_attachments,
-    ) = st.tabs(_INV_TABS)
+    from app.components.inventory_detail_tabs import render_inventory_detail_tabs
 
-    with tab_overview:
-        media1, media2, details = st.columns([1.1, 0.9, 2.0])
-        with media1:
-            st.markdown("**Item Image**")
-            _render_inventory_detail_image(item)
-        with media2:
-            st.markdown("**QR Code**")
-            _render_inventory_qr_block(item)
-        with details:
-            details_html = (
-                f'<div class="ips-detail-grid">'
-                f"{detail_field_html('SKU', item.get('sku'))}"
-                f"{detail_field_html('Description', _inventory_description(item))}"
-                f"{detail_field_html('Category', item.get('category'))}"
-                f'{detail_field_html("Status", status, html_value=status_pill_html(status))}'
-                f"{detail_field_html('Location', item.get('location'))}"
-                f"{detail_field_html('Department', item.get('department'))}"
-                f"{detail_field_html('Vendor', item.get('vendor'))}"
-                f"</div>"
-            )
-            st.markdown(dialog_card_html("Item Details", details_html), unsafe_allow_html=True)
-
-        stock_html = (
-            f'<div class="ips-detail-grid">'
-            f"{detail_field_html('Qty On Hand', int(item.get('qty_on_hand') or 0))}"
-            f"{detail_field_html('Allocated to Jobs', int(float(item.get('quantity_allocated') or 0)))}"
-            f"{detail_field_html('Reorder Point', int(item.get('reorder_point') or 0))}"
-            f"{detail_field_html('Stock policy', item.get('stock_policy_label') or 'Not stocked')}"
-            f"{detail_field_html('Needs reorder', 'Yes' if inventory_needs_reorder(item) else 'No')}"
-            f"{detail_field_html('Unit', _inventory_unit(item))}"
-            f"{detail_field_html('Unit Cost', fmt_currency(item.get('unit_cost')))}"
-            f"</div>"
-        )
-        st.markdown(dialog_card_html("Stock", stock_html), unsafe_allow_html=True)
-
-    with tab_stock:
-        placeholder_html("Stock History will connect to Supabase in a later phase.")
-
-    with tab_transactions:
-        _render_inventory_transactions_tab(item)
-
-    with tab_pos:
-        placeholder_html("Purchase Orders will connect to Supabase in a later phase.")
-
-    with tab_vendors:
-        placeholder_html("Vendors will connect to Supabase in a later phase.")
-
-    with tab_notes:
-        placeholder_html("Notes will connect to Supabase in a later phase.")
-
-    with tab_attachments:
-        placeholder_html("Attachments will connect to Supabase in a later phase.")
+    render_inventory_detail_tabs(item)
 
 
 def _render_inventory_edit_form(item: dict) -> None:
@@ -637,7 +597,14 @@ def _render_inventory_edit_form(item: dict) -> None:
         )
     with ic2:
         st.text_input("Location", key=f"inv_edit_loc_{iid}")
-        st.number_input("Qty on hand", key=f"inv_edit_qty_{iid}", min_value=0, step=1, format="%d")
+        st.number_input(
+            "Qty on hand",
+            key=f"inv_edit_qty_{iid}",
+            **inventory_qty_input_kwargs(
+                min_value=0,
+                value=int(st.session_state.get(f"inv_edit_qty_{iid}") or 0),
+            ),
+        )
         st.number_input("Unit cost", key=f"inv_edit_cost_{iid}")
 
     st.markdown("**Item Photo**")
@@ -711,7 +678,7 @@ def render_inventory_detail_dialog(item: dict) -> None:
     render_modal_meta_grid(
         [
             ("SKU", item.get("sku")),
-            ("On Hand", int(item.get("qty_on_hand") or 0)),
+            ("On Hand", format_inventory_quantity(item.get("qty_on_hand"), _inventory_unit(item))),
             ("Location", item.get("location")),
             ("Unit Cost", fmt_currency(item.get("unit_cost"))),
         ]
@@ -726,45 +693,24 @@ def render_inventory_detail_dialog(item: dict) -> None:
 
 @st.dialog("Inventory Item Details", width="large", on_dismiss=_clear_inventory_modal)
 def _show_inventory_detail_modal() -> None:
-    item = get_modal_record(
-        cache_key=_CACHE_KEY,
-        modal_key=_MODAL_KEY,
-        session_select_key=_SEL,
-    )
+    sel = str(
+        st.session_state.get(_MODAL_KEY)
+        or st.session_state.get(_SEL)
+        or st.session_state.get(SELECTED_INVENTORY_KEY)
+        or ""
+    ).strip()
+    item = get_item_from_modal_cache(sel) if sel else None
     if not item:
         render_missing_record(_clear_inventory_modal, close_key="inv_modal_missing_close")
         return
     render_inventory_detail_dialog(item)
 
 
-def _inventory_export_cache_key(filtered: list[dict]) -> str:
-    """Fingerprint current filter + visible export rows; invalidates prepared downloads when stale."""
-    ids = ",".join(sorted(str(r.get("id") or "") for r in filtered))
-    q = str(st.session_state.get("inv_search") or "").strip()
-    stock_view = str(st.session_state.get("inv_stock_view") or "In stock")
-    return f"{q}|{stock_view}|{ids}"
-
-
-def _clear_prepared_inventory_exports() -> None:
-    for key in (_EXPORT_CACHE_KEY, _EXPORT_ZIP_BYTES_KEY, _EXPORT_CSV_BYTES_KEY, _EXPORT_COUNT_KEY):
-        st.session_state.pop(key, None)
-
-
-def _sync_inventory_export_cache(filtered: list[dict]) -> str:
-    cache_key = _inventory_export_cache_key(filtered)
-    if st.session_state.get(_EXPORT_CACHE_KEY) != cache_key:
-        _clear_prepared_inventory_exports()
-        st.session_state[_EXPORT_CACHE_KEY] = cache_key
-    return cache_key
-
 
 @fragment
-def _render_inventory_items_fragment(
-    rows: list[dict],
-    *,
-    filter_options: dict[str, list[str]],
-) -> None:
+def _render_inventory_items_fragment() -> None:
     """Inventory items tab — filters and table with local reruns."""
+    from app.perf_debug import perf_span
 
     def _filters() -> None:
         c1, c2, c3 = st.columns([3.2, 2.2, 0.6])
@@ -795,23 +741,49 @@ def _render_inventory_items_fragment(
                 clear_field_expanded(FIELD_EXPANDED_INVENTORY_KEY)
                 fragment_rerun()
 
+    search = str(st.session_state.get("inv_search") or "").strip()
+    stock_view = str(st.session_state.get("inv_stock_view") or "In stock")
+    page_num, page_size, _ = pagination_meta(0, _TABLE_KEY)
+
+    with perf_span("inventory.list_query"):
+        inv_page = list_inventory_page(
+            search=search,
+            stock_view=stock_view,
+            page=page_num,
+            page_size=page_size,
+        )
+    page_num, page_size, _ = pagination_meta(inv_page.total_count, _TABLE_KEY)
+    if page_num != inv_page.page or page_size != inv_page.page_size:
+        with perf_span("inventory.list_query"):
+            inv_page = list_inventory_page(
+                search=search,
+                stock_view=stock_view,
+                page=page_num,
+                page_size=page_size,
+            )
+
+    filter_options = inv_page.filter_options
+    page_rows = inv_page.rows
+    _render_reorder_alert(inv_page.reorder_count)
+
     render_inventory_filter_bar_shell()
     layout_filter_bar(_filters)
     close_inventory_filter_bar_shell()
 
-    filtered = _filter_rows(
-        rows,
-        q=str(st.session_state.get("inv_search") or "").strip(),
-        stock_view=str(st.session_state.get("inv_stock_view") or "In stock"),
-    )
+    render_table_pagination_header(inv_page.total_count, _TABLE_KEY, item_label="item")
 
-    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="item")
-    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
+    for row in page_rows:
+        put_item_in_modal_cache(str(row.get("id") or "").strip(), row)
+    selected_id = str(st.session_state.get(SELECTED_INVENTORY_KEY) or "").strip()
+    if selected_id and st.session_state.get(SHOW_INVENTORY_MODAL_KEY):
+        detail = get_inventory_item_detail(selected_id)
+        if detail:
+            put_item_in_modal_cache(selected_id, detail)
 
-    build_modal_cache(filtered, cache_key=_CACHE_KEY)
-    _render_custom_inventory_table(page_rows, filter_options=filter_options)
+    with perf_span("inventory.table_html"):
+        _render_custom_inventory_table(page_rows, filter_options=filter_options)
 
-    render_table_pagination_footer(len(filtered), _TABLE_KEY)
+    render_table_pagination_footer(inv_page.total_count, _TABLE_KEY)
 
 
 def _render_reorder_alert(reorder_count: int) -> None:
@@ -833,118 +805,116 @@ def _render_reorder_alert(reorder_count: int) -> None:
             st.rerun()
 
 
+def _inv_export_header() -> None:
+    from app.perf_debug import perf_span
+    from app.services.inventory_qr_labels import (
+        build_inventory_labels_csv,
+        build_inventory_labels_zip,
+        inventory_labels_csv_filename,
+        inventory_labels_zip_filename,
+    )
+
+    search = str(st.session_state.get("inv_search") or "").strip()
+    stock_view = str(st.session_state.get("inv_stock_view") or "In stock")
+    export_req = build_export_request(search=search, stock_view=stock_view)
+    export_cache_key = export_req.cache_key()
+
+    if st.session_state.get(_EXPORT_CACHE_KEY) != export_cache_key:
+        clear_prepared_export_bytes()
+
+    zip_bytes = st.session_state.get(_EXPORT_ZIP_BYTES_KEY)
+    csv_bytes = st.session_state.get(_EXPORT_CSV_BYTES_KEY)
+    prepared = bool(zip_bytes and csv_bytes and st.session_state.get(_EXPORT_CACHE_KEY) == export_cache_key)
+
+    if not prepared:
+        if st.button("Prepare Label Export", key="inv_prepare_label_export"):
+            with perf_span("inventory.export_query"):
+                export_rows = list_inventory_export_rows(search=search, stock_view=stock_view)
+            count = len(export_rows)
+            if not count:
+                st.warning("No items match the current filters.")
+                return
+            with st.spinner(f"Building labels for {count} item(s)…"):
+                with perf_span("inventory.export_build"):
+                    st.session_state[_EXPORT_ZIP_BYTES_KEY] = build_inventory_labels_zip(export_rows)
+                    st.session_state[_EXPORT_CSV_BYTES_KEY] = build_inventory_labels_csv(export_rows).encode("utf-8")
+                    st.session_state[_EXPORT_COUNT_KEY] = count
+                    st.session_state[_EXPORT_CACHE_KEY] = export_cache_key
+            st.rerun()
+        return
+
+    export_count = int(st.session_state.get(_EXPORT_COUNT_KEY) or 0)
+    with st.popover("Label Export", help=f"{export_count} item(s) ready to download."):
+        st.download_button(
+            "Labels ZIP",
+            data=zip_bytes,
+            file_name=inventory_labels_zip_filename(item_count=export_count),
+            mime="application/zip",
+            key="inv_export_zip_hdr",
+            use_container_width=True,
+        )
+        st.download_button(
+            "Labels CSV",
+            data=csv_bytes,
+            file_name=inventory_labels_csv_filename(item_count=export_count),
+            mime="text/csv",
+            key="inv_export_csv_hdr",
+            use_container_width=True,
+        )
+        if st.button("Rebuild export", key="inv_rebuild_label_export", use_container_width=True):
+            clear_prepared_export_bytes()
+            st.rerun()
+
+
 def render() -> None:
     from app.pages._core._access import begin_module
+    from app.components.tabs import render_tabs
+    from app.perf_debug import perf_span
+
     if not begin_module("inventory"):
         return
     from app.navigation import INVENTORY_SCAN_EMBED_KEY
+
     if st.session_state.pop(INVENTORY_SCAN_EMBED_KEY, False):
         from app.pages.inventory_scan import render_inventory_scan_page
+
         render_inventory_scan_page()
         return
-    inject_inventory_module_css()
-    inject_inventory_page_layout_css()
-    if is_field_context():
-        inject_field_row_expand_css()
-    st.markdown(
-        '<span class="ips-inventory-page ips-page-shell-marker" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
-    rows = load_enriched_inventory_rows()
-    filter_options = build_filter_options(rows, _COLUMN_FILTER_SPECS)
-    reorder_count = sum(1 for r in rows if inventory_needs_reorder(r))
-    _render_reorder_alert(reorder_count)
 
-    filtered_export = _filter_rows(
-        rows,
-        q=str(st.session_state.get("inv_search") or "").strip(),
-        stock_view=str(st.session_state.get("inv_stock_view") or "In stock"),
-    )
-    export_cache_key = _sync_inventory_export_cache(filtered_export)
-
-    def _inv_export_header() -> None:
-        from app.services.inventory_qr_labels import (
-            build_inventory_labels_csv,
-            build_inventory_labels_zip,
-            inventory_labels_csv_filename,
-            inventory_labels_zip_filename,
-        )
-        count = len(filtered_export)
-        if not count:
-            st.button(
-                "Prepare Label Export",
-                key="inv_prepare_label_export",
-                disabled=True,
-                help="No items match the current filters.",
-            )
-            return
-
-        zip_bytes = st.session_state.get(_EXPORT_ZIP_BYTES_KEY)
-        csv_bytes = st.session_state.get(_EXPORT_CSV_BYTES_KEY)
-        prepared = (
-            zip_bytes
-            and csv_bytes
-            and st.session_state.get(_EXPORT_CACHE_KEY) == export_cache_key
-        )
-
-        if not prepared:
-            if st.button(
-                "Prepare Label Export",
-                key="inv_prepare_label_export",
-                help=f"Build ZIP and CSV for {count} filtered item(s).",
-            ):
-                with st.spinner(f"Building labels for {count} item(s)…"):
-                    st.session_state[_EXPORT_ZIP_BYTES_KEY] = build_inventory_labels_zip(filtered_export)
-                    st.session_state[_EXPORT_CSV_BYTES_KEY] = build_inventory_labels_csv(filtered_export).encode(
-                        "utf-8"
-                    )
-                    st.session_state[_EXPORT_COUNT_KEY] = count
-                    st.session_state[_EXPORT_CACHE_KEY] = export_cache_key
-                st.rerun()
-            return
-
-        export_count = int(st.session_state.get(_EXPORT_COUNT_KEY) or count)
-        with st.popover("Label Export", help=f"{export_count} item(s) ready to download."):
-            st.download_button(
-                "Labels ZIP",
-                data=zip_bytes,
-                file_name=inventory_labels_zip_filename(item_count=export_count),
-                mime="application/zip",
-                key="inv_export_zip_hdr",
-                use_container_width=True,
-                help="DuraLabel bulk import: CSV plus PDF labels, QR PNGs, and thumbnails.",
-            )
-            st.download_button(
-                "Labels CSV",
-                data=csv_bytes,
-                file_name=inventory_labels_csv_filename(item_count=export_count),
-                mime="text/csv",
-                key="inv_export_csv_hdr",
-                use_container_width=True,
-                help="Variable data only — pair with ZIP for image and PDF paths.",
-            )
-            if st.button("Rebuild export", key="inv_rebuild_label_export", use_container_width=True):
-                _clear_prepared_inventory_exports()
-                st.session_state[_EXPORT_CACHE_KEY] = export_cache_key
-                st.rerun()
-
-    def _inventory_header_actions() -> None:
+    with perf_span("inventory.page_shell"):
+        inject_inventory_module_css()
+        inject_inventory_page_layout_css()
+        if is_field_context():
+            inject_field_row_expand_css()
         st.markdown(
-            '<span class="ips-inventory-page-header-actions ips-page-header-inline-actions" aria-hidden="true"></span>',
+            '<span class="ips-inventory-page ips-page-shell-marker" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        _inv_export_header()
-        if st.button("+ New Item", key="inv_new", type="primary"):
-            st.session_state["ips_inv_form"] = True
 
-    from app.ui.page_header import render_page_header
+        def _inventory_header_actions() -> None:
+            st.markdown(
+                '<span class="ips-inventory-page-header-actions ips-page-header-inline-actions" aria-hidden="true"></span>',
+                unsafe_allow_html=True,
+            )
+            _inv_export_header()
+            if st.button("+ New Item", key="inv_new", type="primary"):
+                st.session_state["ips_inv_form"] = True
 
-    render_page_header(
-        "Inventory",
-        "Track and manage all inventory items and stock levels.",
-        primary_action=_inventory_header_actions,
-        primary_action_width=4.8,
-    )
+        from app.ui.page_header import render_page_header
+
+        render_page_header(
+            "Inventory",
+            "Track and manage all inventory items and stock levels.",
+            primary_action=_inventory_header_actions,
+            primary_action_width=4.8,
+        )
+
+    _capture_inventory_detail_query()
+    _show_inventory_detail_query_error_if_any()
+
+    if _inventory_detail_pending():
+        show_modal_if_pending(_MODAL_KEY, _show_inventory_detail_modal)
+        return
 
     if is_field_context():
         render_field_scan_bar(("📦 Scan Stock", "scan_inventory"))
@@ -962,6 +932,7 @@ def render() -> None:
             )
             if st.button("Save item", key="inv_save_new", type="primary"):
                 from app.services.inventory_service import save_inventory_item
+
                 result = save_inventory_item(
                     {
                         "sku": st.session_state.get("inv_new_sku"),
@@ -992,20 +963,24 @@ def render() -> None:
                     st.success("Inventory item saved.")
                     st.rerun()
 
-    tab_items, tab_qr_history = st.tabs(["Items", "QR Scan History"])
+    active_main_tab = render_tabs(
+        ["Items", "QR Scan History"],
+        session_key=_INVENTORY_MAIN_TAB_KEY,
+        default="Items",
+    )
 
-    with tab_items:
-        _render_inventory_items_fragment(rows, filter_options=filter_options)
+    if active_main_tab == "Items":
+        _render_inventory_items_fragment()
+    else:
+        with perf_span("inventory.qr_history"):
+            inject_qr_scan_history_css()
+            st.caption(
+                "Recent inventory and tool QR scans — who scanned, what opened, and what action was recorded."
+            )
+            render_qr_scan_history_table(
+                load_recent_qr_scans(limit=25)[0],
+                empty_message="No QR scans recorded yet. Scans appear when materials or tools are used via QR.",
+            )
 
-    with tab_qr_history:
-        inject_qr_scan_history_css()
-        st.caption(
-            "Recent inventory and tool QR scans — who scanned, what opened, and what action was recorded."
-        )
-        render_qr_scan_history_table(
-            load_recent_qr_scans(limit=25)[0],
-            empty_message="No QR scans recorded yet. Scans appear when materials or tools are used via QR.",
-        )
-
-    if st.session_state.get(SHOW_INVENTORY_MODAL_KEY) or str(st.session_state.get(_MODAL_KEY) or "").strip():
+    if _inventory_detail_pending():
         show_modal_if_pending(_MODAL_KEY, _show_inventory_detail_modal)

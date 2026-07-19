@@ -256,3 +256,27 @@ def weekly_timesheet_job_options(*, include_customer: bool = False) -> dict[str,
         if jid:
             opts[label] = jid
     return opts
+
+
+def list_assignable_job_options(
+    *,
+    search: str = "",
+    limit: int = 100,
+) -> list[dict[str, str]]:
+    """Lightweight assignable job options for inventory issue forms."""
+    jobs = load_jobs_for_select(use_admin=True)
+    eligible = [j for j in jobs if is_job_eligible_for_weekly_timesheet(j)]
+    if not eligible:
+        eligible = [
+            j for j in jobs if not bool(j.get("is_deleted")) and str(j.get("id") or "").strip()
+        ]
+    query = str(search or "").strip().lower()
+    if query:
+        eligible = [j for j in eligible if query in job_row_select_label(j).lower()]
+    out: list[dict[str, str]] = []
+    for job in eligible[: max(1, int(limit or 100))]:
+        jid = str(job.get("id") or "").strip()
+        if not jid:
+            continue
+        out.append({"id": jid, "label": job_row_select_label(job)})
+    return out
