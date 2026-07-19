@@ -74,16 +74,9 @@ def test_update_visible_to_role_for_employees():
 
 def test_active_jobs_for_employee_exclude_financials(monkeypatch):
     monkeypatch.setattr(
-        "app.pages._core._data.load_jobs",
-        lambda: [
-            {
-                "id": "1",
-                "job_name": "Active",
-                "customer": "X",
-                "status": "Active",
-                "awarded_amount": 1000,
-            },
-            {"id": "2", "job_name": "Done", "customer": "X", "status": "Completed"},
+        "app.services.employee_portal_service._iter_active_job_rows",
+        lambda **kwargs: [
+            {"id": "1", "job_name": "Active", "customer": "X", "status": "Active"},
         ],
     )
     rows = list_active_jobs_for_employee()
@@ -94,11 +87,8 @@ def test_active_jobs_for_employee_exclude_financials(monkeypatch):
 
 def test_bidding_estimates_exclude_pricing(monkeypatch):
     monkeypatch.setattr(
-        "app.pages._core._data.load_estimates",
-        lambda: [
-            {"id": "1", "project_name": "Open", "status": "Sent", "total": 9000},
-            {"id": "2", "project_name": "Awarded", "status": "Awarded", "total": 9000},
-        ],
+        "app.services.employee_portal_service._iter_bidding_estimate_rows",
+        lambda **kwargs: [{"id": "1", "project_name": "Open", "status": "Sent"}],
     )
     rows = list_bidding_estimates_for_employee()
     assert len(rows) == 1
@@ -167,23 +157,14 @@ def test_portal_dashboard_jobs_assigned_first_and_limited(monkeypatch):
         lambda _eid: ["j3", "j1"],
     )
     monkeypatch.setattr(
-        "app.services.employee_portal_service.list_active_jobs_for_employee",
-        lambda: [
-            {"id": "j1", "job_name": "One", "status": "Active"},
-            {"id": "j2", "job_name": "Two", "status": "Active"},
-            {"id": "j3", "job_name": "Three", "status": "Active"},
-            {"id": "j4", "job_name": "Four", "status": "Active"},
-            {"id": "j5", "job_name": "Five", "status": "Active"},
-        ],
+        "app.services.employee_portal_service._fetch_jobs_by_ids",
+        lambda ids: {jid: {"id": jid, "job_name": jid, "status": "Active"} for jid in ids},
     )
     monkeypatch.setattr(
-        "app.pages._core._data.load_jobs",
-        lambda: [
-            {"id": "j1", "job_name": "One", "status": "Active"},
+        "app.services.employee_portal_service._iter_active_job_rows",
+        lambda **kwargs: [
             {"id": "j2", "job_name": "Two", "status": "Active"},
-            {"id": "j3", "job_name": "Three", "status": "Active"},
             {"id": "j4", "job_name": "Four", "status": "Active"},
-            {"id": "j5", "job_name": "Five", "status": "Active"},
         ],
     )
     rows = list_portal_dashboard_jobs("emp-a", limit=4)

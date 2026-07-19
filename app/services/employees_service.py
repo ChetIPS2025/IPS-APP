@@ -32,6 +32,7 @@ __all__ = [
     "delete_employee_certification",
     "delete_employee",
     "get_certification_attachment_url",
+    "get_employee",
     "get_employee_certifications",
     "list_all_certifications",
     "list_certifications",
@@ -47,6 +48,27 @@ __all__ = [
 
 def clear_certifications_cache() -> None:
     clear_data_cache_for_table("employee_certifications")
+
+
+def get_employee(employee_id: str) -> dict[str, Any] | None:
+    """Fetch one employee record without loading the full catalog."""
+    eid = str(employee_id or "").strip()
+    if not eid:
+        return None
+    from app.services.repository import fetch_by_id
+
+    row = fetch_by_id("employees", eid, normalize=normalize_employee)
+    if row:
+        return row
+    try:
+        from app.pages._core._data import _DEMO_EMPLOYEES
+
+        for emp in _DEMO_EMPLOYEES:
+            if str(emp.get("id") or "") == eid:
+                return normalize_employee(dict(emp))
+    except Exception:
+        pass
+    return None
 
 
 def get_employee_certifications(employee_id: str | None = None) -> list[dict[str, Any]]:
