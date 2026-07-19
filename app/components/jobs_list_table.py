@@ -70,11 +70,23 @@ def job_list_link_html(
     *,
     extra_class: str = "",
     bridge_key: str = "",
+    use_native_link: bool = True,
+    tab: str = "",
 ) -> str:
-    jid = html.escape(str(job_id or "").strip(), quote=True)
+    jid_raw = str(job_id or "").strip()
+    jid = html.escape(jid_raw, quote=True)
     text = html.escape(label)
     title = html.escape(label, quote=True)
+    aria = html.escape(f"Open job details for {label}", quote=True)
     cls = f"ips-row-open-link ips-dash-est-link ips-jobs-list-link {extra_class}".strip()
+    if use_native_link and jid_raw:
+        from app.components.jobs_directory_table import job_detail_href
+
+        href = html.escape(job_detail_href(jid_raw, tab=tab), quote=True)
+        return (
+            f'<a class="{html.escape(cls)} ips-jobs-open-link" href="{href}" '
+            f'target="_self" aria-label="{aria}" title="{title}">{text}</a>'
+        )
     bridge_attr = ""
     if bridge_key:
         bridge_attr = f' data-bridge-key="{html.escape(bridge_key, quote=True)}"'

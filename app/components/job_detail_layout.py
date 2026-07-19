@@ -547,22 +547,22 @@ def gather_job_detail_stats(job: dict[str, Any], cost_summary: dict[str, Any]) -
     }
 
 
-def build_job_detail_tab_labels(job: dict[str, Any]) -> list[str]:
+def build_job_detail_tab_labels(
+    job: dict[str, Any],
+    *,
+    include_counts: bool = True,
+) -> list[str]:
     """Tab labels for the redesigned Job Details modal."""
     jid = str(job.get("id") or "").strip()
     open_subjobs = 0
     document_count = 0
     photo_count = 0
 
-    if jid:
-        from app.services.tasks_service import get_tasks_by_job
+    if jid and include_counts:
+        from app.services.tasks_service import count_open_subjobs_by_job_ids
+
         try:
-            closed = {"complete", "completed", "closed", "cancelled", "canceled", "duplicate"}
-            open_subjobs = sum(
-                1
-                for task in get_tasks_by_job(jid, include_closed=True)
-                if str(task.get("status") or "").strip().lower() not in closed
-            )
+            open_subjobs = int(count_open_subjobs_by_job_ids([jid]).get(jid, 0))
         except Exception:
             open_subjobs = 0
 

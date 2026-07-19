@@ -1129,6 +1129,21 @@ def invalidate_job_cost_session(job_id: str = "") -> None:
     st.session_state.pop(_JOB_COST_SYNCED_KEY, None)
 
 
+def load_job_cost_detail_snapshot(
+    job_id: str,
+    *,
+    job: dict[str, Any] | None = None,
+    force_refresh: bool = False,
+) -> dict[str, Any]:
+    """Full ledger summary for Cost/Financial tabs only."""
+    from app.perf_debug import perf_span
+
+    jid = str(job_id or "").strip()
+    row = job if isinstance(job, dict) else {"id": jid}
+    with perf_span("jobs.detail.cost_summary"):
+        return cached_job_cost_summary(row, force_refresh=force_refresh)
+
+
 def cached_job_cost_summary(job: dict[str, Any], *, force_refresh: bool = False) -> dict[str, Any]:
     """Build or return session-cached cost summary; sync sources at most once per session."""
     import streamlit as st

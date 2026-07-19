@@ -225,6 +225,15 @@ def count_open_subjobs_by_job_id() -> dict[str, int]:
     return counts
 
 
+def count_open_subjobs_by_job_ids(job_ids: list[str]) -> dict[str, int]:
+    """Open subjob counts for specific job IDs only."""
+    wanted = {str(jid or "").strip() for jid in job_ids if str(jid or "").strip()}
+    if not wanted:
+        return {}
+    all_counts = count_open_subjobs_by_job_id()
+    return {jid: int(all_counts.get(jid, 0)) for jid in wanted}
+
+
 def clear_tasks_cache() -> None:
     """Invalidate cached task reads after inline edits."""
     import streamlit as st

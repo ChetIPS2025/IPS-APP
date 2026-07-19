@@ -15,18 +15,14 @@ def test_job_list_link_html_includes_action_and_id():
         "j-123",
         "J26015",
         extra_class="ips-jobs-number-link",
-        bridge_key="job_bridge_open_j123",
     )
-    assert 'data-job-action="open"' in html_out
-    assert 'data-job-id="j-123"' in html_out
-    assert 'data-row-id="j-123"' in html_out
-    assert 'data-bridge-key="job_bridge_open_j123"' in html_out
+    assert 'href="' in html_out
+    assert "job_detail=j-123" in html_out
+    assert 'target="_self"' in html_out
     assert "J26015" in html_out
     assert "ips-jobs-number-link" in html_out
-    assert "ips-dash-est-link" in html_out
-    assert "ips-row-open-link" in html_out
-    assert '<button type="button"' in html_out
     assert "ips-jobs-open-link" in html_out
+    assert '<button type="button"' not in html_out
 
 
 def test_handle_jobs_table_action_strips_open_prefix():
@@ -153,7 +149,7 @@ def test_build_jobs_html_table_includes_actions_and_links():
     )
     assert "ips-dash-est-html-table" in html_out
     assert "ACTIONS" in html_out
-    assert 'data-job-action="open"' in html_out
+    assert 'href="' in html_out
     assert "J100" in html_out
     assert "Test project" in html_out
     assert 'data-job-action="menu"' in html_out
