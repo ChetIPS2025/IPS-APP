@@ -14300,7 +14300,7 @@ def _inject_timekeeping_list_row_gap_css() -> None:
   background: #f8fbff !important;
   box-shadow: inset 0 0 0 1px #bfdbfe !important;
 }
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.timekeeping-day-cell-clickable-marker) [data-testid="stButton"] > button {
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.timekeeping-day-cell-clickable-marker) .timekeeping-day-native-link {
   width: 72px !important;
   min-height: 34px !important;
   margin: 0 auto !important;
@@ -14313,13 +14313,24 @@ def _inject_timekeeping_list_row_gap_css() -> None:
   background: #ffffff !important;
   color: #2563eb !important;
   box-shadow: none !important;
-  display: block !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 2px !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
 }
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.timekeeping-day-cell-clickable-marker) [data-testid="stButton"] > button:hover {
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.timekeeping-day-cell-clickable-marker) .timekeeping-day-native-link:hover {
   border-color: #2563eb !important;
   background: #eff6ff !important;
   color: #1d4ed8 !important;
   box-shadow: 0 0 0 1px #bfdbfe !important;
+}
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.timekeeping-day-cell-clickable-marker) .timekeeping-day-native-link:focus-visible {
+  outline: 2px solid #2563eb !important;
+  outline-offset: 2px !important;
 }
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"]:has(.timekeeping-weekly-row-marker) {
   border-bottom: 1px solid #eef2f7 !important;
@@ -14327,8 +14338,8 @@ def _inject_timekeeping_list_row_gap_css() -> None:
 .st-key-timekeeping_table_wrap [class*="st-key-tk_row_"]:has(.timekeeping-weekly-row-marker):hover {
   background: #f8fbff !important;
 }
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.timekeeping-day-cell-clickable-marker):nth-child(8) [data-testid="stButton"] > button,
-.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.timekeeping-day-cell-clickable-marker):nth-child(9) [data-testid="stButton"] > button {
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.timekeeping-day-cell-clickable-marker):nth-child(8) .timekeeping-day-native-link,
+.st-key-timekeeping_table_wrap [class*="st-key-tk_row_"] [data-testid="column"]:has(.timekeeping-day-cell-clickable-marker):nth-child(9) .timekeeping-day-native-link {
   color: #64748b !important;
   background: #f8fafc !important;
 }

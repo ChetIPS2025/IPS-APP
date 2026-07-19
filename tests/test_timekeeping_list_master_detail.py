@@ -28,9 +28,9 @@ class TestTimekeepingListMasterDetail(unittest.TestCase):
         source = inspect.getsource(tk._render_timekeeping_employee_row_body)
         self.assertIn("_render_timekeeping_employee_row_collapsed", source)
         self.assertNotIn("_render_timekeeping_expand_fragment", source)
-        fragment_source = inspect.getsource(tk._render_timekeeping_employee_row_fragment)
-        self.assertIn("_render_timekeeping_employee_row_body", fragment_source)
-        self.assertNotIn("not expanded and not pending", fragment_source)
+        row_source = inspect.getsource(tk._render_timekeeping_employee_row)
+        self.assertIn("_render_timekeeping_employee_row_body", row_source)
+        self.assertNotIn("@fragment", row_source)
 
     def test_day_editor_session_keys_and_dialog(self) -> None:
         self.assertEqual(tk.SELECTED_TIME_EMPLOYEE_ID_KEY, "selected_time_employee_id")
@@ -40,12 +40,15 @@ class TestTimekeepingListMasterDetail(unittest.TestCase):
         self.assertIn("@st.dialog", inspect.getsource(tk._show_day_time_dialog))
         self.assertIn("render_day_time_dialog_body", inspect.getsource(tk._show_day_time_dialog))
 
-    def test_clickable_day_cell_opens_editor(self) -> None:
+    def test_clickable_day_cell_uses_native_link(self) -> None:
         source = inspect.getsource(tk._render_clickable_list_day_cell)
-        self.assertIn('key=f"open_time_day_{eid}_{iso}"', source)
-        self.assertIn("_open_day_time_editor", source)
-        self.assertIn("_is_day_cell_selected", source)
-        self.assertIn("_timekeeping_app_rerun", source)
+        html_source = inspect.getsource(tk._clickable_list_day_cell_html)
+        self.assertIn("_clickable_list_day_cell_html", source)
+        self.assertIn("timekeeping-day-native-link", html_source)
+        self.assertIn('target="_self"', html_source)
+        self.assertIn("_is_day_cell_selected", html_source)
+        self.assertNotIn("st.button", source)
+        self.assertNotIn("_open_day_time_editor", source)
 
     def test_split_layout_and_panel_rendering(self) -> None:
         render_source = inspect.getsource(tk.render)

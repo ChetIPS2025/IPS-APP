@@ -179,6 +179,8 @@ body.ips-page-loading section[data-testid="stMain"] {{
     if (anchor) {
       const href = (anchor.getAttribute("href") || "").trim();
       if (href.startsWith("#")) return true;
+      if (anchor.classList.contains("timekeeping-day-native-link")) return true;
+      if (href.startsWith("?")) return true;
       if (anchor.target === "_blank" && href) return true;
       if (href && !href.startsWith("javascript:") && anchor.getAttribute("download") != null) {
         return true;
