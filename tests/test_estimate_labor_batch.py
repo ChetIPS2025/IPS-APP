@@ -16,9 +16,16 @@ def test_update_estimate_labor_batch_recalcs_once(monkeypatch):
     monkeypatch.setattr(
         svc,
         "recalculate_and_save_estimate_totals",
-        lambda eid: recalc_calls.append(eid)
+        lambda eid, **kwargs: recalc_calls.append(eid)
         or type("R", (), {"ok": True, "data": {"customer_price": 100.0}, "error": None})(),
     )
+    monkeypatch.setattr(svc, "fetch_by_id", lambda table, eid: {"tax_rate": 0})
+    monkeypatch.setattr(
+        "app.services.estimate_cost_cache.invalidate_estimate_cost_cache",
+        lambda eid: 1,
+    )
+    monkeypatch.setattr("app.services.estimate_cost_cache.write_cached_totals", lambda *a, **k: None)
+    monkeypatch.setattr("app.services.estimate_cost_cache.clear_proposal_bundle", lambda eid: None)
 
     result = svc.update_estimate_labor_batch(
         "est-1",
