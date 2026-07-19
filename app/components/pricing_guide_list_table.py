@@ -5,13 +5,36 @@ from __future__ import annotations
 import html
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import urlencode
 
 import streamlit as st
 
 from app.services.pricing_guide_images import get_pricing_guide_image_url
 from app.services.pricing_guide_service import class_pill_html
 from app.utils.formatting import fmt_currency
+
 PG_TABLE_LAST_ACTION_KEY = "pg_list_last_action"
+_PRICING_DETAIL_QUERY_KEY = "pricing_detail"
+_PRICING_DETAIL_TAB_QUERY_KEY = "pricing_tab"
+_NAV_QUERY_KEY = "ips_nav"
+
+
+def pricing_guide_detail_query_key() -> str:
+    return _PRICING_DETAIL_QUERY_KEY
+
+
+def pricing_guide_detail_tab_query_key() -> str:
+    return _PRICING_DETAIL_TAB_QUERY_KEY
+
+
+def pricing_guide_detail_href(item_id: str, *, tab: str = "") -> str:
+    """Same-app URL to open Pricing Guide details (?ips_nav=pricing_guide&pricing_detail=<id>)."""
+    pid = str(item_id or "").strip()
+    params: dict[str, str] = {_NAV_QUERY_KEY: "pricing_guide", _PRICING_DETAIL_QUERY_KEY: pid}
+    tab_val = str(tab or "").strip()
+    if tab_val:
+        params[_PRICING_DETAIL_TAB_QUERY_KEY] = tab_val
+    return "?" + urlencode(params)
 
 
 def pg_bridge_button_key(row: dict[str, Any]) -> str:
@@ -89,34 +112,28 @@ def _pg_link_html(
     label: str,
     *,
     extra_class: str = "",
-    bridge_key: str = "",
 ) -> str:
-    row_id = html.escape(str(rid or "").strip(), quote=True)
     text = html.escape(label)
     title = html.escape(label, quote=True)
+    href = html.escape(pricing_guide_detail_href(str(rid or "").strip()), quote=True)
     cls = (
         "ips-row-open-link ips-dash-est-link ips-inventory-desc-link ips-pg-open-link "
         f"{extra_class}"
     ).strip()
-    bridge_attr = ""
-    if bridge_key:
-        bridge_attr = f' data-bridge-key="{html.escape(bridge_key, quote=True)}"'
+    aria = html.escape(f"Open Pricing Guide item details for {label}", quote=True)
     return (
-        f'<span role="button" tabindex="0" class="{html.escape(cls)}" data-pg-action="open" '
-        f'data-pg-id="{row_id}" data-row-id="{row_id}"{bridge_attr} '
-        f'title="{title}">{text}</span>'
+        f'<a class="{html.escape(cls)}" href="{href}" target="_self" '
+        f'aria-label="{aria}" title="{title}">{text}</a>'
     )
 
 
 def _pg_thumb_link_html(
     rid: str,
     row: dict[str, Any],
-    *,
-    bridge_key: str = "",
 ) -> str:
-    row_id = html.escape(str(rid or "").strip(), quote=True)
     item = str(row.get("item") or row.get("description") or "item").strip()
     aria = html.escape(f"Open pricing item {item}", quote=True)
+    href = html.escape(pricing_guide_detail_href(str(rid or "").strip()), quote=True)
     image_url = get_pricing_guide_image_url(row)
     if image_url:
         inner = (
@@ -128,13 +145,9 @@ def _pg_thumb_link_html(
             '<span class="pricing-thumb table-image-preview ips-pg-thumb-placeholder '
             'ips-inventory-thumb-placeholder" aria-hidden="true">—</span>'
         )
-    bridge_attr = ""
-    if bridge_key:
-        bridge_attr = f' data-bridge-key="{html.escape(bridge_key, quote=True)}"'
     return (
-        f'<button type="button" class="ips-inventory-thumb-cell-link ips-pg-thumb-cell-link '
-        f'ips-pg-open-link" data-pg-action="open" data-pg-id="{row_id}" data-row-id="{row_id}"'
-        f'{bridge_attr} title="View item" aria-label="{aria}">{inner}</button>'
+        f'<a class="ips-inventory-thumb-cell-link ips-pg-thumb-cell-link ips-pg-open-link" '
+        f'href="{href}" target="_self" title="View item" aria-label="{aria}">{inner}</a>'
     )
 
 
@@ -163,7 +176,6 @@ def build_pricing_guide_html_table(rows: list[dict[str, Any]]) -> str:
         if not rid:
             continue
 
-        bridge_key = pg_bridge_button_key(row)
         description = pg_description(row)
         desc_label = description if description and description != "—" else "View item"
         item_class = pg_item_class(row)
@@ -181,7 +193,7 @@ def build_pricing_guide_html_table(rows: list[dict[str, Any]]) -> str:
                 "image",
                 "center",
                 _cell_wrapper(
-                    _pg_thumb_link_html(rid, row, bridge_key=bridge_key),
+                    _pg_thumb_link_html(rid, row),
                     extra_class="ips-inventory-image-td",
                     align="center",
                 ),
@@ -194,7 +206,6 @@ def build_pricing_guide_html_table(rows: list[dict[str, Any]]) -> str:
                         rid,
                         desc_label,
                         extra_class="ips-dash-est-desc-link",
-                        bridge_key=bridge_key,
                     ),
                     extra_class="ips-dash-est-desc-cell",
                 ),
@@ -271,8 +282,7 @@ def build_pricing_guide_html_table(rows: list[dict[str, Any]]) -> str:
         )
         body_rows.append(
             f'<tr class="ips-dash-est-tr ips-dash-est-row-{row_parity}" '
-            f'data-pg-id="{html.escape(rid, quote=True)}" data-row-id="{html.escape(rid, quote=True)}" '
-            f'data-bridge-key="{html.escape(bridge_key, quote=True)}">'
+            f'data-pg-id="{html.escape(rid, quote=True)}" data-row-id="{html.escape(rid, quote=True)}">'
             f"{tds}"
             f"</tr>"
         )

@@ -23,10 +23,13 @@ _ASSETS_CATALOG_VERSION_KEY = "_ips_assets_catalog_version"
 _JOBS_CATALOG_VERSION_KEY = "_ips_jobs_catalog_version"
 _TASKS_CATALOG_VERSION_KEY = "_ips_tasks_catalog_version"
 _EMPLOYEES_CATALOG_VERSION_KEY = "_ips_employees_catalog_version"
-
 _ESTIMATES_CATALOG_VERSION_KEY = "_ips_estimates_catalog_version"
 _INVENTORY_CATALOG_VERSION_KEY = "_ips_inventory_catalog_version"
 _TIMEKEEPING_CATALOG_VERSION_KEY = "_ips_timekeeping_catalog_version"
+ perf/pricing-guide-module
+_PRICING_GUIDE_CATALOG_VERSION_KEY = "_ips_pricing_guide_catalog_version"
+
+main
 _JOBS_LIST_COST_CACHE_KEY = "_ips_jobs_list_cost_by_id"
 
 
@@ -49,6 +52,7 @@ def employees_catalog_data_version() -> int:
     """Monotonic token bumped whenever the employees/users catalog is invalidated."""
     return int(st.session_state.get(_EMPLOYEES_CATALOG_VERSION_KEY) or 0)
 
+
 def estimates_catalog_data_version() -> int:
     """Monotonic token bumped whenever the estimates catalog cache is invalidated."""
     return int(st.session_state.get(_ESTIMATES_CATALOG_VERSION_KEY) or 0)
@@ -62,6 +66,14 @@ def inventory_catalog_data_version() -> int:
 def timekeeping_catalog_data_version() -> int:
     """Monotonic token bumped whenever timekeeping snapshots are invalidated."""
     return int(st.session_state.get(_TIMEKEEPING_CATALOG_VERSION_KEY) or 0)
+ perf/pricing-guide-module
+
+
+def pricing_guide_catalog_data_version() -> int:
+    """Monotonic token bumped whenever the Pricing Guide catalog cache is invalidated."""
+    return int(st.session_state.get(_PRICING_GUIDE_CATALOG_VERSION_KEY) or 0)
+
+ main
 
 
 def _bump_assets_catalog_data_version() -> None:
@@ -79,6 +91,7 @@ def _bump_tasks_catalog_data_version() -> None:
 def _bump_employees_catalog_data_version() -> None:
     st.session_state[_EMPLOYEES_CATALOG_VERSION_KEY] = employees_catalog_data_version() + 1
 
+
 def _bump_estimates_catalog_data_version() -> None:
     st.session_state[_ESTIMATES_CATALOG_VERSION_KEY] = estimates_catalog_data_version() + 1
 
@@ -89,6 +102,13 @@ def _bump_inventory_catalog_data_version() -> None:
 
 def _bump_timekeeping_catalog_data_version() -> None:
     st.session_state[_TIMEKEEPING_CATALOG_VERSION_KEY] = timekeeping_catalog_data_version() + 1
+ perf/pricing-guide-module
+
+
+def _bump_pricing_guide_catalog_data_version() -> None:
+    st.session_state[_PRICING_GUIDE_CATALOG_VERSION_KEY] = pricing_guide_catalog_data_version() + 1
+
+ main
 
 
 def _catalog_session_get(name: str, loader):
