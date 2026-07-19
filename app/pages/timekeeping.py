@@ -4752,6 +4752,19 @@ def render_day_time_dialog_body(emp: dict, week_start_d: date, iso: str) -> None
         subtitle=_format_modal_day_title(day_d),
         status=day_status,
     )
+    eid = str(emp.get("id") or emp.get("employee_id") or "").strip()
+    if eid:
+        from app.services.scheduling_service import schedule_suggestion_for_employee_day
+
+        suggestion = schedule_suggestion_for_employee_day(eid, day_d)
+        if suggestion:
+            st.info(
+                "**Scheduled Assignment** — "
+                f"{suggestion.get('title', 'Work')} · "
+                f"{suggestion.get('expected_hours', 0)} planned hrs · "
+                f"Shift: {suggestion.get('shift') or '—'}. "
+                "Actual time entry remains editable below."
+            )
     _render_day_time_editor_core(emp, week_start_d, iso)
 
 

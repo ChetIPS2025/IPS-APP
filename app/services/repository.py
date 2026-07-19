@@ -134,6 +134,59 @@ TABLE_COLUMN_ALLOWLIST: dict[str, frozenset[str]] = {
             "image_status",
         }
     ),
+    "schedule_events": frozenset(
+        {
+            "event_type",
+            "title",
+            "job_id",
+            "customer_id",
+            "location",
+            "start_at",
+            "end_at",
+            "all_day",
+            "status",
+            "supervisor_id",
+            "required_crew_count",
+            "shift_name",
+            "per_diem_amount",
+            "lodging_name",
+            "lodging_address",
+            "mobilization_notes",
+            "work_instructions",
+            "internal_notes",
+            "required_certifications",
+            "created_by",
+            "updated_by",
+            "updated_at",
+        }
+    ),
+    "schedule_event_employees": frozenset(
+        {
+            "schedule_event_id",
+            "employee_id",
+            "assignment_role",
+            "is_supervisor",
+            "notes",
+        }
+    ),
+    "schedule_event_assets": frozenset(
+        {
+            "schedule_event_id",
+            "asset_id",
+            "quantity",
+            "notes",
+        }
+    ),
+    "employee_availability": frozenset(
+        {
+            "employee_id",
+            "start_at",
+            "end_at",
+            "availability_type",
+            "notes",
+            "created_by",
+        }
+    ),
 }
 
 # Oldest deployed shape (062) when the table has no sample rows yet.

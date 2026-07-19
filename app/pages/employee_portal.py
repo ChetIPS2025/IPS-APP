@@ -15,7 +15,8 @@ from app.components.company_updates_feed import (
 )
 from app.navigation import set_nav_slug
 from app.pages._core._access import begin_module
-from app.pages._core._data import get_employee
+from app.components.scheduling_portal import render_employee_upcoming_schedule
+from app.pages._core._data import load_jobs
 from app.services.certification_attachments_service import cert_has_attachment
 from app.services.certification_helpers import cert_status_pill_html, resolve_logged_in_employee_id
 from app.services.employee_portal_service import (
@@ -386,6 +387,18 @@ def render() -> None:
     if not show_all_jobs:
         _render_quick_actions(role, employee_id=employee_id)
         _render_updates_section(role)
+        if employee_id:
+            jobs_by_id = {
+                str(j.get("id") or "").strip(): j
+                for j in load_jobs()
+                if str(j.get("id") or "").strip()
+            }
+            employees_by_id = {employee_id: employee} if employee else {}
+            render_employee_upcoming_schedule(
+                employee_id,
+                employees_by_id=employees_by_id,
+                jobs_by_id=jobs_by_id,
+            )
         _render_certifications_section(employee_id)
         _render_recent_jobs_section(employee_id)
     else:

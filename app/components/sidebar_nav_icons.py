@@ -13,6 +13,7 @@ NAV_SLUG_ICONS: dict[str, str] = {
     "assets": "🚜",
     "rental_equipment": "📋",
     "timekeeping": "⏱",
+    "scheduling": "📅",
     "tasks": "☑",
     "reports": "📊",
     "employees": "👥",
