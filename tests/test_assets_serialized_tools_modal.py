@@ -19,11 +19,12 @@ def test_serialized_tools_open_bridge_uses_clean_table() -> None:
     assert ".ips-serialized-tools-html-table" in src
 
 
-def test_serialized_tools_open_buttons_use_app_rerun_callback() -> None:
+def test_serialized_tools_open_buttons_use_on_click_callback() -> None:
     from app.components.serialized_tools_list_table import render_serialized_tools_table_open_buttons
 
     src = inspect.getsource(render_serialized_tools_table_open_buttons)
-    assert "ips_app_rerun()" in src
+    assert "on_click=_open" in src
+    assert "ips_app_rerun()" not in src
 
 
 def test_serialized_tool_table_open_prepares_modal() -> None:
@@ -49,7 +50,7 @@ def test_serialized_tools_table_uses_html_bridge() -> None:
     table_block = src.split("def _render_small_tools_table(")[1].split("def _equipment_summary_counts")[0]
     assert "_render_serialized_tool_name_cell" not in src
     assert "_on_small_tool_checkbox_change" not in src
-    assert "render_serialized_tools_table_open_buttons" not in table_block
+    assert "render_serialized_tools_table_open_buttons" in table_block
     assert "render_serialized_tools_table_bridge_legacy" in table_block
 
 

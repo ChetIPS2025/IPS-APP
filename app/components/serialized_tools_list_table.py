@@ -268,13 +268,16 @@ def render_serialized_tools_table_open_buttons(
             if not row_id:
                 continue
             bridge_key = serialized_tools_bridge_button_key(row)
-            if st.button(
+
+            def _open(_row_id: str = row_id, _row: dict = row) -> None:
+                open_row_fn(_row_id, _row)
+
+            st.button(
                 "Open tool",
                 key=bridge_key,
                 type="tertiary",
-            ):
-                open_row_fn(row_id, row)
-                ips_app_rerun()
+                on_click=_open,
+            )
 
 
 def render_serialized_tools_table_open_bridge(
