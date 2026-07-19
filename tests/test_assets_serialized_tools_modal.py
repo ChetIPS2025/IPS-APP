@@ -50,6 +50,8 @@ def test_serialized_tools_table_uses_html_bridge() -> None:
     table_block = src.split("def _render_small_tools_table(")[1].split("def _equipment_summary_counts")[0]
     assert "_render_serialized_tool_name_cell" not in src
     assert "_on_small_tool_checkbox_change" not in src
+    assert 'key="assets_table_wrap"' in table_block
+    assert "assets_small_tools_table_wrap" not in table_block
     assert "render_serialized_tools_table_open_buttons" not in table_block
     assert "render_serialized_tools_table_bridge_legacy" in table_block
 

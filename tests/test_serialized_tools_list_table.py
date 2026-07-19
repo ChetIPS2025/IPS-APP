@@ -22,6 +22,10 @@ def test_build_serialized_tools_html_table_renders_open_links() -> None:
         ],
         is_row_selected=lambda _rid: False,
     )
-    assert 'data-st-action="open"' in html
+    assert 'data-st-action="open"' not in html
+    assert 'href="' in html
+    assert "asset_detail" in html
+    assert "<a " in html
     assert "M18 Drill" in html
     assert 'data-st-action="select"' in html
+    assert "ips-assets-html-equipment-table" in html

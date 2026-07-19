@@ -8,19 +8,88 @@ from app.components.assets_css_blocks import (
     LAYOUT_EQUIPMENT_CSS,
     LAYOUT_SHELL_CSS,
     MODULE_EQUIPMENT_CSS,
-    MODULE_SERIALIZED_CSS,
     MODULE_SHARED_CSS,
     PAGE_CHROME_CSS,
     PAGE_DETAIL_CSS,
     PAGE_EQUIPMENT_CSS,
     PAGE_HAND_TOOLS_CSS,
-    PAGE_SERIALIZED_CSS,
 )
 from app.ui.css_inject import inject_css_once
 
 _EQUIPMENT_TAB = "Equipment"
 _SERIALIZED_TAB = "Serialized Tools"
 _HAND_TOOLS_TAB = "Small Tools"
+
+# Serialized tools tab — same equipment table card + column-aligned filter row.
+SERIALIZED_TOOLS_TAB_CSS = """
+.st-key-assets_table_wrap:has(.ips-serialized-tools-html-table)
+[data-testid="stHorizontalBlock"]:first-of-type {
+  display: grid !important;
+  grid-template-columns:
+    44px 68px minmax(160px, 2.2fr) minmax(160px, 1fr) minmax(100px, 0.95fr)
+    minmax(110px, 1fr) minmax(100px, 0.95fr) minmax(100px, 0.85fr) minmax(90px, 0.8fr) !important;
+  column-gap: 0 !important;
+  row-gap: 0 !important;
+  align-items: center !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 0.45rem 0.65rem !important;
+  margin: 0 !important;
+  background: #f8fafc !important;
+  border-bottom: 1px solid #e8edf4 !important;
+}
+.st-key-assets_table_wrap:has(.ips-serialized-tools-html-table)
+[data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"] {
+  flex: unset !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  overflow: hidden !important;
+  padding: 0 10px !important;
+  box-sizing: border-box !important;
+}
+.st-key-assets_table_wrap:has(.ips-serialized-tools-html-table)
+[data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:first-child,
+.st-key-assets_table_wrap:has(.ips-serialized-tools-html-table)
+[data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:nth-child(2),
+.st-key-assets_table_wrap:has(.ips-serialized-tools-html-table)
+[data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:nth-child(3),
+.st-key-assets_table_wrap:has(.ips-serialized-tools-html-table)
+[data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:nth-child(5) {
+  padding: 0 !important;
+}
+.st-key-assets_table_wrap .ips-serialized-tools-html-table .ips-serialized-tool-text-cell {
+  display: block !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+.st-key-assets_table_wrap .ips-serialized-tools-html-table .ips-serialized-tool-row-select {
+  width: 16px !important;
+  height: 16px !important;
+  margin: 0 !important;
+  cursor: pointer !important;
+  accent-color: #2563eb !important;
+}
+.st-key-serialized_tools_open_button_harness,
+.st-key-serialized_tools_open_button_harness [data-testid="stVerticalBlock"],
+.st-key-serialized_tools_open_button_harness [data-testid="stElementContainer"] {
+  display: block !important;
+  width: 0 !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+"""
 
 
 def _inject_sidebar_css(style_id: str, css: str) -> None:
@@ -60,8 +129,15 @@ def inject_assets_equipment_css() -> None:
 
 def inject_assets_serialized_css() -> None:
     _inject_sidebar_css(
-        "ips-assets-serialized-v1",
-        "\n\n".join((MODULE_SERIALIZED_CSS, PAGE_SERIALIZED_CSS)),
+        "ips-assets-serialized-v2",
+        "\n\n".join(
+            (
+                LAYOUT_EQUIPMENT_CSS,
+                MODULE_EQUIPMENT_CSS,
+                PAGE_EQUIPMENT_CSS,
+                SERIALIZED_TOOLS_TAB_CSS,
+            )
+        ),
     )
 
 

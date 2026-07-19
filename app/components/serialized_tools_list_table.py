@@ -8,7 +8,7 @@ from typing import Any
 
 import streamlit as st
 
-from app.components.assets_list_table import asset_status_pill_html
+from app.components.assets_list_table import asset_detail_href, asset_status_pill_html
 from app.services.catalog_images import catalog_thumbnail_html
 from app.ui.streamlit_perf import fragment_rerun, ips_app_rerun
 
@@ -37,12 +37,12 @@ SERIALIZED_TOOLS_TABLE_COL_WIDTHS_PX: dict[str, int] = {
     "select": 44,
     "image": 68,
     "name": 220,
-    "model": 100,
-    "serial": 100,
+    "model": 160,
+    "serial": 120,
     "trailer": 130,
     "job": 110,
     "status": 112,
-    "condition": 90,
+    "condition": 96,
 }
 
 
@@ -51,22 +51,23 @@ def _cell_wrapper(inner: str, *, extra_class: str = "", align: str = "left") -> 
     return f'<div class="{html.escape(cls)}">{inner}</div>'
 
 
-def _tool_link_html(row_id: str, label: str, *, bridge_key: str = "") -> str:
-    rid = html.escape(str(row_id or "").strip(), quote=True)
+def _tool_link_html(row_id: str, label: str) -> str:
+    aid = str(row_id or "").strip()
     text = html.escape(label)
     title = html.escape(label, quote=True)
-    bridge_attr = (
-        f' data-bridge-key="{html.escape(bridge_key, quote=True)}"' if bridge_key else ""
-    )
+    href = html.escape(asset_detail_href(aid), quote=True)
+    asset_id = html.escape(aid, quote=True)
     return (
-        f'<button type="button" class="ips-row-open-link ips-dash-est-link ips-inventory-desc-link '
-        f'ips-inventory-open-link ips-assets-open-link ips-serialized-tool-open-link" '
-        f'data-st-action="open" data-row-id="{rid}"{bridge_attr} title="{title}">{text}</button>'
+        f'<a class="ips-row-open-link ips-dash-est-link ips-inventory-desc-link '
+        f'ips-assets-open-link ips-serialized-tool-open-link" href="{href}" target="_self" '
+        f'data-asset-id="{asset_id}" data-row-id="{asset_id}" title="{title}">{text}</a>'
     )
 
 
-def _tool_thumb_link_html(row_id: str, thumb_asset: dict[str, Any], *, bridge_key: str = "") -> str:
-    rid = html.escape(str(row_id or "").strip(), quote=True)
+def _tool_thumb_link_html(row_id: str, thumb_asset: dict[str, Any]) -> str:
+    aid = str(row_id or "").strip()
+    href = html.escape(asset_detail_href(aid), quote=True)
+    asset_id = html.escape(aid, quote=True)
     thumb = catalog_thumbnail_html(
         thumb_asset,
         kind="asset",
@@ -74,13 +75,10 @@ def _tool_thumb_link_html(row_id: str, thumb_asset: dict[str, Any], *, bridge_ke
         cell_class="ips-inventory-image-cell",
         alt="Tool image",
     )
-    bridge_attr = (
-        f' data-bridge-key="{html.escape(bridge_key, quote=True)}"' if bridge_key else ""
-    )
     return (
-        f'<button type="button" class="ips-inventory-thumb-cell-link ips-inventory-open-link '
-        f'ips-assets-open-link ips-serialized-tool-open-link" data-st-action="open" '
-        f'data-row-id="{rid}"{bridge_attr} title="View tool" aria-label="View tool">{thumb}</button>'
+        f'<a class="ips-inventory-thumb-cell-link ips-assets-open-link ips-serialized-tool-open-link" '
+        f'href="{href}" target="_self" data-asset-id="{asset_id}" data-row-id="{asset_id}" '
+        f'title="View tool" aria-label="View tool">{thumb}</a>'
     )
 
 
@@ -111,6 +109,7 @@ def build_serialized_tools_html_table(
 
         bridge_key = serialized_tools_bridge_button_key(row)
         name = str(row.get("_display_name") or "—").strip() or "—"
+        name_label = name if name != "—" else "View tool"
         model_no = str(row.get("_display_model") or "—").strip() or "—"
         serial = str(row.get("_display_serial") or "—").strip() or "—"
         trailer = str(row.get("_display_trailer") or "—").strip() or "—"
@@ -125,7 +124,7 @@ def build_serialized_tools_html_table(
             f'data-st-action="select" data-row-id="{html.escape(row_id, quote=True)}" '
             f'aria-label="Select tool"{checked} />'
         )
-        name_inner = _tool_link_html(row_id, name, bridge_key=bridge_key)
+        name_inner = _tool_link_html(row_id, name_label)
 
         row_parity = "even" if row_idx % 2 else "odd"
         cells = [
@@ -134,7 +133,7 @@ def build_serialized_tools_html_table(
                 "image",
                 "center",
                 _cell_wrapper(
-                    _tool_thumb_link_html(row_id, thumb_asset, bridge_key=bridge_key),
+                    _tool_thumb_link_html(row_id, thumb_asset),
                     extra_class="ips-inventory-image-td",
                     align="center",
                 ),
@@ -144,14 +143,16 @@ def build_serialized_tools_html_table(
                 "model",
                 "left",
                 _cell_wrapper(
-                    f'<span class="ips-inventory-text-cell">{html.escape(model_no)}</span>'
+                    f'<span class="ips-inventory-text-cell ips-serialized-tool-text-cell">'
+                    f"{html.escape(model_no)}</span>"
                 ),
             ),
             (
                 "serial",
                 "left",
                 _cell_wrapper(
-                    f'<span class="ips-inventory-text-cell">{html.escape(serial)}</span>'
+                    f'<span class="ips-inventory-text-cell ips-serialized-tool-text-cell">'
+                    f"{html.escape(serial)}</span>"
                 ),
             ),
             (
@@ -198,6 +199,7 @@ def build_serialized_tools_html_table(
         body_rows.append(
             f'<tr class="ips-dash-est-tr ips-dash-est-row-{row_parity} ips-serialized-tool-row" '
             f'data-row-id="{html.escape(row_id, quote=True)}" '
+            f'data-asset-id="{html.escape(row_id, quote=True)}" '
             f'data-bridge-key="{html.escape(bridge_key, quote=True)}">'
             f"{tds}"
             f"</tr>"
@@ -206,8 +208,8 @@ def build_serialized_tools_html_table(
     min_width = sum(SERIALIZED_TOOLS_TABLE_COL_WIDTHS_PX.values())
     return (
         f'<div class="ips-dash-est-table-scroll" style="min-width:0;">'
-        f'<table class="ips-dash-est-html-table ips-serialized-tools-html-table" '
-        f'style="min-width:{min_width}px;">'
+        f'<table class="ips-dash-est-html-table ips-assets-html-equipment-table ips-serialized-tools-html-table" '
+        f'style="width:100%;min-width:{min_width}px;">'
         f"<colgroup>{''.join(col_parts)}</colgroup>"
         f'<thead><tr class="ips-dash-est-tr ips-dash-est-head-row">{"".join(head_parts)}</tr></thead>'
         f"<tbody>{''.join(body_rows)}</tbody>"

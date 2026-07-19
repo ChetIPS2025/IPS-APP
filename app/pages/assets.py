@@ -108,6 +108,7 @@ from app.components.assets_list_table import (
     render_assets_table_bridge_legacy,
 )
 from app.components.serialized_tools_list_table import (
+    SERIALIZED_TOOLS_TABLE_COL_WIDTHS_PX,
     build_serialized_tools_html_table,
     render_serialized_tools_table_bridge_legacy,
 )
@@ -157,12 +158,20 @@ _ALL_ASSET_IDS_KEY = "_ips_assets_visible_ids"
 _ALL_SMALL_TOOL_IDS_KEY = "_ips_small_tools_visible_ids"
 _TABLE_KEY = "assets_list"
 _SMALL_TOOLS_TABLE_KEY = "assets_small_tools_list"
-_SMALL_TOOL_FILTER_HEADER_SPECS: list[tuple[str, str]] = [
+_SMALL_TOOL_FILTER_COLUMN_LAYOUT: list[tuple[str | None, str | None]] = [
+    (None, None),
+    (None, None),
+    (None, None),
     ("MODEL #", "model_number"),
+    (None, None),
     ("TRAILER", "trailer"),
     ("JOB", "job"),
     ("STATUS", "status"),
     ("CONDITION", "condition"),
+]
+_SMALL_TOOL_FILTER_COL_WEIGHTS: list[int] = [
+    SERIALIZED_TOOLS_TABLE_COL_WIDTHS_PX[key]
+    for key in ("select", "image", "name", "model", "serial", "trailer", "job", "status", "condition")
 ]
 _SMALL_TOOL_FILTER_SPECS: list[tuple[str, object]] = [
     ("model_number", lambda r: _small_tool_model_number(r)),
@@ -827,19 +836,28 @@ def _render_small_tools_table_column_filters(
     *,
     filter_options: dict[str, list[str]],
 ) -> None:
-    if not _SMALL_TOOL_FILTER_HEADER_SPECS:
+    if not _SMALL_TOOL_FILTER_COLUMN_LAYOUT:
         return
-    st.markdown('<div class="ips-assets-table-filter-toolbar">', unsafe_allow_html=True)
-    cols = st.columns(len(_SMALL_TOOL_FILTER_HEADER_SPECS), gap="small")
-    for col, (label, field) in zip(cols, _SMALL_TOOL_FILTER_HEADER_SPECS):
+    st.markdown(
+        '<div class="ips-assets-table-filter-toolbar ips-serialized-tools-filter-toolbar">',
+        unsafe_allow_html=True,
+    )
+    cols = st.columns(_SMALL_TOOL_FILTER_COL_WEIGHTS, gap="small")
+    for col, (label, field) in zip(cols, _SMALL_TOOL_FILTER_COLUMN_LAYOUT):
         with col:
-            render_table_header_cell(
-                label,
-                table_key=_SMALL_TOOLS_TABLE_KEY,
-                filter_field=field,
-                filter_options=filter_options.get(field, []),
-                base_class="ips-assets-filter-toolbar-cell",
-            )
+            if label and field:
+                render_table_header_cell(
+                    label,
+                    table_key=_SMALL_TOOLS_TABLE_KEY,
+                    filter_field=field,
+                    filter_options=filter_options.get(field, []),
+                    base_class="ips-assets-filter-toolbar-cell",
+                )
+            else:
+                st.markdown(
+                    '<span class="ips-assets-filter-spacer" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -883,12 +901,7 @@ def _render_small_tools_table(
             assets_by_id=assets_by_id,
         )
 
-    with st.container(key="assets_small_tools_table_wrap"):
-        st.markdown(
-            '<span class="ips-assets-table-header-marker ips-serialized-tools-table-anchor" aria-hidden="true"></span>',
-            unsafe_allow_html=True,
-        )
-        st.markdown('<div class="ips-assets-table-wrap">', unsafe_allow_html=True)
+    with st.container(key="assets_table_wrap"):
         _render_small_tools_table_column_filters(filter_options=filter_options)
         st.markdown(
             build_serialized_tools_html_table(display_rows, is_row_selected=_is_row_selected),
@@ -899,7 +912,6 @@ def _render_small_tools_table(
             open_row_fn=_open_row,
             select_row_fn=_select_row,
         )
-        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _equipment_summary_counts(rows: list[dict]) -> dict[str, int]:
@@ -1092,6 +1104,8 @@ def _render_small_tools_list(rows: list[dict]) -> None:
     layout_filter_bar(_filters)
     close_assets_filter_bar_shell()
 
+    render_serialized_tools_toolbar()
+
     filtered = _filter_small_tool_rows(
         small_tool_rows,
         q=str(st.session_state.get("ast_st_search") or "").strip(),
@@ -1102,9 +1116,10 @@ def _render_small_tools_list(rows: list[dict]) -> None:
         jobs_by_id=jobs_by_id,
     )
 
-    render_serialized_tools_toolbar()
     render_table_pagination_header(len(filtered), _SMALL_TOOLS_TABLE_KEY, item_label="tool")
     page_rows, _, _, _ = paginate_rows(filtered, _SMALL_TOOLS_TABLE_KEY)
+    render_table_pagination_footer(len(filtered), _SMALL_TOOLS_TABLE_KEY)
+
     _render_small_tools_table(
         page_rows,
         filter_options=filter_options,
@@ -1112,7 +1127,6 @@ def _render_small_tools_list(rows: list[dict]) -> None:
         employees_by_id=employees_by_id,
         jobs_by_id=jobs_by_id,
     )
-    render_table_pagination_footer(len(filtered), _SMALL_TOOLS_TABLE_KEY)
     _rerun_if_assets_modal_pending()
 
 
