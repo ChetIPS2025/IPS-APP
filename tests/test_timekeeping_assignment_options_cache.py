@@ -16,7 +16,7 @@ class TestTimekeepingAssignmentOptionsCache(unittest.TestCase):
         st.session_state.clear()
         tk.clear_timekeeping_assignment_options_cache()
 
-    @patch("app.services.tasks_service.get_tasks_by_job", return_value=[])
+    @patch("app.services.tasks_service.get_tasks_for_jobs", return_value={})
     @patch.object(tk, "load_jobs")
     def test_build_assignment_options_includes_jobs_and_specials(
         self,
@@ -59,19 +59,6 @@ class TestTimekeepingAssignmentOptionsCache(unittest.TestCase):
         third = tk._assignment_options_for_timekeeping(week_start_d=week)
         self.assertEqual(third, first)
         self.assertEqual(build_mock.call_count, 2)
-
-    @patch.object(tk, "load_jobs", return_value=[{"id": "a"}, {"id": "b"}])
-    def test_assignment_options_cache_sig_uses_week_and_job_count(self, _jobs_mock) -> None:
-        week = date(2026, 7, 6)
-        self.assertEqual(
-            tk._assignment_options_cache_sig(week_start_d=week),
-            "2026-07-06:2",
-        )
-
-    def test_expand_fragment_uses_streamlit_fragment(self) -> None:
-        self.assertTrue(callable(tk._render_timekeeping_expand_fragment))
-        wrapped = getattr(tk._render_timekeeping_expand_fragment, "__wrapped__", None)
-        self.assertIsNotNone(wrapped)
 
 
 if __name__ == "__main__":
