@@ -1090,6 +1090,33 @@ def list_tasks(*, demo: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], boo
     return rows, used
 
 
+_REMINDER_TASK_COLUMNS = (
+    "id,title,status,priority,assignee_name,assigned_to,assigned_to_email,"
+    "assignee_email,assigned_to_employee_id,assignee_id,job_id,job_label,"
+    "linked_job,due_date,created_at,updated_at"
+)
+
+
+def list_reminder_task_projections(
+    *,
+    demo: list[dict[str, Any]] | None = None,
+) -> tuple[list[dict[str, Any]], bool]:
+    """Lightweight open-task rows for dashboard reminder filtering (no descriptions/media)."""
+    demo_rows = demo if demo is not None else []
+    rows, err = fetch_rows(
+        "todos",
+        columns=_REMINDER_TASK_COLUMNS,
+        limit=5000,
+        order_by="due_date",
+        alt_tables=("tasks",),
+    )
+    if rows:
+        return [normalize_task(r) for r in rows], False
+    if err:
+        _LOG.debug("list_reminder_task_projections todos failed: %s", err)
+    return [normalize_task(r) for r in demo_rows], bool(demo_rows)
+
+
 def list_timekeeping_summaries(week_start: date, *, demo: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], bool]:
     ws = week_start.isoformat()
     from app.db import fetch_by_match
@@ -1182,6 +1209,87 @@ def list_timekeeping_days_for_week(week_start: date, *, limit: int = 5000) -> li
     if err:
         return []
     return [r for r in rows or [] if _day_row_in_week(r, week_start)]
+
+
+def _day_row_hours(row: dict[str, Any]) -> float:
+    return (
+        float(row.get("st_hours") or 0)
+        + float(row.get("ot_hours") or 0)
+        + float(row.get("dt_hours") or 0)
+    )
+
+
+def _count_distinct_employees_with_hours(
+    rows: list[dict[str, Any]],
+    *,
+    employee_ids: set[str] | None = None,
+) -> int:
+    totals: dict[str, float] = {}
+    for row in rows:
+        eid = str(row.get("employee_id") or row.get("id") or "").strip()
+        if not eid:
+            continue
+        if employee_ids is not None and eid not in employee_ids:
+            continue
+        totals[eid] = totals.get(eid, 0.0) + _day_row_hours(row)
+    return sum(1 for total in totals.values() if total > 0)
+
+
+def count_employees_working_on_date(
+    work_date: date,
+    *,
+    employee_ids: list[str] | None = None,
+) -> tuple[int, bool]:
+    """
+    Count distinct employees with positive ST/OT/DT hours on one calendar date.
+
+    Returns ``(count, used_demo)``.
+    """
+    wd = work_date.isoformat()[:10]
+    allowed = {str(eid).strip() for eid in (employee_ids or []) if str(eid).strip()} or None
+    columns = "employee_id,st_hours,ot_hours,dt_hours,work_date"
+    from app.db import fetch_by_match
+
+    try:
+        rows = fetch_by_match(
+            "employee_timekeeping_days",
+            {"work_date": wd},
+            columns=columns,
+            limit=5000,
+        ) or []
+        if rows:
+            return _count_distinct_employees_with_hours(rows, employee_ids=allowed), False
+    except Exception as exc:
+        _LOG.debug("count_employees_working_on_date fetch_by_match failed: %s", exc)
+
+    rows, err = fetch_rows(
+        "employee_timekeeping_days",
+        columns=columns,
+        limit=5000,
+        order_by="work_date",
+    )
+    if rows and not err:
+        day_rows = [r for r in rows if str(r.get("work_date") or "")[:10] == wd]
+        if day_rows:
+            return _count_distinct_employees_with_hours(day_rows, employee_ids=allowed), False
+
+    demo_rows = [
+        {
+            "employee_id": "emp-chance",
+            "work_date": wd,
+            "st_hours": 8.0 if work_date.weekday() < 5 else 0.0,
+            "ot_hours": 0.0,
+            "dt_hours": 0.0,
+        },
+        {
+            "employee_id": "emp-mark",
+            "work_date": wd,
+            "st_hours": 10.0 if work_date.weekday() < 4 else 0.0,
+            "ot_hours": 0.0,
+            "dt_hours": 0.0,
+        },
+    ]
+    return _count_distinct_employees_with_hours(demo_rows, employee_ids=allowed), True
 
 
 def clear_timekeeping_day_rows(

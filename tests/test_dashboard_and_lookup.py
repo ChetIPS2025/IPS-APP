@@ -193,7 +193,8 @@ def test_ops_dashboard_renders_mockup_panels():
     assert "dashboard_root" in source
     assert "dashboard_kpis" in source
     assert "dashboard_value_cards" in source
-    assert "render_dashboard_ops_panels" in source
+    assert "_render_dashboard_secondary_panels" in source
     assert "primary_action" in source
+    assert "load_dashboard_snapshot" in source
     assert "render_dashboard_company_updates_section" not in source
     assert "render_dashboard_preview_sections" not in source
