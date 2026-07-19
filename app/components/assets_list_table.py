@@ -356,13 +356,16 @@ def render_assets_table_open_buttons(
             if not aid:
                 continue
             bridge_key = assets_bridge_button_key(asset)
-            if st.button(
+
+            def _open(_aid: str = aid, _asset: dict = asset) -> None:
+                open_asset_fn(_aid, _asset)
+
+            st.button(
                 "Open asset",
                 key=bridge_key,
                 type="tertiary",
-            ):
-                open_asset_fn(aid, asset)
-                ips_app_rerun()
+                on_click=_open,
+            )
 
 
 def render_assets_table_bridge(

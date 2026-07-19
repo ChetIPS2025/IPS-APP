@@ -593,6 +593,15 @@ def render_clean_table_click_bridge(
     return anchor.closest('div[data-testid="stVerticalBlockBorderWrapper"]') || anchor.parentElement;
   }}
 
+  function clickBridgeButton(bridgeKey) {{
+    if (!bridgeKey) return false;
+    const host = doc.querySelector(".st-key-" + bridgeKey);
+    const btn = host && host.querySelector('[data-testid="stButton"] > button');
+    if (!btn) return false;
+    btn.click();
+    return true;
+  }}
+
   function rowOpenLink(target) {{
     return target && target.closest
       ? target.closest(".ips-row-open-link[data-row-id]")
@@ -613,6 +622,8 @@ def render_clean_table_click_bridge(
       e.preventDefault();
       e.stopPropagation();
     }}
+    const bridgeKey = link.getAttribute("data-bridge-key");
+    if (bridgeKey && clickBridgeButton(bridgeKey)) return true;
     sendValue(id);
     return true;
   }}
@@ -629,6 +640,14 @@ def render_clean_table_click_bridge(
         btn.click();
         return true;
       }}
+    }}
+    const bridgeKey = row.getAttribute("data-bridge-key");
+    if (bridgeKey && clickBridgeButton(bridgeKey)) {{
+      if (e) {{
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      return true;
     }}
     const id = row.getAttribute("data-row-id")
       || row.getAttribute("data-jid")
@@ -698,6 +717,14 @@ def render_clean_table_click_bridge(
           || row.getAttribute("data-jid")
           || row.getAttribute("data-est-id");
         if (!id) continue;
+        const bridgeKey = row.getAttribute("data-bridge-key");
+        if (bridgeKey && clickBridgeButton(bridgeKey)) {{
+          if (e) {{
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          return;
+        }}
         if (cfg.triggerSiblingButton) {{
           activateRow(row, e);
         }} else {{

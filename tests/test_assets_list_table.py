@@ -93,7 +93,21 @@ def test_build_assets_html_table_includes_matching_bridge_keys():
     assert bridge_key == "ast_bridge_open_ast_uuid_1"
 
 
-def test_assets_bridge_uses_clean_table_click_bridge() -> None:
+def test_assets_open_buttons_use_on_click_callback() -> None:
+    from app.components.assets_list_table import render_assets_table_open_buttons
+
+    src = inspect.getsource(render_assets_table_open_buttons)
+    assert "on_click=_open" in src
+    assert "ips_app_rerun()" not in src
+
+
+def test_clean_table_bridge_clicks_hidden_button_by_bridge_key() -> None:
+    from app.ui.clean_table import render_clean_table_click_bridge
+
+    src = inspect.getsource(render_clean_table_click_bridge)
+    assert "clickBridgeButton" in src
+    assert "data-bridge-key" in src
+
     from app.components.assets_list_table import render_assets_table_bridge
 
     src = inspect.getsource(render_assets_table_bridge)
