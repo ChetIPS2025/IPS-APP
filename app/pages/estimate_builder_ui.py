@@ -12,6 +12,23 @@ from app.auth import current_role
 from app.components.record_modal import detail_field_html, dialog_card_html
 from app.components.searchable_select import render_searchable_selectbox
 from app.pages._core._crud import is_demo_id
+from app.components.estimate_builder import (
+    ESTIMATE_COST_LINE_PAGE_SIZE,
+    LINE_HTML_BUILDERS,
+    MAX_BATCH_DRAFT_ROWS,
+    load_estimate_builder_permissions,
+)
+from app.components.table_pagination import (
+    paginate_rows,
+    render_table_pagination_footer,
+    render_table_pagination_header,
+)
+from app.services.estimate_cost_builder_page_service import load_estimate_cost_builder_snapshot
+from app.services.estimate_cost_cache import (
+    clear_proposal_bundle,
+    read_cached_totals,
+    write_cached_totals,
+)
 from app.services.estimate_costing_service import (
     DURATION_UNITS,
     LABOR_ROLE_TYPES,
@@ -34,8 +51,15 @@ from app.services.estimate_costing_service import (
     delete_estimate_other_cost,
     delete_estimate_subcontractor,
     delete_estimate_travel,
+    delete_estimate_cost_line,
+    finalize_estimate_cost_write,
     get_estimate_bundle,
     get_estimate_labor,
+    list_estimate_equipment_lines,
+    list_estimate_labor_lines,
+    list_estimate_other_cost_lines,
+    list_estimate_subcontractor_lines,
+    list_estimate_travel_lines,
     recalculate_and_save_estimate_totals,
     resolve_global_markup_pct,
     resolve_category_markup_defaults,
@@ -45,7 +69,7 @@ from app.services.estimate_costing_service import (
     update_estimate_labor_batch,
 )
 from app.services.labor_rates_service import save_default_rates_from_lines
-from app.ui.streamlit_perf import fragment, ips_app_rerun
+from app.ui.streamlit_perf import fragment, fragment_rerun, ips_app_rerun
 from app.utils.estimate_calculations import TRAVEL_TYPES, calc_travel_line, calc_travel_total
 from app.services.proposal_pdf_service import build_customer_quote_bundle
 from app.services.estimate_builder_helpers import (
@@ -68,23 +92,31 @@ def _cost_builder_totals_cache_key(eid: str) -> str:
 
 
 def _read_cost_builder_totals(eid: str, est: dict[str, Any]) -> dict[str, float]:
-    cached = st.session_state.get(_cost_builder_totals_cache_key(eid))
+    tax_rate = _estimate_tax_rate(est)
+    cached = read_cached_totals(eid, tax_rate=tax_rate)
     if isinstance(cached, dict) and cached:
         return cached
-    return calculate_estimate_totals(eid, tax_rate=_estimate_tax_rate(est))
-
-
-def _cache_cost_builder_totals(eid: str, totals: dict[str, Any]) -> None:
-    if totals:
-        st.session_state[_cost_builder_totals_cache_key(eid)] = dict(totals)
+    session_cached = st.session_state.get(_cost_builder_totals_cache_key(eid))
+    if isinstance(session_cached, dict) and session_cached:
+        return session_cached
+    totals = calculate_estimate_totals(eid, tax_rate=tax_rate)
+    write_cached_totals(eid, tax_rate=tax_rate, totals=totals)
+    return totals
 
 
 def _recalc_and_cache_cost_builder_totals(eid: str, est: dict[str, Any]) -> tuple[bool, str | None]:
-    result = recalculate_and_save_estimate_totals(eid, tax_rate=_estimate_tax_rate(est))
+    result = finalize_estimate_cost_write(eid, tax_rate=_estimate_tax_rate(est))
     if getattr(result, "ok", False):
-        _cache_cost_builder_totals(eid, getattr(result, "data", None) or {})
+        totals = getattr(result, "data", None) or {}
+        _cache_cost_builder_totals(eid, totals)
         return True, ""
     return False, str(getattr(result, "error", None) or "Could not update totals.")
+
+
+def _totals_may_be_stale(est: dict[str, Any], totals: dict[str, float]) -> bool:
+    stored_price = float(est.get("customer_price") or est.get("total") or 0)
+    calc_price = float(totals.get("customer_price") or 0)
+    return calc_price > 0 and stored_price > 0 and abs(stored_price - calc_price) > 0.01
 
 
 def _service_ok(result) -> tuple[bool, str]:
@@ -112,8 +144,13 @@ def _margin_banner_html(margin: float) -> str:
     )
 
 
-def render_cost_summary_cards(est: dict[str, Any], totals: dict[str, float] | None = None) -> None:
-    t = totals or calculate_estimate_totals(str(est.get("id") or ""))
+def _cache_cost_builder_totals(eid: str, totals: dict[str, Any]) -> None:
+    if totals:
+        st.session_state[_cost_builder_totals_cache_key(eid)] = dict(totals)
+
+
+def render_cost_summary_cards(est: dict[str, Any], totals: dict[str, float]) -> None:
+    t = totals
     cards = [
         ("Total Cost", fmt_currency(t.get("total_cost"))),
         ("Customer Price", fmt_currency(t.get("customer_price"))),
@@ -283,6 +320,7 @@ def _clear_batch_form(*, form_state_key: str, draft_key: str) -> None:
 
 
 _DEFAULT_BATCH_ROW_COUNT = 5
+_MAX_BATCH_DRAFT_ROWS = MAX_BATCH_DRAFT_ROWS
 
 _BATCH_ENTRY_CAPTION = (
     f"{_DEFAULT_BATCH_ROW_COUNT} blank rows ready — start typing on any line, then save. "
@@ -328,6 +366,11 @@ def _maybe_auto_extend_batch_draft(
     append_row: Callable[[], dict[str, str]],
 ) -> None:
     if not draft_rows:
+        return
+    if len(draft_rows) >= _MAX_BATCH_DRAFT_ROWS:
+        last_rid = str(draft_rows[-1].get("rid") or "")
+        if last_rid and is_row_filled(last_rid):
+            st.caption("Save these lines before adding more.")
         return
     last_rid = str(draft_rows[-1].get("rid") or "")
     if last_rid and is_row_filled(last_rid):
@@ -622,13 +665,8 @@ def render_cost_builder_tab(
         return
 
     totals = _read_cost_builder_totals(eid, est)
-    stored_price = float(est.get("customer_price") or est.get("total") or 0)
-    calc_price = float(totals.get("customer_price") or 0)
-    if calc_price > 0 and abs(stored_price - calc_price) > 0.01:
-        ok, _ = _recalc_and_cache_cost_builder_totals(eid, est)
-        if ok and on_saved:
-            on_saved()
-        totals = _read_cost_builder_totals(eid, est)
+    if _totals_may_be_stale(est, totals):
+        st.warning("Estimate totals may be out of date.")
     render_cost_summary_cards(est, totals)
 
     st.caption(
@@ -659,7 +697,7 @@ def render_cost_builder_tab(
                     on_saved()
                 st.rerun()
             else:
-                st.error(err)
+                st.error(err or "Could not update totals.")
     st.markdown("</div>", unsafe_allow_html=True)
 
     if add_mat:
@@ -725,7 +763,44 @@ def render_cost_builder_tab(
     if st.session_state.get(f"ecb_form_other_{eid}"):
         _render_add_other_form(eid, est, key_prefix="ecb_oth", form_state_key=f"ecb_form_other_{eid}")
 
-    _render_cost_builder_line_sections(est)
+    _render_cost_builder_active_section(est, on_saved=on_saved)
+
+
+def _render_cost_builder_active_section(
+    est: dict[str, Any],
+    *,
+    on_saved: Callable[[], None] | None = None,
+) -> None:
+    from app.components.tabs import render_tabs
+
+    _SECTION_TABS = [
+        "Pricing Items",
+        "Labor",
+        "Equipment",
+        "Travel",
+        "Subcontractors",
+        "Other Costs",
+        "Summary",
+    ]
+    section = render_tabs(
+        _SECTION_TABS,
+        session_key="ips_estimate_cost_builder_section",
+        default="Labor",
+    )
+    if section == "Pricing Items":
+        st.info("Use the Materials tab in estimate details for pricing items.")
+    elif section == "Labor":
+        render_labor_tab(est)
+    elif section == "Equipment":
+        render_equipment_tab(est)
+    elif section == "Travel":
+        render_travel_tab(est)
+    elif section == "Subcontractors":
+        render_subcontractors_tab(est)
+    elif section == "Other Costs":
+        render_other_costs_tab(est)
+    elif section == "Summary":
+        render_summary_tab(est)
 
 
 def _sync_material_batch_pick(
@@ -970,11 +1045,14 @@ def _render_add_labor_form(
     key_prefix: str = "ecb_lab",
     form_state_key: str | None = None,
     tab_entry: bool = False,
+    permissions: Any | None = None,
 ) -> None:
     fk = form_state_key or f"ecb_form_lab_{eid}"
     k = lambda field: _line_form_key(key_prefix, eid, field)  # noqa: E731
     default_markup = float(est.get("default_labor_markup_pct") or 0)
-    labor_options = labor_options_as_select()
+    from app.services.estimate_builder_reference_service import cached_labor_options_as_select
+
+    labor_options = cached_labor_options_as_select()
     lab_map = {label: opt for label, opt in labor_options}
     role_labels = [label for label, _ in labor_options] or list(LABOR_ROLE_TYPES)
     draft_key = _labor_batch_draft_key(key_prefix, eid)
@@ -1130,7 +1208,8 @@ def _render_add_labor_form(
                 st.rerun()
 
     save_as_default = False
-    if current_role() == "admin":
+    perms = permissions or load_estimate_builder_permissions()
+    if perms.can_manage_default_rates:
         save_as_default = st.checkbox(
             "Save modified rates as defaults for future estimates",
             value=False,
@@ -2232,8 +2311,7 @@ def render_travel_tab(est: dict[str, Any]) -> None:
         st.info("Save this estimate to Supabase before adding travel costs.")
         return
 
-    bundle = get_estimate_bundle(eid)
-    travel_lines = bundle.get("travel") or []
+    travel_lines, _ = list_estimate_travel_lines(eid, page=1, page_size=500)
     travel_totals = calc_travel_total(travel_lines)
     cols = st.columns(3, gap="small")
     cards = [
@@ -2251,48 +2329,99 @@ def render_travel_tab(est: dict[str, Any]) -> None:
                 unsafe_allow_html=True,
             )
 
-    if travel_lines:
-        st.caption("Saved rental/travel lines — remove with ✕, or add more lines below.")
-        for row in travel_lines:
-            rid = str(row.get("id") or "")
-            cells = [
-                html.escape(str(row.get("travel_type") or "—")),
-                html.escape(str(row.get("description") or "—")),
-                html.escape(str(row.get("origin") or "—")),
-                html.escape(str(row.get("destination") or "—")),
-                html.escape(_travel_basis_text(row)),
-                html.escape(fmt_currency(row.get("cost_total"))),
-                html.escape(f"{float(row.get('markup_percent') or 0):.1f}%"),
-                html.escape(fmt_currency(row.get("price_total"))),
-                html.escape("Yes" if row.get("taxable") else "No"),
-            ]
-            c0, c_del = st.columns([8, 1], gap="small")
-            with c0:
-                _line_table(
-                    ["Type", "Description", "Origin", "Destination", "Qty / Basis", "Cost", "Markup %", "Customer Price", "Taxable"],
-                    [cells],
-                )
-            with c_del:
-                if st.button("✕", key=f"trv_tab_del_{rid}", help="Delete travel line"):
-                    ok, err = _service_ok(delete_estimate_travel(rid, estimate_id=eid))
-                    if ok:
-                        st.rerun()
-                    st.error(err)
+    _render_paginated_category_lines(
+        est,
+        category="travel",
+        table_key=f"ecb_trv_{eid}",
+        key_prefix="trv_tab",
+    )
 
     fk = f"trv_tab_form_{eid}"
     draft_key = _batch_draft_key("trv", "trv_tab", eid)
-    _open_tab_entry_form(
+    if _render_lazy_add_button(
+        label="+ Add Travel",
         form_state_key=fk,
         draft_key=draft_key,
         init_rows=lambda: _initial_batch_draft_rows(_DEFAULT_BATCH_ROW_COUNT),
-    )
-    _render_add_travel_form(
-        eid,
+        button_key=f"trv_tab_open_{eid}",
+    ):
+        _ensure_tab_batch_draft(draft_key, lambda: _initial_batch_draft_rows(_DEFAULT_BATCH_ROW_COUNT))
+        _render_add_travel_form(
+            eid,
+            est,
+            key_prefix="trv_tab",
+            form_state_key=fk,
+            tab_entry=True,
+        )
+
+
+def _line_action_state_key(eid: str) -> str:
+    return f"ecb_line_action_{eid}"
+
+
+def _render_paginated_category_lines(
+    est: dict[str, Any],
+    *,
+    category: str,
+    table_key: str,
+    key_prefix: str,
+) -> None:
+    eid = str(est.get("id") or "")
+    snapshot = load_estimate_cost_builder_snapshot(
         est,
-        key_prefix="trv_tab",
-        form_state_key=fk,
-        tab_entry=True,
+        section=category,
+        page=int(st.session_state.get(f"ips_pg_page_{table_key}", 1)),
+        page_size=ESTIMATE_COST_LINE_PAGE_SIZE,
     )
+    rows = snapshot.section_rows
+    total = snapshot.section_total_count
+    if total <= 0:
+        st.caption("No lines yet.")
+        return
+    render_table_pagination_header(total, table_key, item_label="line")
+    builder = LINE_HTML_BUILDERS.get(category)
+    if builder:
+        html_out = builder(rows, eid=eid)
+        if html_out:
+            st.markdown(html_out, unsafe_allow_html=True)
+    render_table_pagination_footer(total, table_key)
+
+    action = st.session_state.get(_line_action_state_key(eid)) or {}
+    sel_id = str(action.get("line_id") or "")
+    sel_cat = str(action.get("category") or "")
+    if sel_id and sel_cat == category:
+        st.caption(f"Selected line: {sel_id[:8]}…")
+        c1, c2 = st.columns(2, gap="small")
+        with c1:
+            if st.button("Delete selected line", key=f"{key_prefix}_del_confirm_{sel_id}"):
+                result = delete_estimate_cost_line(eid, category=category, line_id=sel_id)
+                ok, err = _service_ok(result)
+                if ok:
+                    st.session_state.pop(_line_action_state_key(eid), None)
+                    fragment_rerun()
+                else:
+                    st.error(err)
+        with c2:
+            if st.button("Cancel", key=f"{key_prefix}_del_cancel_{sel_id}"):
+                st.session_state.pop(_line_action_state_key(eid), None)
+                fragment_rerun()
+
+
+def _render_lazy_add_button(
+    *,
+    label: str,
+    form_state_key: str,
+    draft_key: str,
+    init_rows: Callable[[], list[dict[str, str]]],
+    button_key: str,
+) -> bool:
+    if st.session_state.get(form_state_key):
+        return True
+    if st.button(label, key=button_key, use_container_width=True):
+        st.session_state[form_state_key] = True
+        st.session_state.pop(draft_key, None)
+        fragment_rerun()
+    return False
 
 
 def _render_deletable_lines(
@@ -2388,7 +2517,7 @@ def _finish_labor_hours_save(
                 st_hours=float(st.session_state.get(st_key, row.get("st_hours") or 0)),
                 ot_hours=float(st.session_state.get(ot_key, row.get("ot_hours") or 0)),
             )
-        ips_app_rerun()
+        fragment_rerun()
     return ok, err
 
 
@@ -2689,54 +2818,61 @@ def render_labor_tab(est: dict[str, Any]) -> None:
     eid = str(est.get("id") or "")
     fk = f"lab_tab_form_{eid}"
     draft_key = _labor_batch_draft_key("lab_tab", eid)
+    perms = load_estimate_builder_permissions()
 
-    def _init_rows() -> list[dict[str, str]]:
-        labor_options = labor_options_as_select()
-        lab_map = {label: opt for label, opt in labor_options}
-        role_labels = [label for label, _ in labor_options] or list(LABOR_ROLE_TYPES)
-        default_markup = float(est.get("default_labor_markup_pct") or 0)
-        return [
-            _new_labor_batch_row(
-                role_labels=role_labels,
-                lab_map=lab_map,
-                default_markup=default_markup,
-            )
-            for _ in range(_DEFAULT_BATCH_ROW_COUNT)
-        ]
-
-    _open_tab_entry_form(form_state_key=fk, draft_key=draft_key, init_rows=_init_rows)
-    labor, _ = get_estimate_labor(eid)
-    if labor:
-        st.caption("Saved labor lines — edit hours inline, or add new lines below.")
-        _render_labor_lines_fragment(eid, est, key_prefix="lab_tab")
-    _render_add_labor_form(
+    labor, total = list_estimate_labor_lines(
         eid,
-        est,
-        key_prefix="lab_tab",
-        form_state_key=fk,
-        tab_entry=True,
+        page=int(st.session_state.get(f"ips_pg_page_ecb_lab_{eid}", 1)),
+        page_size=ESTIMATE_COST_LINE_PAGE_SIZE,
     )
+    if total > 0:
+        st.caption("Saved labor lines — edit hours inline, or add new lines below.")
+        render_table_pagination_header(total, f"ecb_lab_{eid}", item_label="line")
+        _render_labor_lines(eid, labor, key_prefix="lab_tab")
+        render_table_pagination_footer(total, f"ecb_lab_{eid}")
+
+    if _render_lazy_add_button(
+        label="+ Add Labor",
+        form_state_key=fk,
+        draft_key=draft_key,
+        init_rows=lambda: _initial_batch_draft_rows(_DEFAULT_BATCH_ROW_COUNT),
+        button_key=f"lab_tab_open_{eid}",
+    ):
+        def _init_rows() -> list[dict[str, str]]:
+            from app.services.estimate_builder_reference_service import cached_labor_options_as_select
+
+            labor_options = cached_labor_options_as_select()
+            lab_map = {label: opt for label, opt in labor_options}
+            role_labels = [label for label, _ in labor_options] or list(LABOR_ROLE_TYPES)
+            default_markup = float(est.get("default_labor_markup_pct") or 0)
+            return [
+                _new_labor_batch_row(
+                    role_labels=role_labels,
+                    lab_map=lab_map,
+                    default_markup=default_markup,
+                )
+                for _ in range(_DEFAULT_BATCH_ROW_COUNT)
+            ]
+
+        _ensure_tab_batch_draft(draft_key, _init_rows)
+        _render_add_labor_form(
+            eid,
+            est,
+            key_prefix="lab_tab",
+            form_state_key=fk,
+            tab_entry=True,
+            permissions=perms,
+        )
 
 
 def render_equipment_tab(est: dict[str, Any], *, asset_options: list[tuple[str, dict[str, Any]]] | None = None) -> None:
     eid = str(est.get("id") or "")
-    bundle = get_estimate_bundle(eid)
-    equipment = bundle["equipment"]
-    if equipment:
-        st.caption("Saved equipment lines — remove with ✕, or add more lines below.")
-        _render_deletable_lines(
-            eid,
-            ["Equipment", "Duration", "Cost", "Price"],
-            equipment,
-            row_cells=lambda r: [
-                html.escape(str(r.get("equipment_name") or "—")),
-                html.escape(f"{r.get('duration',0)} {r.get('duration_unit','')}" ),
-                html.escape(fmt_currency(r.get("cost_total"))),
-                html.escape(fmt_currency(r.get("price_total"))),
-            ],
-            delete_fn=delete_estimate_equipment,
-            key_prefix="eq_tab",
-        )
+    _render_paginated_category_lines(
+        est,
+        category="equipment",
+        table_key=f"ecb_eq_{eid}",
+        key_prefix="eq_tab",
+    )
     fk = f"eq_tab_form_{eid}"
     draft_key = _batch_draft_key("eq", "eq_tab", eid)
     labels = [label for label, _ in (asset_options or [])]
@@ -2744,86 +2880,77 @@ def render_equipment_tab(est: dict[str, Any], *, asset_options: list[tuple[str, 
     def _init_rows() -> list[dict[str, str]]:
         return _initial_batch_draft_rows(_DEFAULT_BATCH_ROW_COUNT, pick=labels[0] if labels else "")
 
-    _open_tab_entry_form(form_state_key=fk, draft_key=draft_key, init_rows=_init_rows)
-    _render_add_equipment_form(
-        eid,
-        est,
-        asset_options or [],
-        key_prefix="eq_tab",
+    if _render_lazy_add_button(
+        label="+ Add Equipment",
         form_state_key=fk,
-        tab_entry=True,
-    )
+        draft_key=draft_key,
+        init_rows=_init_rows,
+        button_key=f"eq_tab_open_{eid}",
+    ):
+        _ensure_tab_batch_draft(draft_key, _init_rows)
+        _render_add_equipment_form(
+            eid,
+            est,
+            asset_options or [],
+            key_prefix="eq_tab",
+            form_state_key=fk,
+            tab_entry=True,
+        )
 
 
 def render_subcontractors_tab(est: dict[str, Any], *, vendor_options: list[str] | None = None) -> None:
     eid = str(est.get("id") or "")
-    bundle = get_estimate_bundle(eid)
-    subs = bundle["subcontractors"]
-    if subs:
-        st.caption("Saved subcontractor lines — remove with ✕, or add more lines below.")
-        _render_deletable_lines(
-            eid,
-            ["Subcontractor", "Scope", "Cost", "Price"],
-            subs,
-            row_cells=lambda r: [
-                html.escape(str(r.get("subcontractor_name") or "—")),
-                html.escape(str(r.get("description") or "—")),
-                html.escape(fmt_currency(r.get("cost_total"))),
-                html.escape(fmt_currency(r.get("price_total"))),
-            ],
-            delete_fn=delete_estimate_subcontractor,
-            key_prefix="sub_tab",
-        )
+    _render_paginated_category_lines(
+        est,
+        category="subcontractors",
+        table_key=f"ecb_sub_{eid}",
+        key_prefix="sub_tab",
+    )
     fk = f"sub_tab_form_{eid}"
     draft_key = _batch_draft_key("sub", "sub_tab", eid)
-    _open_tab_entry_form(
+    if _render_lazy_add_button(
+        label="+ Add Subcontractors",
         form_state_key=fk,
         draft_key=draft_key,
         init_rows=lambda: _initial_batch_draft_rows(_DEFAULT_BATCH_ROW_COUNT),
-    )
-    _render_add_subcontractor_form(
-        eid,
-        est,
-        vendor_options or [],
-        key_prefix="sub_tab",
-        form_state_key=fk,
-        tab_entry=True,
-    )
+        button_key=f"sub_tab_open_{eid}",
+    ):
+        _ensure_tab_batch_draft(draft_key, lambda: _initial_batch_draft_rows(_DEFAULT_BATCH_ROW_COUNT))
+        _render_add_subcontractor_form(
+            eid,
+            est,
+            vendor_options or [],
+            key_prefix="sub_tab",
+            form_state_key=fk,
+            tab_entry=True,
+        )
 
 
 def render_other_costs_tab(est: dict[str, Any]) -> None:
     eid = str(est.get("id") or "")
-    bundle = get_estimate_bundle(eid)
-    others = bundle["other_costs"]
-    if others:
-        st.caption("Saved other cost lines — remove with ✕, or add more lines below.")
-        _render_deletable_lines(
-            eid,
-            ["Description", "Category", "Cost", "Price"],
-            others,
-            row_cells=lambda r: [
-                html.escape(str(r.get("description") or "—")),
-                html.escape(str(r.get("category") or "—")),
-                html.escape(fmt_currency(r.get("cost_total"))),
-                html.escape(fmt_currency(r.get("price_total"))),
-            ],
-            delete_fn=delete_estimate_other_cost,
-            key_prefix="oth_tab",
-        )
+    _render_paginated_category_lines(
+        est,
+        category="other_costs",
+        table_key=f"ecb_oth_{eid}",
+        key_prefix="oth_tab",
+    )
     fk = f"oth_tab_form_{eid}"
     draft_key = _batch_draft_key("oth", "oth_tab", eid)
-    _open_tab_entry_form(
+    if _render_lazy_add_button(
+        label="+ Add Other Costs",
         form_state_key=fk,
         draft_key=draft_key,
         init_rows=lambda: _initial_batch_draft_rows(_DEFAULT_BATCH_ROW_COUNT),
-    )
-    _render_add_other_form(
-        eid,
-        est,
-        key_prefix="oth_tab",
-        form_state_key=fk,
-        tab_entry=True,
-    )
+        button_key=f"oth_tab_open_{eid}",
+    ):
+        _ensure_tab_batch_draft(draft_key, lambda: _initial_batch_draft_rows(_DEFAULT_BATCH_ROW_COUNT))
+        _render_add_other_form(
+            eid,
+            est,
+            key_prefix="oth_tab",
+            form_state_key=fk,
+            tab_entry=True,
+        )
 
 
 def _estimate_scope_display_text(est: dict[str, Any]) -> str:
@@ -2941,7 +3068,13 @@ def render_markups_tab(est: dict[str, Any]) -> None:
         else:
             st.error(str(result.error or "Could not save markup settings."))
 
-    with st.expander("Advanced", expanded=False):
+    adv_open_key = f"mk_adv_open_{eid}"
+    if not st.session_state.get(adv_open_key):
+        if st.button("Open Advanced Category Markups", key=f"mk_open_advanced_{eid}"):
+            st.session_state[adv_open_key] = True
+            st.rerun()
+    else:
+        st.markdown("##### Advanced Category Markups")
         st.caption(
             "Optional per-category defaults for new lines only. "
             "When set, each category uses its own markup instead of the global default."
@@ -3019,7 +3152,19 @@ def render_markups_tab(est: dict[str, Any]) -> None:
 
 def render_summary_tab(est: dict[str, Any]) -> None:
     eid = str(est.get("id") or "")
-    totals = calculate_estimate_totals(eid)
+    snapshot = load_estimate_cost_builder_snapshot(est, section="summary")
+    totals = snapshot.totals
+    if snapshot.warning:
+        st.warning(snapshot.warning)
+    perms = load_estimate_builder_permissions()
+    if perms.can_recalculate and eid and not is_demo_id(eid):
+        if st.button("Recalculate Totals", key=f"summary_recalc_{eid}"):
+            ok, err = _recalc_and_cache_cost_builder_totals(eid, est)
+            if ok:
+                st.success("Totals updated.")
+                st.rerun()
+            else:
+                st.error(err or "Could not update totals.")
     render_cost_summary_cards(est, totals)
 
     cost_html = (
@@ -3065,33 +3210,69 @@ def render_summary_tab(est: dict[str, Any]) -> None:
 
 
 def render_proposal_preview_tab(est: dict[str, Any]) -> None:
-    """Customer quote preview and exports (single view aligned with Word/PDF)."""
+    """Customer quote preview and exports (lazy generation)."""
     eid = str(est.get("id") or "")
 
     if is_demo_id(eid):
         st.info("Save estimate to Supabase to preview and download the customer quote.")
         return
 
-    totals = calculate_estimate_totals(eid) if eid else {}
-    from app.services.proposal_pdf_service import merge_proposal_totals
-    totals = merge_proposal_totals(totals, est)
+    bundle_key = f"ecb_proposal_{eid}_{load_estimate_cost_builder_snapshot(est, section='summary').cost_data_version}"
+    st.markdown("##### Customer Quote")
+    docx_bytes = b""
+    pdf_bytes = b""
+    page_html = ""
+    word_err = None
+    pdf_note = None
 
-    try:
-        docx_bytes, pdf_bytes, page_html, word_err, pdf_note = build_customer_quote_bundle(eid, est, totals=totals)
-    except Exception as exc:
-        st.error(f"Could not build customer quote: {exc}")
+    if not st.session_state.get(f"ecb_proposal_ready_{eid}"):
+        if st.button("Generate Preview", key=f"pp_generate_{eid}", type="primary"):
+            st.session_state[f"ecb_proposal_ready_{eid}"] = True
+            st.session_state.pop(bundle_key, None)
+            st.rerun()
         return
+
+    cached = st.session_state.get(bundle_key)
+    if isinstance(cached, dict) and cached.get("page_html"):
+        docx_bytes = cached.get("docx_bytes") or b""
+        pdf_bytes = cached.get("pdf_bytes") or b""
+        page_html = str(cached.get("page_html") or "")
+        word_err = cached.get("word_err")
+        pdf_note = cached.get("pdf_note")
+    else:
+        from app.perf_debug import perf_span
+
+        totals = _read_cost_builder_totals(eid, est)
+        from app.services.proposal_pdf_service import merge_proposal_totals
+
+        totals = merge_proposal_totals(totals, est)
+        with perf_span("estimate_builder.proposal"):
+            try:
+                docx_bytes, pdf_bytes, page_html, word_err, pdf_note = build_customer_quote_bundle(
+                    eid, est, totals=totals
+                )
+            except Exception as exc:
+                st.error(f"Could not build customer quote: {exc}")
+                return
+        st.session_state[bundle_key] = {
+            "docx_bytes": docx_bytes,
+            "pdf_bytes": pdf_bytes,
+            "page_html": page_html,
+            "word_err": word_err,
+            "pdf_note": pdf_note,
+        }
 
     if word_err:
         st.error(word_err)
         return
 
     from app.estimate.proposal_exports import _inject_proposal_preview_styles
+
     _inject_proposal_preview_styles()
     st.markdown(page_html, unsafe_allow_html=True)
 
     slug = str(est.get("estimate_number") or est.get("quote_number") or "quote").strip() or "quote"
-    d1, d2 = st.columns(2)
+    d1, d2, d3 = st.columns(3)
     with d1:
         st.download_button(
             "Download Quote (Word)",
@@ -3113,11 +3294,18 @@ def render_proposal_preview_tab(est: dict[str, Any]) -> None:
             disabled=not pdf_bytes,
             use_container_width=True,
         )
+    with d3:
+        if st.button("Clear Preview", key=f"pp_clear_{eid}", use_container_width=True):
+            st.session_state.pop(f"ecb_proposal_ready_{eid}", None)
+            st.session_state.pop(bundle_key, None)
+            clear_proposal_bundle(eid)
+            st.rerun()
     if not pdf_bytes and pdf_note:
         st.caption(pdf_note)
 
     if st.button("Mark as Sent", key=f"pp_sent_{eid}"):
         from app.pages._core._data import persist_estimate, get_estimate as _get_est
+
         cur = _get_est(eid) or est
         ok, msg = persist_estimate(
             {
@@ -3131,4 +3319,5 @@ def render_proposal_preview_tab(est: dict[str, Any]) -> None:
         if ok:
             st.success(msg or "Estimate marked as Sent.")
             st.rerun()
-        st.error(msg or "Could not update status.")
+        else:
+            st.error(msg or "Could not update status.")

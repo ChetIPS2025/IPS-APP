@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Callable
 
 from app.services.repository import (
     ServiceResult,
@@ -492,6 +492,136 @@ def get_estimate_travel(estimate_id: str) -> tuple[list[dict[str, Any]], bool]:
     return [normalize_travel_line(r, eid) for r in _filter_estimate_rows(rows, eid)], False
 
 
+def _paginate_estimate_lines(
+    rows: list[dict[str, Any]],
+    *,
+    page: int,
+    page_size: int,
+) -> tuple[list[dict[str, Any]], int]:
+    total = len(rows)
+    pg = max(1, int(page or 1))
+    size = max(1, min(200, int(page_size or 25)))
+    start = (pg - 1) * size
+    return rows[start : start + size], total
+
+
+def _cached_category_lines(
+    estimate_id: str,
+    category: str,
+    loader: Callable[[], list[dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    eid = _str(estimate_id)
+    if not eid:
+        return []
+    try:
+        from app.pages._core.page_data_cache import page_data_cache_get
+        from app.services.estimate_cost_cache import estimate_cost_data_version
+
+        version = estimate_cost_data_version(eid)
+        cache_key = f"est_cost:{eid}:{category}:v{version}"
+        return page_data_cache_get(cache_key, loader)
+    except Exception:
+        return loader()
+
+
+def list_estimate_material_lines(
+    estimate_id: str,
+    *,
+    page: int = 1,
+    page_size: int = 25,
+    demo: list[dict[str, Any]] | None = None,
+) -> tuple[list[dict[str, Any]], int]:
+    eid = _str(estimate_id)
+
+    def _load() -> list[dict[str, Any]]:
+        rows, _ = get_estimate_materials(eid, demo=demo)
+        return rows
+
+    all_rows = _cached_category_lines(eid, "materials", _load)
+    return _paginate_estimate_lines(all_rows, page=page, page_size=page_size)
+
+
+def list_estimate_labor_lines(
+    estimate_id: str,
+    *,
+    page: int = 1,
+    page_size: int = 25,
+    demo: list[dict[str, Any]] | None = None,
+) -> tuple[list[dict[str, Any]], int]:
+    eid = _str(estimate_id)
+
+    def _load() -> list[dict[str, Any]]:
+        rows, _ = get_estimate_labor(eid, demo=demo)
+        return rows
+
+    all_rows = _cached_category_lines(eid, "labor", _load)
+    return _paginate_estimate_lines(all_rows, page=page, page_size=page_size)
+
+
+def list_estimate_equipment_lines(
+    estimate_id: str,
+    *,
+    page: int = 1,
+    page_size: int = 25,
+) -> tuple[list[dict[str, Any]], int]:
+    eid = _str(estimate_id)
+
+    def _load() -> list[dict[str, Any]]:
+        rows, _ = get_estimate_equipment(eid)
+        return rows
+
+    all_rows = _cached_category_lines(eid, "equipment", _load)
+    return _paginate_estimate_lines(all_rows, page=page, page_size=page_size)
+
+
+def list_estimate_travel_lines(
+    estimate_id: str,
+    *,
+    page: int = 1,
+    page_size: int = 25,
+) -> tuple[list[dict[str, Any]], int]:
+    eid = _str(estimate_id)
+
+    def _load() -> list[dict[str, Any]]:
+        rows, _ = get_estimate_travel(eid)
+        return rows
+
+    all_rows = _cached_category_lines(eid, "travel", _load)
+    return _paginate_estimate_lines(all_rows, page=page, page_size=page_size)
+
+
+def list_estimate_subcontractor_lines(
+    estimate_id: str,
+    *,
+    page: int = 1,
+    page_size: int = 25,
+) -> tuple[list[dict[str, Any]], int]:
+    eid = _str(estimate_id)
+
+    def _load() -> list[dict[str, Any]]:
+        rows, _ = get_estimate_subcontractors(eid)
+        return rows
+
+    all_rows = _cached_category_lines(eid, "subcontractors", _load)
+    return _paginate_estimate_lines(all_rows, page=page, page_size=page_size)
+
+
+def list_estimate_other_cost_lines(
+    estimate_id: str,
+    *,
+    page: int = 1,
+    page_size: int = 25,
+) -> tuple[list[dict[str, Any]], int]:
+    eid = _str(estimate_id)
+
+    def _load() -> list[dict[str, Any]]:
+        rows, _ = get_estimate_other_costs(eid)
+        return rows
+
+    all_rows = _cached_category_lines(eid, "other_costs", _load)
+    return _paginate_estimate_lines(all_rows, page=page, page_size=page_size)
+
+
 def clear_estimate_cache() -> None:
     _reset_equipment_storage_cache()
     clear_data_cache_for_table("estimates")
@@ -601,7 +731,90 @@ def recalculate_and_save_estimate_totals(
 
 def recalculate_estimate_rollups(estimate_id: str, *, tax_rate: float | None = None) -> ServiceResult:
     """Explicit rollup recalculation — use on Cost Builder save or user action."""
-    return recalculate_and_save_estimate_totals(estimate_id, tax_rate=tax_rate)
+    return finalize_estimate_cost_write(estimate_id, tax_rate=tax_rate)
+
+
+def finalize_estimate_cost_write(
+    estimate_id: str,
+    *,
+    tax_rate: float | None = None,
+    on_saved: Callable[[], None] | None = None,
+) -> ServiceResult:
+    """Recalculate persisted totals once after a cost-line write and refresh caches."""
+    from app.perf_debug import perf_span
+    from app.services.estimate_cost_cache import (
+        clear_proposal_bundle,
+        invalidate_estimate_cost_cache,
+        write_cached_totals,
+    )
+
+    eid = _str(estimate_id)
+    if not eid:
+        return ServiceResult(ok=False, error="Estimate id is required.")
+    with perf_span("estimate_builder.totals_recalculate"):
+        result = recalculate_and_save_estimate_totals(eid, tax_rate=tax_rate)
+    if not result.ok:
+        return result
+    invalidate_estimate_cost_cache(eid)
+    totals = getattr(result, "data", None) or {}
+    rate = tax_rate
+    if rate is None:
+        row = fetch_by_id("estimates", eid)
+        rate = _num(row.get("tax_rate")) if row else 0.0
+    write_cached_totals(eid, tax_rate=float(rate or 0), totals=totals)
+    clear_proposal_bundle(eid)
+    clear_estimate_cache()
+    if on_saved:
+        on_saved()
+    return result
+
+
+def delete_estimate_cost_line(
+    estimate_id: str,
+    *,
+    category: str,
+    line_id: str,
+    tax_rate: float | None = None,
+) -> ServiceResult:
+    """Delete one cost line and refresh cost caches (delete handlers already recalc totals)."""
+    from app.perf_debug import perf_span
+    from app.services.estimate_cost_cache import (
+        clear_proposal_bundle,
+        invalidate_estimate_cost_cache,
+        write_cached_totals,
+    )
+
+    eid = _str(estimate_id)
+    lid = _str(line_id)
+    cat = str(category or "").strip().lower()
+    dispatch = {
+        "materials": delete_estimate_material,
+        "material": delete_estimate_material,
+        "labor": delete_estimate_labor,
+        "equipment": delete_estimate_equipment,
+        "travel": delete_estimate_travel,
+        "subcontractors": delete_estimate_subcontractor,
+        "subcontractor": delete_estimate_subcontractor,
+        "other_costs": delete_estimate_other_cost,
+        "other": delete_estimate_other_cost,
+    }
+    delete_fn = dispatch.get(cat)
+    if not delete_fn:
+        return ServiceResult(ok=False, error=f"Unknown cost category: {category}")
+    with perf_span("estimate_builder.line_delete"):
+        result = delete_fn(lid, estimate_id=eid)
+    if not result.ok:
+        return result
+    invalidate_estimate_cost_cache(eid)
+    clear_proposal_bundle(eid)
+    rate = tax_rate
+    if rate is None:
+        row = fetch_by_id("estimates", eid)
+        rate = _num(row.get("tax_rate")) if row else 0.0
+    totals = calculate_estimate_totals(eid, tax_rate=rate)
+    write_cached_totals(eid, tax_rate=float(rate or 0), totals=totals)
+    clear_estimate_cache()
+    return ServiceResult(ok=True, data=totals)
 
 
 def _next_sort_order(rows: list[dict[str, Any]]) -> int:
@@ -667,7 +880,7 @@ def add_estimate_material(estimate_id: str, data: dict[str, Any]) -> ServiceResu
     payload = _material_insert_payload(eid, data, _next_sort_order(existing))
     result = _insert_estimate_line_item(payload)
     if result.ok:
-        recalculate_and_save_estimate_totals(eid)
+        finalize_estimate_cost_write(eid)
     return result
 
 
@@ -688,7 +901,7 @@ def add_estimate_material_batch(estimate_id: str, lines: list[dict[str, Any]]) -
             break
         inserted += 1
     if inserted:
-        recalculate_and_save_estimate_totals(eid)
+        finalize_estimate_cost_write(eid)
     if inserted < len(lines):
         if inserted:
             return ServiceResult(
@@ -728,7 +941,7 @@ def update_estimate_material(line_id: str, data: dict[str, Any]) -> ServiceResul
     result = update_row("estimate_line_items", payload, {"id": rid})
     eid = _str(data.get("estimate_id"))
     if result.ok and eid:
-        recalculate_and_save_estimate_totals(eid)
+        finalize_estimate_cost_write(eid)
     return result
 
 
@@ -736,7 +949,7 @@ def delete_estimate_material(line_id: str, *, estimate_id: str = "") -> ServiceR
     result = delete_row("estimate_line_items", {"id": _str(line_id)})
     eid = _str(estimate_id)
     if result.ok and eid:
-        recalculate_and_save_estimate_totals(eid)
+        finalize_estimate_cost_write(eid)
     return result
 
 
@@ -784,7 +997,7 @@ def add_estimate_labor(estimate_id: str, data: dict[str, Any]) -> ServiceResult:
     if not result.ok and result.error and _is_missing_table_error(Exception(result.error)):
         return ServiceResult(ok=False, error=_LABOR_LINES_MISSING_MSG)
     if result.ok:
-        recalculate_and_save_estimate_totals(eid)
+        finalize_estimate_cost_write(eid)
     return result
 
 
@@ -807,7 +1020,7 @@ def add_estimate_labor_batch(estimate_id: str, lines: list[dict[str, Any]]) -> S
             break
         inserted += 1
     if inserted:
-        recalculate_and_save_estimate_totals(eid)
+        finalize_estimate_cost_write(eid)
     if inserted < len(lines):
         if inserted:
             return ServiceResult(
@@ -859,7 +1072,7 @@ def update_estimate_labor(line_id: str, data: dict[str, Any], *, recalc: bool = 
         return ServiceResult(ok=False, error=_LABOR_LINES_MISSING_MSG)
     eid = _str(data.get("estimate_id"))
     if result.ok and recalc and eid:
-        recalc_result = recalculate_and_save_estimate_totals(eid)
+        recalc_result = finalize_estimate_cost_write(eid)
         if not recalc_result.ok:
             return recalc_result
         return ServiceResult(ok=True, data=recalc_result.data)
@@ -894,7 +1107,7 @@ def update_estimate_labor_batch(
             break
         saved += 1
     if saved and recalc:
-        recalc_result = recalculate_and_save_estimate_totals(eid)
+        recalc_result = finalize_estimate_cost_write(eid)
         if not recalc_result.ok:
             if saved < len(updates):
                 return ServiceResult(
@@ -926,7 +1139,7 @@ def delete_estimate_labor(line_id: str, *, estimate_id: str = "") -> ServiceResu
     if not result.ok and result.error and _is_missing_table_error(Exception(result.error)):
         return ServiceResult(ok=False, error=_LABOR_LINES_MISSING_MSG)
     if result.ok and estimate_id:
-        recalculate_and_save_estimate_totals(_str(estimate_id))
+        finalize_estimate_cost_write(_str(estimate_id))
     return result
 
 
@@ -943,21 +1156,21 @@ def _add_line(
     if not result.ok and missing_table_msg and result.error and _is_missing_table_message(result.error):
         return ServiceResult(ok=False, error=missing_table_msg)
     if result.ok and recalc:
-        recalculate_and_save_estimate_totals(_str(estimate_id))
+        finalize_estimate_cost_write(_str(estimate_id))
     return result
 
 
 def _update_line(table: str, line_id: str, payload: dict[str, Any], *, estimate_id: str = "") -> ServiceResult:
     result = update_row(table, payload, {"id": _str(line_id)})
     if result.ok and estimate_id:
-        recalculate_and_save_estimate_totals(_str(estimate_id))
+        finalize_estimate_cost_write(_str(estimate_id))
     return result
 
 
 def _delete_line(table: str, line_id: str, *, estimate_id: str = "") -> ServiceResult:
     result = delete_row(table, {"id": _str(line_id)})
     if result.ok and estimate_id:
-        recalculate_and_save_estimate_totals(_str(estimate_id))
+        finalize_estimate_cost_write(_str(estimate_id))
     return result
 
 
@@ -981,7 +1194,7 @@ def _insert_equipment_line(
             _equipment_line_item_payload(eid, data, calc=calc, sort_order=sort_order),
         )
         if result.ok and recalc:
-            recalculate_and_save_estimate_totals(eid)
+            finalize_estimate_cost_write(eid)
         return result
 
     payload = {
@@ -1003,7 +1216,7 @@ def _insert_equipment_line(
     result = insert_row(_EQUIPMENT_TABLE, payload)
     if result.ok:
         if recalc:
-            recalculate_and_save_estimate_totals(eid)
+            finalize_estimate_cost_write(eid)
         return result
     if result.error and _is_missing_table_message(str(result.error)):
         _mark_equipment_uses_line_items()
@@ -1013,7 +1226,7 @@ def _insert_equipment_line(
         )
         if retry.ok:
             if recalc:
-                recalculate_and_save_estimate_totals(eid)
+                finalize_estimate_cost_write(eid)
             return retry
         return ServiceResult(ok=False, error=_EQUIPMENT_MISSING_MSG)
     return result
@@ -1041,7 +1254,7 @@ def add_estimate_equipment_batch(estimate_id: str, lines: list[dict[str, Any]]) 
             break
         inserted += 1
     if inserted:
-        recalculate_and_save_estimate_totals(eid)
+        finalize_estimate_cost_write(eid)
     if inserted < len(lines):
         if inserted:
             return ServiceResult(
@@ -1075,7 +1288,7 @@ def update_estimate_equipment(line_id: str, data: dict[str, Any]) -> ServiceResu
             {"id": rid},
         )
         if result.ok and eid:
-            recalculate_and_save_estimate_totals(eid)
+            finalize_estimate_cost_write(eid)
         return result
 
     payload = {
@@ -1103,7 +1316,7 @@ def update_estimate_equipment(line_id: str, data: dict[str, Any]) -> ServiceResu
             {"id": rid},
         )
         if retry.ok and eid:
-            recalculate_and_save_estimate_totals(eid)
+            finalize_estimate_cost_write(eid)
         return retry
     return result
 
@@ -1114,7 +1327,7 @@ def delete_estimate_equipment(line_id: str, *, estimate_id: str = "") -> Service
     if _equipment_storage_is_line_items():
         result = delete_row("estimate_line_items", {"id": rid})
         if result.ok and eid:
-            recalculate_and_save_estimate_totals(eid)
+            finalize_estimate_cost_write(eid)
         return result
 
     result = _delete_line(_EQUIPMENT_TABLE, rid, estimate_id=eid)
@@ -1124,7 +1337,7 @@ def delete_estimate_equipment(line_id: str, *, estimate_id: str = "") -> Service
         _mark_equipment_uses_line_items()
         retry = delete_row("estimate_line_items", {"id": rid})
         if retry.ok and eid:
-            recalculate_and_save_estimate_totals(eid)
+            finalize_estimate_cost_write(eid)
         return retry
     return result
 
@@ -1186,7 +1399,7 @@ def add_estimate_subcontractor_batch(estimate_id: str, lines: list[dict[str, Any
             break
         inserted += 1
     if inserted:
-        recalculate_and_save_estimate_totals(eid)
+        finalize_estimate_cost_write(eid)
     if inserted < len(lines):
         if inserted:
             return ServiceResult(
@@ -1274,7 +1487,7 @@ def add_estimate_other_cost_batch(estimate_id: str, lines: list[dict[str, Any]])
             break
         inserted += 1
     if inserted:
-        recalculate_and_save_estimate_totals(eid)
+        finalize_estimate_cost_write(eid)
     if inserted < len(lines):
         if inserted:
             return ServiceResult(
@@ -1359,7 +1572,7 @@ def add_estimate_travel_batch(estimate_id: str, lines: list[dict[str, Any]]) -> 
             break
         inserted += 1
     if inserted:
-        recalculate_and_save_estimate_totals(eid)
+        finalize_estimate_cost_write(eid)
     if inserted < len(lines):
         if inserted:
             return ServiceResult(
@@ -1654,6 +1867,6 @@ def save_global_markup_settings(
             return apply_result
 
     if recalculate or apply_to_existing_lines:
-        return recalculate_and_save_estimate_totals(eid)
+        return finalize_estimate_cost_write(eid)
 
     return ServiceResult(ok=True, data={"global_markup_pct": mk})
