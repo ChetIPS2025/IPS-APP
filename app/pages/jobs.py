@@ -25,6 +25,12 @@ from app.components.job_status_ui import (
     render_job_status_badge_editor,
 )
 from app.components.job_row_actions_ui import render_job_row_actions
+from app.components.jobs_directory_table import job_detail_query_key
+from app.components.job_detail_tabs import (
+    job_detail_active_tab_key,
+    reset_job_detail_tab,
+    set_job_detail_tab_from_query,
+)
 from app.components.jobs_list_table import (
     JOBS_TABLE_LAST_ACTION_KEY,
     JOBS_TABLE_PENDING_MENU_KEY,
@@ -77,17 +83,28 @@ from app.components.table_filters import (
     render_table_header_cell,
 )
 from app.components.table_pagination import (
-    paginate_rows,
+    pagination_meta,
     reset_table_page,
 )
 from app.components.record_modal import show_modal_if_pending
+from app.services.job_detail_service import (
+    get_job_detail,
+    get_job_from_modal_cache,
+    list_job_equipment,
+    put_job_in_modal_cache,
+)
+from app.services.jobs_directory_service import (
+    build_page_list_financials,
+    invalidate_jobs_directory_cache,
+    list_jobs_page,
+    list_page_subjob_counts,
+)
 from app.pages._core._data import (
     customer_contact_select_options,
     customer_filter_options,
     customer_id_for_name,
     customer_location_select_options,
     employee_options,
-    jobs_list_cost_cache,
     load_estimates,
     load_jobs,
     lookup_options,
@@ -123,6 +140,9 @@ _SEL = select_key("jobs")
 _TABLE_KEY = "jobs_list"
 _JOBS_MODAL_KEY = "ips_jobs_detail_modal_id"
 _JOBS_DETAIL_AUX_PANEL_KEY = "jobs_detail_aux_panel"
+_JOB_DETAIL_QUERY_KEY = job_detail_query_key()
+_JOB_DETAIL_QUERY_ERROR_KEY = "_ips_jobs_detail_query_error"
+_JOB_TAB_QUERY_KEY = "job_tab"
 
 
 def _job_new_num_edited() -> None:
@@ -734,8 +754,9 @@ def _job_list_cost_fields(
     jid = str(job.get("id") or "").strip()
     if cost_cache is not None and jid and jid in cost_cache:
         return cost_cache[jid]
-    from app.services.job_financial_ui import job_table_list_financials_from_row
-    return job_table_list_financials_from_row(job)
+    from app.services.job_financial_ui import job_list_financials_from_row
+
+    return job_list_financials_from_row(job)
 
 
 def _jobs_summary_counts(
@@ -808,10 +829,7 @@ def _activate_job_detail_modal(job_id: str, job: dict | None = None) -> None:
     st.session_state[_SEL] = jid
     st.session_state[_JOBS_MODAL_KEY] = jid
     if isinstance(job, dict):
-        cache = st.session_state.get(CACHE_KEY) or {}
-        if isinstance(cache, dict):
-            cache[jid] = job
-            st.session_state[CACHE_KEY] = cache
+        put_job_in_modal_cache(jid, job)
         st.session_state[_job_edit_mode_key(job)] = False
     else:
         st.session_state[
@@ -991,6 +1009,52 @@ def _clear_jobs_detail_modal() -> None:
     st.session_state.pop(JOB_DOC_UPLOAD_MODE_KEY, None)
     st.session_state.pop(JOB_DOC_PENDING_DELETE_ID_KEY, None)
     st.session_state.pop(JOB_DOC_PENDING_DELETE_JOB_KEY, None)
+    if _JOB_DETAIL_QUERY_KEY in st.query_params:
+        del st.query_params[_JOB_DETAIL_QUERY_KEY]
+    if _JOB_TAB_QUERY_KEY in st.query_params:
+        del st.query_params[_JOB_TAB_QUERY_KEY]
+
+
+def _jobs_detail_pending() -> bool:
+    return bool(
+        st.session_state.get(SHOW_MODAL_KEY)
+        or str(st.session_state.get(_JOBS_MODAL_KEY) or "").strip()
+    )
+
+
+def _capture_job_detail_query() -> None:
+    from app.perf_debug import perf_span
+
+    with perf_span("jobs.detail_lookup"):
+        requested_id = str(st.query_params.get(_JOB_DETAIL_QUERY_KEY) or "").strip()
+        if not requested_id:
+            return
+        current_modal_id = str(st.session_state.get(_JOBS_MODAL_KEY) or "").strip()
+        if requested_id == current_modal_id and st.session_state.get(SHOW_MODAL_KEY):
+            tab_focus = str(st.query_params.get(_JOB_TAB_QUERY_KEY) or "").strip()
+            if tab_focus:
+                set_job_detail_tab_from_query(tab_focus)
+            return
+        job = get_job_detail(requested_id)
+        if not job:
+            st.session_state[_JOB_DETAIL_QUERY_ERROR_KEY] = requested_id
+            if _JOB_DETAIL_QUERY_KEY in st.query_params:
+                del st.query_params[_JOB_DETAIL_QUERY_KEY]
+            if _JOB_TAB_QUERY_KEY in st.query_params:
+                del st.query_params[_JOB_TAB_QUERY_KEY]
+            return
+        tab_focus = str(st.query_params.get(_JOB_TAB_QUERY_KEY) or "").strip()
+        _activate_job_detail_modal(requested_id, job)
+        reset_job_detail_tab(default="Overview")
+        if tab_focus:
+            set_job_detail_tab_from_query(tab_focus)
+        elif not str(st.session_state.get(job_detail_active_tab_key()) or "").strip():
+            reset_job_detail_tab(default="Overview")
+
+
+def _show_job_detail_query_error_if_any() -> None:
+    if st.session_state.pop(_JOB_DETAIL_QUERY_ERROR_KEY, None):
+        st.warning("The selected job could not be found.")
 
 
 def _refresh_job_modal_cache(job_id: str) -> None:
@@ -1003,11 +1067,7 @@ def _refresh_job_modal_cache(job_id: str) -> None:
     if not row:
         return
     fresh = normalize_job(row)
-    cache = st.session_state.get(CACHE_KEY)
-    if isinstance(cache, dict):
-        updated = dict(cache)
-        updated[jid] = fresh
-        st.session_state[CACHE_KEY] = updated
+    put_job_in_modal_cache(jid, fresh)
 
 
 def _show_job_persist_error(msg: str, dev_detail: str | None = None) -> None:
@@ -1039,12 +1099,9 @@ def _render_jobs_list_fragment(
 
 
 @fragment
-def _render_jobs_catalog_fragment(
-    all_jobs: list[dict],
-    *,
-    filter_options: dict[str, list[str]],
-) -> None:
+def _render_jobs_catalog_fragment() -> None:
     """Jobs filters, summary cards, and table — local reruns avoid full page reload."""
+    from app.perf_debug import perf_span
 
     def _filters() -> None:
         c1, c2 = st.columns([9, 1], gap="small")
@@ -1068,12 +1125,30 @@ def _render_jobs_catalog_fragment(
                 clear_field_expanded(FIELD_EXPANDED_JOB_KEY)
                 fragment_rerun()
 
-    subjob_counts = _load_open_subjob_counts()
-    filtered = _filter_jobs(
-        all_jobs,
-        q=str(st.session_state.get("jobs_search") or "").strip(),
-        view=str(st.session_state.get("jobs_view") or _JOBS_DEFAULT_VIEW),
-    )
+    view = str(st.session_state.get("jobs_view") or _JOBS_DEFAULT_VIEW)
+    search = str(st.session_state.get("jobs_search") or "").strip()
+    page_num, page_size, _total_pages = pagination_meta(0, _TABLE_KEY)
+
+    with perf_span("jobs.list_query"):
+        jobs_page = list_jobs_page(
+            view=view,
+            search=search,
+            page=page_num,
+            page_size=page_size,
+        )
+    page_num, page_size, _total_pages = pagination_meta(jobs_page.total_count, _TABLE_KEY)
+    if page_num != jobs_page.page or page_size != jobs_page.page_size:
+        with perf_span("jobs.list_query"):
+            jobs_page = list_jobs_page(
+                view=view,
+                search=search,
+                page=page_num,
+                page_size=page_size,
+            )
+
+    filter_options = jobs_page.filter_options
+    summary = jobs_page.summary
+    page_rows = jobs_page.rows
 
     render_jobs_filter_bar_shell()
     layout_filter_bar(_filters)
@@ -1084,51 +1159,50 @@ def _render_jobs_catalog_fragment(
         default=_JOBS_DEFAULT_VIEW,
     )
 
-    summary = _jobs_summary_counts(filtered, subjob_counts)
-    render_jobs_summary_cards(
-        total=int(summary["total"]),
-        active=int(summary["active"]),
-        on_hold=int(summary["on_hold"]),
-        completed=int(summary["completed"]),
-        open_subjobs=int(summary["open_subjobs"]),
-        total_contract=float(summary["total_contract"]),
-        total_actual=float(summary["total_actual"]),
-        total_profit=float(summary["total_profit"]),
-        avg_profit_pct=float(summary["avg_profit_pct"]),
-        has_contract_data=bool(summary.get("has_any_contract")),
-    )
-    render_jobs_summary_badge_bar(
-        total=int(summary["total"]),
-        active=int(summary["active"]),
-        on_hold=int(summary["on_hold"]),
-        open_subjobs=int(summary["open_subjobs"]),
-        total_contract=float(summary["total_contract"]),
-        has_contract_data=bool(summary.get("has_any_contract")),
-    )
-    render_jobs_table_pagination_header(len(filtered), _TABLE_KEY)
-    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
+    with perf_span("jobs.summary"):
+        render_jobs_summary_cards(
+            total=int(summary["total"]),
+            active=int(summary["active"]),
+            on_hold=int(summary["on_hold"]),
+            completed=int(summary["completed"]),
+            open_subjobs=int(summary["open_subjobs"]),
+            total_contract=float(summary["total_contract"]),
+            total_actual=float(summary["total_actual"]),
+            total_profit=float(summary["total_profit"]),
+            avg_profit_pct=float(summary["avg_profit_pct"]),
+            has_contract_data=bool(summary.get("has_any_contract")),
+        )
+        render_jobs_summary_badge_bar(
+            total=int(summary["total"]),
+            active=int(summary["active"]),
+            on_hold=int(summary["on_hold"]),
+            open_subjobs=int(summary["open_subjobs"]),
+            total_contract=float(summary["total_contract"]),
+            has_contract_data=bool(summary.get("has_any_contract")),
+        )
+    render_jobs_table_pagination_header(jobs_page.total_count, _TABLE_KEY)
 
-    modal_cache = {
-        str(job.get("id") or "").strip(): job
-        for job in filtered
-        if str(job.get("id") or "").strip()
-    }
-    selected_job_id = str(st.session_state.get(SELECTED_JOB_KEY) or "").strip()
-    if selected_job_id and st.session_state.get(SHOW_MODAL_KEY):
-        for job in all_jobs:
-            if str(job.get("id") or "").strip() == selected_job_id:
-                modal_cache[selected_job_id] = job
-                break
-    st.session_state[CACHE_KEY] = modal_cache
+    page_job_ids = [str(j.get("id") or "").strip() for j in page_rows if str(j.get("id") or "").strip()]
+    with perf_span("jobs.subjob_counts"):
+        subjob_counts = list_page_subjob_counts(page_job_ids)
+    with perf_span("jobs.table_html"):
+        cost_cache = build_page_list_financials(page_rows)
+        for job in page_rows:
+            put_job_in_modal_cache(str(job.get("id") or "").strip(), job)
+        selected_job_id = str(st.session_state.get(SELECTED_JOB_KEY) or "").strip()
+        if selected_job_id and st.session_state.get(SHOW_MODAL_KEY):
+            detail = get_job_detail(selected_job_id)
+            if detail:
+                put_job_in_modal_cache(selected_job_id, detail)
 
-    _render_jobs_list_fragment(
-        page_rows,
-        filter_options=filter_options,
-        cost_cache=jobs_list_cost_cache(filtered),
-        subjob_counts=subjob_counts,
-    )
+        _render_jobs_list_fragment(
+            page_rows,
+            filter_options=filter_options,
+            cost_cache=cost_cache,
+            subjob_counts=subjob_counts,
+        )
 
-    render_jobs_pagination_footer(len(filtered), _TABLE_KEY, item_label="job")
+    render_jobs_pagination_footer(jobs_page.total_count, _TABLE_KEY, item_label="job")
 
 
 def _jobs_table_cost_payload(job: dict, *, cost_cache: dict[str, dict[str, float | dict | bool]]) -> dict[str, Any]:
@@ -1247,18 +1321,19 @@ def _render_custom_jobs_table(
             ),
             unsafe_allow_html=True,
         )
-        render_jobs_table_open_buttons(
-            filtered,
-            open_job_fn=_activate_job_detail_modal,
-        )
-        render_jobs_table_bridge_legacy(
-            jobs_by_id,
-            component_key="ips_jobs_list_bridge",
-            hook_key="ipsJobsList::action",
-            open_job_fn=_activate_job_detail_modal,
-            on_expand_fn=_on_jobs_table_expand if field_mode else None,
-            field_mode=field_mode,
-        )
+        if field_mode:
+            render_jobs_table_open_buttons(
+                filtered,
+                open_job_fn=_activate_job_detail_modal,
+            )
+            render_jobs_table_bridge_legacy(
+                jobs_by_id,
+                component_key="ips_jobs_list_bridge",
+                hook_key="ipsJobsList::action",
+                open_job_fn=_activate_job_detail_modal,
+                on_expand_fn=_on_jobs_table_expand,
+                field_mode=True,
+            )
 
         if field_mode and expanded_job_id and expanded_job_id in jobs_by_id:
             expanded_job = jobs_by_id[expanded_job_id]
@@ -2223,23 +2298,14 @@ def _render_job_equipment_tab(job: dict) -> None:
         return
 
     from app.components.coupling_inspection_launcher import render_coupling_inspection_launcher
-    from app.db import fetch_table
-    from app.pages._core._data import load_assets
-    equip_rows: list[dict] = []
-    try:
-        equip_rows = fetch_table("job_equipment", limit=500, order_by="created_at") or []
-    except Exception:
-        equip_rows = []
-    equip_rows = [r for r in equip_rows if str(r.get("job_id") or "") == jid]
 
-    assets_by_id = {str(a.get("id") or ""): a for a in load_assets()}
+    equip_rows = list_job_equipment(jid)
     st.markdown(_dialog_card("Equipment on Job", ""), unsafe_allow_html=True)
     if equip_rows:
         for row in equip_rows:
             asset_id = str(row.get("asset_id") or "").strip()
-            asset = assets_by_id.get(asset_id) or {}
-            label = str(row.get("asset_label") or asset.get("asset_name") or "Equipment")
-            asset_no = str(asset.get("asset_number") or asset.get("asset_id") or "—")
+            label = str(row.get("asset_name") or row.get("asset_label") or "Equipment")
+            asset_no = str(row.get("asset_number") or "—")
             st.markdown(
                 f"**{html.escape(label)}** · Asset #{html.escape(asset_no)}",
             )
@@ -2265,19 +2331,19 @@ def _field_admin_read() -> bool:
 
 
 def _render_field_job_detail_tabs(job: dict) -> None:
-    """Compact job detail for field mode (4 tabs)."""
+    """Compact job detail for field mode (conditional tabs)."""
+    from app.components.tabs import render_tabs
+
     jn = _safe_value(job.get("job_number"))
     jname = _safe_value(job.get("job_name"))
     status = _safe_value(job.get("status"))
     customer = _safe_value(job.get("customer"))
     supervisor = _safe_value(job.get("supervisor"))
     jid = str(job.get("id") or "").strip()
+    tab_key = f"ips_field_job_tab_{jid or _job_session_key(job)}"
+    active_tab = render_tabs(_FIELD_JOB_TABS, session_key=tab_key, default="Overview")
 
-    from app.pages.supervisor_daily_reports import render_daily_reports_for_job
-    from app.services.job_service import job_row_select_label
-    tab_overview, tab_materials, tab_tasks, tab_photos, tab_daily = st.tabs(_FIELD_JOB_TABS)
-
-    with tab_overview:
+    if active_tab == "Overview":
         overview_html = (
             f'<div class="ips-detail-grid">'
             f"{_detail_field('Job Number', jn)}"
@@ -2298,18 +2364,17 @@ def _render_field_job_detail_tabs(job: dict) -> None:
             f"</p>"
         )
         st.markdown(_dialog_card("Scope", scope_html), unsafe_allow_html=True)
-
-    with tab_materials:
+    elif active_tab == "Materials":
         render_job_materials_tab(job, key_prefix=f"field_job_mat_{jid}")
-
-    with tab_tasks:
+    elif active_tab == "Subjobs":
         inject_tasks_module_css()
         render_job_linked_tasks_tab(job)
-
-    with tab_photos:
+    elif active_tab == "Photos":
         _render_job_photos_tab(job)
+    elif active_tab == "Daily Report":
+        from app.pages.supervisor_daily_reports import render_daily_reports_for_job
+        from app.services.job_service import job_row_select_label
 
-    with tab_daily:
         if jid:
             render_daily_reports_for_job(
                 job_id=jid,
@@ -2405,140 +2470,15 @@ def _render_job_overview_financials(job: dict, *, cost_summary: dict | None = No
 @fragment
 def _render_job_detail_tabs_fragment(job: dict, *, cost_summary: dict | None = None) -> None:
     """Job detail modal tabs — local reruns for tab interactions."""
-    _render_job_detail_tabs(job, cost_summary=cost_summary)
+    from app.components.job_detail_tabs import render_job_detail_tabs
+
+    render_job_detail_tabs(job, cost_summary=cost_summary)
 
 
 def _render_job_detail_tabs(job: dict, *, cost_summary: dict | None = None) -> None:
-    customer = _safe_value(job.get("customer"))
-    supervisor = _safe_value(job.get("supervisor"))
-    project_manager = _safe_value(job.get("project_manager"))
-    estimate_no = _safe_value(_resolve_job_estimate_number(job))
-    jid = str(job.get("id") or "").strip()
-    job_key = _job_session_key(job)
-    fin = _job_financial_snapshot(job, cost_summary=cost_summary)
-    summary = cost_summary if isinstance(cost_summary, dict) else {}
-    detail_stats = gather_job_detail_stats(job, summary) if summary else {}
-    progress_pct = float(
-        detail_stats.get("progress_pct")
-        or job.get("progress")
-        or summary.get("progress_pct")
-        or 0
-    )
-    show_financial = can_view_job_financial_tab()
+    from app.components.job_detail_tabs import render_job_detail_tabs
 
-    tab_labels = _job_detail_tab_labels(job)
-    tabs = st.tabs(tab_labels)
-    idx = 0
-    tab_overview = tabs[idx]
-    idx += 1
-    tab_tasks = tabs[idx]
-    idx += 1
-    tab_schedule = tabs[idx]
-    idx += 1
-    tab_crew = tabs[idx]
-    idx += 1
-    tab_cost = tabs[idx]
-    idx += 1
-    tab_materials = tabs[idx]
-    idx += 1
-    tab_equipment = tabs[idx]
-    idx += 1
-    tab_documents = tabs[idx]
-    idx += 1
-    tab_photos = tabs[idx]
-    idx += 1
-    tab_financial = tabs[idx] if show_financial else None
-    if show_financial:
-        idx += 1
-    tab_activity = tabs[idx]
-
-    with tab_overview:
-        render_job_detail_overview_section(
-            job,
-            customer=customer,
-            project_manager=project_manager,
-            supervisor=supervisor,
-            start_date=fmt_date(job.get("start_date")),
-            end_date=fmt_date(job.get("end_date")),
-            progress_pct=progress_pct,
-        )
-
-    with tab_tasks:
-        inject_tasks_module_css()
-        render_job_linked_tasks_tab(job)
-
-    with tab_schedule:
-        from app.components.scheduling_job_tab import render_job_schedule_tab
-        from app.pages._core._data import load_employees
-
-        employees = load_employees()
-        employees_by_id = {
-            str(e.get("id") or "").strip(): e for e in employees if str(e.get("id") or "").strip()
-        }
-        render_job_schedule_tab(
-            job,
-            jobs_by_id={jid: job} if jid else {},
-            employees_by_id=employees_by_id,
-        )
-
-    with tab_crew:
-        if jid:
-            st.markdown("#### Labor Summary")
-            render_job_labor_summary_tab(
-                job,
-                key_prefix=f"job_labor_{job_key}",
-            )
-            st.divider()
-            st.markdown("#### Weekly Timesheets")
-            render_job_weekly_timesheets_tab(
-                job,
-                key_prefix=f"job_wts_{job_key}",
-            )
-        else:
-            _render_dialog_placeholder("Save this job before viewing crew and time data.")
-
-    with tab_cost:
-        if jid:
-            render_job_cost_tab(job, key_prefix=f"job_cost_lines_{job_key}")
-        else:
-            _render_dialog_placeholder("Save this job before viewing cost lines.")
-
-    with tab_materials:
-        render_job_materials_tab(job, key_prefix=f"job_mat_{jid}")
-
-    with tab_equipment:
-        _render_job_equipment_tab(job)
-
-    with tab_documents:
-        _render_job_documents_tab(job)
-
-    with tab_photos:
-        _render_job_photos_tab(job)
-
-    if tab_financial is not None:
-        with tab_financial:
-            render_job_detail_financial_section(job, summary, fin)
-            _render_job_customer_po_overview(job)
-            st.divider()
-            render_job_cost_breakdown(summary)
-            st.divider()
-            cached_summary = st.session_state.get(f"_job_cost_summary_{jid}")
-            render_job_costing_tab(
-                job,
-                key_prefix=f"job_cost_{jid}",
-                cost_summary=cached_summary if isinstance(cached_summary, dict) else summary,
-            )
-            st.divider()
-            _render_job_estimates_section(job)
-
-    with tab_activity:
-        render_job_detail_activity_timeline(job)
-        st.divider()
-        _render_job_daily_updates_tab(job)
-        notes_text = _safe_value(job.get("notes") or job.get("description"), "")
-        if notes_text and notes_text != "—":
-            st.markdown("#### Notes")
-            st.markdown(notes_text)
+    render_job_detail_tabs(job, cost_summary=cost_summary)
 
 
 def _has_useful_detail_value(value: object) -> bool:
@@ -2727,8 +2667,7 @@ def _render_job_edit_form(job: dict) -> None:
         if ok:
             st.session_state[edit_mode_key] = False
             _refresh_job_modal_cache(jid)
-            from app.pages._core._data import clear_jobs_list_cache
-            clear_jobs_list_cache()
+            invalidate_jobs_directory_cache()
             st.success(msg or "Job updated successfully.")
             st.rerun()
         else:
@@ -2809,9 +2748,6 @@ def render_job_detail_dialog(job: dict) -> None:
 
     jid = str(job.get("id") or "").strip()
     cost_summary: dict = {}
-    if jid and not edit_mode:
-        cost_summary = _enrich_job_cost_summary(job, cached_job_cost_summary(job))
-        st.session_state[f"_job_cost_summary_{jid}"] = cost_summary
 
     if edit_mode:
         _render_job_edit_form(job)
@@ -2829,7 +2765,7 @@ def render_job_detail_dialog(job: dict) -> None:
             if is_field_context():
                 _render_field_job_detail_tabs(job)
             else:
-                _render_job_detail_tabs_fragment(job, cost_summary=cost_summary if cost_summary else None)
+                _render_job_detail_tabs_fragment(job, cost_summary=None)
 
     _focus_job_detail_tab_if_requested()
 
@@ -2852,33 +2788,8 @@ def _focus_job_detail_tab_if_requested() -> None:
         "weekly timesheets": "crew & time",
         "subjobs": "tasks",
     }
-    resolved = alias_map.get(focus_lower, focus_lower)
-    from app.ui.clean_table import _components_html
-    label_js = resolved.replace("\\", "\\\\").replace("'", "\\'")
-    _components_html(
-        f"""
-<script>
-(function () {{
-  const w = window.parent || window;
-  const doc = w.document;
-  const dialog = doc.querySelector('[data-testid="stDialog"]');
-  if (!dialog) return;
-  const want = '{label_js}'.toLowerCase();
-  const tabs = dialog.querySelectorAll('[data-testid="stTabs"] button[role="tab"]');
-  for (const tab of tabs) {{
-    const text = (tab.textContent || '').trim().toLowerCase();
-    const base = text.replace(/\\s*\\(\\d+\\)\\s*$/, '');
-    if (base === want || base.startsWith(want) || text.startsWith(want)) {{
-      tab.click();
-      return;
-    }}
-  }}
-}})();
-</script>
-        """,
-        component_key=f"ips_jobs_focus_tab_{label_js.replace(' ', '_')}",
-        height=1,
-    )
+    resolved = alias_map.get(focus_lower, focus)
+    set_job_detail_tab_from_query(resolved)
 
 
 @st.dialog("Job Details", width="large", on_dismiss=_clear_jobs_detail_modal)
@@ -2889,8 +2800,7 @@ def _show_jobs_detail_modal() -> None:
         or st.session_state.get(SELECTED_JOB_KEY)
         or ""
     ).strip()
-    jobs_by_id = st.session_state.get("_ips_jobs_modal_by_id")
-    job = jobs_by_id.get(sel) if isinstance(jobs_by_id, dict) and sel else None
+    job = get_job_from_modal_cache(sel) if sel else None
     if not job:
         st.warning("That job could not be loaded.")
         return
@@ -2938,12 +2848,18 @@ def _render_jobs_page() -> None:
     inject_jobs_page_layout_css()
     if is_field_context():
         inject_field_row_expand_css()
-    all_jobs = load_jobs()
-    filter_options = build_filter_options(all_jobs, _JOB_COLUMN_FILTER_SPECS)
+
+    _capture_job_detail_query()
+    _show_job_detail_query_error_if_any()
+
+    if _jobs_detail_pending():
+        show_modal_if_pending(_JOBS_MODAL_KEY, _show_jobs_detail_modal)
+        return
 
     if is_field_mode():
         from app.services.job_service import sort_jobs_by_number_then_name
-        field_jobs = sort_jobs_by_number_then_name(all_jobs)
+
+        field_jobs = sort_jobs_by_number_then_name(load_jobs())
         if field_jobs:
             render_field_job_bar(field_jobs, key_prefix="jobs")
 
@@ -3017,11 +2933,12 @@ def _render_jobs_page() -> None:
                 )
                 if apply_persist_feedback(ok, msg, clear_keys=("ips_job_form",)):
                     clear_new_job_number_state()
+                    invalidate_jobs_directory_cache()
                     st.rerun()
                 else:
                     _show_job_persist_error(msg, dev_detail)
 
-    _render_jobs_catalog_fragment(all_jobs, filter_options=filter_options)
+    _render_jobs_catalog_fragment()
 
-    if st.session_state.get(SHOW_MODAL_KEY) or str(st.session_state.get(_JOBS_MODAL_KEY) or "").strip():
+    if _jobs_detail_pending():
         show_modal_if_pending(_JOBS_MODAL_KEY, _show_jobs_detail_modal)
