@@ -83,6 +83,18 @@ def _day_anchor() -> date:
     return date.today()
 
 
+def _clamp_day_to_week() -> None:
+    week_start, week_end = week_range(_week_anchor())
+    raw = st.session_state.get(_DAY_KEY)
+    if not isinstance(raw, date) or not (week_start <= raw < week_end):
+        st.session_state[_DAY_KEY] = week_start
+
+
+def _day_in_week() -> date:
+    _clamp_day_to_week()
+    return _day_anchor()
+
+
 def _view_mode() -> str:
     mode = str(st.session_state.get(_VIEW_KEY) or "Week").strip()
     return mode if mode in _VIEW_MODES else "Week"
@@ -366,10 +378,12 @@ def render() -> None:
 
     def _prev_week() -> None:
         _set_week_anchor(week_anchor - timedelta(days=7))
+        _clamp_day_to_week()
         fragment_rerun()
 
     def _next_week() -> None:
         _set_week_anchor(week_anchor + timedelta(days=7))
+        _clamp_day_to_week()
         fragment_rerun()
 
     with nav1:
@@ -430,10 +444,18 @@ def render() -> None:
                     on_open_event=_open_event,
                 )
         elif mode == "Day":
-            day = _day_anchor()
+            week_start, week_end = week_range(week_anchor)
+            day = _day_in_week()
+            st.date_input(
+                "Day",
+                value=day,
+                min_value=week_start,
+                max_value=week_end - timedelta(days=1),
+                key=_DAY_KEY,
+            )
             render_day_agenda(
                 events,
-                day=day,
+                day=_day_anchor(),
                 conflict_event_ids=conflict_ids,
                 on_open_event=_open_event,
             )

@@ -8,7 +8,7 @@ from typing import Any, Callable
 import streamlit as st
 
 from app.auth import current_profile, effective_role
-from app.services.scheduling_conflicts import ConflictReport
+from app.services.scheduling_conflicts import ConflictReport, parse_dt
 from app.services.scheduling_service import (
     EVENT_STATUSES,
     EVENT_TYPES,
@@ -31,6 +31,15 @@ SCHED_OPEN_DETAIL_KEY = "sched_open_detail_id"
 SCHED_CONFLICTS_KEY = "sched_pending_conflicts"
 SCHED_SAVE_WITH_CONFLICTS_KEY = "sched_save_with_conflicts"
 SCHED_PREFILL_JOB_KEY = "sched_prefill_job_id"
+SCHED_FORM_LOADED_KEY = "sched_form_loaded_id"
+
+_FORM_DATE_TIME_KEYS = (
+    "sched_form_start_date",
+    "sched_form_start_time",
+    "sched_form_end_date",
+    "sched_form_end_time",
+    "sched_form_all_day",
+)
 
 
 def _can_manage_scheduling(role: str | None = None) -> bool:
@@ -48,12 +57,50 @@ def _asset_label(asset: dict[str, Any]) -> str:
     return f"{num} — {name}" if num and name else num or name or "Asset"
 
 
-def _dt_from_inputs(d: date | None, t: time | None, *, end: bool = False) -> datetime | None:
+def _dt_from_inputs(
+    d: date | None,
+    t: time | None,
+    *,
+    end: bool = False,
+    all_day: bool = False,
+) -> datetime | None:
     if d is None:
         return None
+    if all_day:
+        if end:
+            return datetime.combine(d, time(23, 59, 59), tzinfo=timezone.utc)
+        return datetime.combine(d, time.min, tzinfo=timezone.utc)
     if t is None:
-        t = time(23, 59) if end else time(8, 0)
+        t = time(23, 59, 59) if end else time(8, 0)
     return datetime.combine(d, t, tzinfo=timezone.utc)
+
+
+def _clear_schedule_form_date_widgets() -> None:
+    for key in _FORM_DATE_TIME_KEYS:
+        st.session_state.pop(key, None)
+
+
+def _seed_schedule_form_from_event(existing: dict[str, Any] | None, *, edit_id: str) -> None:
+    """Load stored event dates into widget session keys when opening or switching edits."""
+    target = edit_id or "__new__"
+    if str(st.session_state.get(SCHED_FORM_LOADED_KEY) or "") == target:
+        return
+    _clear_schedule_form_date_widgets()
+    st.session_state[SCHED_FORM_LOADED_KEY] = target
+    if not existing:
+        return
+    start = parse_dt(existing.get("start_at"))
+    end = parse_dt(existing.get("end_at"))
+    all_day = bool(existing.get("all_day"))
+    if start:
+        st.session_state["sched_form_start_date"] = start.date()
+        if not all_day:
+            st.session_state["sched_form_start_time"] = start.time().replace(tzinfo=None)
+    if end:
+        st.session_state["sched_form_end_date"] = end.date()
+        if not all_day:
+            st.session_state["sched_form_end_time"] = end.time().replace(tzinfo=None)
+    st.session_state["sched_form_all_day"] = all_day
 
 
 def _parse_date_field(key: str) -> date | None:
@@ -73,6 +120,7 @@ def _parse_time_field(key: str) -> time | None:
 def open_new_schedule_dialog(*, job_id: str = "") -> None:
     st.session_state[SCHED_EDIT_ID_KEY] = ""
     st.session_state[SCHED_FORM_KEY] = True
+    st.session_state.pop(SCHED_FORM_LOADED_KEY, None)
     if job_id:
         st.session_state[SCHED_PREFILL_JOB_KEY] = job_id
     st.session_state.pop(SCHED_CONFLICTS_KEY, None)
@@ -82,6 +130,7 @@ def open_new_schedule_dialog(*, job_id: str = "") -> None:
 def open_edit_schedule_dialog(event_id: str) -> None:
     st.session_state[SCHED_EDIT_ID_KEY] = str(event_id or "").strip()
     st.session_state[SCHED_FORM_KEY] = True
+    st.session_state.pop(SCHED_FORM_LOADED_KEY, None)
     st.session_state.pop(SCHED_CONFLICTS_KEY, None)
     st.session_state.pop(SCHED_SAVE_WITH_CONFLICTS_KEY, None)
 
@@ -185,18 +234,40 @@ def show_schedule_event_dialog(
         if not st.session_state.get("sched_form_location") and pre.get("location"):
             st.session_state["sched_form_location"] = pre["location"]
 
+    _seed_schedule_form_from_event(existing, edit_id=edit_id)
+
     d1, d2, d3 = st.columns(3)
     with d1:
-        start_date = st.date_input("Start Date", value=date.today(), key="sched_form_start_date")
+        start_date = st.date_input(
+            "Start Date",
+            value=st.session_state.get("sched_form_start_date") or date.today(),
+            key="sched_form_start_date",
+        )
     with d2:
-        start_time = st.time_input("Start Time", value=time(8, 0), key="sched_form_start_time")
+        start_time = st.time_input(
+            "Start Time",
+            value=st.session_state.get("sched_form_start_time") or time(8, 0),
+            key="sched_form_start_time",
+        )
     with d3:
-        all_day = st.checkbox("All Day", value=bool((existing or {}).get("all_day")), key="sched_form_all_day")
+        all_day = st.checkbox(
+            "All Day",
+            value=bool(st.session_state.get("sched_form_all_day", (existing or {}).get("all_day"))),
+            key="sched_form_all_day",
+        )
     e1, e2 = st.columns(2)
     with e1:
-        end_date = st.date_input("End Date", value=date.today(), key="sched_form_end_date")
+        end_date = st.date_input(
+            "End Date",
+            value=st.session_state.get("sched_form_end_date") or date.today(),
+            key="sched_form_end_date",
+        )
     with e2:
-        end_time = st.time_input("End Time", value=time(17, 0), key="sched_form_end_time")
+        end_time = st.time_input(
+            "End Time",
+            value=st.session_state.get("sched_form_end_time") or time(17, 0),
+            key="sched_form_end_time",
+        )
 
     cur_emps = [str(r.get("employee_id") or "") for r in (list_event_employees(edit_id) if edit_id else [])]
     cur_assets = [str(r.get("asset_id") or "") for r in (list_event_assets(edit_id) if edit_id else [])]
@@ -250,10 +321,11 @@ def show_schedule_event_dialog(
     if cancel:
         st.session_state[SCHED_FORM_KEY] = False
         st.session_state.pop(SCHED_CONFLICTS_KEY, None)
+        st.session_state.pop(SCHED_FORM_LOADED_KEY, None)
         st.rerun()
 
-    start_dt = _dt_from_inputs(start_date, None if all_day else start_time)
-    end_dt = _dt_from_inputs(end_date, None if all_day else end_time, end=True)
+    start_dt = _dt_from_inputs(start_date, None if all_day else start_time, all_day=all_day)
+    end_dt = _dt_from_inputs(end_date, None if all_day else end_time, end=True, all_day=all_day)
     payload: dict[str, Any] = {
         "event_type": event_type,
         "title": title.strip(),
@@ -392,7 +464,12 @@ def show_schedule_detail_dialog(
             st.rerun()
     with c2:
         if _can_manage_scheduling() and st.button("Mark Confirmed", key="sched_detail_confirm", use_container_width=True):
+            from app.services.scheduling_notifications import notify_schedule_event_saved
+
+            previous = dict(ev)
             update_schedule_event(eid, {"status": "confirmed"})
+            updated = get_schedule_event(eid) or {}
+            notify_schedule_event_saved(updated, previous=previous)
             st.rerun()
     with c3:
         if _can_manage_scheduling() and st.button("Cancel Event", key="sched_detail_cancel_ev", use_container_width=True):

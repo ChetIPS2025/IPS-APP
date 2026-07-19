@@ -54,12 +54,15 @@ def test_serialized_tools_table_uses_html_bridge() -> None:
     assert "render_serialized_tools_table_bridge_legacy" in table_block
 
 
-def test_equipment_table_uses_clean_table_bridge() -> None:
+def test_equipment_table_uses_open_buttons_and_assets_bridge() -> None:
     src = _assets_source()
     table_block = src.split("def _render_custom_assets_table(")[1].split("def _render_small_tools_table_column_filters")[0]
     assert "render_assets_table_open_buttons" in table_block
     assert "render_assets_table_bridge_legacy" in table_block
     assert "open_asset_fn=_prepare_open_assets_table_item" in table_block
+    open_idx = table_block.index("render_assets_table_open_buttons")
+    bridge_idx = table_block.index("render_assets_table_bridge_legacy")
+    assert open_idx < bridge_idx
 
 
 def test_asset_fragments_escalate_modal_to_app_rerun() -> None:

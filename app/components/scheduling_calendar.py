@@ -162,8 +162,16 @@ def render_crew_schedule_table(
                 hours_by_emp_day[emp_id][day].append(ev)
 
     emp_ids = sorted(hours_by_emp_day.keys(), key=lambda eid: str((employees_by_id.get(eid) or {}).get("full_name") or eid))
+    if show_unassigned:
+        emp_ids = sorted(
+            employees_by_id.keys(),
+            key=lambda eid: str((employees_by_id.get(eid) or {}).get("full_name") or eid),
+        )
     if not emp_ids and not show_unassigned:
         st.info("No crew assignments this week.")
+        return
+    if not emp_ids:
+        st.info("No employees to display.")
         return
 
     head = "".join(f"<th>{html.escape(d.strftime('%a %m/%d'))}</th>" for d in days)

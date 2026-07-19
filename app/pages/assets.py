@@ -107,6 +107,7 @@ from app.components.asset_row_actions_ui import ASSET_OPEN_ACTIVITY_KEY, render_
 from app.components.assets_list_table import (
     build_assets_html_table,
     render_assets_table_bridge_legacy,
+    render_assets_table_open_buttons,
 )
 from app.components.serialized_tools_list_table import (
     build_serialized_tools_html_table,
@@ -890,9 +891,16 @@ def _render_custom_assets_table(
             ),
             unsafe_allow_html=True,
         )
+ feature/scheduling-module-mvp
         from app.components.assets_list_table import render_assets_table_open_buttons
 
         render_assets_table_open_buttons(filtered, open_asset_fn=_prepare_open_assets_table_item)
+
+        render_assets_table_open_buttons(
+            filtered,
+            open_asset_fn=_prepare_open_assets_table_item,
+        )
+ main
         render_assets_table_bridge_legacy(
             assets_by_id,
             component_key="ips_assets_list_bridge",
