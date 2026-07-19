@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
+from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any
+from urllib.parse import urlencode
 
 import streamlit as st
+from streamlit.runtime.fragment import fragment
 
-from app.auth import effective_role
+from app.auth import current_profile, current_user_display_name, effective_role
 from app.components.scheduling_calendar import (
     render_crew_schedule_table,
     render_day_agenda,
@@ -25,44 +27,75 @@ from app.components.scheduling_dialogs import (
     show_schedule_detail_dialog,
     show_schedule_event_dialog,
 )
+from app.components.scheduling_export_panel import clear_prepared_export, render_scheduling_export_panel
+from app.components.scheduling_filters import render_scheduling_filters, show_unassigned_enabled
+from app.components.scheduling_view_nav import (
+    render_view_tabs,
+    render_week_navigation,
+    scheduling_view_modes,
+)
 from app.pages._core._access import begin_module
-from app.pages._core._data import (
-    load_all_certifications,
-    load_assets,
-    load_customers,
-    load_employees,
-    load_jobs,
-)
 from app.perf_debug import perf_span
-from app.services.scheduling_conflicts import build_event_conflict_report, parse_dt
-from app.services.scheduling_service import (
-    clear_scheduling_cache,
-    enrich_events,
-    list_asset_assignments_in_range,
-    list_employee_assignments_in_range,
-    list_schedule_events,
-    list_availability_in_range,
-    list_supervisor_events_in_range,
-    monday_of,
-    week_range,
-    build_weekly_schedule_export_rows,
-)
-from app.ui.streamlit_perf import ips_app_rerun
+from app.services.scheduling_detail_service import get_schedule_event_detail
+from app.services.scheduling_page_service import load_scheduling_page_snapshot
+from app.services.scheduling_service import invalidate_scheduling_page_cache, monday_of, week_range
+from app.ui.streamlit_perf import fragment_rerun, ips_app_rerun
+from app.utils.permissions import normalize_role
 
 _MODULE = "scheduling"
 _VIEW_KEY = "scheduling_view_mode"
 _WEEK_KEY = "scheduling_week_anchor"
 _DAY_KEY = "scheduling_day_anchor"
 _FILTERS_KEY = "scheduling_filters"
-_SHOW_UNASSIGNED_KEY = "scheduling_show_unassigned"
+_SCHEDULE_DETAIL_QUERY_KEY = "schedule_detail"
+_SCHEDULE_DETAIL_QUERY_ERROR_KEY = "_ips_schedule_detail_query_error"
 
-_VIEW_MODES = ("Week", "Day", "Crew", "Jobs", "Equipment")
+
+@dataclass(frozen=True)
+class SchedulingPermissions:
+    role: str
+    user_id: str
+    user_name: str
+    can_manage: bool
+    can_create: bool
+    can_edit: bool
+    can_delete: bool
+    can_export: bool
 
 
-def _can_manage_scheduling() -> bool:
-    from app.utils.permissions import normalize_role
+@dataclass(frozen=True)
+class SchedulingRenderContext:
+    today: date
+    week_anchor: date
+    week_start: date
+    week_end: date
+    selected_day: date
+    view_mode: str
+    filters: dict[str, str]
+    permissions: SchedulingPermissions
 
-    return normalize_role(effective_role()) in {"admin", "supervisor", "project manager"}
+
+def schedule_detail_href(event_id: str) -> str:
+    params = urlencode({"ips_nav": _MODULE, _SCHEDULE_DETAIL_QUERY_KEY: str(event_id or "").strip()})
+    return f"?{params}"
+
+
+def _build_permissions() -> SchedulingPermissions:
+    role = normalize_role(effective_role())
+    profile = current_profile() or {}
+    user_id = str(profile.get("id") or profile.get("employee_id") or "").strip()
+    user_name = current_user_display_name()
+    can_manage = role in {"admin", "supervisor", "project manager"}
+    return SchedulingPermissions(
+        role=role,
+        user_id=user_id,
+        user_name=user_name,
+        can_manage=can_manage,
+        can_create=can_manage,
+        can_edit=can_manage,
+        can_delete=can_manage,
+        can_export=can_manage,
+    )
 
 
 def _week_anchor() -> date:
@@ -72,231 +105,127 @@ def _week_anchor() -> date:
     return monday_of(date.today())
 
 
-def _set_week_anchor(d: date) -> None:
-    st.session_state[_WEEK_KEY] = monday_of(d)
-
-
-def _day_anchor() -> date:
-    raw = st.session_state.get(_DAY_KEY)
-    if isinstance(raw, date):
-        return raw
-    return date.today()
-
-
-def _clamp_day_to_week() -> None:
-    week_start, week_end = week_range(_week_anchor())
-    raw = st.session_state.get(_DAY_KEY)
-    if not isinstance(raw, date) or not (week_start <= raw < week_end):
-        st.session_state[_DAY_KEY] = week_start
-
-
-def _day_in_week() -> date:
-    _clamp_day_to_week()
-    return _day_anchor()
-
-
 def _view_mode() -> str:
     mode = str(st.session_state.get(_VIEW_KEY) or "Week").strip()
-    return mode if mode in _VIEW_MODES else "Week"
+    return mode if mode in scheduling_view_modes() else "Week"
 
 
-def _refs() -> tuple[
-    list[dict[str, Any]],
-    list[dict[str, Any]],
-    list[dict[str, Any]],
-    list[dict[str, Any]],
-    dict[str, dict[str, Any]],
-    dict[str, dict[str, Any]],
-    dict[str, dict[str, Any]],
-    dict[str, dict[str, Any]],
-]:
-    with perf_span("scheduling.refs.jobs"):
-        jobs = load_jobs()
-    with perf_span("scheduling.refs.employees"):
-        employees = load_employees()
-    with perf_span("scheduling.refs.assets"):
-        assets = load_assets()
-    with perf_span("scheduling.refs.customers"):
-        customers = load_customers()
-    jobs_by_id = {str(j.get("id") or "").strip(): j for j in jobs if str(j.get("id") or "").strip()}
-    employees_by_id = {str(e.get("id") or "").strip(): e for e in employees if str(e.get("id") or "").strip()}
-    assets_by_id = {str(a.get("id") or "").strip(): a for a in assets if str(a.get("id") or "").strip()}
-    customers_by_id = {str(c.get("id") or "").strip(): c for c in customers if str(c.get("id") or "").strip()}
-    return jobs, employees, assets, customers, jobs_by_id, employees_by_id, assets_by_id, customers_by_id
-
-
-def _assignment_maps(
-    start: date,
-    end: date,
-) -> tuple[dict[str, list[dict[str, Any]]], dict[str, list[dict[str, Any]]]]:
-    emp_rows = list_employee_assignments_in_range(start, end)
-    asset_rows = list_asset_assignments_in_range(start, end)
-    by_event_emp: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    by_event_asset: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for row in emp_rows:
-        eid = str(row.get("schedule_event_id") or "").strip()
-        if eid:
-            by_event_emp[eid].append(row)
-    for row in asset_rows:
-        eid = str(row.get("schedule_event_id") or "").strip()
-        if eid:
-            by_event_asset[eid].append(row)
-    return dict(by_event_emp), dict(by_event_asset)
-
-
-def _conflict_event_ids(
-    events: list[dict[str, Any]],
-    *,
-    employee_rows_by_event: dict[str, list[dict[str, Any]]],
-    asset_rows_by_event: dict[str, list[dict[str, Any]]],
-    pad_start: date,
-    pad_end: date,
-    assets_by_id: dict[str, dict[str, Any]],
-    employee_certs: list[dict[str, Any]],
-    employees_by_id: dict[str, dict[str, Any]],
-) -> set[str]:
-    emp_assignments = list_employee_assignments_in_range(pad_start, pad_end)
-    asset_assignments = list_asset_assignments_in_range(pad_start, pad_end)
-    supervisor_events = list_supervisor_events_in_range(pad_start, pad_end)
-    all_emp_ids = {
-        str(r.get("employee_id") or "").strip()
-        for rows in employee_rows_by_event.values()
-        for r in rows
-        if str(r.get("employee_id") or "").strip()
-    }
-    availability = list_availability_in_range(pad_start, pad_end, employee_ids=list(all_emp_ids))
-    labels = {
-        eid: str(
-            (employees_by_id.get(eid) or {}).get("full_name")
-            or (employees_by_id.get(eid) or {}).get("employee_name")
-            or eid
+def _build_render_context(*, filters: dict[str, str]) -> SchedulingRenderContext:
+    with perf_span("scheduling.context"):
+        today = date.today()
+        week_start, week_end = week_range(_week_anchor())
+        selected_day = st.session_state.get(_DAY_KEY)
+        if not isinstance(selected_day, date):
+            selected_day = week_start
+        return SchedulingRenderContext(
+            today=today,
+            week_anchor=week_start,
+            week_start=week_start,
+            week_end=week_end,
+            selected_day=selected_day,
+            view_mode=_view_mode(),
+            filters=filters,
+            permissions=_build_permissions(),
         )
-        for eid in all_emp_ids
-    }
-    conflict_ids: set[str] = set()
-    with perf_span("scheduling.conflicts.batch"):
-        for ev in events:
-            eid = str(ev.get("id") or "").strip()
-            if not eid:
-                continue
-            start = parse_dt(ev.get("start_at"))
-            end = parse_dt(ev.get("end_at"))
-            if not start or not end:
-                continue
-            emp_ids = [
-                str(r.get("employee_id") or "").strip()
-                for r in employee_rows_by_event.get(eid) or []
-                if str(r.get("employee_id") or "").strip()
-            ]
-            asset_ids = [
-                str(r.get("asset_id") or "").strip()
-                for r in asset_rows_by_event.get(eid) or []
-                if str(r.get("asset_id") or "").strip()
-            ]
-            report = build_event_conflict_report(
-                start_at=start,
-                end_at=end,
-                employee_ids=emp_ids,
-                asset_ids=asset_ids,
-                supervisor_id=str(ev.get("supervisor_id") or "").strip(),
-                required_certifications=list(ev.get("required_certifications") or []),
-                employee_assignments=emp_assignments,
-                supervisor_events=supervisor_events,
-                asset_assignments=asset_assignments,
-                availability_rows=availability,
-                employee_certs=employee_certs,
-                assets_by_id=assets_by_id,
-                employee_labels=labels,
-                exclude_event_id=eid,
-            )
-            if report.has_warnings:
-                conflict_ids.add(eid)
-    return conflict_ids
+
+
+def _capture_schedule_detail_query() -> bool:
+    """Return True when detail fast path is active."""
+    with perf_span("scheduling.detail_lookup"):
+        requested_id = str(st.query_params.get(_SCHEDULE_DETAIL_QUERY_KEY) or "").strip()
+        if not requested_id:
+            return bool(st.session_state.get(SCHED_OPEN_DETAIL_KEY))
+
+        current_id = str(st.session_state.get(SCHED_OPEN_DETAIL_KEY) or "").strip()
+        if requested_id == current_id:
+            return True
+
+        detail = get_schedule_event_detail(requested_id)
+        if not detail:
+            st.session_state[_SCHEDULE_DETAIL_QUERY_ERROR_KEY] = requested_id
+            if _SCHEDULE_DETAIL_QUERY_KEY in st.query_params:
+                del st.query_params[_SCHEDULE_DETAIL_QUERY_KEY]
+            return False
+
+        open_schedule_detail(requested_id)
+        st.session_state["_sched_detail_cache"] = detail
+        return True
+
+
+def _show_schedule_detail_query_error_if_any() -> None:
+    if st.session_state.pop(_SCHEDULE_DETAIL_QUERY_ERROR_KEY, None):
+        st.warning("The selected schedule event could not be found.")
 
 
 def _open_event(event_id: str) -> None:
     open_schedule_detail(event_id)
+    st.query_params[_SCHEDULE_DETAIL_QUERY_KEY] = str(event_id or "").strip()
     ips_app_rerun()
 
 
-def _render_filters(
-    *,
-    jobs: list[dict[str, Any]],
-    employees: list[dict[str, Any]],
-) -> dict[str, str]:
-    filt = dict(st.session_state.get(_FILTERS_KEY) or {})
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        job_opts = ["All"] + [str(j.get("id") or "") for j in jobs if str(j.get("id") or "").strip()]
-        job_labels = {
-            str(j.get("id") or ""): f"{j.get('job_number', '—')} — {j.get('job_name', j.get('project_name', 'Job'))}"
-            for j in jobs
-            if str(j.get("id") or "").strip()
-        }
-        job_pick = st.selectbox(
-            "Job",
-            job_opts,
-            index=job_opts.index(filt.get("job_id")) if filt.get("job_id") in job_opts else 0,
-            format_func=lambda x: "All jobs" if x == "All" else job_labels.get(x, x),
-            key="sched_filter_job",
-        )
-        filt["job_id"] = "" if job_pick == "All" else job_pick
-    with c2:
-        emp_opts = ["All"] + [str(e.get("id") or "") for e in employees if str(e.get("id") or "").strip()]
-        emp_labels = {
-            str(e.get("id") or ""): str(e.get("full_name") or e.get("employee_name") or e.get("name") or e.get("id"))
-            for e in employees
-        }
-        sup_pick = st.selectbox(
-            "Supervisor",
-            emp_opts,
-            index=emp_opts.index(filt.get("supervisor_id")) if filt.get("supervisor_id") in emp_opts else 0,
-            format_func=lambda x: "All supervisors" if x == "All" else emp_labels.get(x, x),
-            key="sched_filter_supervisor",
-        )
-        filt["supervisor_id"] = "" if sup_pick == "All" else sup_pick
-    with c3:
-        status_opts = ["All statuses", "tentative", "confirmed", "in_progress", "completed", "cancelled"]
-        cur_status = str(filt.get("status") or "All statuses")
-        filt["status"] = st.selectbox(
-            "Status",
-            status_opts,
-            index=status_opts.index(cur_status) if cur_status in status_opts else 0,
-            key="sched_filter_status",
-        )
-    with c4:
-        st.session_state[_SHOW_UNASSIGNED_KEY] = st.checkbox(
-            "Show Unassigned Employees",
-            value=bool(st.session_state.get(_SHOW_UNASSIGNED_KEY)),
-            key="sched_filter_unassigned",
-        )
-    st.session_state[_FILTERS_KEY] = filt
-    return filt
+def _close_detail() -> None:
+    st.session_state.pop(SCHED_OPEN_DETAIL_KEY, None)
+    st.session_state.pop("_sched_detail_cache", None)
+    if _SCHEDULE_DETAIL_QUERY_KEY in st.query_params:
+        del st.query_params[_SCHEDULE_DETAIL_QUERY_KEY]
 
 
-def _apply_client_filters(
-    events: list[dict[str, Any]],
-    filt: dict[str, str],
+@fragment
+def _render_scheduling_view_content(
     *,
-    jobs_by_id: dict[str, dict[str, Any]],
-) -> list[dict[str, Any]]:
-    out = events
-    emp_f = str(filt.get("employee_id") or "").strip()
-    if emp_f:
-        # Filter applied in crew view primarily; week view uses server filters
-        pass
-    loc = str(filt.get("location") or "").strip().lower()
-    if loc:
-        out = [e for e in out if loc in str(e.get("location") or "").lower()]
-    cust = str(filt.get("customer_id") or "").strip()
-    if cust:
-        out = [
-            e
-            for e in out
-            if str(e.get("customer_id") or "").strip() == cust
-            or str((jobs_by_id.get(str(e.get("job_id") or "")) or {}).get("customer_id") or "") == cust
-        ]
-    return out
+    ctx: SchedulingRenderContext,
+    snapshot,
+    on_open_event,
+) -> None:
+    mode = ctx.view_mode
+    if mode == "Week":
+        with perf_span("scheduling.render.week"):
+            render_week_calendar(
+                snapshot.events,
+                week_anchor=ctx.week_anchor,
+                conflict_event_ids=snapshot.conflict_event_ids,
+                on_open_event=on_open_event,
+            )
+    elif mode == "Day":
+        st.date_input(
+            "Day",
+            value=ctx.selected_day,
+            min_value=ctx.week_start,
+            max_value=ctx.week_end - timedelta(days=1),
+            key=_DAY_KEY,
+        )
+        with perf_span("scheduling.render.day"):
+            render_day_agenda(
+                snapshot.events,
+                day=ctx.selected_day,
+                conflict_event_ids=snapshot.conflict_event_ids,
+                on_open_event=on_open_event,
+            )
+    elif mode == "Crew":
+        with perf_span("scheduling.render.crew"):
+            render_crew_schedule_table(
+                snapshot.events,
+                week_anchor=ctx.week_anchor,
+                employees_by_id=snapshot.employees_by_id,
+                employee_rows_by_event=snapshot.employee_assignments_by_event,
+                show_unassigned=show_unassigned_enabled(),
+                on_open_event=on_open_event,
+            )
+    elif mode == "Jobs":
+        with perf_span("scheduling.render.jobs"):
+            render_jobs_schedule_grouped(
+                snapshot.events,
+                jobs_by_id=snapshot.jobs_by_id,
+                on_open_event=on_open_event,
+            )
+    elif mode == "Equipment":
+        with perf_span("scheduling.render.equipment"):
+            render_equipment_schedule_table(
+                snapshot.events,
+                assets_by_id=snapshot.assets_by_id,
+                asset_rows_by_event=snapshot.asset_assignments_by_event,
+                on_open_event=on_open_event,
+            )
 
 
 def render() -> None:
@@ -304,6 +233,7 @@ def render() -> None:
         return
 
     inject_scheduling_css()
+    permissions = _build_permissions()
 
     from app.ui.page_header import render_page_header
 
@@ -312,188 +242,87 @@ def render() -> None:
         ips_app_rerun()
 
     def _refresh() -> None:
-        clear_scheduling_cache()
-        ips_app_rerun()
+        clear_prepared_export()
+        invalidate_scheduling_page_cache(force=True)
 
     render_page_header(
         "Scheduling",
         "Plan jobs, crews, travel, and equipment assignments.",
         icon="📅",
-        primary_action=_new_event if _can_manage_scheduling() else None,
+        primary_action=_new_event if permissions.can_create else None,
         show_refresh=True,
         on_refresh=_refresh,
         primary_action_width=2.0,
     )
 
-    (
-        jobs,
-        employees,
-        assets,
-        customers,
-        jobs_by_id,
-        employees_by_id,
-        assets_by_id,
-        customers_by_id,
-    ) = _refs()
+    _show_schedule_detail_query_error_if_any()
+    detail_pending = _capture_schedule_detail_query()
 
-    week_anchor = _week_anchor()
-    week_start, week_end = week_range(week_anchor)
-    filt = _render_filters(jobs=jobs, employees=employees)
+    filt = render_scheduling_filters(filters_key=_FILTERS_KEY)
+
+    if detail_pending:
+        detail = st.session_state.get("_sched_detail_cache") or get_schedule_event_detail(
+            str(st.session_state.get(SCHED_OPEN_DETAIL_KEY) or "").strip()
+        )
+        if detail:
+            show_schedule_detail_dialog(
+                jobs_by_id=detail.get("jobs_by_id") or {},
+                employees_by_id=detail.get("employees_by_id") or {},
+                assets_by_id=detail.get("assets_by_id") or {},
+                detail_bundle=detail,
+                permissions=permissions,
+                on_close=_close_detail,
+            )
+        elif st.session_state.get(SCHED_OPEN_DETAIL_KEY):
+            show_schedule_detail_dialog(
+                jobs_by_id={},
+                employees_by_id={},
+                assets_by_id={},
+                permissions=permissions,
+                on_close=_close_detail,
+            )
+        return
+
+    render_week_navigation(week_key=_WEEK_KEY, day_key=_DAY_KEY, on_week_change=clear_prepared_export)
+    render_view_tabs(session_key=_VIEW_KEY, default="Week")
+    ctx = _build_render_context(filters=filt)
 
     with st.spinner("Loading schedule…"):
-        with perf_span("scheduling.query.events"):
-            events = list_schedule_events(week_start, week_end, filters=filt)
+        with perf_span("scheduling.page_shell"):
+            snapshot = load_scheduling_page_snapshot(
+                week_start=ctx.week_start,
+                week_end=ctx.week_end,
+                selected_day=ctx.selected_day,
+                view_mode=ctx.view_mode,
+                filters=ctx.filters,
+                show_unassigned=show_unassigned_enabled(),
+            )
 
-        emp_by_event, asset_by_event = _assignment_maps(week_start, week_end)
-        events = enrich_events(
-            events,
-            jobs_by_id=jobs_by_id,
-            employees_by_id=employees_by_id,
-            customers_by_id=customers_by_id,
-            employee_rows_by_event=emp_by_event,
-        )
-        events = _apply_client_filters(events, filt, jobs_by_id=jobs_by_id)
+    if snapshot.warning:
+        st.warning(snapshot.warning)
 
-        pad_start = week_start - timedelta(days=14)
-        pad_end = week_end + timedelta(days=14)
-        with perf_span("scheduling.refs.certs"):
-            employee_certs = load_all_certifications()
-        conflict_ids = _conflict_event_ids(
-            events,
-            employee_rows_by_event=emp_by_event,
-            asset_rows_by_event=asset_by_event,
-            pad_start=pad_start,
-            pad_end=pad_end,
-            assets_by_id=assets_by_id,
-            employee_certs=employee_certs,
-            employees_by_id=employees_by_id,
-        )
+    render_scheduling_export_panel(
+        events=snapshot.events,
+        week_start=ctx.week_start,
+        filters=ctx.filters,
+        jobs_by_id=snapshot.jobs_by_id,
+        employees_by_id=snapshot.employees_by_id,
+        employee_rows_by_event=snapshot.employee_assignments_by_event,
+        can_export=permissions.can_export,
+    )
 
-    nav1, nav2, nav3, nav4 = st.columns(4)
-
-    def _today() -> None:
-        _set_week_anchor(date.today())
-        st.session_state[_DAY_KEY] = date.today()
-        ips_app_rerun()
-
-    def _prev_week() -> None:
-        _set_week_anchor(week_anchor - timedelta(days=7))
-        _clamp_day_to_week()
-        ips_app_rerun()
-
-    def _next_week() -> None:
-        _set_week_anchor(week_anchor + timedelta(days=7))
-        _clamp_day_to_week()
-        ips_app_rerun()
-
-    with nav1:
-        st.button("Today", key="sched_hdr_today", on_click=_today, use_container_width=True)
-    with nav2:
-        st.button("Previous Week", key="sched_hdr_prev", on_click=_prev_week, use_container_width=True)
-    with nav3:
-        st.button("Next Week", key="sched_hdr_next", on_click=_next_week, use_container_width=True)
-    with nav4:
-        st.caption(f"Week: {week_start.strftime('%b %d')} – {(week_end - timedelta(days=1)).strftime('%b %d, %Y')}")
-
-    if _can_manage_scheduling():
-        exp_col1, exp_col2 = st.columns([1, 3])
-        with exp_col1:
-            if st.button("Export Weekly Schedule", key="sched_export_week", use_container_width=True):
-                import csv
-                import io
-
-                rows = build_weekly_schedule_export_rows(
-                    events,
-                    jobs_by_id=jobs_by_id,
-                    employees_by_id=employees_by_id,
-                    employee_rows_by_event=emp_by_event,
-                )
-                buf = io.StringIO()
-                if rows:
-                    writer = csv.DictWriter(buf, fieldnames=list(rows[0].keys()))
-                    writer.writeheader()
-                    writer.writerows(rows)
-                st.download_button(
-                    "Download CSV",
-                    data=buf.getvalue().encode("utf-8"),
-                    file_name=f"schedule_{week_start.isoformat()}.csv",
-                    mime="text/csv",
-                    key="sched_export_csv_dl",
-                )
-
-    mode_cols = st.columns(len(_VIEW_MODES))
-    for col, mode in zip(mode_cols, _VIEW_MODES):
-        with col:
-            if st.button(
-                mode,
-                key=f"sched_view_{mode.lower()}",
-                type="primary" if _view_mode() == mode else "secondary",
-                use_container_width=True,
-            ):
-                st.session_state[_VIEW_KEY] = mode
-                ips_app_rerun()
-
-    mode = _view_mode()
     with st.container(key="scheduling_page_wrap"):
-        if mode == "Week":
-            with perf_span("scheduling.render.week"):
-                render_week_calendar(
-                    events,
-                    week_anchor=week_anchor,
-                    conflict_event_ids=conflict_ids,
-                    on_open_event=_open_event,
-                )
-        elif mode == "Day":
-            week_start, week_end = week_range(week_anchor)
-            day = _day_in_week()
-            st.date_input(
-                "Day",
-                value=day,
-                min_value=week_start,
-                max_value=week_end - timedelta(days=1),
-                key=_DAY_KEY,
-            )
-            render_day_agenda(
-                events,
-                day=_day_anchor(),
-                conflict_event_ids=conflict_ids,
-                on_open_event=_open_event,
-            )
-        elif mode == "Crew":
-            render_crew_schedule_table(
-                events,
-                week_anchor=week_anchor,
-                employees_by_id=employees_by_id,
-                employee_rows_by_event=emp_by_event,
-                show_unassigned=bool(st.session_state.get(_SHOW_UNASSIGNED_KEY)),
-                on_open_event=_open_event,
-            )
-        elif mode == "Jobs":
-            render_jobs_schedule_grouped(
-                events,
-                jobs_by_id=jobs_by_id,
-                on_open_event=_open_event,
-            )
-        elif mode == "Equipment":
-            render_equipment_schedule_table(
-                events,
-                assets_by_id=assets_by_id,
-                asset_rows_by_event=asset_by_event,
-                on_open_event=_open_event,
-            )
+        _render_scheduling_view_content(ctx=ctx, snapshot=snapshot, on_open_event=_open_event)
 
     if st.session_state.get(SCHED_FORM_KEY):
-        show_schedule_event_dialog(
-            jobs=jobs,
-            employees=employees,
-            assets=assets,
-            customers=customers,
-            employee_certs=employee_certs,
-        )
+        with perf_span("scheduling.dialog_options"):
+            show_schedule_event_dialog(permissions=permissions)
 
     if st.session_state.get(SCHED_OPEN_DETAIL_KEY):
         show_schedule_detail_dialog(
-            jobs_by_id=jobs_by_id,
-            employees_by_id=employees_by_id,
-            assets_by_id=assets_by_id,
+            jobs_by_id=snapshot.jobs_by_id,
+            employees_by_id=snapshot.employees_by_id,
+            assets_by_id=snapshot.assets_by_id,
+            permissions=permissions,
+            on_close=_close_detail,
         )

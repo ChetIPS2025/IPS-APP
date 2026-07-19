@@ -8,6 +8,7 @@ from typing import Any, Callable
 import streamlit as st
 
 from app.auth import current_profile, effective_role
+from app.perf_debug import perf_span
 from app.services.scheduling_conflicts import ConflictReport, parse_dt
 from app.services.scheduling_service import (
     EVENT_STATUSES,
@@ -20,7 +21,7 @@ from app.services.scheduling_service import (
     replace_event_assets,
     replace_event_employees,
     update_schedule_event,
-    compute_event_conflicts,
+    validate_schedule_event_draft,
 )
 from app.ui.streamlit_perf import ips_app_rerun
 from app.utils.permissions import normalize_role
@@ -166,25 +167,41 @@ def _job_prefill(
 @st.dialog("Schedule Event", width="large")
 def show_schedule_event_dialog(
     *,
-    jobs: list[dict[str, Any]],
-    employees: list[dict[str, Any]],
-    assets: list[dict[str, Any]],
-    customers: list[dict[str, Any]],
-    employee_certs: list[dict[str, Any]] | None = None,
+    permissions: Any | None = None,
 ) -> None:
-    if not _can_manage_scheduling():
+    role = getattr(permissions, "role", None) if permissions else None
+    if not _can_manage_scheduling(role):
         st.warning("You do not have permission to edit schedules.")
         return
 
+    edit_id = str(st.session_state.get(SCHED_EDIT_ID_KEY) or "").strip()
+    existing = get_schedule_event(edit_id) if edit_id else None
+    preserve_ids: list[str] = []
+    if edit_id:
+        preserve_ids.extend(str(r.get("employee_id") or "") for r in list_event_employees(edit_id))
+        preserve_ids.extend(str(r.get("asset_id") or "") for r in list_event_assets(edit_id))
+        if existing:
+            preserve_ids.append(str(existing.get("job_id") or ""))
+            preserve_ids.append(str(existing.get("supervisor_id") or ""))
+
+    from app.services.scheduling_reference_service import get_jobs_by_ids, load_scheduling_form_options, rows_to_by_id
+
+    with perf_span("scheduling.dialog_options"):
+        form_options = load_scheduling_form_options(preserve_ids=preserve_ids)
+
+    jobs = [{"id": o["id"], **o} for o in form_options.jobs]
+    employees = [{"id": o["id"], "full_name": o["label"], **o} for o in form_options.employees]
+    assets = [{"id": o["id"], "asset_name": o["label"], **o} for o in form_options.assets]
+    customers = [{"id": o["id"], "customer_name": o["label"], **o} for o in form_options.customers]
+    employee_certs = None
     jobs_by_id = {str(j.get("id") or "").strip(): j for j in jobs if str(j.get("id") or "").strip()}
     employees_by_id = {str(e.get("id") or "").strip(): e for e in employees if str(e.get("id") or "").strip()}
     assets_by_id = {str(a.get("id") or "").strip(): a for a in assets if str(a.get("id") or "").strip()}
     customers_by_id = {str(c.get("id") or "").strip(): c for c in customers if str(c.get("id") or "").strip()}
-
-    edit_id = str(st.session_state.get(SCHED_EDIT_ID_KEY) or "").strip()
-    existing = get_schedule_event(edit_id) if edit_id else None
     prefill_job = str(st.session_state.pop(SCHED_PREFILL_JOB_KEY, "") or "").strip()
     if not existing and prefill_job:
+        extra_jobs = rows_to_by_id(get_jobs_by_ids([prefill_job]))
+        jobs_by_id.update(extra_jobs)
         existing = _job_prefill(prefill_job, jobs_by_id=jobs_by_id, customers_by_id=customers_by_id)
 
     title_label = "Edit Schedule Event" if edit_id else "New Schedule Event"
@@ -349,12 +366,14 @@ def show_schedule_event_dialog(
     emp_labels_map = {eid: emp_labels.get(eid, eid) for eid in assigned}
 
     if check and start_dt and end_dt:
-        report = compute_event_conflicts(
-            payload,
+        report = validate_schedule_event_draft(
+            event_id=edit_id or None,
+            start_at=start_dt,
+            end_at=end_dt,
             employee_ids=assigned,
             asset_ids=assigned_assets,
-            exclude_event_id=edit_id,
-            employee_certs=employee_certs or [],
+            supervisor_id=supervisor or None,
+            required_certifications=list(payload.get("required_certifications") or []),
             assets_by_id=assets_by_id,
             employee_labels=emp_labels_map,
         )
@@ -365,12 +384,14 @@ def show_schedule_event_dialog(
         if end_dt <= start_dt:
             st.error("End must be after start.")
             return
-        report = compute_event_conflicts(
-            payload,
+        report = validate_schedule_event_draft(
+            event_id=edit_id or None,
+            start_at=start_dt,
+            end_at=end_dt,
             employee_ids=assigned,
             asset_ids=assigned_assets,
-            exclude_event_id=edit_id,
-            employee_certs=employee_certs or [],
+            supervisor_id=supervisor or None,
+            required_certifications=list(payload.get("required_certifications") or []),
             assets_by_id=assets_by_id,
             employee_labels=emp_labels_map,
         )
@@ -412,15 +433,39 @@ def show_schedule_detail_dialog(
     jobs_by_id: dict[str, dict[str, Any]],
     employees_by_id: dict[str, dict[str, Any]],
     assets_by_id: dict[str, dict[str, Any]],
+    detail_bundle: dict[str, Any] | None = None,
+    permissions: Any | None = None,
+    on_close: Callable[[], None] | None = None,
 ) -> None:
     eid = str(st.session_state.get(SCHED_OPEN_DETAIL_KEY) or "").strip()
-    ev = get_schedule_event(eid) if eid else None
+    bundle = detail_bundle or {}
+    ev = bundle.get("event") if bundle else None
+    if not ev and eid:
+        ev = get_schedule_event(eid)
     if not ev:
         st.warning("Event not found.")
         if st.button("Close", key="sched_detail_missing_close"):
-            st.session_state.pop(SCHED_OPEN_DETAIL_KEY, None)
+            if on_close:
+                on_close()
+            else:
+                st.session_state.pop(SCHED_OPEN_DETAIL_KEY, None)
             st.rerun()
         return
+
+    if bundle:
+        jobs_by_id = bundle.get("jobs_by_id") or jobs_by_id
+        employees_by_id = bundle.get("employees_by_id") or employees_by_id
+        assets_by_id = bundle.get("assets_by_id") or assets_by_id
+        emps = bundle.get("employee_rows") or []
+        assets = bundle.get("asset_rows") or []
+        conflict_report = bundle.get("conflict_report")
+    else:
+        emps = list_event_employees(eid)
+        assets = list_event_assets(eid)
+        conflict_report = None
+
+    role = getattr(permissions, "role", None) if permissions else None
+    can_manage = _can_manage_scheduling(role)
 
     st.markdown(f"### {ev.get('title', 'Event')}")
     st.caption(f"Type: {ev.get('event_type', '—')} · Status: {str(ev.get('status', '—')).replace('_', ' ').title()}")
@@ -434,15 +479,15 @@ def show_schedule_detail_dialog(
     sup = employees_by_id.get(str(ev.get("supervisor_id") or "").strip()) or {}
     if sup:
         st.markdown(f"**Supervisor:** {_employee_label(sup)}")
+    if conflict_report and getattr(conflict_report, "has_warnings", False):
+        st.warning("This event has scheduling conflicts.")
 
-    emps = list_event_employees(eid)
     if emps:
         st.markdown("**Crew**")
         for row in emps:
             emp = employees_by_id.get(str(row.get("employee_id") or "")) or {}
             st.markdown(f"- {_employee_label(emp)}")
 
-    assets = list_event_assets(eid)
     if assets:
         st.markdown("**Equipment**")
         for row in assets:
@@ -453,17 +498,18 @@ def show_schedule_detail_dialog(
         st.markdown(f"**Work Instructions:** {ev.get('work_instructions')}")
     if ev.get("mobilization_notes"):
         st.markdown(f"**Mobilization:** {ev.get('mobilization_notes')}")
-    if _can_manage_scheduling() and ev.get("internal_notes"):
+    if can_manage and ev.get("internal_notes"):
         st.markdown(f"**Internal Notes:** {ev.get('internal_notes')}")
 
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4, c5 = st.columns(5)
     with c1:
-        if _can_manage_scheduling() and st.button("Edit", key="sched_detail_edit", use_container_width=True):
-            st.session_state.pop(SCHED_OPEN_DETAIL_KEY, None)
+        if can_manage and st.button("Edit", key="sched_detail_edit", use_container_width=True):
+            if on_close:
+                on_close()
             open_edit_schedule_dialog(eid)
-            st.rerun()
+            ips_app_rerun()
     with c2:
-        if _can_manage_scheduling() and st.button("Mark Confirmed", key="sched_detail_confirm", use_container_width=True):
+        if can_manage and st.button("Mark Confirmed", key="sched_detail_confirm", use_container_width=True):
             from app.services.scheduling_notifications import notify_schedule_event_saved
 
             previous = dict(ev)
@@ -472,11 +518,23 @@ def show_schedule_detail_dialog(
             notify_schedule_event_saved(updated, previous=previous)
             st.rerun()
     with c3:
-        if _can_manage_scheduling() and st.button("Cancel Event", key="sched_detail_cancel_ev", use_container_width=True):
+        if can_manage and st.button("Cancel Event", key="sched_detail_cancel_ev", use_container_width=True):
             update_schedule_event(eid, {"status": "cancelled"})
-            st.rerun()
+            ips_app_rerun()
     with c4:
-        if normalize_role(effective_role()) == "admin" and st.button("Delete", key="sched_detail_delete", use_container_width=True):
+        if normalize_role(role or effective_role()) == "admin" and st.button(
+            "Delete", key="sched_detail_delete", use_container_width=True
+        ):
             delete_schedule_event(eid)
-            st.session_state.pop(SCHED_OPEN_DETAIL_KEY, None)
+            if on_close:
+                on_close()
+            else:
+                st.session_state.pop(SCHED_OPEN_DETAIL_KEY, None)
+            ips_app_rerun()
+    with c5:
+        if st.button("Close", key="sched_detail_close", use_container_width=True):
+            if on_close:
+                on_close()
+            else:
+                st.session_state.pop(SCHED_OPEN_DETAIL_KEY, None)
             st.rerun()

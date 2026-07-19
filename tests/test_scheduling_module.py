@@ -155,26 +155,34 @@ def test_scheduling_page_has_mobile_friendly_css():
 
 def test_scheduling_page_unique_widget_key_prefixes():
     import inspect
+    from pathlib import Path
 
     from app.pages import scheduling as sched_page
 
-    source = inspect.getsource(sched_page)
+    root = Path(__file__).resolve().parents[1] / "app"
+    parts = [
+        inspect.getsource(sched_page),
+        (root / "components" / "scheduling_filters.py").read_text(encoding="utf-8"),
+        (root / "components" / "scheduling_view_nav.py").read_text(encoding="utf-8"),
+    ]
+    source = "\n".join(parts)
     assert 'key="sched_' in source or "key=f\"sched_" in source
     assert "scheduling_view_mode" in source
 
 
-def test_scheduling_page_header_precedes_filters_and_uses_app_rerun():
+def test_scheduling_page_header_precedes_filters_and_snapshot():
     import inspect
 
     from app.pages import scheduling as sched_page
 
     source = inspect.getsource(sched_page.render)
     header_idx = source.index("render_page_header(")
-    filters_idx = source.index("_render_filters(")
+    filters_idx = source.index("render_scheduling_filters(")
+    snapshot_idx = source.index("load_scheduling_page_snapshot(")
     assert header_idx < filters_idx
-    assert "@fragment" not in source
-    assert "fragment_rerun()" not in source
-    assert "ips_app_rerun()" in source
+    assert filters_idx < snapshot_idx
+    assert "load_jobs()" not in source
+    assert "load_employees()" not in source
 
 
 def test_upcoming_employee_schedule_skips_cancelled(monkeypatch):
