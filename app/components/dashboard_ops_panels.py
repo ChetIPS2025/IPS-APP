@@ -66,8 +66,6 @@ def _panel_cache_key(prefix: str, *, profile: dict[str, Any], role: str, suffix:
 def _jobs_by_status_counts(*, profile: dict[str, Any], role: str) -> tuple[dict[str, int], bool]:
     from app.pages._core.page_data_cache import page_data_cache_get
 
-    del profile, role
-
     def _load() -> tuple[dict[str, int], bool]:
         overview, is_live = dashboard_job_status_overview()
         counts = {label: 0 for label, _, _ in _STATUS_PANEL_ORDER}
@@ -190,8 +188,6 @@ def _recent_activity_html(items: list[dict[str, str]]) -> str:
 
 def _recent_activity_rows(*, profile: dict[str, Any], role: str, activity_limit: int) -> list[dict[str, str]]:
     from app.pages._core.page_data_cache import page_data_cache_get
-
-    del role
 
     def _load() -> list[dict[str, str]]:
         activity_rows, _ = load_recent_item_activity(limit=activity_limit)
