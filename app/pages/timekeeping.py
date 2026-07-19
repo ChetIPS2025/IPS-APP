@@ -6,6 +6,7 @@ import html
 import time
 from datetime import date, datetime, timezone
 from typing import Any
+from urllib.parse import urlencode
 
 import streamlit as st
 
@@ -93,6 +94,11 @@ TIMEKEEPING_MODAL_TIMECARD_KEY = "timekeeping_modal_timecard_id"
 SHOW_TIMEKEEPING_DAY_MODAL_KEY = "show_timekeeping_day_modal"
 SELECTED_TIME_EMPLOYEE_ID_KEY = "selected_time_employee_id"
 SELECTED_TIME_DATE_KEY = "selected_time_date"
+_TIMEKEEPING_NAV_QUERY_KEY = "ips_nav"
+_TIMEKEEPING_NAV_SLUG = "timekeeping"
+_TIMEKEEPING_DAY_EMPLOYEE_QUERY_KEY = "tk_employee"
+_TIMEKEEPING_DAY_DATE_QUERY_KEY = "tk_date"
+_TIMEKEEPING_DAY_TIMECARD_QUERY_KEY = "tk_timecard"
 _EXPANDED_TIMECARD_KEY = "ips_timekeeping_expanded_id"
 _TS_EXPAND = 32
 _TS_EMPLOYEE = 180
@@ -138,6 +144,87 @@ def _is_day_cell_selected(eid: str, iso: str) -> bool:
     sel_eid = str(st.session_state.get(SELECTED_TIME_EMPLOYEE_ID_KEY) or "").strip()
     sel_iso = str(st.session_state.get(SELECTED_TIME_DATE_KEY) or "").strip()[:10]
     return sel_eid == str(eid or "").strip() and sel_iso == str(iso or "").strip()[:10]
+
+
+def _timekeeping_day_href(
+    *,
+    employee_id: str,
+    work_date: date,
+    timecard_id: str,
+) -> str:
+    eid = str(employee_id or "").strip()
+    tid = str(timecard_id or "").strip()
+    if not eid:
+        return "#"
+    params: dict[str, str] = {
+        _TIMEKEEPING_NAV_QUERY_KEY: _TIMEKEEPING_NAV_SLUG,
+        _TIMEKEEPING_DAY_EMPLOYEE_QUERY_KEY: eid,
+        _TIMEKEEPING_DAY_DATE_QUERY_KEY: work_date.isoformat(),
+    }
+    if tid:
+        params[_TIMEKEEPING_DAY_TIMECARD_QUERY_KEY] = tid
+    return "?" + urlencode(params)
+
+
+def _clear_timekeeping_day_query_params() -> None:
+    try:
+        qp = st.query_params
+    except Exception:
+        return
+    for key in (
+        _TIMEKEEPING_DAY_EMPLOYEE_QUERY_KEY,
+        _TIMEKEEPING_DAY_DATE_QUERY_KEY,
+        _TIMEKEEPING_DAY_TIMECARD_QUERY_KEY,
+    ):
+        if key in qp:
+            del qp[key]
+
+
+def _capture_timekeeping_day_query() -> None:
+    try:
+        employee_id = str(
+            st.query_params.get(_TIMEKEEPING_DAY_EMPLOYEE_QUERY_KEY) or ""
+        ).strip()
+        date_raw = str(
+            st.query_params.get(_TIMEKEEPING_DAY_DATE_QUERY_KEY) or ""
+        ).strip()[:10]
+        timecard_id = str(
+            st.query_params.get(_TIMEKEEPING_DAY_TIMECARD_QUERY_KEY) or ""
+        ).strip()
+    except Exception:
+        return
+    if not employee_id or not date_raw:
+        return
+    try:
+        work_date = date.fromisoformat(date_raw)
+    except ValueError:
+        return
+    target_week = week_start(work_date)
+    if target_week != _current_week_start():
+        st.session_state[_WEEK_KEY] = target_week
+        clear_timekeeping_list_caches()
+    _open_day_time_editor(
+        eid=employee_id,
+        work_date=work_date,
+        timecard_id=timecard_id,
+        week_start_d=target_week,
+    )
+
+
+def _is_day_editor_active() -> bool:
+    if st.session_state.get(SHOW_TIMEKEEPING_DAY_MODAL_KEY):
+        return True
+    eid = str(
+        st.session_state.get(SELECTED_TIME_EMPLOYEE_ID_KEY)
+        or st.session_state.get(TIMEKEEPING_MODAL_EMPLOYEE_ID_KEY)
+        or ""
+    ).strip()
+    iso = str(
+        st.session_state.get(SELECTED_TIME_DATE_KEY)
+        or st.session_state.get(TIMEKEEPING_MODAL_DATE_KEY)
+        or ""
+    ).strip()[:10]
+    return bool(eid and iso)
 
 
 def _timekeeping_app_rerun() -> None:
@@ -4239,7 +4326,7 @@ def _render_timekeeping_list_fragment(
     filter_options: dict[str, list[str]],
     week_start_d: date,
 ) -> list[str]:
-    """Weekly timecard list — each employee row reruns in its own fragment on hour edits."""
+    """Weekly timecard list table (fragment isolates filter/pagination widget reruns)."""
     return _render_custom_timekeeping_table(
         page_rows,
         filter_options=filter_options,
@@ -4263,6 +4350,7 @@ def _clear_day_time_modal() -> None:
     st.session_state.pop(SELECTED_TIME_EMPLOYEE_ID_KEY, None)
     st.session_state.pop(SELECTED_TIME_DATE_KEY, None)
     st.session_state[SHOW_TIMEKEEPING_DAY_MODAL_KEY] = False
+    _clear_timekeeping_day_query_params()
 
 
 def _clear_day_time_selection() -> None:
@@ -4778,6 +4866,59 @@ def _show_day_time_dialog() -> None:
     render_day_time_dialog_body(emp, week_start_d, iso)
 
 
+def _clickable_list_day_cell_html(
+    *,
+    day_d: date,
+    day_ix: int,
+    day_row: dict,
+    eid: str,
+    timecard_id: str,
+) -> str:
+    iso = day_d.isoformat()
+    day_status = _normalize_timecard_status(day_row.get("status"))
+    total = _day_hours_total(day_row)
+    has_hours = total > _ALLOC_TOLERANCE
+    filled_marker = _list_day_box_marker_classes(
+        day_status=day_status,
+        alloc_state="",
+        has_hours=has_hours,
+    )
+    weekend_cls = " timekeeping-day-cell-weekend" if day_ix >= 5 else ""
+    selected_cls = (
+        " timekeeping-day-cell-selected-marker"
+        if _is_day_cell_selected(eid, iso)
+        else ""
+    )
+    hours_cls = "timekeeping-day-cell-hours" + _day_approval_ro_hour_class(day_status)
+    href = _timekeeping_day_href(
+        employee_id=eid,
+        work_date=day_d,
+        timecard_id=timecard_id,
+    )
+    aria = f"Open {day_d.strftime('%A %m/%d')} time entry"
+    status_html = _list_day_status_badge_html(day_status, "")
+    if not status_html.strip():
+        status_html = (
+            f'<span class="timekeeping-day-cell-status">'
+            f"{html.escape(_timecard_status_display(day_status).upper())}"
+            f"</span>"
+        )
+    return (
+        f'<span class="timekeeping-day-cell-clickable-marker{weekend_cls}{selected_cls}{filled_marker}" '
+        f'aria-hidden="true"></span>'
+        f'<div class="timekeeping-day-cell-card">'
+        f'<div class="timekeeping-day-cell-date">'
+        f"{html.escape(day_d.strftime('%a').upper())} {html.escape(day_d.strftime('%m/%d'))}"
+        f"</div>"
+        f'<a class="timekeeping-day-native-link" href="{html.escape(href, quote=True)}" '
+        f'target="_self" aria-label="{html.escape(aria, quote=True)}">'
+        f"{status_html}"
+        f'<span class="{html.escape(hours_cls.strip())}">{html.escape(_fmt_day_hours(total))}</span>'
+        f"</a>"
+        f"</div>"
+    )
+
+
 def _render_clickable_list_day_cell(
     *,
     day_d: date,
@@ -4787,35 +4928,17 @@ def _render_clickable_list_day_cell(
     timecard_id: str,
     week_start_d: date,
 ) -> None:
-    """Compact day cell — click hours to open the day editor panel."""
-    iso = day_d.isoformat()
-    day_status = _normalize_timecard_status(day_row.get("status"))
-    total = _day_hours_total(day_row)
-    hours_label = _fmt_day_hours(total)
-    weekend_cls = " timekeeping-day-cell-weekend" if day_ix >= 5 else ""
-    selected_cls = " timekeeping-day-cell-selected-marker" if _is_day_cell_selected(eid, iso) else ""
-    st.markdown(
-        f'<span class="timekeeping-day-cell-clickable-marker{weekend_cls}{selected_cls}" '
-        f'aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        f'<div class="timekeeping-day-cell-status">{html.escape(_timecard_status_display(day_status).upper())}</div>',
-        unsafe_allow_html=True,
-    )
-    if st.button(
-        hours_label,
-        key=f"open_time_day_{eid}_{iso}",
-        use_container_width=True,
-        help=f"Open {day_d.strftime('%A %m/%d')} time entry",
-    ):
-        _open_day_time_editor(
+    """Compact day cell — native link opens the day editor without Streamlit widgets."""
+    del week_start_d
+    _render_timekeeping_inline_html(
+        _clickable_list_day_cell_html(
+            day_d=day_d,
+            day_ix=day_ix,
+            day_row=day_row,
             eid=eid,
-            work_date=day_d,
             timecard_id=timecard_id,
-            week_start_d=week_start_d,
         )
-        _timekeeping_app_rerun()
+    )
 
 
 def _render_timekeeping_employee_row_collapsed(
@@ -4923,14 +5046,13 @@ def _render_timekeeping_employee_row_body(
     )
 
 
-@fragment
-def _render_timekeeping_employee_row_fragment(
+def _render_timekeeping_employee_row(
     row: dict,
     *,
     week_start_d: date,
     days: list[date],
 ) -> None:
-    """One employee list row — local reruns when day cells update this row."""
+    """One employee list row (HTML day cells — no per-day Streamlit widgets)."""
     _render_timekeeping_employee_row_body(row, week_start_d=week_start_d, days=days)
 
 
@@ -4998,9 +5120,37 @@ def _render_custom_timekeeping_table(
         _render_timekeeping_employee_filter_header(filter_options, days=days)
 
         for row in filtered:
-            _render_timekeeping_employee_row_fragment(row, week_start_d=week_start_d, days=days)
+            _render_timekeeping_employee_row(row, week_start_d=week_start_d, days=days)
 
     return all_timecard_ids
+
+
+def _render_weekly_customer_timesheets_footer(filtered: list[dict] | None = None) -> None:
+    from app.auth import effective_role
+    from app.utils.permissions import role_can_access_page
+    if not role_can_access_page(effective_role(), "jobs"):
+        return
+    st.divider()
+    st.markdown("**Weekly customer timesheets**")
+    st.caption("Generate and send weekly timesheets from the job's **Weekly Timesheets** tab in Job Detail.")
+    if st.button("Open Job Weekly Timesheets", key="tk_open_weekly_ts", use_container_width=False):
+        from app.navigation import navigate_to_weekly_timesheet
+        prefill_job = ""
+        tc_id = str(st.session_state.get(SELECTED_TIMECARD_KEY) or "").strip()
+        rows = filtered or []
+        if tc_id:
+            for row in rows:
+                if str(row.get("id") or "") == tc_id:
+                    prefill_job = str(row.get("primary_job_id") or row.get("job_id") or "").strip()
+                    break
+        if not prefill_job:
+            from app.utils.field_context import get_field_job_id
+            prefill_job = str(get_field_job_id() or "").strip()
+        navigate_to_weekly_timesheet(
+            job_id=prefill_job,
+            week_start=_current_week_start().isoformat(),
+        )
+        st.rerun()
 
 
 def render() -> None:
@@ -5016,6 +5166,8 @@ def render() -> None:
             clear_timekeeping_list_caches()
         except ValueError:
             pass
+
+    _capture_timekeeping_day_query()
 
     ws = _current_week_start()
     we = week_end(ws)
@@ -5041,10 +5193,6 @@ def render() -> None:
         '<span class="ips-timekeeping-page ips-page-shell-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
-
-    summaries = _filter_summaries_for_field_user(load_timekeeping_summaries(ws))
-    built_rows = [_build_timecard_row(row, ws) for row in summaries]
-    filter_options = build_filter_options(built_rows, _TK_COLUMN_FILTER_SPECS)
 
     can_enter = _can_submit_timekeeping()
 
@@ -5077,6 +5225,24 @@ def render() -> None:
                 render_field_job_bar(jobs, key_prefix="tk")
 
     _render_weekly_timekeeping_toolbar(ws, we)
+
+    if _is_day_editor_active():
+        panel_ctx = _get_day_panel_context() or _get_day_modal_context()
+        with st.container(key="weekly_timekeeping_layout"):
+            st.markdown(
+                '<span class="weekly-timekeeping-layout-marker" aria-hidden="true"></span>',
+                unsafe_allow_html=True,
+            )
+            if panel_ctx and not _is_narrow_viewport():
+                emp, week_start_d, iso, _row = panel_ctx
+                _render_day_time_entry_panel(emp, week_start_d, iso)
+        show_modal_if_pending(SHOW_TIMEKEEPING_DAY_MODAL_KEY, _show_day_time_dialog)
+        _render_weekly_customer_timesheets_footer(filtered=None)
+        return
+
+    summaries = _filter_summaries_for_field_user(load_timekeeping_summaries(ws))
+    built_rows = [_build_timecard_row(row, ws) for row in summaries]
+    filter_options = build_filter_options(built_rows, _TK_COLUMN_FILTER_SPECS)
 
     filtered = _filter_timecards(built_rows)
 
@@ -5117,29 +5283,7 @@ def render() -> None:
 
     show_modal_if_pending(SHOW_TIMEKEEPING_DAY_MODAL_KEY, _show_day_time_dialog)
 
-    from app.auth import effective_role
-    from app.utils.permissions import role_can_access_page
-    if role_can_access_page(effective_role(), "jobs"):
-        st.divider()
-        st.markdown("**Weekly customer timesheets**")
-        st.caption("Generate and send weekly timesheets from the job's **Weekly Timesheets** tab in Job Detail.")
-        if st.button("Open Job Weekly Timesheets", key="tk_open_weekly_ts", use_container_width=False):
-            from app.navigation import navigate_to_weekly_timesheet
-            prefill_job = ""
-            tc_id = str(st.session_state.get(SELECTED_TIMECARD_KEY) or "").strip()
-            if tc_id:
-                for row in filtered:
-                    if str(row.get("id") or "") == tc_id:
-                        prefill_job = str(row.get("primary_job_id") or row.get("job_id") or "").strip()
-                        break
-            if not prefill_job:
-                from app.utils.field_context import get_field_job_id
-                prefill_job = str(get_field_job_id() or "").strip()
-            navigate_to_weekly_timesheet(
-                job_id=prefill_job,
-                week_start=_current_week_start().isoformat(),
-            )
-            st.rerun()
+    _render_weekly_customer_timesheets_footer(filtered=filtered)
 
 
 def render_field_time_panel(*, key_prefix: str = "ftp") -> None:
