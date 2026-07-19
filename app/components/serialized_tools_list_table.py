@@ -268,17 +268,13 @@ def render_serialized_tools_table_open_buttons(
             if not row_id:
                 continue
             bridge_key = serialized_tools_bridge_button_key(row)
-
-            def _open(_row_id: str = row_id, _row: dict = row) -> None:
-                open_row_fn(_row_id, _row)
-                ips_app_rerun()
-
-            st.button(
+            if st.button(
                 "Open tool",
                 key=bridge_key,
                 type="tertiary",
-                on_click=_open,
-            )
+            ):
+                open_row_fn(row_id, row)
+                ips_app_rerun()
 
 
 def render_serialized_tools_table_bridge(
@@ -320,14 +316,17 @@ def render_serialized_tools_table_bridge(
   function clickBridgeButton(bridgeKey) {{
     if (!bridgeKey) return false;
     const harness = doc.querySelector(".st-key-serialized_tools_open_button_harness");
+    const escaped = CSS.escape(bridgeKey);
     const host =
-      doc.querySelector(".st-key-" + CSS.escape(bridgeKey))
-      || (harness && harness.querySelector('[class*="st-key-' + CSS.escape(bridgeKey) + '"]'))
-      || (harness && harness.querySelector('[class*="' + bridgeKey + '"]'));
+      doc.querySelector(".st-key-" + escaped)
+      || (harness && harness.querySelector(".st-key-" + escaped))
+      || (harness && harness.querySelector('[class*="st-key-' + escaped + '"]'))
+      || (harness && harness.querySelector('[class*="' + bridgeKey + '"]'))
+      || doc.querySelector('[class*="st-key-' + escaped + '"]');
     if (!host) {{
       return false;
     }}
-    const btn = host.querySelector('[data-testid="stButton"] > button');
+    const btn = host.querySelector('[data-testid="stButton"] > button, button[kind="tertiary"]');
     if (!btn) {{
       return false;
     }}
@@ -337,8 +336,8 @@ def render_serialized_tools_table_bridge(
 
   function openRow(id, bridgeKey) {{
     if (!id) return;
-    if (bridgeKey && clickBridgeButton(bridgeKey)) {{
-      return;
+    if (bridgeKey) {{
+      clickBridgeButton(bridgeKey);
     }}
     sendValue("open:" + id);
   }}

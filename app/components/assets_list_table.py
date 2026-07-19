@@ -356,17 +356,13 @@ def render_assets_table_open_buttons(
             if not aid:
                 continue
             bridge_key = assets_bridge_button_key(asset)
-
-            def _open(_aid: str = aid, _asset: dict = asset) -> None:
-                open_asset_fn(_aid, _asset)
-                ips_app_rerun()
-
-            st.button(
+            if st.button(
                 "Open asset",
                 key=bridge_key,
                 type="tertiary",
-                on_click=_open,
-            )
+            ):
+                open_asset_fn(aid, asset)
+                ips_app_rerun()
 
 
 def render_assets_table_bridge(
@@ -410,14 +406,17 @@ def render_assets_table_bridge(
   function clickBridgeButton(bridgeKey) {{
     if (!bridgeKey) return false;
     const harness = doc.querySelector(".st-key-assets_open_button_harness");
+    const escaped = CSS.escape(bridgeKey);
     const host =
-      doc.querySelector(".st-key-" + CSS.escape(bridgeKey))
-      || (harness && harness.querySelector('[class*="st-key-' + CSS.escape(bridgeKey) + '"]'))
-      || (harness && harness.querySelector('[class*="' + bridgeKey + '"]'));
+      doc.querySelector(".st-key-" + escaped)
+      || (harness && harness.querySelector(".st-key-" + escaped))
+      || (harness && harness.querySelector('[class*="st-key-' + escaped + '"]'))
+      || (harness && harness.querySelector('[class*="' + bridgeKey + '"]'))
+      || doc.querySelector('[class*="st-key-' + escaped + '"]');
     if (!host) {{
       return false;
     }}
-    const btn = host.querySelector('[data-testid="stButton"] > button');
+    const btn = host.querySelector('[data-testid="stButton"] > button, button[kind="tertiary"]');
     if (!btn) {{
       return false;
     }}
@@ -429,8 +428,8 @@ def render_assets_table_bridge(
     if (!id) return;
     const act = action || "open";
     if (act === "open") {{
-      if (bridgeKey && clickBridgeButton(bridgeKey)) {{
-        return;
+      if (bridgeKey) {{
+        clickBridgeButton(bridgeKey);
       }}
       sendValue(act + ":" + id);
       return;

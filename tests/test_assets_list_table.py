@@ -97,8 +97,9 @@ def test_assets_open_buttons_use_callback_with_app_rerun() -> None:
     from app.components.assets_list_table import render_assets_table_open_buttons
 
     src = inspect.getsource(render_assets_table_open_buttons)
-    assert "on_click=_open" in src
+    assert "if st.button(" in src
     assert "ips_app_rerun()" in src
+    assert "on_click=_open" not in src
 
 
 def test_assets_bridge_clicks_hidden_button_before_send_value() -> None:
