@@ -22,7 +22,13 @@ _CATALOG_SESSION_KEY = "_ips_catalog_datasets"
 _ASSETS_CATALOG_VERSION_KEY = "_ips_assets_catalog_version"
 _JOBS_CATALOG_VERSION_KEY = "_ips_jobs_catalog_version"
 _TASKS_CATALOG_VERSION_KEY = "_ips_tasks_catalog_version"
+ perf/users-employees-module
 _EMPLOYEES_CATALOG_VERSION_KEY = "_ips_employees_catalog_version"
+
+_ESTIMATES_CATALOG_VERSION_KEY = "_ips_estimates_catalog_version"
+_INVENTORY_CATALOG_VERSION_KEY = "_ips_inventory_catalog_version"
+_TIMEKEEPING_CATALOG_VERSION_KEY = "_ips_timekeeping_catalog_version"
+ main
 _JOBS_LIST_COST_CACHE_KEY = "_ips_jobs_list_cost_by_id"
 
 
@@ -41,9 +47,25 @@ def tasks_catalog_data_version() -> int:
     return int(st.session_state.get(_TASKS_CATALOG_VERSION_KEY) or 0)
 
 
+ perf/users-employees-module
 def employees_catalog_data_version() -> int:
     """Monotonic token bumped whenever the employees/users catalog is invalidated."""
     return int(st.session_state.get(_EMPLOYEES_CATALOG_VERSION_KEY) or 0)
+
+def estimates_catalog_data_version() -> int:
+    """Monotonic token bumped whenever the estimates catalog cache is invalidated."""
+    return int(st.session_state.get(_ESTIMATES_CATALOG_VERSION_KEY) or 0)
+
+
+def inventory_catalog_data_version() -> int:
+    """Monotonic token bumped whenever the inventory catalog cache is invalidated."""
+    return int(st.session_state.get(_INVENTORY_CATALOG_VERSION_KEY) or 0)
+
+
+def timekeeping_catalog_data_version() -> int:
+    """Monotonic token bumped whenever timekeeping snapshots are invalidated."""
+    return int(st.session_state.get(_TIMEKEEPING_CATALOG_VERSION_KEY) or 0)
+ main
 
 
 def _bump_assets_catalog_data_version() -> None:
@@ -58,8 +80,21 @@ def _bump_tasks_catalog_data_version() -> None:
     st.session_state[_TASKS_CATALOG_VERSION_KEY] = tasks_catalog_data_version() + 1
 
 
+ perf/users-employees-module
 def _bump_employees_catalog_data_version() -> None:
     st.session_state[_EMPLOYEES_CATALOG_VERSION_KEY] = employees_catalog_data_version() + 1
+
+def _bump_estimates_catalog_data_version() -> None:
+    st.session_state[_ESTIMATES_CATALOG_VERSION_KEY] = estimates_catalog_data_version() + 1
+
+
+def _bump_inventory_catalog_data_version() -> None:
+    st.session_state[_INVENTORY_CATALOG_VERSION_KEY] = inventory_catalog_data_version() + 1
+
+
+def _bump_timekeeping_catalog_data_version() -> None:
+    st.session_state[_TIMEKEEPING_CATALOG_VERSION_KEY] = timekeeping_catalog_data_version() + 1
+ main
 
 
 def _catalog_session_get(name: str, loader):
@@ -832,6 +867,7 @@ def clear_jobs_catalog_cache() -> None:
 def clear_estimates_catalog_cache() -> None:
     clear_estimates_list_cache()
     clear_catalog_session_key("estimates")
+    _bump_estimates_catalog_data_version()
     clear_dashboard_page_data_cache()
     clear_customers_page_data_cache()
 
@@ -840,6 +876,7 @@ def clear_inventory_catalog_cache() -> None:
     clear_inventory_list_cache()
     clear_catalog_session_key("inventory")
     clear_inventory_page_data_cache()
+    _bump_inventory_catalog_data_version()
     clear_dashboard_page_data_cache()
 
 
@@ -888,9 +925,13 @@ def clear_labor_rates_catalog_cache() -> None:
 def clear_timekeeping_catalog_cache() -> None:
     """Timekeeping writes roll up to job costing — refresh jobs list snapshots only."""
     clear_timekeeping_summaries_page_data_cache()
+    _bump_timekeeping_catalog_data_version()
     clear_jobs_list_cache()
     clear_catalog_session_key("jobs")
     clear_jobs_list_cost_cache()
+    from app.services.dashboard_service import clear_dashboard_snapshot_cache
+
+    clear_dashboard_snapshot_cache()
 
 
 def clear_pricing_guide_catalog_cache() -> None:

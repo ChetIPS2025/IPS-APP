@@ -13,6 +13,7 @@ __all__ = [
     "can_create_management_reminder",
     "can_create_office_reminder",
     "complete_management_reminder",
+    "count_dashboard_reminders",
     "create_management_reminder",
     "due_date_badge",
     "filter_dashboard_reminders",
@@ -145,6 +146,21 @@ def filter_dashboard_reminders(
     visible = [r for r in rows if visible_to_user(r, profile=profile, role=role)]
     visible.sort(key=_due_sort_key)
     return visible[: max(0, int(limit))]
+
+
+def count_dashboard_reminders(
+    *,
+    profile: dict[str, Any],
+    role: str,
+    projections: list[dict[str, Any]] | None = None,
+) -> int:
+    """Count visible office reminders without loading full task records."""
+    rows = projections
+    if rows is None:
+        from app.services.phase2_modules_service import list_reminder_task_projections
+
+        rows, _used = list_reminder_task_projections()
+    return len(filter_dashboard_reminders(rows, profile=profile, role=role, limit=999_999))
 
 
 def due_date_badge(due_raw: object) -> tuple[str, str]:
