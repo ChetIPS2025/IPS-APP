@@ -11,7 +11,8 @@ from app.components.scheduling_dialogs import (
     _dt_from_inputs,
     _seed_schedule_form_from_event,
 )
-from app.pages.scheduling import _DAY_KEY, _WEEK_KEY, _clamp_day_to_week, _day_in_week
+from app.components.scheduling_view_nav import clamp_day_to_week, week_anchor
+from app.pages.scheduling import _DAY_KEY, _WEEK_KEY
 from app.services.scheduling_service import monday_of, week_range
 
 
@@ -68,11 +69,12 @@ def test_clamp_day_to_selected_week():
     week = date(2026, 7, 13)
     st.session_state[_WEEK_KEY] = week
     st.session_state[_DAY_KEY] = date(2026, 7, 1)
-    _clamp_day_to_week()
+    clamp_day_to_week(week_key=_WEEK_KEY, day_key=_DAY_KEY)
     assert st.session_state[_DAY_KEY] == week
 
     st.session_state[_DAY_KEY] = date(2026, 7, 15)
-    assert _day_in_week() == date(2026, 7, 15)
+    clamp_day_to_week(week_key=_WEEK_KEY, day_key=_DAY_KEY)
+    assert st.session_state[_DAY_KEY] == date(2026, 7, 15)
 
 
 def test_day_in_week_defaults_to_monday():
@@ -80,7 +82,8 @@ def test_day_in_week_defaults_to_monday():
     anchor = date(2026, 7, 15)
     st.session_state[_WEEK_KEY] = monday_of(anchor)
     st.session_state.pop(_DAY_KEY, None)
-    day = _day_in_week()
+    clamp_day_to_week(week_key=_WEEK_KEY, day_key=_DAY_KEY)
+    day = st.session_state[_DAY_KEY]
     week_start, _ = week_range(anchor)
     assert day == week_start
 

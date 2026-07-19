@@ -49,19 +49,46 @@ AVAILABILITY_TYPES: tuple[str, ...] = (
 
 _SCHEDULE_CACHE_KEY = "_ips_schedule_events_cache"
 _SCHEDULE_RANGE_KEY = "_ips_schedule_range_cache"
+_SCHEDULING_DATA_VERSION_KEY = "_ips_scheduling_data_version"
+_EXPORT_CACHE_KEY = "_ips_scheduling_export_csv"
 
 
-def _run_query(operation: str, fn):
-    return run_user_supabase_operation(operation, fn, friendly_on_failure=False)
+def scheduling_data_version() -> int:
+    """Monotonic token bumped when schedule data or assignments change."""
+    return int(st.session_state.get(_SCHEDULING_DATA_VERSION_KEY) or 0)
+
+
+def _bump_scheduling_data_version() -> None:
+    st.session_state[_SCHEDULING_DATA_VERSION_KEY] = scheduling_data_version() + 1
+
+
+def invalidate_scheduling_page_cache(*, force: bool = False) -> None:
+    """Central cache invalidation for Scheduling page snapshots and exports."""
+    _bump_scheduling_data_version()
+    for key in (_SCHEDULE_CACHE_KEY, _SCHEDULE_RANGE_KEY, _EXPORT_CACHE_KEY):
+        st.session_state.pop(key, None)
+    if force:
+        from app.pages._core.page_data_cache import clear_page_data_cache_prefix
+
+        clear_page_data_cache_prefix("scheduling_page_snapshot:")
+        clear_page_data_cache_prefix("scheduling_event_detail:")
+        clear_page_data_cache_prefix("scheduling_filter_options:")
+        clear_page_data_cache_prefix("scheduling_form_options:")
+        clear_page_data_cache_prefix("scheduling_active_employees:")
+        clear_page_data_cache_prefix("scheduling_export_csv:")
 
 
 def clear_scheduling_cache() -> None:
-    for key in (_SCHEDULE_CACHE_KEY, _SCHEDULE_RANGE_KEY):
-        st.session_state.pop(key, None)
+    """Compatibility entry point — clears repository table caches and bumps version."""
+    invalidate_scheduling_page_cache(force=True)
     clear_data_cache_for_table(SCHEDULE_EVENTS_TABLE)
     clear_data_cache_for_table(SCHEDULE_EMPLOYEES_TABLE)
     clear_data_cache_for_table(SCHEDULE_ASSETS_TABLE)
     clear_data_cache_for_table(AVAILABILITY_TABLE)
+
+
+def _run_query(operation: str, fn):
+    return run_user_supabase_operation(operation, fn, friendly_on_failure=False)
 
 
 def monday_of(d: date) -> date:
@@ -677,6 +704,65 @@ def compute_event_conflicts(
             availability_rows=list_availability_in_range(pad_start, pad_end, employee_ids=employee_ids),
             employee_certs=employee_certs or [],
             assets_by_id=assets_by_id or {},
+            employee_labels=employee_labels,
+            exclude_event_id=exclude_event_id,
+        )
+
+
+def validate_schedule_event_draft(
+    *,
+    event_id: str | None,
+    start_at: object,
+    end_at: object,
+    employee_ids: list[str],
+    asset_ids: list[str],
+    supervisor_id: str | None,
+    required_certifications: list[str],
+    employee_certs: list[dict[str, Any]] | None = None,
+    assets_by_id: dict[str, dict[str, Any]] | None = None,
+    employee_labels: dict[str, str] | None = None,
+    range_pad_days: int = 14,
+) -> Any:
+    """Conflict validation for a single draft event — scoped overlapping resources only."""
+    start = parse_dt(start_at)
+    end = parse_dt(end_at)
+    if not start or not end:
+        from app.services.scheduling_conflicts import ConflictReport
+
+        return ConflictReport()
+
+    pad_start = start.date() - timedelta(days=range_pad_days)
+    pad_end = end.date() + timedelta(days=range_pad_days)
+    exclude_event_id = str(event_id or "").strip()
+    scoped_assets = assets_by_id or {}
+    if asset_ids and not scoped_assets:
+        from app.services.scheduling_reference_service import get_assets_by_ids, rows_to_by_id
+
+        scoped_assets = rows_to_by_id(get_assets_by_ids(asset_ids))
+
+    with perf_span("scheduling.dialog_validation"):
+        emp_assignments = list_employee_assignments_in_range(pad_start, pad_end)
+        asset_assignments = list_asset_assignments_in_range(pad_start, pad_end)
+        supervisor_events = list_supervisor_events_in_range(pad_start, pad_end)
+        availability = list_availability_in_range(pad_start, pad_end, employee_ids=employee_ids)
+        certs = employee_certs
+        if certs is None and required_certifications:
+            from app.services.scheduling_reference_service import list_relevant_certifications
+
+            certs = list_relevant_certifications(employee_ids, required_certifications)
+        return build_event_conflict_report(
+            start_at=start,
+            end_at=end,
+            employee_ids=employee_ids,
+            asset_ids=asset_ids,
+            supervisor_id=str(supervisor_id or "").strip(),
+            required_certifications=list(required_certifications or []),
+            employee_assignments=emp_assignments,
+            supervisor_events=supervisor_events,
+            asset_assignments=asset_assignments,
+            availability_rows=availability,
+            employee_certs=certs or [],
+            assets_by_id=scoped_assets,
             employee_labels=employee_labels,
             exclude_event_id=exclude_event_id,
         )
