@@ -885,14 +885,17 @@ def _render_custom_assets_table(
 
     with st.container(key="assets_table_wrap"):
         _render_assets_table_column_filters(filter_options=filter_options)
-        st.markdown(
-            build_assets_html_table(
-                filtered,
-                field_mode=field_mode,
-                expanded_asset_id=expanded_asset_id,
-            ),
-            unsafe_allow_html=True,
-        )
+        from app.perf_debug import perf_span
+
+        with perf_span("assets.table_html"):
+            st.markdown(
+                build_assets_html_table(
+                    filtered,
+                    field_mode=field_mode,
+                    expanded_asset_id=expanded_asset_id,
+                ),
+                unsafe_allow_html=True,
+            )
         if field_mode:
             render_assets_table_bridge_legacy(
                 assets_by_id,
@@ -1082,10 +1085,13 @@ def _render_equipment_list(
         status=str(st.session_state.get("ast_bar_status") or "All Statuses"),
     )
 
-    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="asset")
-    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
-    _render_custom_assets_table(page_rows, filter_options=filter_options)
-    render_table_pagination_footer(len(filtered), _TABLE_KEY)
+    from app.perf_debug import perf_span
+
+    with perf_span("assets.equipment_filter"):
+        render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="asset")
+        page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
+        _render_custom_assets_table(page_rows, filter_options=filter_options)
+        render_table_pagination_footer(len(filtered), _TABLE_KEY)
     _rerun_if_assets_modal_pending()
 
 
@@ -1225,34 +1231,37 @@ def _clear_assets_detail_modal() -> None:
 
 
 def _capture_asset_detail_query() -> None:
-    requested_id = str(
-        st.query_params.get(_ASSET_DETAIL_QUERY_KEY)
-        or ""
-    ).strip()
+    from app.perf_debug import perf_span
 
-    if not requested_id:
-        return
+    with perf_span("assets.query_capture"):
+        requested_id = str(
+            st.query_params.get(_ASSET_DETAIL_QUERY_KEY)
+            or ""
+        ).strip()
 
-    current_modal_id = str(
-        st.session_state.get(_ASSETS_MODAL_KEY)
-        or ""
-    ).strip()
+        if not requested_id:
+            return
 
-    if requested_id == current_modal_id:
-        return
+        current_modal_id = str(
+            st.session_state.get(_ASSETS_MODAL_KEY)
+            or ""
+        ).strip()
 
-    asset = _cached_asset_for_modal(requested_id)
+        if requested_id == current_modal_id:
+            return
 
-    if not asset:
-        st.session_state[_ASSET_DETAIL_QUERY_ERROR_KEY] = requested_id
-        if _ASSET_DETAIL_QUERY_KEY in st.query_params:
-            del st.query_params[_ASSET_DETAIL_QUERY_KEY]
-        return
+        asset = _cached_asset_for_modal(requested_id)
 
-    _open_assets_detail_modal(
-        requested_id,
-        asset,
-    )
+        if not asset:
+            st.session_state[_ASSET_DETAIL_QUERY_ERROR_KEY] = requested_id
+            if _ASSET_DETAIL_QUERY_KEY in st.query_params:
+                del st.query_params[_ASSET_DETAIL_QUERY_KEY]
+            return
+
+        _open_assets_detail_modal(
+            requested_id,
+            asset,
+        )
 
 
 def _show_asset_detail_query_error_if_any() -> None:
@@ -1280,28 +1289,31 @@ def _clear_assets_catalog_cache() -> None:
 
 def _cached_asset_for_modal(asset_id: str) -> dict | None:
     """Resolve one asset for the detail modal without building a full-page cache."""
-    aid = str(asset_id or "").strip()
-    if not aid:
-        return None
-    cache = st.session_state.get(_ASSETS_CACHE_KEY)
-    if isinstance(cache, dict):
-        hit = cache.get(aid)
-        if isinstance(hit, dict):
-            return hit
-    from app.services.phase2_modules_service import normalize_asset
-    from app.services.repository import fetch_by_id
+    from app.perf_debug import perf_span
 
-    raw = fetch_by_id("assets", aid)
-    if isinstance(raw, dict):
-        asset = normalize_asset(raw)
-        _put_asset_in_modal_cache(aid, asset)
-        return asset
-    for row in load_assets():
-        if str(row.get("id") or "").strip() == aid:
-            asset = normalize_asset(row)
+    with perf_span("assets.modal_lookup"):
+        aid = str(asset_id or "").strip()
+        if not aid:
+            return None
+        cache = st.session_state.get(_ASSETS_CACHE_KEY)
+        if isinstance(cache, dict):
+            hit = cache.get(aid)
+            if isinstance(hit, dict):
+                return hit
+        from app.services.phase2_modules_service import normalize_asset
+        from app.services.repository import fetch_by_id
+
+        raw = fetch_by_id("assets", aid)
+        if isinstance(raw, dict):
+            asset = normalize_asset(raw)
             _put_asset_in_modal_cache(aid, asset)
             return asset
-    return None
+        for row in load_assets():
+            if str(row.get("id") or "").strip() == aid:
+                asset = normalize_asset(row)
+                _put_asset_in_modal_cache(aid, asset)
+                return asset
+        return None
 
 
 def _open_assets_detail_modal(

@@ -112,6 +112,13 @@ def _render_collapse_toggle(*, collapsed: bool) -> None:
 
 
 def render_sidebar(active_slug: str) -> None:
+    from app.perf_debug import perf_span
+
+    with perf_span("sidebar.render"):
+        _render_sidebar_body(active_slug)
+
+
+def _render_sidebar_body(active_slug: str) -> None:
     apply_pending_sidebar_collapse()
     role = normalize_role(effective_role())
     field_mode = bool(st.session_state.get("ips_field_mode"))
