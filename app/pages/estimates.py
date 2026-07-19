@@ -82,7 +82,7 @@ from app.components.table_filters import (
     clear_table_filters,
     render_table_header_cell,
 )
-from app.components.table_pagination import reset_table_page
+from app.components.table_pagination import pagination_meta, reset_table_page
 from app.pages._core._crud import apply_persist_feedback, is_demo_id
 from app.pages._core._session import select_key
 from app.services.estimate_detail_service import (
@@ -1876,9 +1876,31 @@ def _render_estimates_catalog_fragment() -> None:
 
     view = str(st.session_state.get("estimates_view") or _ESTIMATES_DEFAULT_VIEW)
     search = str(st.session_state.get("estimates_search") or "").strip()
-    est_page = list_estimates_page(view=view, search=search, table_key=_TABLE_KEY)
+    page_num, page_size, _total_pages = pagination_meta(0, _TABLE_KEY)
+    est_page = list_estimates_page(
+        view=view,
+        search=search,
+        page=page_num,
+        page_size=page_size,
+        table_key=_TABLE_KEY,
+    )
     if sanitize_column_filters(_TABLE_KEY, est_page.filter_options, filter_fields=_ESTIMATE_BAR_FILTER_FIELDS):
-        est_page = list_estimates_page(view=view, search=search, table_key=_TABLE_KEY)
+        est_page = list_estimates_page(
+            view=view,
+            search=search,
+            page=page_num,
+            page_size=page_size,
+            table_key=_TABLE_KEY,
+        )
+    page_num, page_size, _total_pages = pagination_meta(est_page.total_count, _TABLE_KEY)
+    if page_num != est_page.page or page_size != est_page.page_size:
+        est_page = list_estimates_page(
+            view=view,
+            search=search,
+            page=page_num,
+            page_size=page_size,
+            table_key=_TABLE_KEY,
+        )
 
     summary = est_page.summary
     render_estimates_summary_cards(
