@@ -139,6 +139,8 @@ body.ips-page-loading section[data-testid="stMain"] {{
   let active = false;
   let hideTimer = null;
   let layoutTimer = null;
+  let failSafeTimer = null;
+  const MAX_LOADING_MS = 10000;
 
   function setActive(on) {
     const nodes = ensureNodes();
@@ -147,7 +149,12 @@ body.ips-page-loading section[data-testid="stMain"] {{
     nodes.bar.classList.toggle("ips-active", active);
     nodes.badge.classList.toggle("ips-active", active);
     doc.body.classList.toggle("ips-page-loading", active);
-    if (active) layoutNodes();
+    if (active) {
+      layoutNodes();
+    } else if (failSafeTimer) {
+      clearTimeout(failSafeTimer);
+      failSafeTimer = null;
+    }
   }
 
   function showLoading() {
@@ -155,7 +162,31 @@ body.ips-page-loading section[data-testid="stMain"] {{
       clearTimeout(hideTimer);
       hideTimer = null;
     }
+    if (failSafeTimer) {
+      clearTimeout(failSafeTimer);
+      failSafeTimer = null;
+    }
     setActive(true);
+    failSafeTimer = setTimeout(function () {
+      failSafeTimer = null;
+      setActive(false);
+    }, MAX_LOADING_MS);
+  }
+
+  function shouldSkipLoadingIndicator(target) {
+    if (!target || !target.closest) return true;
+    const anchor = target.closest("a[href]");
+    if (anchor) {
+      const href = (anchor.getAttribute("href") || "").trim();
+      if (href.startsWith("#")) return true;
+      if (anchor.target === "_blank" && href) return true;
+      if (href && !href.startsWith("javascript:") && anchor.getAttribute("download") != null) {
+        return true;
+      }
+    }
+    if (target.closest('[data-testid="stFragment"]')) return true;
+    if (target.closest('[data-testid="stDialog"]')) return true;
+    return false;
   }
 
   function scheduleHide(delay) {
@@ -191,6 +222,7 @@ body.ips-page-loading section[data-testid="stMain"] {{
   doc.addEventListener(
     "click",
     function (event) {
+      if (shouldSkipLoadingIndicator(event.target)) return;
       if (isInteractive(event.target)) showLoading();
     },
     true
@@ -199,6 +231,7 @@ body.ips-page-loading section[data-testid="stMain"] {{
   doc.addEventListener(
     "change",
     function (event) {
+      if (shouldSkipLoadingIndicator(event.target)) return;
       if (isInteractive(event.target)) showLoading();
     },
     true

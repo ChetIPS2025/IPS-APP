@@ -17,6 +17,7 @@ from app.auth import (
     CURRENT_USER_PROFILE_KEY,
     IPS_CURRENT_USER_FULL_NAME_KEY,
     _clear_cached_identity_keys,
+    _mark_auth_verified,
     _persist_auth_tokens,
     _sync_current_user_snapshot,
     current_user_display_name,
@@ -90,10 +91,10 @@ class TestAuthUserSession(unittest.TestCase):
         self.assertEqual(st.session_state["auth_profile"]["full_name"], "Chet Breaux")
         self.assertEqual(st.session_state[IPS_CURRENT_USER_FULL_NAME_KEY], "Chet Breaux")
 
-    @patch("app.auth.ensure_authenticated_user_identity")
+    @patch("app.auth._live_auth_user_from_client")
     def test_current_user_display_name_uses_loaded_profile_only(
         self,
-        ensure_mock,
+        live_mock,
     ) -> None:
         st.session_state["auth_user"] = SimpleNamespace(id="auth-chet")
         st.session_state[CURRENT_USER_ID_KEY] = "auth-chet"
@@ -103,9 +104,10 @@ class TestAuthUserSession(unittest.TestCase):
             "full_name": "Chet Breaux",
             "email": "chet@example.com",
         }
+        _mark_auth_verified("auth-chet")
 
         self.assertEqual(current_user_display_name(), "Chet Breaux")
-        ensure_mock.assert_called()
+        live_mock.assert_not_called()
 
     def test_sign_out_clears_user_snapshot(self) -> None:
         st.session_state["auth_user"] = SimpleNamespace(id="auth-amanda")
@@ -185,16 +187,14 @@ class TestAuthUserSession(unittest.TestCase):
 
     @patch("app.auth.st.stop")
     @patch("app.auth.ensure_authenticated_user_identity")
-    @patch("app.auth._live_auth_user_from_client")
     @patch("app.auth.is_authenticated", return_value=True)
     def test_verify_identity_binding_stops_on_profile_mismatch(
         self,
         _auth_mock,
-        live_user_mock,
         ensure_mock,
         stop_mock,
     ) -> None:
-        live_user_mock.return_value = SimpleNamespace(id="auth-chet", email="chet@example.com")
+        ensure_mock.side_effect = [True, True]
         st.session_state["auth_user"] = SimpleNamespace(id="auth-chet", email="chet@example.com")
         st.session_state[AUTH_USER_ID_KEY] = "auth-chet"
         st.session_state["auth_profile"] = {
@@ -203,6 +203,10 @@ class TestAuthUserSession(unittest.TestCase):
         }
         verify_identity_binding_or_stop()
         stop_mock.assert_called_once()
+        ensure_mock.assert_any_call(
+            force_profile_reload=True,
+            force_live_verification=True,
+        )
 
 
 class TestPerSessionSupabaseClient(unittest.TestCase):
