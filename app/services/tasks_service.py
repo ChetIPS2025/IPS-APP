@@ -236,6 +236,9 @@ def count_open_subjobs_by_job_ids(job_ids: list[str]) -> dict[str, int]:
 
 def clear_tasks_cache() -> None:
     """Invalidate cached task reads after inline edits."""
+    from app.services.tasks_cache import invalidate_tasks_cache
+
+    invalidate_tasks_cache()
     import streamlit as st
 
     st.session_state.pop("_ips_tasks_by_job_index", None)
@@ -302,5 +305,7 @@ def update_task(task_id: str, update_data: dict[str, Any]) -> ServiceResult:
         return ServiceResult(ok=True)
     result = update_row("todos", payload, {"id": tid})
     if result.ok:
-        clear_tasks_cache()
+        from app.services.tasks_cache import finalize_task_write
+
+        finalize_task_write(tid, job_id=str(payload.get("job_id") or update_data.get("job_id") or "") or None)
     return result
