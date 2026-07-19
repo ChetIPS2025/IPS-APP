@@ -81,17 +81,9 @@ __all__ = [
 
 
 def clear_inventory_cache() -> None:
-    from app.perf_debug import perf_span
-    with perf_span("inventory.clear_cache"):
-        from app.services.repository import clear_data_cache_for_table
-        clear_data_cache_for_table("inventory_items")
-        clear_inventory_image_url_cache()
-        try:
-            from app.services.pricing_guide_images import clear_catalog_image_maps_cache
+    from app.services.inventory_directory_service import invalidate_inventory_directory_cache
 
-            clear_catalog_image_maps_cache()
-        except ImportError:
-            pass
+    invalidate_inventory_directory_cache()
 
 
 def can_manage_inventory_actions() -> bool:
@@ -567,3 +559,21 @@ def get_inventory_transactions(
         })
     out.sort(key=lambda r: str(r.get("created_at") or ""), reverse=True)
     return out
+
+
+def get_inventory_transactions_page(
+    *,
+    inventory_id: str,
+    page: int = 1,
+    page_size: int = 25,
+) -> tuple[list[dict[str, Any]], int]:
+    """Paginated transaction history for one inventory item."""
+    iid = str(inventory_id or "").strip()
+    if not iid:
+        return [], 0
+    all_rows = get_inventory_transactions(inventory_id=iid, limit=500)
+    total = len(all_rows)
+    page_num = max(1, int(page or 1))
+    size = max(1, int(page_size or 25))
+    start = (page_num - 1) * size
+    return all_rows[start : start + size], total

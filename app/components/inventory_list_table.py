@@ -124,11 +124,23 @@ def _inventory_link_html(
     *,
     extra_class: str = "",
     bridge_key: str = "",
+    use_native_link: bool = True,
+    tab: str = "",
 ) -> str:
-    item_id = html.escape(str(iid or "").strip(), quote=True)
+    item_id_raw = str(iid or "").strip()
+    item_id = html.escape(item_id_raw, quote=True)
     text = html.escape(label)
     title = html.escape(label, quote=True)
+    aria = html.escape(f"Open inventory item details for {label}", quote=True)
     cls = f"ips-row-open-link ips-dash-est-link ips-inventory-desc-link ips-inventory-open-link {extra_class}".strip()
+    if use_native_link and item_id_raw:
+        from app.components.inventory_directory_table import inventory_detail_href
+
+        href = html.escape(inventory_detail_href(item_id_raw, tab=tab), quote=True)
+        return (
+            f'<a class="{html.escape(cls)}" href="{href}" target="_self" '
+            f'aria-label="{aria}" title="{title}">{text}</a>'
+        )
     bridge_attr = ""
     if bridge_key:
         bridge_attr = f' data-bridge-key="{html.escape(bridge_key, quote=True)}"'
