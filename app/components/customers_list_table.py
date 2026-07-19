@@ -8,6 +8,8 @@ from typing import Any
 
 import streamlit as st
 
+from app.components.customers_directory_table import customer_name_link_html
+
 CUSTOMERS_TABLE_LAST_ACTION_KEY = "customers_list_last_action"
 
 
@@ -24,17 +26,15 @@ CUSTOMERS_TABLE_HEADERS: tuple[tuple[str, str], ...] = (
     ("open_jobs", "OPEN JOBS"),
     ("open_estimates", "OPEN ESTIMATES"),
     ("status", "STATUS"),
-    ("actions", "ACTIONS"),
 )
 
 CUSTOMERS_TABLE_COL_WIDTHS_PX: dict[str, int] = {
     "avatar": 64,
-    "customer": 240,
+    "customer": 280,
     "contacts": 96,
     "open_jobs": 104,
     "open_estimates": 128,
     "status": 108,
-    "actions": 88,
 }
 
 
@@ -174,12 +174,7 @@ def build_customers_html_table(rows: list[dict[str, Any]]) -> str:
                 "customer",
                 "left",
                 _cell_wrapper(
-                    _customer_link_html(
-                        cid,
-                        desc_label,
-                        extra_class="ips-dash-est-desc-link",
-                        bridge_key=bridge_key,
-                    ),
+                    customer_name_link_html(cid, desc_label),
                     extra_class="ips-dash-est-desc-cell",
                 ),
             ),
@@ -204,19 +199,6 @@ def build_customers_html_table(rows: list[dict[str, Any]]) -> str:
                 _cell_wrapper(
                     customer_status_pill_html(status),
                     extra_class="ips-dash-est-status-cell",
-                    align="center",
-                ),
-            ),
-            (
-                "actions",
-                "center",
-                _cell_wrapper(
-                    _customer_link_html(
-                        cid,
-                        "View",
-                        extra_class="ips-customers-action-link",
-                        bridge_key=bridge_key,
-                    ),
                     align="center",
                 ),
             ),

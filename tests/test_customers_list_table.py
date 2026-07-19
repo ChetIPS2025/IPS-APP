@@ -27,13 +27,19 @@ def test_customer_status_pill_html_includes_class():
     assert "Active" in html_out
 
 
-def test_customer_link_html_uses_open_span():
-    html_out = _customer_link_html("cust-1", "Acme Corp", extra_class="ips-dash-est-desc-link")
-    assert 'role="button"' in html_out
-    assert 'data-cust-action="open"' in html_out
-    assert 'data-customer-id="cust-1"' in html_out
-    assert "ips-customers-open-link" in html_out
+def test_customer_name_link_uses_native_anchor():
+    from app.components.customers_directory_table import customer_name_link_html
+
+    html_out = customer_name_link_html("cust-1", "Acme Corp")
+    assert "<a " in html_out
+    assert 'target="_self"' in html_out
+    assert "customer_detail=cust-1" in html_out
     assert "Acme Corp" in html_out
+
+
+def test_customer_link_html_legacy_span_still_exists_for_bridge_compat():
+    html_out = _customer_link_html("cust-1", "Acme Corp", extra_class="ips-dash-est-desc-link")
+    assert 'data-cust-action="open"' in html_out
 
 
 def test_customer_initials_from_name():
@@ -63,10 +69,9 @@ def test_build_customers_html_table_includes_columns_and_link():
     assert "ips-customers-html-list-table" in html_out
     assert "CUSTOMER" in html_out
     assert "OPEN JOBS" in html_out
-    assert "ACTIONS" in html_out
-    assert 'data-cust-action="open"' in html_out
-    assert 'data-customer-id="cust-1"' in html_out
+    assert "customer_detail=cust-1" in html_out
     assert "Acme Corp" in html_out
+    assert 'data-cust-action="open"' not in html_out
     assert customer_name(rows[0]) == "Acme Corp"
 
 
