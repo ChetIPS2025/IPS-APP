@@ -26,13 +26,14 @@ def test_inventory_status_pill_html_includes_class():
     assert "In Stock" in html_out
 
 
-def test_inventory_link_html_uses_open_button():
+def test_inventory_link_html_uses_native_anchor():
     html_out = _inventory_link_html("inv-1", "Copper fitting", extra_class="ips-dash-est-desc-link")
-    assert '<button type="button"' in html_out
-    assert 'data-inv-action="open"' in html_out
-    assert 'data-inventory-id="inv-1"' in html_out
-    assert "ips-inventory-open-link" in html_out
+    assert "<a " in html_out
+    assert 'target="_self"' in html_out
+    assert "inventory_detail=inv-1" in html_out
     assert "Copper fitting" in html_out
+    assert "ips-inventory-open-link" in html_out
+    assert "<button" not in html_out
 
 
 def test_inventory_thumb_link_html_wraps_thumbnail():
