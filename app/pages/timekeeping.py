@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import time
+from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from typing import Any
 from urllib.parse import urlencode
@@ -99,6 +100,19 @@ _TIMEKEEPING_NAV_SLUG = "timekeeping"
 _TIMEKEEPING_DAY_EMPLOYEE_QUERY_KEY = "tk_employee"
 _TIMEKEEPING_DAY_DATE_QUERY_KEY = "tk_date"
 _TIMEKEEPING_DAY_TIMECARD_QUERY_KEY = "tk_timecard"
+_TIMEKEEPING_DETAIL_TAB_KEY = "ips_timekeeping_detail_tab"
+_TK_DETAIL_TAB_EMP_KEY = "ips_timekeeping_detail_tab_employee"
+_TK_DETAIL_TAB_REQUEST_KEY = "ips_timekeeping_detail_tab_request"
+_TIMEKEEPING_DETAIL_TABS = (
+    "Weekly Timecard",
+    "Daily Entries",
+    "Approval",
+    "Notes",
+    "Activity",
+)
+_TK_PERMISSIONS_KEY = "ips_timekeeping_permissions"
+_TK_PERMISSIONS_FP_KEY = "ips_timekeeping_permissions_fp"
+_TK_WEEKEND_COUNTS_KEY = "ips_timekeeping_weekend_counts_toward_40"
 _EXPANDED_TIMECARD_KEY = "ips_timekeeping_expanded_id"
 _TS_EXPAND = 32
 _TS_EMPLOYEE = 180
@@ -519,13 +533,16 @@ def _recalculate_visible_week_totals(week_start_d: date) -> None:
 
 def _ensure_week_days_by_employee(week_start_d: date) -> dict[str, list[dict[str, Any]]]:
     """Batch-load day rows for the active week once per session/week."""
+    from app.perf_debug import perf_span
+
     sig = week_start_d.isoformat()
     if st.session_state.get(_TK_WEEK_DAYS_SIG_KEY) == sig:
         cached = st.session_state.get(_TK_WEEK_DAYS_KEY)
         if isinstance(cached, dict):
             return cached
-    from app.services.timekeeping_service import list_timekeeping_days_for_week
-    rows = list_timekeeping_days_for_week(week_start_d)
+    with perf_span("timekeeping.week_days_batch"):
+        from app.services.timekeeping_service import list_timekeeping_days_for_week
+        rows = list_timekeeping_days_for_week(week_start_d)
     by_eid: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
         eid = str(row.get("employee_id") or "").strip()
@@ -862,19 +879,6 @@ def _day_is_editable(status: str) -> bool:
     return _normalize_timecard_status(status) in ("Draft", "Rejected")
 
 
-def _can_admin_edit_approved_timekeeping() -> bool:
-    from app.auth import effective_role
-    from app.utils.permissions import can_admin_edit_approved_timekeeping
-    return can_admin_edit_approved_timekeeping(effective_role())
-
-
-def _can_override_overtime_allocation() -> bool:
-    """Only administrators may manually change calculated S/T vs O/T."""
-    from app.auth import effective_role
-    from app.utils.permissions import normalize_role
-    return normalize_role(effective_role()) == "admin"
-
-
 def _day_hours_editable(day_status: str, week_status: str) -> bool:
     """Whether list-row / allocation hours may be edited for this day."""
     if not _can_submit_timekeeping():
@@ -975,28 +979,142 @@ def _db_status_for_save(status: str) -> str:
     return "Pending"
 
 
+@dataclass(frozen=True)
+class TimekeepingPermissions:
+    role: str
+    can_submit: bool
+    can_approve: bool
+    can_edit_approved: bool
+    can_override_overtime: bool
+    can_access_jobs: bool
+
+
+def _permissions_fingerprint() -> str:
+    from app.auth import AUTH_USER_ID_KEY, CURRENT_USER_PROFILE_KEY
+    from app.utils.view_as import is_view_as_active, view_as_mode
+
+    prof = (
+        st.session_state.get("auth_profile")
+        or st.session_state.get(CURRENT_USER_PROFILE_KEY)
+        or {}
+    )
+    uid = str(
+        st.session_state.get(AUTH_USER_ID_KEY)
+        or prof.get("id")
+        or prof.get("user_id")
+        or ""
+    ).strip()
+    view_as = (
+        f"{is_view_as_active()}:{view_as_mode()}"
+        if is_view_as_active()
+        else ""
+    )
+    return f"{uid}|{view_as}"
+
+
+def _build_timekeeping_permissions() -> TimekeepingPermissions:
+    from app.auth import effective_role
+    from app.utils.permissions import (
+        can_admin_edit_approved_timekeeping,
+        can_approve_timekeeping,
+        can_submit_timekeeping,
+        normalize_role,
+        role_can_access_page,
+    )
+
+    role = str(effective_role() or "").strip()
+    norm = normalize_role(role)
+    return TimekeepingPermissions(
+        role=role,
+        can_submit=can_submit_timekeeping(role),
+        can_approve=can_approve_timekeeping(role),
+        can_edit_approved=can_admin_edit_approved_timekeeping(role),
+        can_override_overtime=norm == "admin",
+        can_access_jobs=role_can_access_page(role, "jobs"),
+    )
+
+
+def _timekeeping_permissions(*, force: bool = False) -> TimekeepingPermissions:
+    fp = _permissions_fingerprint()
+    if not force:
+        if st.session_state.get(_TK_PERMISSIONS_FP_KEY) == fp:
+            snap = st.session_state.get(_TK_PERMISSIONS_KEY)
+            if isinstance(snap, TimekeepingPermissions):
+                return snap
+    snap = _build_timekeeping_permissions()
+    st.session_state[_TK_PERMISSIONS_KEY] = snap
+    st.session_state[_TK_PERMISSIONS_FP_KEY] = fp
+    return snap
+
+
+def clear_timekeeping_permissions_snapshot() -> None:
+    st.session_state.pop(_TK_PERMISSIONS_KEY, None)
+    st.session_state.pop(_TK_PERMISSIONS_FP_KEY, None)
+    st.session_state.pop(_TK_WEEKEND_COUNTS_KEY, None)
+
+
+def _init_timekeeping_render_context() -> TimekeepingPermissions:
+    from app.perf_debug import perf_span
+
+    st.session_state.pop(_TK_WEEKEND_COUNTS_KEY, None)
+    with perf_span("timekeeping.permissions"):
+        perms = _timekeeping_permissions(force=True)
+    _load_weekend_counts_toward_40()
+    return perms
+
+
+def _cached_auth_profile() -> dict[str, Any]:
+    from app.auth import CURRENT_USER_PROFILE_KEY
+
+    prof = (
+        st.session_state.get("auth_profile")
+        or st.session_state.get(CURRENT_USER_PROFILE_KEY)
+        or {}
+    )
+    return dict(prof) if isinstance(prof, dict) else {}
+
+
 def _current_user_id() -> str | None:
-    from app.auth import current_profile
-    uid = str(current_profile().get("id") or "").strip()
+    prof = _cached_auth_profile()
+    uid = str(prof.get("id") or prof.get("user_id") or "").strip()
     return uid or None
 
 
 def _current_user_name() -> str:
-    from app.auth import current_profile
-    profile = current_profile()
-    return str(profile.get("name") or profile.get("email") or "User").strip() or "User"
+    prof = _cached_auth_profile()
+    return str(prof.get("name") or prof.get("email") or "User").strip() or "User"
 
 
 def _can_approve_timekeeping() -> bool:
-    from app.auth import effective_role
-    from app.utils.permissions import can_approve_timekeeping
-    return can_approve_timekeeping(effective_role())
+    return _timekeeping_permissions().can_approve
 
 
 def _can_submit_timekeeping() -> bool:
-    from app.auth import effective_role
-    from app.utils.permissions import can_submit_timekeeping
-    return can_submit_timekeeping(effective_role())
+    return _timekeeping_permissions().can_submit
+
+
+def _can_admin_edit_approved_timekeeping() -> bool:
+    return _timekeeping_permissions().can_edit_approved
+
+
+def _can_override_overtime_allocation() -> bool:
+    return _timekeeping_permissions().can_override_overtime
+
+
+def _load_weekend_counts_toward_40() -> bool:
+    from app.services.company_settings_service import load_app_settings
+
+    settings = load_app_settings()
+    value = bool(settings.get("timekeeping_weekend_counts_toward_40"))
+    st.session_state[_TK_WEEKEND_COUNTS_KEY] = value
+    return value
+
+
+def _weekend_counts_toward_40() -> bool:
+    cached = st.session_state.get(_TK_WEEKEND_COUNTS_KEY)
+    if isinstance(cached, bool):
+        return cached
+    return _load_weekend_counts_toward_40()
 
 
 def _handle_day_submit_for_date(emp: dict, week_start_d: date, work_date: str) -> bool:
@@ -1265,12 +1383,6 @@ def _alloc_time_type_hint_html(line: dict[str, Any], iso: str) -> str:
         f"{f' ({html.escape(reason)})' if reason else ''}"
         f"</div>"
     )
-
-
-def _weekend_counts_toward_40() -> bool:
-    from app.services.company_settings_service import load_app_settings
-    settings = load_app_settings()
-    return bool(settings.get("timekeeping_weekend_counts_toward_40"))
 
 
 def _overtime_meta_from_db_row(row: dict[str, Any]) -> dict[str, Any]:
@@ -3577,9 +3689,68 @@ def _on_timecard_checkbox_change(timecard_id: str, all_timecard_ids: list[str]) 
         st.session_state[SELECTED_TIMECARD_KEY] = timecard_id
         st.session_state[SHOW_TIMECARD_MODAL_KEY] = True
         st.session_state[_MODAL_KEY] = timecard_id
+        _prepare_timecard_detail_modal(timecard_id)
     elif st.session_state.get(SELECTED_TIMECARD_KEY) == timecard_id:
         st.session_state[SELECTED_TIMECARD_KEY] = None
         st.session_state[SHOW_TIMECARD_MODAL_KEY] = False
+
+
+def _prepare_timecard_detail_modal(
+    timecard_id: str,
+    *,
+    requested_tab: str | None = None,
+) -> None:
+    tid = str(timecard_id or "").strip()
+    if not tid:
+        return
+    if requested_tab and requested_tab in _TIMEKEEPING_DETAIL_TABS:
+        st.session_state[_TK_DETAIL_TAB_REQUEST_KEY] = requested_tab
+    prev_tid = str(st.session_state.get(_TK_DETAIL_TAB_EMP_KEY) or "")
+    if prev_tid and prev_tid != tid and not requested_tab:
+        st.session_state[_TIMEKEEPING_DETAIL_TAB_KEY] = "Weekly Timecard"
+
+
+def _timecard_detail_modal_pending() -> bool:
+    return bool(
+        st.session_state.get(SELECTED_TIMECARD_KEY)
+        and st.session_state.get(SHOW_TIMECARD_MODAL_KEY)
+    )
+
+
+def _ensure_selected_timecard_modal_cache(week_start_d: date) -> bool:
+    tid = str(st.session_state.get(SELECTED_TIMECARD_KEY) or "").strip()
+    if not tid:
+        return False
+    cache = st.session_state.get(_CACHE_KEY)
+    if isinstance(cache, dict) and isinstance(cache.get(tid), dict):
+        return True
+    summaries = _filter_summaries_for_field_user(load_timekeeping_summaries(week_start_d))
+    for row in summaries:
+        built = _build_timecard_row(row, week_start_d)
+        if str(built.get("timecard_id") or "") == tid:
+            st.session_state[_CACHE_KEY] = {tid: built}
+            return True
+    return False
+
+
+def _sync_timekeeping_detail_tab(emp: dict) -> None:
+    tid = str(
+        st.session_state.get(SELECTED_TIMECARD_KEY)
+        or st.session_state.get(_MODAL_KEY)
+        or ""
+    ).strip()
+    eid = str(emp.get("employee_id") or emp.get("id") or "").strip()
+    tab_key = tid or eid
+    explicit = str(st.session_state.pop(_TK_DETAIL_TAB_REQUEST_KEY, "") or "").strip()
+    prev = str(st.session_state.get(_TK_DETAIL_TAB_EMP_KEY) or "")
+    if explicit in _TIMEKEEPING_DETAIL_TABS:
+        st.session_state[_TIMEKEEPING_DETAIL_TAB_KEY] = explicit
+    elif prev and tab_key and prev != tab_key:
+        st.session_state[_TIMEKEEPING_DETAIL_TAB_KEY] = "Weekly Timecard"
+    elif _TIMEKEEPING_DETAIL_TAB_KEY not in st.session_state:
+        st.session_state[_TIMEKEEPING_DETAIL_TAB_KEY] = "Weekly Timecard"
+    if tab_key:
+        st.session_state[_TK_DETAIL_TAB_EMP_KEY] = tab_key
 
 
 def _clear_timecard_modal() -> None:
@@ -3705,14 +3876,20 @@ def _render_weekly_grid_readonly(emp: dict, week_start_d: date) -> None:
             )
 
 
-def _render_weekly_grid_edit(emp: dict, week_start_d: date) -> None:
+def _render_weekly_grid_edit(
+    emp: dict,
+    week_start_d: date,
+    *,
+    perms: TimekeepingPermissions | None = None,
+) -> None:
+    perms = perms or _timekeeping_permissions()
     eid = str(emp.get("id") or emp.get("employee_id") or "")
     gk = _grid_key(eid)
     week_sig = week_start_d.isoformat()
     grid = _ensure_weekly_grid(emp, week_start_d)
     job_opts = _assignment_options_for_timekeeping(week_start_d=week_start_d)
-    can_approve = _can_approve_timekeeping()
-    can_submit = _can_submit_timekeeping()
+    can_approve = perms.can_approve
+    can_submit = perms.can_submit
 
     st.markdown(
         '<span class="ips-time-day-edit-marker timekeeping-detail-grid-marker timekeeping-detail-grid-edit" '
@@ -4183,6 +4360,7 @@ def _render_inline_daily_entries(row: dict, week_start_d: date) -> None:
             st.session_state[SELECTED_TIMECARD_KEY] = timecard_id
             st.session_state[SHOW_TIMECARD_MODAL_KEY] = True
             st.session_state[_MODAL_KEY] = timecard_id
+            _prepare_timecard_detail_modal(timecard_id)
             _timekeeping_app_rerun()
 
 
@@ -4199,9 +4377,15 @@ def _render_timekeeping_expand_fragment(row: dict, week_start_d: date) -> None:
         _render_inline_daily_entries(row, week_start_d)
 
 
-def _render_daily_entries_tab(emp: dict, week_start_d: date) -> None:
+def _render_daily_entries_tab(
+    emp: dict,
+    week_start_d: date,
+    *,
+    perms: TimekeepingPermissions | None = None,
+) -> None:
+    perms = perms or _timekeeping_permissions()
     week_status = _resolved_week_status(emp, week_start_d)
-    admin_edit = _can_admin_edit_approved_timekeeping()
+    admin_edit = perms.can_edit_approved
     if week_status == "Approved" and not admin_edit:
         _render_weekly_grid_readonly(emp, week_start_d)
         st.info("This week is approved and locked.")
@@ -4209,7 +4393,7 @@ def _render_daily_entries_tab(emp: dict, week_start_d: date) -> None:
 
     if week_status == "Approved" and admin_edit:
         st.warning("Administrator edit mode — approved days can be corrected here.")
-    _render_weekly_grid_edit(emp, week_start_d)
+    _render_weekly_grid_edit(emp, week_start_d, perms=perms)
     action_left, action_right = st.columns([1, 1])
     record_key = record_session_key(emp, "id")
     with action_left:
@@ -4217,7 +4401,7 @@ def _render_daily_entries_tab(emp: dict, week_start_d: date) -> None:
             if _save_timekeeping_week(emp, week_start_d):
                 fragment_rerun()
     with action_right:
-        if _can_submit_timekeeping() and week_status in ("Draft", "Rejected") and st.button(
+        if perms.can_submit and week_status in ("Draft", "Rejected") and st.button(
             "Submit All for Approval",
             key=f"tk_submit_{record_key}",
         ):
@@ -4228,7 +4412,13 @@ def _render_daily_entries_tab(emp: dict, week_start_d: date) -> None:
     )
 
 
-def _render_approval_tab(emp: dict, week_start_d: date) -> None:
+def _render_approval_tab(
+    emp: dict,
+    week_start_d: date,
+    *,
+    perms: TimekeepingPermissions | None = None,
+) -> None:
+    perms = perms or _timekeeping_permissions()
     status = _resolved_week_status(emp, week_start_d)
     approved_at = str(emp.get("approved_at") or "").strip()
     notes = str(emp.get("notes") or "").strip()
@@ -4246,7 +4436,7 @@ def _render_approval_tab(emp: dict, week_start_d: date) -> None:
         unsafe_allow_html=True,
     )
 
-    if status == "Pending" and _can_approve_timekeeping():
+    if status == "Pending" and perms.can_approve:
         reject_notes = st.text_area(
             "Rejection notes (optional)",
             key=f"tk_reject_notes_{record_session_key(emp, 'id')}",
@@ -4273,46 +4463,63 @@ def _render_approval_tab(emp: dict, week_start_d: date) -> None:
 
 
 @fragment
-def _render_timekeeping_detail_tabs_fragment(emp: dict, week_start_d: date) -> None:
+def _render_timekeeping_detail_tabs_fragment(
+    emp: dict,
+    week_start_d: date,
+    *,
+    perms: TimekeepingPermissions | None = None,
+) -> None:
     """Timecard modal tabs — local reruns for hour edits and allocation saves."""
-    _render_timekeeping_view_tabs(emp, week_start_d)
+    _render_timekeeping_view_tabs(emp, week_start_d, perms=perms)
 
 
-def _render_timekeeping_view_tabs(emp: dict, week_start_d: date) -> None:
-    st_total, ot_total, dt_total, total = _emp_totals(emp)
+def _render_timekeeping_view_tabs(
+    emp: dict,
+    week_start_d: date,
+    *,
+    perms: TimekeepingPermissions | None = None,
+) -> None:
+    from app.components.tabs import render_tabs
+    from app.perf_debug import perf_span
+
+    perms = perms or _timekeeping_permissions()
+    _sync_timekeeping_detail_tab(emp)
+    st_total, ot_total, _dt_total, total = _emp_totals(emp)
     status = _resolved_week_status(emp, week_start_d)
-    tab_weekly, tab_daily, tab_approval, tab_notes, tab_activity = st.tabs(
-        ["Weekly Timecard", "Daily Entries", "Approval", "Notes", "Activity"]
+
+    active_tab = render_tabs(
+        list(_TIMEKEEPING_DETAIL_TABS),
+        session_key=_TIMEKEEPING_DETAIL_TAB_KEY,
+        default="Weekly Timecard",
     )
 
-    with tab_weekly:
-        overview_html = (
-            '<div class="ips-detail-grid">'
-            f"{detail_field_html('Employee', emp.get('name') or emp.get('employee_name'))}"
-            f"{detail_field_html('Department', emp.get('department'))}"
-            f'{detail_field_html("Status", status, html_value=_timecard_status_pill_html(status))}'
-            f"{detail_field_html('Week', f'{fmt_date(week_start_d)} – {fmt_date(week_end(week_start_d))}')}"
-            f"{detail_field_html('ST Total', _fmt_table_hours(st_total))}"
-            f"{detail_field_html('OT Total', _fmt_table_hours(ot_total))}"
-            f"{detail_field_html('Total Hours', _fmt_table_hours(total))}"
-            "</div>"
-        )
-        st.markdown(dialog_card_html("Week Summary", overview_html), unsafe_allow_html=True)
-
-    with tab_daily:
-        _render_daily_entries_tab(emp, week_start_d)
-
-    with tab_approval:
-        _render_approval_tab(emp, week_start_d)
-
-    with tab_notes:
+    if active_tab == "Weekly Timecard":
+        with perf_span("timekeeping.modal.summary"):
+            overview_html = (
+                '<div class="ips-detail-grid">'
+                f"{detail_field_html('Employee', emp.get('name') or emp.get('employee_name'))}"
+                f"{detail_field_html('Department', emp.get('department'))}"
+                f'{detail_field_html("Status", status, html_value=_timecard_status_pill_html(status))}'
+                f"{detail_field_html('Week', f'{fmt_date(week_start_d)} – {fmt_date(week_end(week_start_d))}')}"
+                f"{detail_field_html('ST Total', _fmt_table_hours(st_total))}"
+                f"{detail_field_html('OT Total', _fmt_table_hours(ot_total))}"
+                f"{detail_field_html('Total Hours', _fmt_table_hours(total))}"
+                "</div>"
+            )
+            st.markdown(dialog_card_html("Week Summary", overview_html), unsafe_allow_html=True)
+    elif active_tab == "Daily Entries":
+        with perf_span("timekeeping.modal.daily_entries"):
+            _render_daily_entries_tab(emp, week_start_d, perms=perms)
+    elif active_tab == "Approval":
+        with perf_span("timekeeping.modal.approval"):
+            _render_approval_tab(emp, week_start_d, perms=perms)
+    elif active_tab == "Notes":
         note_text = str(emp.get("notes") or "").strip()
         if note_text:
             st.markdown(dialog_card_html("Notes", detail_field_html("Notes", note_text)), unsafe_allow_html=True)
         else:
             placeholder_html("No notes on this timecard yet.")
-
-    with tab_activity:
+    elif active_tab == "Activity":
         activity_lines: list[str] = []
         if approved_at := str(emp.get("approved_at") or "").strip():
             activity_lines.append(f"{fmt_date(approved_at)} — Status changed to {status}")
@@ -4325,7 +4532,13 @@ def _render_timekeeping_view_tabs(emp: dict, week_start_d: date) -> None:
             placeholder_html("Activity will appear after approval actions are recorded.")
 
 
-def render_timekeeping_detail_dialog(emp: dict, week_start_d: date) -> None:
+def render_timekeeping_detail_dialog(
+    emp: dict,
+    week_start_d: date,
+    *,
+    perms: TimekeepingPermissions | None = None,
+) -> None:
+    perms = perms or _timekeeping_permissions()
     st_total, ot_total, dt_total, total = _emp_totals(emp)
     status = _resolved_week_status(emp, week_start_d)
     render_modal_shell()
@@ -4342,7 +4555,7 @@ def render_timekeeping_detail_dialog(emp: dict, week_start_d: date) -> None:
             ("Total Hours", _fmt_table_hours(total)),
         ]
     )
-    _render_timekeeping_detail_tabs_fragment(emp, week_start_d)
+    _render_timekeeping_detail_tabs_fragment(emp, week_start_d, perms=perms)
 
 
 @st.dialog("Timecard Details", width="large", on_dismiss=_clear_timecard_modal)
@@ -5165,10 +5378,13 @@ def _render_custom_timekeeping_table(
     return all_timecard_ids
 
 
-def _render_weekly_customer_timesheets_footer(filtered: list[dict] | None = None) -> None:
-    from app.auth import effective_role
-    from app.utils.permissions import role_can_access_page
-    if not role_can_access_page(effective_role(), "jobs"):
+def _render_weekly_customer_timesheets_footer(
+    filtered: list[dict] | None = None,
+    *,
+    perms: TimekeepingPermissions | None = None,
+) -> None:
+    perms = perms or _timekeeping_permissions()
+    if not perms.can_access_jobs:
         return
     st.divider()
     st.markdown("**Weekly customer timesheets**")
@@ -5209,6 +5425,8 @@ def render() -> None:
 
     _capture_timekeeping_day_query()
 
+    perms = _init_timekeeping_render_context()
+
     ws = _current_week_start()
     we = week_end(ws)
 
@@ -5234,7 +5452,7 @@ def render() -> None:
         unsafe_allow_html=True,
     )
 
-    can_enter = _can_submit_timekeeping()
+    can_enter = perms.can_submit
 
     if not can_enter:
         st.info(
@@ -5256,8 +5474,7 @@ def render() -> None:
     if is_field_context():
         from app.db import fetch_jobs_with_order_fallback
         from app.services.job_service import sort_jobs_by_number_then_name
-        from app.auth import effective_role as _tk_role
-        if _tk_role() in {"admin", "manager", "supervisor", "project manager", "pm"}:
+        if perms.role in {"admin", "manager", "supervisor", "project manager", "pm"}:
             jobs = sort_jobs_by_number_then_name(
                 list(fetch_jobs_with_order_fallback(limit=3000, use_admin=True) or [])
             )
@@ -5275,9 +5492,18 @@ def render() -> None:
             )
             if panel_ctx and not _is_narrow_viewport():
                 emp, week_start_d, iso, _row = panel_ctx
-                _render_day_time_entry_panel(emp, week_start_d, iso)
+                from app.perf_debug import perf_span
+                with perf_span("timekeeping.day_editor"):
+                    _render_day_time_entry_panel(emp, week_start_d, iso)
         show_modal_if_pending(SHOW_TIMEKEEPING_DAY_MODAL_KEY, _show_day_time_dialog)
-        _render_weekly_customer_timesheets_footer(filtered=None)
+        _render_weekly_customer_timesheets_footer(filtered=None, perms=perms)
+        return
+
+    if _timecard_detail_modal_pending():
+        _ensure_selected_timecard_modal_cache(ws)
+        if st.session_state.get(SELECTED_TIMECARD_KEY) and st.session_state.get(SHOW_TIMECARD_MODAL_KEY):
+            _show_timecard_detail_modal()
+        _render_weekly_customer_timesheets_footer(filtered=None, perms=perms)
         return
 
     summaries = _filter_summaries_for_field_user(load_timekeeping_summaries(ws))
@@ -5303,27 +5529,33 @@ def render() -> None:
                     '<span class="weekly-timekeeping-left-panel" aria-hidden="true"></span>',
                     unsafe_allow_html=True,
                 )
+                from app.perf_debug import perf_span
+                with perf_span("timekeeping.table_rows"):
+                    _render_timekeeping_table_area(
+                        filtered,
+                        filter_options=filter_options,
+                        week_start_d=ws,
+                    )
+            with panel_col:
+                emp, week_start_d, iso, _row = panel_ctx
+                from app.perf_debug import perf_span
+                with perf_span("timekeeping.day_editor"):
+                    _render_day_time_entry_panel(emp, week_start_d, iso)
+        else:
+            from app.perf_debug import perf_span
+            with perf_span("timekeeping.table_rows"):
                 _render_timekeeping_table_area(
                     filtered,
                     filter_options=filter_options,
                     week_start_d=ws,
                 )
-            with panel_col:
-                emp, week_start_d, iso, _row = panel_ctx
-                _render_day_time_entry_panel(emp, week_start_d, iso)
-        else:
-            _render_timekeeping_table_area(
-                filtered,
-                filter_options=filter_options,
-                week_start_d=ws,
-            )
 
     if st.session_state.get(SELECTED_TIMECARD_KEY) and st.session_state.get(SHOW_TIMECARD_MODAL_KEY):
         _show_timecard_detail_modal()
 
     show_modal_if_pending(SHOW_TIMEKEEPING_DAY_MODAL_KEY, _show_day_time_dialog)
 
-    _render_weekly_customer_timesheets_footer(filtered=filtered)
+    _render_weekly_customer_timesheets_footer(filtered=filtered, perms=perms)
 
 
 def render_field_time_panel(*, key_prefix: str = "ftp") -> None:
