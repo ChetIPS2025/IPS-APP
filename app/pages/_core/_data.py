@@ -859,11 +859,9 @@ def clear_jobs_catalog_cache() -> None:
 
 
 def clear_estimates_catalog_cache() -> None:
-    clear_estimates_list_cache()
-    clear_catalog_session_key("estimates")
-    _bump_estimates_catalog_data_version()
-    clear_dashboard_page_data_cache()
-    clear_customers_page_data_cache()
+    from app.services.estimates_directory_service import invalidate_estimates_directory_cache
+
+    invalidate_estimates_directory_cache()
 
 
 def clear_inventory_catalog_cache() -> None:

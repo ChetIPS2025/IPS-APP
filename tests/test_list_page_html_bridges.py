@@ -16,21 +16,21 @@ def _customers_source() -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_estimates_list_table_open_prepares_navigation_without_rerun() -> None:
-    from app.pages import estimates as estimates_page
-
-    src = inspect.getsource(estimates_page._prepare_open_estimate_table_row)
-    assert "_activate_estimate_detail_modal(" in src
-    assert "ips_app_rerun()" not in src
-
-
-def test_estimates_list_table_uses_html_bridge() -> None:
-    src = _estimates_source()
+def test_estimates_list_table_uses_native_detail_links() -> None:
+    src = _estimates_source().replace("\r\n", "\n")
     table_block = src.split("def _render_custom_estimates_table(")[1].split("def _contact_label_for_estimate")[0]
     assert "build_estimates_html_table" in table_block
-    assert "render_estimates_table_bridge" in table_block
-    assert "render_estimates_list_table_body" not in src
-    assert "render_estimates_list_table_header" not in src
+    assert "open_estimate_fn=None" in table_block
+    assert "estimate_detail_href" in src
+
+
+def test_estimates_catalog_fragment_uses_directory_service() -> None:
+    src = _estimates_source().replace("\r\n", "\n")
+    fragment_block = src.split("@fragment\ndef _render_estimates_catalog_fragment")[1].split(
+        "\ndef render("
+    )[0]
+    assert "list_estimates_page" in fragment_block
+    assert "_rerun_if_estimates_detail_pending()" not in fragment_block
 
 
 def test_customers_list_table_open_prepares_navigation_without_rerun() -> None:
@@ -59,13 +59,6 @@ def test_customers_catalog_fragment_escalates_detail_to_app_rerun() -> None:
     )[0]
     assert "_rerun_if_customers_detail_pending()" in fragment_block
 
-
-def test_estimates_catalog_fragment_escalates_detail_to_app_rerun() -> None:
-    src = _estimates_source().replace("\r\n", "\n")
-    fragment_block = src.split("@fragment\ndef _render_estimates_catalog_fragment")[1].split(
-        "\ndef render("
-    )[0]
-    assert "_rerun_if_estimates_detail_pending()" in fragment_block
 
 
 def test_estimates_approve_panel_uses_app_rerun_not_st_rerun() -> None:
