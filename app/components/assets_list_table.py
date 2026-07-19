@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import urlencode
 
 import streamlit as st
 
@@ -15,6 +16,21 @@ from app.services.phase2_modules_service import asset_is_rentable
 from app.services.status_maps import normalize_asset_status
 from app.utils.formatting import fmt_date
 ASSETS_TABLE_LAST_ACTION_KEY = "assets_list_last_action"
+_ASSETS_NAV_QUERY_KEY = "ips_nav"
+_ASSETS_NAV_SLUG = "assets"
+
+
+def asset_detail_href(asset_id: str) -> str:
+    aid = str(asset_id or "").strip()
+    if not aid:
+        return "#"
+
+    return "?" + urlencode(
+        {
+            _ASSETS_NAV_QUERY_KEY: _ASSETS_NAV_SLUG,
+            "asset_detail": aid,
+        }
+    )
 
 
 def assets_bridge_button_key(asset: dict[str, Any]) -> str:
@@ -124,32 +140,28 @@ def _asset_link_html(
     label: str,
     *,
     extra_class: str = "",
-    bridge_key: str = "",
 ) -> str:
     asset_id = html.escape(str(aid or "").strip(), quote=True)
     text = html.escape(label)
     title = html.escape(label, quote=True)
+    href = html.escape(asset_detail_href(aid), quote=True)
     cls = (
-        "ips-row-open-link ips-dash-est-link ips-inventory-desc-link ips-inventory-open-link "
+        "ips-row-open-link ips-dash-est-link ips-inventory-desc-link "
         f"ips-assets-open-link {extra_class}"
     ).strip()
-    bridge_attr = ""
-    if bridge_key:
-        bridge_attr = f' data-bridge-key="{html.escape(bridge_key, quote=True)}"'
     return (
-        f'<button type="button" class="{html.escape(cls)}" data-asset-action="open" '
-        f'data-asset-id="{asset_id}" data-row-id="{asset_id}"{bridge_attr} '
-        f'title="{title}">{text}</button>'
+        f'<a class="{html.escape(cls)}" href="{href}" target="_self" '
+        f'data-asset-id="{asset_id}" data-row-id="{asset_id}" '
+        f'title="{title}">{text}</a>'
     )
 
 
 def _asset_thumb_link_html(
     aid: str,
     asset: dict[str, Any],
-    *,
-    bridge_key: str = "",
 ) -> str:
     asset_id = html.escape(str(aid or "").strip(), quote=True)
+    href = html.escape(asset_detail_href(aid), quote=True)
     thumb = catalog_thumbnail_html(
         asset,
         kind="asset",
@@ -157,13 +169,10 @@ def _asset_thumb_link_html(
         cell_class="ips-inventory-image-cell",
         alt="Asset image",
     )
-    bridge_attr = ""
-    if bridge_key:
-        bridge_attr = f' data-bridge-key="{html.escape(bridge_key, quote=True)}"'
     return (
-        f'<button type="button" class="ips-inventory-thumb-cell-link ips-inventory-open-link ips-assets-open-link" '
-        f'data-asset-action="open" data-asset-id="{asset_id}" data-row-id="{asset_id}"{bridge_attr} '
-        f'title="View asset" aria-label="View asset">{thumb}</button>'
+        f'<a class="ips-inventory-thumb-cell-link ips-assets-open-link" '
+        f'href="{href}" target="_self" data-asset-id="{asset_id}" data-row-id="{asset_id}" '
+        f'title="View asset" aria-label="View asset">{thumb}</a>'
     )
 
 
@@ -197,7 +206,6 @@ def build_assets_html_table(
         if not aid:
             continue
 
-        bridge_key = assets_bridge_button_key(asset)
         name = asset_name(asset)
         name_label = name if name and name != "—" else "View asset"
         number = asset_number(asset)
@@ -211,7 +219,6 @@ def build_assets_html_table(
             aid,
             name_label,
             extra_class="ips-dash-est-desc-link",
-            bridge_key=bridge_key,
         )
         if rentable_badge:
             name_inner += f'<div class="ips-assets-name-badges">{rentable_badge}</div>'
@@ -224,7 +231,7 @@ def build_assets_html_table(
                 "image",
                 "center",
                 _cell_wrapper(
-                    _asset_thumb_link_html(aid, asset, bridge_key=bridge_key),
+                    _asset_thumb_link_html(aid, asset),
                     extra_class="ips-inventory-image-td",
                     align="center",
                 ),
@@ -292,8 +299,8 @@ def build_assets_html_table(
         expanded_cls = " ips-inventory-row-expanded" if expanded else ""
         body_rows.append(
             f'<tr class="ips-dash-est-tr ips-dash-est-row-{row_parity}{expanded_cls}" '
-            f'data-asset-id="{html.escape(aid, quote=True)}" data-row-id="{html.escape(aid, quote=True)}" '
-            f'data-bridge-key="{html.escape(bridge_key, quote=True)}"{expand_attr}>'
+            f'data-asset-id="{html.escape(aid, quote=True)}" data-row-id="{html.escape(aid, quote=True)}"'
+            f'{expand_attr}>'
             f"{tds}"
             f"</tr>"
         )
@@ -372,9 +379,8 @@ def render_assets_table_bridge(
     *,
     component_key: str = "ips_assets_list_bridge",
     hook_key: str = "ipsAssetsList::action",
-    field_mode: bool = False,
 ) -> str | None:
-    """Assets-specific zero-height bridge: keyed hidden buttons, sendValue fallback."""
+    """Field-mode row expand bridge; asset name/thumbnail links use native query navigation."""
     from app.ui.clean_table import _components_html
 
     return _components_html(
@@ -386,7 +392,6 @@ def render_assets_table_bridge(
   const hookKey = {hook_key!r};
   const wrapSel = ".st-key-assets_table_wrap";
   const rowSel = ".ips-assets-html-equipment-table tbody tr[data-row-id]";
-  const fieldMode = {"true" if field_mode else "false"};
 
   function sendValue(action) {{
     const payload = {{ type: "streamlit:setComponentValue", value: action }};
@@ -406,41 +411,7 @@ def render_assets_table_bridge(
     }}
   }}
 
-  function clickBridgeButton(bridgeKey) {{
-    if (!bridgeKey) return false;
-    const safeKey =
-      window.CSS && CSS.escape
-        ? CSS.escape(bridgeKey)
-        : bridgeKey.replace(/[^a-zA-Z0-9_-]/g, "\\\\$&");
-    const host = doc.querySelector(".st-key-" + safeKey);
-    const btn = host && host.querySelector('[data-testid="stButton"] > button');
-    if (!btn) return false;
-    btn.click();
-    return true;
-  }}
-
-  function openAssetElement(element, event) {{
-    const id =
-      element.getAttribute("data-asset-id")
-      || element.getAttribute("data-row-id");
-    const bridgeKey = element.getAttribute("data-bridge-key") || "";
-    if (!id) return false;
-    event.preventDefault();
-    event.stopPropagation();
-    if (clickBridgeButton(bridgeKey)) {{
-      return true;
-    }}
-    sendValue("open:" + id);
-    return true;
-  }}
-
-  function isOpenTarget(target) {{
-    return !!(target && target.closest
-      && target.closest("[data-asset-action='open'][data-bridge-key]"));
-  }}
-
   function isInteractive(target) {{
-    if (isOpenTarget(target)) return false;
     return !!(target && target.closest && target.closest(
       "button, [role='button'], input, select, textarea, label, a, "
       + "[data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox']"
@@ -459,32 +430,20 @@ def render_assets_table_bridge(
       const wrap = doc.querySelector(wrapSel);
       if (!wrap || !wrap.contains(t)) return;
 
-      const openEl = t.closest("[data-asset-action='open'][data-bridge-key]");
-      if (openEl && wrap.contains(openEl)) {{
-        openAssetElement(openEl, e);
-        return;
-      }}
-
       if (isInteractive(t)) return;
       const row = t.closest(rowSel);
       if (!row || !wrap.contains(row)) return;
       const id = row.getAttribute("data-row-id") || row.getAttribute("data-asset-id");
       if (!id) return;
+      if (!rowExpandMode(row)) return;
       e.preventDefault();
       e.stopPropagation();
-      if (rowExpandMode(row)) {{
-        sendValue("expand:" + id);
-        return;
-      }}
-      const bridgeKey = row.getAttribute("data-bridge-key") || "";
-      if (!clickBridgeButton(bridgeKey)) {{
-        sendValue("open:" + id);
-      }}
+      sendValue("expand:" + id);
     }}, true);
   }}
 
   if (!doc.ipsAssetsTableRegistry) doc.ipsAssetsTableRegistry = {{}};
-  doc.ipsAssetsTableRegistry[hookKey] = {{ fieldMode: fieldMode }};
+  doc.ipsAssetsTableRegistry[hookKey] = {{ fieldMode: true }};
   try {{
     w.postMessage({{ type: "streamlit:componentReady", apiVersion: 1 }}, "*");
   }} catch (err) {{}}
@@ -534,7 +493,6 @@ def render_assets_table_bridge_legacy(
     picked = render_assets_table_bridge(
         component_key=component_key,
         hook_key=hook_key,
-        field_mode=field_mode,
     )
     apply_assets_table_bridge_action(
         picked,
