@@ -34,11 +34,11 @@ def kit_badge_html() -> str:
 
 
 def inject_kit_ui_styles() -> None:
-    if not inject_css_once("ips-kit-ui-styles-v2"):
+    if not inject_css_once("ips-kit-ui-styles-v3"):
         return
     st.markdown(
         """
-        <style id="ips-kit-ui-styles-v2">
+        <style id="ips-kit-ui-styles-v3">
         .ips-kit-badge {
             display: inline-block;
             margin-left: 0.35rem;
@@ -112,6 +112,49 @@ def inject_kit_ui_styles() -> None:
         }
         .st-key-asset_kit_table_wrap .ips-kit-item-row-selected td {
             background: #f0f7ff !important;
+        }
+        .st-key-asset_kit_table_wrap .ips-kit-th-name,
+        .st-key-asset_kit_table_wrap .ips-kit-td-name {
+            white-space: normal !important;
+            word-break: break-word !important;
+        }
+        .st-key-asset_kit_table_wrap .ips-kit-th-serial,
+        .st-key-asset_kit_table_wrap .ips-kit-td-serial,
+        .st-key-asset_kit_table_wrap .ips-kit-th-type,
+        .st-key-asset_kit_table_wrap .ips-kit-td-type,
+        .st-key-asset_kit_table_wrap .ips-kit-th-expected,
+        .st-key-asset_kit_table_wrap .ips-kit-td-expected,
+        .st-key-asset_kit_table_wrap .ips-kit-th-actual,
+        .st-key-asset_kit_table_wrap .ips-kit-td-actual,
+        .st-key-asset_kit_table_wrap .ips-kit-th-unit,
+        .st-key-asset_kit_table_wrap .ips-kit-td-unit,
+        .st-key-asset_kit_table_wrap .ips-kit-th-total,
+        .st-key-asset_kit_table_wrap .ips-kit-td-total,
+        .st-key-asset_kit_table_wrap .ips-kit-th-assigned,
+        .st-key-asset_kit_table_wrap .ips-kit-td-assigned {
+            padding-left: 0.35rem !important;
+            padding-right: 0.35rem !important;
+        }
+        .st-key-asset_kit_table_wrap .ips-kit-th-expected,
+        .st-key-asset_kit_table_wrap .ips-kit-td-expected,
+        .st-key-asset_kit_table_wrap .ips-kit-th-actual,
+        .st-key-asset_kit_table_wrap .ips-kit-td-actual,
+        .st-key-asset_kit_table_wrap .ips-kit-th-unit,
+        .st-key-asset_kit_table_wrap .ips-kit-td-unit,
+        .st-key-asset_kit_table_wrap .ips-kit-th-total,
+        .st-key-asset_kit_table_wrap .ips-kit-td-total {
+            text-align: right !important;
+        }
+        .st-key-asset_kit_table_wrap .ips-kit-th-condition,
+        .st-key-asset_kit_table_wrap .ips-kit-td-condition,
+        .st-key-asset_kit_table_wrap .ips-kit-th-status,
+        .st-key-asset_kit_table_wrap .ips-kit-td-status {
+            text-align: center !important;
+        }
+        .st-key-asset_kit_table_wrap .ips-kit-status-pill {
+            font-size: 0.68rem !important;
+            padding: 0.06rem 0.35rem !important;
+            white-space: nowrap !important;
         }
         </style>
         """,

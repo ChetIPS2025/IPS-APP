@@ -23,18 +23,24 @@ from app.components.table_pagination import (
 from app.services.asset_kits_service import CONDITIONS, ITEM_STATUSES, ITEM_TYPES, kit_data_version
 
 _ASSETS_NAV = "assets"
-_COLS = (
-    ("name", "Item", 2.0),
-    ("serial", "Serial", 1.0),
-    ("type", "Type", 0.85),
-    ("expected", "Expected", 0.55),
-    ("actual", "Actual", 0.55),
-    ("condition", "Condition", 0.95),
-    ("status", "Status", 0.95),
-    ("unit", "Unit Value", 0.8),
-    ("total", "Total Value", 0.8),
-    ("assigned", "Assigned To", 0.9),
+# Relative weights → percentage widths via _kit_col_pct().
+_KIT_ITEMS_COLS: tuple[tuple[str, str, float], ...] = (
+    ("name", "Item", 4.5),
+    ("serial", "Serial", 0.75),
+    ("type", "Type", 0.65),
+    ("expected", "Expected", 0.45),
+    ("actual", "Actual", 0.45),
+    ("condition", "Condition", 0.75),
+    ("status", "Status", 0.65),
+    ("unit", "Unit Value", 0.6),
+    ("total", "Total Value", 0.65),
+    ("assigned", "Assigned To", 0.55),
 )
+
+
+def _kit_col_pct() -> dict[str, float]:
+    total = sum(w for _, _, w in _KIT_ITEMS_COLS)
+    return {key: (w / total) * 100.0 for key, _, w in _KIT_ITEMS_COLS}
 
 
 def kit_item_detail_href(parent_asset_id: str, kit_item_id: str) -> str:
@@ -55,10 +61,18 @@ def build_kit_items_html_table(
     all_items: list[dict[str, Any]],
     selected_item_id: str = "",
 ) -> str:
+    col_pct = _kit_col_pct()
+    col_parts = [
+        f'<col class="ips-kit-col-{html.escape(key)}" style="width:{pct:.2f}%;" />'
+        for key, pct in col_pct.items()
+    ]
     head = "".join(
-        f'<th scope="col" class="ips-dash-est-th ips-kit-th-{html.escape(key)}">'
-        f"{html.escape(label)}</th>"
-        for key, label, _w in _COLS
+        (
+            f'<th scope="col" class="ips-dash-est-th ips-kit-th-{html.escape(key)}" '
+            f'style="width:{col_pct[key]:.2f}%;max-width:{col_pct[key]:.2f}%;">'
+            f"{html.escape(label)}</th>"
+        )
+        for key, label, _w in _KIT_ITEMS_COLS
     )
     body: list[str] = []
     for it in items:
@@ -84,7 +98,11 @@ def build_kit_items_html_table(
             ("assigned", html.escape(str(it.get("assigned_to_name") or "—"))),
         ]
         tds = "".join(
-            f'<td class="ips-dash-est-td ips-kit-td-{html.escape(key)}">{val}</td>'
+            (
+                f'<td class="ips-dash-est-td ips-kit-td-{html.escape(key)}" '
+                f'style="width:{col_pct[key]:.2f}%;max-width:{col_pct[key]:.2f}%;">'
+                f"{val}</td>"
+            )
             for key, val in cells
         )
         body.append(
@@ -94,6 +112,7 @@ def build_kit_items_html_table(
     return (
         '<div class="ips-dash-est-table-scroll">'
         '<table class="ips-dash-est-html-table ips-kit-items-html-table">'
+        f"<colgroup>{''.join(col_parts)}</colgroup>"
         f"<thead><tr>{head}</tr></thead><tbody>{''.join(body)}</tbody></table></div>"
     )
 
