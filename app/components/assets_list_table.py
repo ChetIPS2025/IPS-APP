@@ -356,13 +356,16 @@ def render_assets_table_open_buttons(
             if not aid:
                 continue
             bridge_key = assets_bridge_button_key(asset)
-            if st.button(
+
+            def _open(_aid: str = aid, _asset: dict = asset) -> None:
+                open_asset_fn(_aid, _asset)
+
+            st.button(
                 "Open asset",
                 key=bridge_key,
                 type="tertiary",
-            ):
-                open_asset_fn(aid, asset)
-                ips_app_rerun()
+                on_click=_open,
+            )
 
 
 def render_assets_table_bridge(
@@ -371,15 +374,121 @@ def render_assets_table_bridge(
     hook_key: str = "ipsAssetsList::action",
     field_mode: bool = False,
 ) -> str | None:
-    """Return the clicked asset id via the shared clean-table row/link bridge."""
-    del hook_key  # preserved for callers; clean-table registers its own hook key
-    del field_mode  # field expand uses data-asset-action on the row when enabled
-    from app.ui.clean_table import render_clean_table_click_bridge
+    """Assets-specific zero-height bridge: keyed hidden buttons, sendValue fallback."""
+    from app.ui.clean_table import _components_html
 
-    return render_clean_table_click_bridge(
-        table_selector=".ips-assets-html-equipment-table",
-        row_selector=".ips-assets-html-equipment-table tbody tr[data-row-id]",
+    return _components_html(
+        f"""
+<script>
+(function () {{
+  const w = window.parent || window;
+  const doc = w.document;
+  const hookKey = {hook_key!r};
+  const wrapSel = ".st-key-assets_table_wrap";
+  const rowSel = ".ips-assets-html-equipment-table tbody tr[data-row-id]";
+  const fieldMode = {"true" if field_mode else "false"};
+
+  function sendValue(action) {{
+    const payload = {{ type: "streamlit:setComponentValue", value: action }};
+    const frames = [window, window.parent, w].filter(function (f, i, arr) {{
+      return f && arr.indexOf(f) === i;
+    }});
+    for (var i = 0; i < frames.length; i++) {{
+      try {{
+        if (frames[i].Streamlit && typeof frames[i].Streamlit.setComponentValue === "function") {{
+          frames[i].Streamlit.setComponentValue(action);
+          return;
+        }}
+      }} catch (err) {{}}
+    }}
+    for (var j = 0; j < frames.length; j++) {{
+      try {{ frames[j].postMessage(payload, "*"); }} catch (err) {{}}
+    }}
+  }}
+
+  function clickBridgeButton(bridgeKey) {{
+    if (!bridgeKey) return false;
+    const safeKey =
+      window.CSS && CSS.escape
+        ? CSS.escape(bridgeKey)
+        : bridgeKey.replace(/[^a-zA-Z0-9_-]/g, "\\\\$&");
+    const host = doc.querySelector(".st-key-" + safeKey);
+    const btn = host && host.querySelector('[data-testid="stButton"] > button');
+    if (!btn) return false;
+    btn.click();
+    return true;
+  }}
+
+  function openAssetElement(element, event) {{
+    const id =
+      element.getAttribute("data-asset-id")
+      || element.getAttribute("data-row-id");
+    const bridgeKey = element.getAttribute("data-bridge-key") || "";
+    if (!id) return false;
+    event.preventDefault();
+    event.stopPropagation();
+    if (clickBridgeButton(bridgeKey)) {{
+      return true;
+    }}
+    sendValue("open:" + id);
+    return true;
+  }}
+
+  function isOpenTarget(target) {{
+    return !!(target && target.closest
+      && target.closest("[data-asset-action='open'][data-bridge-key]"));
+  }}
+
+  function isInteractive(target) {{
+    if (isOpenTarget(target)) return false;
+    return !!(target && target.closest && target.closest(
+      "button, [role='button'], input, select, textarea, label, a, "
+      + "[data-testid='stButton'], [data-testid='stPopover'], [data-testid='stCheckbox']"
+    ));
+  }}
+
+  if (!doc.ipsAssetsTableDocClick) {{
+    doc.ipsAssetsTableDocClick = true;
+    doc.addEventListener("click", function (e) {{
+      const t = e.target;
+      if (!t || !t.closest) return;
+      const wrap = doc.querySelector(wrapSel);
+      if (!wrap || !wrap.contains(t)) return;
+
+      const openEl = t.closest("[data-asset-action='open'][data-bridge-key]");
+      if (openEl && wrap.contains(openEl)) {{
+        openAssetElement(openEl, e);
+        return;
+      }}
+
+      if (isInteractive(t)) return;
+      const row = t.closest(rowSel);
+      if (!row || !wrap.contains(row)) return;
+      const id = row.getAttribute("data-row-id") || row.getAttribute("data-asset-id");
+      if (!id) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (fieldMode) {{
+        sendValue("expand:" + id);
+        return;
+      }}
+      const bridgeKey = row.getAttribute("data-bridge-key") || "";
+      if (!clickBridgeButton(bridgeKey)) {{
+        sendValue("open:" + id);
+      }}
+    }}, true);
+  }}
+
+  if (!doc.ipsAssetsTableRegistry) doc.ipsAssetsTableRegistry = {{}};
+  doc.ipsAssetsTableRegistry[hookKey] = {{ fieldMode: fieldMode }};
+  try {{
+    w.postMessage({{ type: "streamlit:componentReady", apiVersion: 1 }}, "*");
+  }} catch (err) {{}}
+}})();
+</script>
+        """,
         component_key=component_key,
+        height=0,
     )
 
 
