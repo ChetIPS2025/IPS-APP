@@ -9,6 +9,7 @@ from typing import Any
 import streamlit as st
 
 from app.pages._core._data import CATALOG_CACHE_TTL
+from app.pages._core.page_data_cache import clear_page_data_cache_prefix
 from app.services.repository import ServiceResult, delete_row, fetch_rows, insert_row, update_row
 
 _KIT_ITEMS = "asset_kit_items"
@@ -56,6 +57,30 @@ _KIT_CATEGORY_HINTS = (
 )
 
 _trailer_kit_parent_ids_cache: set[str] | None = None
+_KIT_DATA_VERSIONS_KEY = "_ips_kit_data_versions"
+
+
+def kit_data_version(asset_id: str) -> int:
+    """Monotonic per-kit version for page-data cache keys."""
+    aid = str(asset_id or "").strip()
+    if not aid:
+        return 0
+    store = st.session_state.setdefault(_KIT_DATA_VERSIONS_KEY, {})
+    return int(store.get(aid) or 0)
+
+
+def invalidate_asset_kit_cache(asset_id: str) -> None:
+    """Bump kit data version and clear derived page caches for one trailer/kit."""
+    aid = str(asset_id or "").strip()
+    if not aid:
+        return
+    store = st.session_state.setdefault(_KIT_DATA_VERSIONS_KEY, {})
+    store[aid] = int(store.get(aid) or 0) + 1
+    clear_page_data_cache_prefix(f"kit_page_{aid}_")
+    clear_page_data_cache_prefix(f"kit_filter_meta_{aid}_")
+    clear_page_data_cache_prefix(f"kit_audits_{aid}_")
+    clear_page_data_cache_prefix(f"kit_exports_{aid}_")
+    clear_kit_items_list_cache()
 
 
 def _tool_trailer_kit_parent_asset_ids() -> set[str]:
@@ -217,11 +242,10 @@ def get_asset_kit_items(parent_asset_id: str) -> list[dict[str, Any]]:
     pid = str(parent_asset_id or "").strip()
     if not pid:
         return []
-    rows, _ = fetch_rows(_KIT_ITEMS, limit=10000, order_by="item_name")
     out = [
         normalize_kit_item(r)
-        for r in rows
-        if str(r.get("parent_asset_id") or "") == pid and r.get("is_active") is not False
+        for r in _cached_kit_item_rows()
+        if str(r.get("parent_asset_id") or "") == pid
     ]
     return sorted(out, key=lambda x: str(x.get("item_name") or "").lower())
 
@@ -230,8 +254,7 @@ def get_asset_kit_item(item_id: str) -> dict[str, Any] | None:
     iid = str(item_id or "").strip()
     if not iid:
         return None
-    rows, _ = fetch_rows(_KIT_ITEMS, limit=10000)
-    for r in rows:
+    for r in _cached_kit_item_rows():
         if str(r.get("id") or "") == iid:
             return normalize_kit_item(r)
     return None
@@ -278,8 +301,14 @@ def recalculate_asset_kit_value(parent_asset_id: str) -> ServiceResult:
     )
 
 
-def get_asset_kit_summary(parent_asset_id: str, asset: dict[str, Any] | None = None) -> dict[str, Any]:
-    items = get_asset_kit_items(parent_asset_id)
+def get_asset_kit_summary(
+    parent_asset_id: str,
+    asset: dict[str, Any] | None = None,
+    *,
+    items: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    if items is None:
+        items = get_asset_kit_items(parent_asset_id)
     expected = len(items)
     present = sum(1 for i in items if str(i.get("status") or "").lower() == "present")
     missing = sum(1 for i in items if str(i.get("status") or "").lower() == "missing")
@@ -332,6 +361,7 @@ def convert_asset_to_kit(asset_id: str, kit_type: str | None = None) -> ServiceR
     if result.ok:
         clear_assets_cache()
         recalculate_asset_kit_value(aid)
+        invalidate_asset_kit_cache(aid)
     return result
 
 
@@ -444,6 +474,7 @@ def create_asset_kit_item(parent_asset_id: str, data: dict[str, Any]) -> Service
     result = insert_row(_KIT_ITEMS, payload)
     if result.ok:
         recalculate_asset_kit_value(pid)
+        invalidate_asset_kit_cache(pid)
         create_asset_kit_transaction(
             {
                 "parent_asset_id": pid,
@@ -496,6 +527,7 @@ def update_asset_kit_item(item_id: str, data: dict[str, Any]) -> ServiceResult:
     result = update_row(_KIT_ITEMS, payload, {"id": iid})
     if result.ok and pid:
         recalculate_asset_kit_value(pid)
+        invalidate_asset_kit_cache(pid)
         if payload["status"] != prev_status:
             create_asset_kit_transaction(
                 {
@@ -532,6 +564,7 @@ def delete_asset_kit_item(item_id: str) -> ServiceResult:
     result = delete_row(_KIT_ITEMS, {"id": iid})
     if result.ok and pid:
         recalculate_asset_kit_value(pid)
+        invalidate_asset_kit_cache(pid)
     return result
 
 
@@ -697,6 +730,7 @@ def create_asset_kit_audit(
             "notes": audit_data.get("notes"),
         }
     )
+    invalidate_asset_kit_cache(pid)
     return ServiceResult(
         ok=True,
         data={
@@ -723,6 +757,7 @@ def assign_asset_kit(parent_asset_id: str, data: dict[str, Any]) -> ServiceResul
     }
     result = update_row(_ASSETS, payload, {"id": pid})
     if result.ok:
+        invalidate_asset_kit_cache(pid)
         create_asset_kit_transaction(
             {
                 "parent_asset_id": pid,

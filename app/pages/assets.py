@@ -1202,9 +1202,11 @@ def _capture_asset_detail_query() -> None:
                 del st.query_params[_ASSET_DETAIL_QUERY_KEY]
             return
 
+        tab_focus = str(st.query_params.get("asset_tab") or "").strip() or None
         _open_assets_detail_modal(
             requested_id,
             asset,
+            tab_focus=tab_focus,
         )
 
 
