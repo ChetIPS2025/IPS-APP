@@ -163,6 +163,20 @@ def test_scheduling_page_unique_widget_key_prefixes():
     assert "scheduling_view_mode" in source
 
 
+def test_scheduling_page_header_precedes_filters_and_uses_app_rerun():
+    import inspect
+
+    from app.pages import scheduling as sched_page
+
+    source = inspect.getsource(sched_page.render)
+    header_idx = source.index("render_page_header(")
+    filters_idx = source.index("_render_filters(")
+    assert header_idx < filters_idx
+    assert "@fragment" not in source
+    assert "fragment_rerun()" not in source
+    assert "ips_app_rerun()" in source
+
+
 def test_upcoming_employee_schedule_skips_cancelled(monkeypatch):
     from app.services.scheduling_service import list_upcoming_employee_schedule
 
