@@ -57,6 +57,12 @@ def clear_dashboard_page_data_cache() -> None:
     clear_page_data_cache_prefix("dashboard_")
 
 
+def clear_dashboard_snapshot_cache(*, user_id: str | None = None) -> None:
+    from app.services.dashboard_service import clear_dashboard_snapshot_cache as _clear
+
+    _clear(user_id=user_id)
+
+
 def clear_customers_page_data_cache() -> None:
     clear_page_data_cache_keys("customers_enriched_list", "customers_page_list_rows")
 
@@ -77,6 +83,7 @@ __all__ = [
     "clear_page_data_cache_prefix",
     "clear_customers_page_data_cache",
     "clear_dashboard_page_data_cache",
+    "clear_dashboard_snapshot_cache",
     "clear_inventory_page_data_cache",
     "clear_timekeeping_summaries_page_data_cache",
 ]
