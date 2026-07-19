@@ -33,6 +33,7 @@ __all__ = [
     "get_open_tasks",
     "get_tasks",
     "get_tasks_by_job",
+    "get_tasks_for_jobs",
     "list_tasks",
     "normalize_task",
     "save_task",
@@ -42,6 +43,8 @@ __all__ = [
 _CLOSED_SUBJOB_STATUSES = frozenset(
     {"complete", "completed", "closed", "cancelled", "canceled", "duplicate"}
 )
+_TASKS_FOR_JOBS_CHUNK_SIZE = 100
+_TASKS_FOR_JOBS_TABLES = ("todos", "tasks")
 
 
 def get_tasks() -> list[dict[str, Any]]:
@@ -105,6 +108,108 @@ def get_tasks_by_job(job_id: str, *, include_closed: bool = False) -> list[dict[
     if include_closed:
         return tasks
     return [t for t in tasks if normalize_task_status(t.get("status")) == "Open"]
+
+
+def _ordered_unique_job_ids(job_ids: list[str]) -> list[str]:
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for raw in job_ids:
+        jid = str(raw or "").strip()
+        if not jid or jid in seen:
+            continue
+        seen.add(jid)
+        ordered.append(jid)
+    return ordered
+
+
+def _fetch_tasks_rows_for_job_id_chunk(job_ids: list[str]) -> list[dict[str, Any]]:
+    if not job_ids:
+        return []
+    from app.db import get_client, run_user_supabase_operation
+
+    chunk = list(job_ids)
+    limit = max(500, len(chunk) * 50)
+
+    def _query_table(table: str) -> list[dict[str, Any]]:
+        def _run() -> list[dict[str, Any]]:
+            resp = (
+                get_client()
+                .table(table)
+                .select("*")
+                .in_("job_id", chunk)
+                .order("due_date")
+                .limit(limit)
+                .execute()
+            )
+            return list(resp.data or [])
+
+        return run_user_supabase_operation(
+            f"read {table} by job_id",
+            _run,
+            friendly_on_failure=False,
+        )
+
+    for table in _TASKS_FOR_JOBS_TABLES:
+        try:
+            rows = _query_table(table)
+        except Exception:
+            rows = []
+        if rows:
+            return rows
+    return []
+
+
+def _tasks_for_jobs_from_index(
+    job_ids: list[str],
+    *,
+    include_closed: bool,
+) -> dict[str, list[dict[str, Any]]]:
+    """Fallback when batched DB reads are unavailable (demo/offline)."""
+    wanted = set(job_ids)
+    grouped: dict[str, list[dict[str, Any]]] = {jid: [] for jid in job_ids}
+    for task in get_tasks():
+        jid = _resolve_task_job_id(task)
+        if not jid or jid not in wanted:
+            continue
+        if not include_closed and normalize_task_status(task.get("status")) != "Open":
+            continue
+        grouped.setdefault(jid, []).append(task)
+    return grouped
+
+
+def get_tasks_for_jobs(
+    job_ids: list[str],
+    *,
+    include_closed: bool = True,
+) -> dict[str, list[dict[str, Any]]]:
+    """Batch-load tasks for many jobs in one or few DB queries, grouped by job_id."""
+    ordered_ids = _ordered_unique_job_ids(job_ids)
+    if not ordered_ids:
+        return {}
+
+    grouped: dict[str, list[dict[str, Any]]] = {jid: [] for jid in ordered_ids}
+    rows: list[dict[str, Any]] = []
+    for start in range(0, len(ordered_ids), _TASKS_FOR_JOBS_CHUNK_SIZE):
+        chunk = ordered_ids[start : start + _TASKS_FOR_JOBS_CHUNK_SIZE]
+        rows.extend(_fetch_tasks_rows_for_job_id_chunk(chunk))
+
+    if not rows:
+        return _tasks_for_jobs_from_index(ordered_ids, include_closed=include_closed)
+
+    for raw in rows:
+        if not raw:
+            continue
+        task = normalize_task(raw)
+        jid = str(task.get("job_id") or raw.get("job_id") or "").strip()
+        if not jid or jid not in grouped:
+            continue
+        if not include_closed and normalize_task_status(task.get("status")) != "Open":
+            continue
+        task_no = str(raw.get("task_number") or raw.get("hazard_number") or "").strip()
+        if task_no:
+            task["task_number"] = task_no
+        grouped[jid].append(task)
+    return grouped
 
 
 def count_open_subjobs_by_job_id() -> dict[str, int]:

@@ -408,7 +408,15 @@ def _job_assignment_label(job: dict[str, Any]) -> str:
 
 def _build_assignment_options_for_timekeeping() -> list[str]:
     """Build assignable job/subjob labels (uncached)."""
-    from app.services.tasks_service import get_tasks_by_job
+    import logging
+
+    from app.perf_debug import perf_enabled, perf_span
+    from app.services.tasks_service import (
+        _TASKS_FOR_JOBS_CHUNK_SIZE,
+        get_tasks_for_jobs,
+    )
+
+    _log = logging.getLogger("ips.perf")
     opts: list[str] = ["— No assignment —"]
     seen: set[str] = {opts[0].casefold()}
 
@@ -422,28 +430,60 @@ def _build_assignment_options_for_timekeeping() -> list[str]:
         opts.append(clean)
         seen.add(key)
 
-    for job in load_jobs():
-        if not _job_row_assignable_for_timekeeping(job):
-            continue
-        job_label = _job_assignment_label(job)
-        if not job_label:
-            continue
-        _add(job_label)
-        jid = str(job.get("id") or "").strip()
-        if jid:
-            for task in get_tasks_by_job(jid, include_closed=True):
-                _add(_subjob_assignment_label(task, job_label=job_label))
+    assignable_jobs: list[dict[str, Any]] = []
+    job_ids: list[str] = []
+    with perf_span("timekeeping.assignment_jobs"):
+        for job in load_jobs():
+            if not _job_row_assignable_for_timekeeping(job):
+                continue
+            assignable_jobs.append(job)
+            jid = str(job.get("id") or "").strip()
+            if jid:
+                job_ids.append(jid)
 
-    for special in ("Shop", "Administrative", "Vacation"):
-        _add(special)
+    tasks_by_job: dict[str, list[dict[str, Any]]] = {}
+    batch_count = 0
+    with perf_span("timekeeping.assignment_tasks_batch"):
+        if job_ids:
+            batch_count = (len(job_ids) + _TASKS_FOR_JOBS_CHUNK_SIZE - 1) // _TASKS_FOR_JOBS_CHUNK_SIZE
+            tasks_by_job = get_tasks_for_jobs(job_ids, include_closed=True)
+
+    task_count = sum(len(rows) for rows in tasks_by_job.values())
+    if perf_enabled():
+        _log.warning(
+            "[perf] timekeeping.assignment_jobs: jobs=%d",
+            len(assignable_jobs),
+        )
+        _log.warning(
+            "[perf] timekeeping.assignment_tasks_batch: tasks=%d batches=%d",
+            task_count,
+            batch_count,
+        )
+
+    with perf_span("timekeeping.assignment_options_build"):
+        for job in assignable_jobs:
+            job_label = _job_assignment_label(job)
+            if not job_label:
+                continue
+            _add(job_label)
+            jid = str(job.get("id") or "").strip()
+            if jid:
+                for task in tasks_by_job.get(jid, []):
+                    _add(_subjob_assignment_label(task, job_label=job_label))
+
+        for special in ("Shop", "Administrative", "Vacation"):
+            _add(special)
 
     return opts
 
 
 def _assignment_options_cache_sig(*, week_start_d: date | None = None) -> str:
+    from app.pages._core._data import jobs_catalog_data_version, tasks_catalog_data_version
+
     ws = week_start_d or _current_week_start()
-    jobs = load_jobs()
-    return f"{ws.isoformat()}:{len(jobs)}"
+    return (
+        f"{ws.isoformat()}:{jobs_catalog_data_version()}:{tasks_catalog_data_version()}"
+    )
 
 
 def clear_timekeeping_assignment_options_cache() -> None:
