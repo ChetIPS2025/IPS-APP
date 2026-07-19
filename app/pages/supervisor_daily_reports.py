@@ -247,6 +247,44 @@ def render_daily_reports_for_job(
             tone = "success" if rep_status == "Reviewed" else "warning" if rep_status == "Submitted" else "neutral"
             render_badge(rep_status, tone=tone)
 
+        sched_hint = None
+        try:
+            from app.services.scheduling_service import schedule_suggestion_for_job_day
+
+            sched_hint = schedule_suggestion_for_job_day(jid, rd)
+        except Exception:
+            sched_hint = None
+        if sched_hint and (not wizard or wiz_step in (0, 1)):
+            st.markdown("##### Scheduled Assignment")
+            st.caption(
+                f"{sched_hint.get('title', 'Scheduled work')} · Shift: {sched_hint.get('shift') or '—'}"
+            )
+            if sched_hint.get("work_instructions"):
+                st.caption(str(sched_hint.get("work_instructions")))
+            if st.button("Copy scheduled crew into form", key=f"sdr_copy_sched_{jid}"):
+                crew_lines = sched_hint.get("employees") or []
+                if crew_lines:
+                    from app.pages._core._data import load_employees
+
+                    emp_by_id = {
+                        str(e.get("id") or "").strip(): e
+                        for e in load_employees()
+                        if str(e.get("id") or "").strip()
+                    }
+                    n = min(25, max(1, len(crew_lines)))
+                    st.session_state[f"sdr_crew_n_{jid}"] = n
+                    for idx, row in enumerate(crew_lines[:25]):
+                        emp = emp_by_id.get(str(row.get("employee_id") or "").strip()) or {}
+                        name = str(
+                            emp.get("full_name") or emp.get("employee_name") or emp.get("name") or ""
+                        )
+                        st.session_state[f"sdr_crew_name_{jid}_{idx}"] = name
+                        st.session_state[f"sdr_crew_task_{jid}_{idx}"] = str(
+                            sched_hint.get("work_instructions") or ""
+                        )[:200]
+                st.success("Scheduled crew copied — review before saving.")
+                st.rerun()
+
         def _basics_fields() -> None:
             st.text_input("Supervisor", key=f"sdr_supervisor_{jid}", placeholder="Name")
             st.number_input("Crew size", min_value=0, max_value=500, step=1, key=f"sdr_crew_size_{jid}")

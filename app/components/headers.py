@@ -124,6 +124,7 @@ DEFAULT_PAGE_SUBTITLES: dict[str, str] = {
     "inventory": "Inventory management and stock levels.",
     "assets": "Track and manage all company assets and equipment.",
     "timekeeping": "Weekly employee timecards.",
+    "scheduling": "Plan jobs, crews, travel, and equipment assignments.",
     "weekly_timesheets": "Weekly job timesheets and crew hours.",
     "employees": "Employee management.",
     "users": "Employee management.",

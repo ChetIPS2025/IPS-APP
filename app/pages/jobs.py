@@ -2468,23 +2468,18 @@ def _render_job_detail_tabs(job: dict, *, cost_summary: dict | None = None) -> N
         render_job_linked_tasks_tab(job)
 
     with tab_schedule:
-        sched_fields = [
-            ("Start Date", fmt_date(job.get("start_date"))),
-            ("End Date", fmt_date(job.get("end_date"))),
-            ("Location", _job_location(job)),
-            ("Schedule", _schedule_summary(job)),
-        ]
-        visible = [(label, value) for label, value in sched_fields if _has_useful_detail_value(value)]
-        if visible:
-            sched_html = "".join(
-                _detail_field(label, value) for label, value in visible
-            )
-            st.markdown(
-                f'<div class="ips-detail-grid">{sched_html}</div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            st.caption("Add start and end dates in Edit Job.")
+        from app.components.scheduling_job_tab import render_job_schedule_tab
+        from app.pages._core._data import load_employees
+
+        employees = load_employees()
+        employees_by_id = {
+            str(e.get("id") or "").strip(): e for e in employees if str(e.get("id") or "").strip()
+        }
+        render_job_schedule_tab(
+            job,
+            jobs_by_id={jid: job} if jid else {},
+            employees_by_id=employees_by_id,
+        )
 
     with tab_crew:
         if jid:

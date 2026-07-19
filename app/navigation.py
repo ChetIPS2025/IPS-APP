@@ -28,6 +28,7 @@ ACTIVE_MODULE_SLUGS: frozenset[str] = frozenset(
         "inventory",
         "assets",
         "timekeeping",
+        "scheduling",
         "weekly_timesheets",
         "employees",
         "users",  # alias → employees
@@ -90,6 +91,7 @@ LEGACY_PAGE_LABEL_TO_SLUG: dict[str, str] = {
     "Asset Manager": "assets",
     "Asset Detail": "assets",
     "Timekeeping": "timekeeping",
+    "Scheduling": "scheduling",
     "Daily Reports": "field_daily_reports",
     "Crew Time": "field_crew_time",
     "Time Tracking": "timekeeping",

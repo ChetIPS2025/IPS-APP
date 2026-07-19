@@ -26,6 +26,7 @@ _MODULE_SPECS: dict[str, tuple[str, str]] = {
     "inventory": ("app.pages.inventory", "render"),
     "assets": ("app.pages.assets", "render"),
     "timekeeping": ("app.pages.timekeeping", "render"),
+    "scheduling": ("app.pages.scheduling", "render"),
     "weekly_timesheets": ("app.pages.weekly_timesheets", "render"),
     "employees": ("app.pages.employees", "render"),
     "users": ("app.pages.employees", "render"),
