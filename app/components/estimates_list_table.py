@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import urlencode
 
 import streamlit as st
 
@@ -61,6 +62,27 @@ ESTIMATES_TABLE_COL_WIDTHS_PX: dict[str, int] = {
 ESTIMATES_TABLE_LAST_ACTION_KEY = "estimates_list_last_action"
 ESTIMATES_MODE_KEY = "estimates_mode"
 ESTIMATES_SELECTED_ID_KEY = "selected_estimate_id"
+_ESTIMATE_DETAIL_QUERY_KEY = "estimate_detail"
+_ESTIMATE_DETAIL_TAB_QUERY_KEY = "estimate_tab"
+_NAV_QUERY_KEY = "ips_nav"
+
+
+def estimate_detail_query_key() -> str:
+    return _ESTIMATE_DETAIL_QUERY_KEY
+
+
+def estimate_detail_tab_query_key() -> str:
+    return _ESTIMATE_DETAIL_TAB_QUERY_KEY
+
+
+def estimate_detail_href(estimate_id: str, *, tab: str = "") -> str:
+    """Same-app URL to open Estimate Details (?ips_nav=estimates&estimate_detail=<id>)."""
+    eid = str(estimate_id or "").strip()
+    params: dict[str, str] = {_NAV_QUERY_KEY: "estimates", _ESTIMATE_DETAIL_QUERY_KEY: eid}
+    tab_val = str(tab or "").strip()
+    if tab_val:
+        params[_ESTIMATE_DETAIL_TAB_QUERY_KEY] = tab_val
+    return "?" + urlencode(params)
 
 _ESTIMATES_LIST_COL_RATIOS = tuple(ESTIMATES_LIST_COL_WIDTHS_PX.values())
 
@@ -184,19 +206,15 @@ def estimate_list_link_html(
     label: str,
     *,
     extra_class: str = "",
-    bridge_key: str = "",
 ) -> str:
-    eid = html.escape(str(estimate_id or "").strip(), quote=True)
     text = html.escape(label)
     title = html.escape(label, quote=True)
+    href = html.escape(estimate_detail_href(str(estimate_id or "").strip()), quote=True)
     cls = f"ips-row-open-link ips-dash-est-link ips-estimates-list-link ips-estimates-open-link {extra_class}".strip()
-    bridge_attr = ""
-    if bridge_key:
-        bridge_attr = f' data-bridge-key="{html.escape(bridge_key, quote=True)}"'
+    aria = html.escape(f"Open estimate details for {label}", quote=True)
     return (
-        f'<button type="button" class="{html.escape(cls)}" '
-        f'data-row-id="{eid}" data-estimate-id="{eid}" data-est-action="open"{bridge_attr} '
-        f'title="{title}">{text}</button>'
+        f'<a class="{html.escape(cls)}" href="{href}" target="_self" '
+        f'aria-label="{aria}" title="{title}">{text}</a>'
     )
 
 
@@ -408,7 +426,6 @@ def build_estimates_html_table(
         num_label = est_no if est_no and est_no != "—" else "Open estimate"
         title_label = project if project and project != "—" else "Open estimate"
         row_parity = "even" if row_idx % 2 else "odd"
-        bridge_key = estimates_bridge_button_key(est)
 
         if layout == "list":
             cells = [
@@ -420,7 +437,6 @@ def build_estimates_html_table(
                             eid,
                             num_label,
                             extra_class="ips-dash-est-num-link",
-                            bridge_key=bridge_key,
                         ),
                         extra_class="ips-dash-est-num-cell",
                     ),
@@ -433,7 +449,6 @@ def build_estimates_html_table(
                             eid,
                             title_label,
                             extra_class="ips-dash-est-desc-link",
-                            bridge_key=bridge_key,
                         ),
                         extra_class="ips-dash-est-desc-cell",
                     ),

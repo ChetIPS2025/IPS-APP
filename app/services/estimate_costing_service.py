@@ -589,8 +589,19 @@ def recalculate_and_save_estimate_totals(
     payload = _estimate_totals_persist_payload(totals)
     result = update_row("estimates", payload, {"id": eid})
     if result.ok:
+        try:
+            from app.services.estimates_directory_service import invalidate_estimates_directory_cache
+
+            invalidate_estimates_directory_cache()
+        except Exception:
+            pass
         return ServiceResult(ok=True, data={**totals, **payload})
     return result
+
+
+def recalculate_estimate_rollups(estimate_id: str, *, tax_rate: float | None = None) -> ServiceResult:
+    """Explicit rollup recalculation — use on Cost Builder save or user action."""
+    return recalculate_and_save_estimate_totals(estimate_id, tax_rate=tax_rate)
 
 
 def _next_sort_order(rows: list[dict[str, Any]]) -> int:

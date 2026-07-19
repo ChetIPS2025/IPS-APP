@@ -8,7 +8,6 @@ from datetime import date, timedelta
 import streamlit as st
 
 from app.components.record_modal import (
-    build_modal_cache,
     clear_edit_modes,
     clear_record_modal,
     detail_field_html,
@@ -48,9 +47,6 @@ from app.pages._core._data import (
     customer_id_for_name,
     customer_location_select_options,
     get_estimate,
-    load_documents_hub,
-    load_estimates,
-    load_inventory,
     load_jobs,
     lookup_options,
     persist_document,
@@ -74,6 +70,7 @@ from app.components.estimates_list_table import (
     build_approve_flags,
     build_approved_flags,
     build_estimates_html_table,
+    estimate_detail_href,
     filter_waiting_approval_rows,
     open_estimate_detail,
     render_estimates_table_bridge,
@@ -82,13 +79,23 @@ from app.components.headers import render_page_brand_header
 from app.components.layout import render_filter_bar as layout_filter_bar
 from app.components.table_filters import (
     apply_column_filters,
-    build_filter_options,
     clear_table_filters,
     render_table_header_cell,
 )
-from app.components.table_pagination import paginate_rows, reset_table_page
+from app.components.table_pagination import reset_table_page
 from app.pages._core._crud import apply_persist_feedback, is_demo_id
 from app.pages._core._session import select_key
+from app.services.estimate_detail_service import (
+    get_estimate_detail,
+    list_documents_for_estimate,
+    put_estimate_in_modal_cache,
+)
+from app.services.estimates_directory_service import (
+    list_estimates_export_rows,
+    list_estimates_page,
+    stored_customer_price_amount,
+)
+from app.services.estimate_reference_service import search_vendor_estimate_options
 from app.services.estimates_service import (
     approve_estimate_and_sync_job,
     begin_approved_estimate_revision,
@@ -116,7 +123,6 @@ from app.utils.permissions import normalize_role
 from app.services.estimate_expiration_service import (
     default_expiration_date,
     effective_expiration_date,
-    ensure_estimate_expiration_persisted,
     format_effective_expiration,
     format_estimate_date,
 )
@@ -158,6 +164,9 @@ ESTIMATES_MODE_KEY = "estimates_mode"
 SHOW_ESTIMATE_MODAL_KEY = "show_estimate_detail_modal"
 _ALL_ESTIMATE_IDS_KEY = "_ips_estimates_visible_ids"
 _COST_BUILDER_OPTS_CACHE_KEY = "_ips_cost_builder_select_opts"
+_ESTIMATE_DETAIL_QUERY_KEY = "estimate_detail"
+_ESTIMATE_DETAIL_TAB_QUERY_KEY = "estimate_tab"
+_ESTIMATE_DETAIL_QUERY_ERROR_KEY = "_ips_estimate_detail_query_error"
 
 
 def _as_date(value: object) -> date | None:
@@ -265,96 +274,43 @@ def _estimate_stored_customer_price(row: dict) -> float:
 
 
 def _estimate_live_customer_price_amount(row: dict) -> float:
-    eid = str(row.get("id") or "").strip()
-    if not eid or is_demo_id(eid):
-        return 0.0
-    from app.services.estimate_costing_service import calculate_estimate_totals
-    try:
-        return float(calculate_estimate_totals(eid).get("customer_price") or 0)
-    except Exception:
-        return 0.0
+    """Deprecated for list/summary — use stored rollups only."""
+    return stored_customer_price_amount(row)
 
 
 def _estimate_rollups_are_stale(row: dict) -> bool:
-    live = _estimate_live_customer_price_amount(row)
-    if live <= 0:
+    """Detect missing persisted rollups without live Cost Builder calculation."""
+    stored = stored_customer_price_amount(row)
+    if stored > 0:
         return False
-    stored = _estimate_stored_customer_price(row)
-    return stored <= 0 or abs(stored - live) > 0.01
+    return bool(str(row.get("id") or "").strip()) and not is_demo_id(str(row.get("id") or ""))
 
 
 def _estimate_customer_price_from_builder(row: dict, *, field: str = "customer_price") -> str:
-    """Use live Cost Builder totals when the estimate row rollup is still zero."""
-    eid = str(row.get("id") or "").strip()
-    if not eid or is_demo_id(eid):
-        return fmt_currency(0)
-    from app.services.estimate_costing_service import calculate_estimate_totals
-    try:
-        totals = calculate_estimate_totals(eid)
-        amount = float(totals.get(field) or totals.get("customer_price") or 0)
-        if amount > 0:
-            return fmt_currency(amount)
-    except Exception:
-        pass
-    return fmt_currency(0)
+    stored = stored_customer_price_amount(row)
+    if stored > 0:
+        return fmt_currency(stored)
+    return "—"
 
 
 def _estimate_customer_price(row: dict) -> str:
-    """List view: prefer persisted rollups; only hit Cost Builder when stored total is zero."""
-    stored = _estimate_stored_customer_price(row)
-    if stored > 0:
-        return fmt_currency(stored)
-    live = _estimate_live_customer_price_amount(row)
-    return fmt_currency(live) if live > 0 else fmt_currency(0)
+    """List view: persisted rollups only."""
+    stored = stored_customer_price_amount(row)
+    return fmt_currency(stored) if stored > 0 else "—"
 
 
 def _estimate_customer_price_amount(row: dict) -> float:
-    stored = _estimate_stored_customer_price(row)
-    if stored > 0:
-        return stored
-    live = _estimate_live_customer_price_amount(row)
-    return live if live > 0 else 0.0
+    return stored_customer_price_amount(row)
 
 
 def _sync_estimate_rollups_if_stale(estimate_id: str) -> None:
-    """Persist Cost Builder totals when list/modal row is out of date."""
-    eid = str(estimate_id or "").strip()
-    if not eid or is_demo_id(eid):
-        return
-    est_row = get_estimate(eid) or {}
-    if not _estimate_rollups_are_stale(est_row):
-        return
-    live = _estimate_live_customer_price_amount(est_row)
-    sync_key = f"_est_rollups_synced_{eid}"
-    if st.session_state.get(sync_key) == live:
-        return
-    from app.services.estimate_costing_service import recalculate_and_save_estimate_totals
-    try:
-        if recalculate_and_save_estimate_totals(eid).ok:
-            st.session_state[sync_key] = live
-            from app.pages._core._data import clear_catalog_session_key, clear_estimates_list_cache
-            clear_estimates_list_cache()
-            clear_catalog_session_key("estimates")
-    except Exception:
-        pass
+    """No-op during read-only rendering — use explicit Recalculate Totals."""
+    return
 
 
 def _sync_stale_estimate_rollups(rows: list[dict], *, max_sync: int = 5) -> dict[str, dict]:
-    """Refresh at most ``max_sync`` stale estimate totals per page load (not per table row)."""
-    refreshed: dict[str, dict] = {}
-    synced = 0
-    for est in rows:
-        if synced >= max_sync:
-            break
-        eid = str(est.get("id") or "").strip()
-        if not eid or not _estimate_rollups_are_stale(est):
-            continue
-        _sync_estimate_rollups_if_stale(eid)
-        fresh_row = get_estimate(eid)
-        if fresh_row:
-            refreshed[eid] = fresh_row
-        synced += 1
-    return refreshed
+    """No-op — rollups are not synchronized during list rendering."""
+    return {}
 
 
 def _apply_estimate_row_refreshes(rows: list[dict], refreshed: dict[str, dict]) -> list[dict]:
@@ -392,12 +348,7 @@ def _asset_options() -> list[tuple[str, dict]]:
 
 
 def _vendor_options() -> list[str]:
-    vendors: set[str] = set()
-    for item in load_inventory():
-        v = str(item.get("vendor") or "").strip()
-        if v and v != "—":
-            vendors.add(v)
-    return sorted(vendors)
+    return search_vendor_estimate_options(limit=100)
 
 
 def _clear_cost_builder_options_cache() -> None:
@@ -576,6 +527,72 @@ _ESTIMATES_VIEW_OPTIONS = [
 _ESTIMATE_BAR_FILTER_FIELDS = ["customer", "status"]
 
 
+def _estimates_detail_pending() -> bool:
+    return bool(
+        st.session_state.get(SHOW_ESTIMATE_MODAL_KEY)
+        or str(st.session_state.get(_ESTIMATES_MODAL_KEY) or "").strip()
+        or (
+            st.session_state.get(ESTIMATES_MODE_KEY) == "detail"
+            and str(st.session_state.get(SELECTED_ESTIMATE_KEY) or "").strip()
+        )
+    )
+
+
+def _set_estimate_detail_tab_from_query(tab: str) -> None:
+    raw = str(tab or "").strip()
+    if not raw:
+        return
+    alias = {
+        "details": "Details",
+        "scope": "Scope of Work",
+        "materials": "Materials",
+        "labor": "Labor",
+        "equipment": "Equipment",
+        "rentals": "Rentals",
+        "subcontractors": "Subcontractors",
+        "other costs": "Other Costs",
+        "summary": "Summary",
+        "documents": "Documents",
+    }
+    resolved = alias.get(raw.lower(), raw)
+    if resolved in _ESTIMATE_DETAIL_TABS:
+        st.session_state[ESTIMATE_DETAIL_TAB_KEY] = resolved
+
+
+def _capture_estimate_detail_query() -> None:
+    from app.perf_debug import perf_span
+
+    with perf_span("estimates.detail_lookup"):
+        requested_id = str(st.query_params.get(_ESTIMATE_DETAIL_QUERY_KEY) or "").strip()
+        if not requested_id:
+            return
+        current_id = str(st.session_state.get(SELECTED_ESTIMATE_KEY) or "").strip()
+        if requested_id == current_id and st.session_state.get(ESTIMATES_MODE_KEY) == "detail":
+            tab_focus = str(st.query_params.get(_ESTIMATE_DETAIL_TAB_QUERY_KEY) or "").strip()
+            if tab_focus:
+                _set_estimate_detail_tab_from_query(tab_focus)
+            return
+        est = get_estimate_detail(requested_id)
+        if not est:
+            st.session_state[_ESTIMATE_DETAIL_QUERY_ERROR_KEY] = requested_id
+            if _ESTIMATE_DETAIL_QUERY_KEY in st.query_params:
+                del st.query_params[_ESTIMATE_DETAIL_QUERY_KEY]
+            if _ESTIMATE_DETAIL_TAB_QUERY_KEY in st.query_params:
+                del st.query_params[_ESTIMATE_DETAIL_TAB_QUERY_KEY]
+            return
+        open_estimate_detail(requested_id)
+        put_estimate_in_modal_cache(requested_id, est)
+        st.session_state[ESTIMATE_DETAIL_TAB_KEY] = "Details"
+        tab_focus = str(st.query_params.get(_ESTIMATE_DETAIL_TAB_QUERY_KEY) or "").strip()
+        if tab_focus:
+            _set_estimate_detail_tab_from_query(tab_focus)
+
+
+def _show_estimate_detail_query_error_if_any() -> None:
+    if st.session_state.pop(_ESTIMATE_DETAIL_QUERY_ERROR_KEY, None):
+        st.warning("The selected estimate could not be found.")
+
+
 def _estimate_select_key(estimate_id: str) -> str:
     return f"estimate_select_{estimate_id}"
 
@@ -590,6 +607,10 @@ def _clear_estimate_selection(estimate_ids: list[str] | None = None) -> None:
     for key in list(st.session_state.keys()):
         if isinstance(key, str) and key.startswith("estimate_select_"):
             st.session_state[key] = False
+    if _ESTIMATE_DETAIL_QUERY_KEY in st.query_params:
+        del st.query_params[_ESTIMATE_DETAIL_QUERY_KEY]
+    if _ESTIMATE_DETAIL_TAB_QUERY_KEY in st.query_params:
+        del st.query_params[_ESTIMATE_DETAIL_TAB_QUERY_KEY]
 
 
 def _on_estimate_checkbox_change(estimate_id: str, all_estimate_ids: list[str]) -> None:
@@ -679,6 +700,11 @@ def _render_custom_estimates_table(
     ]
     st.session_state[_ALL_ESTIMATE_IDS_KEY] = all_estimate_ids
 
+    for row in filtered:
+        rid = str(row.get("id") or "").strip()
+        if rid:
+            put_estimate_in_modal_cache(rid, row)
+
     approve_flags = build_approve_flags(filtered)
     approved_flags = build_approved_flags(filtered)
     estimates_by_id = {
@@ -707,7 +733,7 @@ def _render_custom_estimates_table(
             hook_key="ipsEstList::action",
             last_action_key=ESTIMATES_TABLE_LAST_ACTION_KEY,
             pending_approve_key=_PENDING_APPROVE_KEY,
-            open_estimate_fn=_prepare_open_estimate_table_row,
+            open_estimate_fn=None,
         )
 
     return all_estimate_ids
@@ -870,11 +896,11 @@ def _can_show_approve_job(est: dict) -> bool:
     return estimate_status_approvable(est.get("status")) and not estimate_visible_in_approved_view(est)
 
 
-def _render_approve_confirmation_panel(rows_by_id: dict[str, dict]) -> None:
+def _render_approve_confirmation_panel() -> None:
     eid = str(st.session_state.get(_PENDING_APPROVE_KEY) or "").strip()
     if not eid:
         return
-    est = rows_by_id.get(eid)
+    est = get_estimate_detail(eid) or get_estimate(eid)
     if not est:
         st.session_state.pop(_PENDING_APPROVE_KEY, None)
         return
@@ -900,8 +926,11 @@ def _render_approve_confirmation_panel(rows_by_id: dict[str, dict]) -> None:
         if st.button("Approve Job", key=f"est_confirm_approve_{eid}", type="primary", use_container_width=True):
             res = approve_estimate_and_sync_job(eid)
             if res.ok:
-                from app.services.repository import clear_data_cache_for_table
-                clear_data_cache_for_table("estimates")
+                from app.services.estimates_directory_service import invalidate_estimates_directory_cache
+                from app.services.jobs_directory_service import invalidate_jobs_directory_cache
+
+                invalidate_estimates_directory_cache()
+                invalidate_jobs_directory_cache()
                 st.session_state.pop(_PENDING_APPROVE_KEY, None)
                 st.success(res.message or "Estimate approved and linked job activated.")
                 ips_app_rerun()
@@ -1211,17 +1240,13 @@ def _estimate_documents_link_ref(est: dict) -> str:
 def _estimate_documents_for(est: dict, eid: str) -> list[dict]:
     ref = _estimate_documents_link_ref(est)
     num = str(est.get("estimate_number") or "").strip()
-    rows: list[dict] = []
-    for doc in load_documents_hub(role=normalize_role(effective_role())):
-        mod = str(doc.get("linked_module") or "").strip().lower()
-        if mod not in {"estimates", "estimate"}:
-            continue
-        linked_id = str(doc.get("linked_record_id") or "").strip()
-        linked_ref = str(doc.get("linked_ref") or "")
-        if linked_id == eid or (num and num in linked_ref) or ref in linked_ref:
-            rows.append(doc)
-    rows.sort(key=lambda r: str(r.get("upload_date") or r.get("created_at") or ""), reverse=True)
-    return rows
+    page = list_documents_for_estimate(
+        eid,
+        estimate_number=num,
+        linked_ref=ref,
+        role=normalize_role(effective_role()),
+    )
+    return page.rows
 
 
 def _render_estimate_documents_tab(est: dict) -> None:
@@ -1293,12 +1318,6 @@ def _render_estimate_detail_tabs(est: dict) -> None:
     status = safe_value(est.get("status"))
     customer = safe_value(est.get("customer"))
 
-    if eid and not is_demo_id(eid):
-        _sync_estimate_rollups_if_stale(eid)
-        fresh = get_estimate(eid)
-        if fresh:
-            est = fresh
-
     active_tab = render_tabs(
         _ESTIMATE_DETAIL_TABS,
         session_key=ESTIMATE_DETAIL_TAB_KEY,
@@ -1311,10 +1330,6 @@ def _render_estimate_detail_tabs(est: dict) -> None:
             "and other costs, then review **Summary**."
         )
 
-    pg_opts, inv_opts, asset_opts, vendor_opts = (
-        _cost_builder_option_lists() if eid and not is_demo_id(eid) else ([], [], [], [])
-    )
-
     editing_locked = _approved_estimate_editing_locked(est)
 
     def _locked_msg(action: str) -> None:
@@ -1323,36 +1338,48 @@ def _render_estimate_detail_tabs(est: dict) -> None:
         )
 
     if active_tab == "Details":
-        overview_html = (
-            f'<div class="ips-detail-grid">'
-            f"{detail_field_html('Estimate #', en)}"
-            f"{detail_field_html('Project', _estimate_project(est))}"
-            f"{detail_field_html('Customer', customer)}"
-            f"{detail_field_html('Contact', _contact_label_for_estimate(est))}"
-            f'{detail_field_html("Status", status, html_value=modal_status_pill_html(status))}'
-            f"{detail_field_html('Estimate date', format_estimate_date(est))}"
-            f"{detail_field_html('Expiration', _estimate_expiration_display(est))}"
-            f"{detail_field_html('Linked Job', est.get('job_number'))}"
-            f"</div>"
-        )
-        st.markdown(dialog_card_html("Estimate Summary", overview_html), unsafe_allow_html=True)
+        from app.perf_debug import perf_span
 
-        from app.services.estimate_costing_service import calculate_estimate_totals
-        overview_totals = (
-            calculate_estimate_totals(eid) if eid and not is_demo_id(eid) else {}
-        )
-        margin_pct = f"{float(overview_totals.get('gross_margin_percent') or est.get('gross_margin_percent') or 0):.1f}%"
-        fin_html = (
-            f'<div class="ips-detail-grid">'
-            f"{detail_field_html('Total cost', fmt_currency(overview_totals.get('total_cost') or est.get('total_cost') or est.get('subtotal')))}"
-            f"{detail_field_html('Customer price', fmt_currency(overview_totals.get('customer_price') or _estimate_stored_customer_price(est)))}"
-            f"{detail_field_html('Tax', fmt_currency(overview_totals.get('tax_amount') or est.get('tax')))}"
-            f"{detail_field_html('Gross profit', fmt_currency(overview_totals.get('gross_profit') or est.get('gross_profit')))}"
-            f"{detail_field_html('Margin %', margin_pct)}"
-            f"</div>"
-        )
-        st.markdown(dialog_card_html("Financial Summary", fin_html), unsafe_allow_html=True)
-        st.caption("Use the cost tabs above to build this estimate.")
+        with perf_span("estimates.detail.details"):
+            overview_html = (
+                f'<div class="ips-detail-grid">'
+                f"{detail_field_html('Estimate #', en)}"
+                f"{detail_field_html('Project', _estimate_project(est))}"
+                f"{detail_field_html('Customer', customer)}"
+                f"{detail_field_html('Contact', _contact_label_for_estimate(est))}"
+                f'{detail_field_html("Status", status, html_value=modal_status_pill_html(status))}'
+                f"{detail_field_html('Estimate date', format_estimate_date(est))}"
+                f"{detail_field_html('Expiration', _estimate_expiration_display(est))}"
+                f"{detail_field_html('Linked Job', est.get('job_number'))}"
+                f"</div>"
+            )
+            st.markdown(dialog_card_html("Estimate Summary", overview_html), unsafe_allow_html=True)
+
+            if _estimate_rollups_are_stale(est):
+                st.caption("Totals pending recalculation.")
+            margin_pct = f"{float(est.get('gross_margin_percent') or 0):.1f}%"
+            fin_html = (
+                f'<div class="ips-detail-grid">'
+                f"{detail_field_html('Total cost', fmt_currency(est.get('total_cost') or est.get('subtotal')))}"
+                f"{detail_field_html('Customer price', fmt_currency(stored_customer_price_amount(est) or None))}"
+                f"{detail_field_html('Tax', fmt_currency(est.get('tax') or est.get('tax_amount')))}"
+                f"{detail_field_html('Gross profit', fmt_currency(est.get('gross_profit')))}"
+                f"{detail_field_html('Margin %', margin_pct)}"
+                f"</div>"
+            )
+            st.markdown(dialog_card_html("Financial Summary", fin_html), unsafe_allow_html=True)
+            if eid and not is_demo_id(eid) and can_approve_estimates(effective_role()):
+                if st.button("Recalculate Totals", key=f"est_recalc_totals_{eid}"):
+                    from app.services.estimate_costing_service import recalculate_estimate_rollups
+
+                    result = recalculate_estimate_rollups(eid)
+                    if result.ok:
+                        _refresh_estimate_modal_cache(eid)
+                        st.success("Totals recalculated.")
+                        st.rerun()
+                    else:
+                        st.error(str(result.error or "Could not recalculate totals."))
+            st.caption("Use the cost tabs above to build this estimate.")
 
     elif active_tab == "Scope of Work":
         if editing_locked:
@@ -1384,7 +1411,9 @@ def _render_estimate_detail_tabs(est: dict) -> None:
         if editing_locked:
             _locked_msg("edit equipment")
         elif eid and not is_demo_id(eid):
-            render_equipment_tab(est, asset_options=asset_opts)
+            from app.services.estimate_builder_helpers import asset_options_as_select
+
+            render_equipment_tab(est, asset_options=asset_options_as_select())
         else:
             placeholder_html("Save this estimate to add equipment.")
 
@@ -1400,7 +1429,7 @@ def _render_estimate_detail_tabs(est: dict) -> None:
         if editing_locked:
             _locked_msg("edit subcontractors")
         elif eid and not is_demo_id(eid):
-            render_subcontractors_tab(est, vendor_options=vendor_opts)
+            render_subcontractors_tab(est, vendor_options=_vendor_options())
         else:
             placeholder_html("Save this estimate to add subcontractors.")
 
@@ -1599,7 +1628,7 @@ def render_estimate_detail(estimate_id: str) -> None:
         st.error("Estimate not found.")
         return
 
-    est = get_estimate(eid)
+    est = get_estimate_detail(eid) or get_estimate(eid)
     if not est:
         render_page_brand_header("Estimate Detail", "Estimate not found.", icon="📄", on_back=_back_to_estimates_list)
         st.error("Estimate not found.")
@@ -1621,11 +1650,7 @@ def render_estimate_detail(estimate_id: str) -> None:
 def render_estimate_detail_dialog(est: dict, *, page_mode: bool = False) -> None:
     rk = record_session_key(est, "id", "estimate_number")
     eid = str(est.get("id") or "")
-    if eid and not is_demo_id(eid):
-        ensure_estimate_expiration_persisted(eid)
-    if eid and not is_demo_id(eid) and _estimate_rollups_are_stale(est):
-        _sync_estimate_rollups_if_stale(eid)
-    fresh = get_estimate(eid) if eid else None
+    fresh = get_estimate_detail(eid) if eid else None
     if fresh:
         est = fresh
     en = safe_value(est.get("estimate_number"))
@@ -1633,7 +1658,6 @@ def render_estimate_detail_dialog(est: dict, *, page_mode: bool = False) -> None
     status = safe_value(est.get("status"))
     customer = safe_value(est.get("customer"))
     total = _estimate_customer_price(est)
-    linked_job = str(est.get("job_id") or est.get("job_number") or "").strip()
 
     if not page_mode:
         render_modal_shell()
@@ -1692,7 +1716,6 @@ def _show_estimates_detail_modal() -> None:
 
 @st.dialog("New Estimate", width="large")
 def _show_new_estimate_dialog() -> None:
-    clear_new_estimate_number_state()
     if "est_new_est_date" not in st.session_state:
         st.session_state["est_new_est_date"] = date.today()
     if "est_new_exp_manual" not in st.session_state:
@@ -1817,8 +1840,9 @@ def _export_estimates_csv(rows: list[dict]) -> str:
 
 
 @fragment
-def _render_estimates_catalog_fragment(rows: list[dict]) -> None:
+def _render_estimates_catalog_fragment() -> None:
     """Estimates filters, summary, and table — local reruns for list interactions."""
+    from app.components.table_filters import sanitize_column_filters
 
     def _filters() -> None:
         c1, c2 = st.columns([9, 1], gap="small")
@@ -1850,14 +1874,13 @@ def _render_estimates_catalog_fragment(rows: list[dict]) -> None:
         default=_ESTIMATES_DEFAULT_VIEW,
     )
 
-    filtered = _filter_rows(
-        rows,
-        q=str(st.session_state.get("estimates_search") or "").strip(),
-        date_range=None,
-        view_filter=str(st.session_state.get("estimates_view") or _ESTIMATES_DEFAULT_VIEW),
-    )
+    view = str(st.session_state.get("estimates_view") or _ESTIMATES_DEFAULT_VIEW)
+    search = str(st.session_state.get("estimates_search") or "").strip()
+    est_page = list_estimates_page(view=view, search=search, table_key=_TABLE_KEY)
+    if sanitize_column_filters(_TABLE_KEY, est_page.filter_options, filter_fields=_ESTIMATE_BAR_FILTER_FIELDS):
+        est_page = list_estimates_page(view=view, search=search, table_key=_TABLE_KEY)
 
-    summary = _estimates_summary_counts(filtered)
+    summary = est_page.summary
     render_estimates_summary_cards(
         total=int(summary["total"]),
         active=int(summary["active"]),
@@ -1876,39 +1899,32 @@ def _render_estimates_catalog_fragment(rows: list[dict]) -> None:
         has_value_data=bool(summary.get("has_any_value")),
     )
 
-    rows_by_id = {str(r.get("id") or ""): r for r in rows if str(r.get("id") or "").strip()}
-    _render_approve_confirmation_panel(rows_by_id)
+    _render_approve_confirmation_panel()
 
     if st.session_state.pop("est_export_ready", False):
+        export_rows = list_estimates_export_rows(view=view, search=search, table_key=_TABLE_KEY)
         st.download_button(
             "Download CSV",
-            data=_export_estimates_csv(filtered),
+            data=_export_estimates_csv(export_rows),
             file_name="estimates_export.csv",
             mime="text/csv",
             key="est_export_download",
         )
 
-    build_modal_cache(filtered, cache_key=_ESTIMATES_CACHE_KEY)
-    filter_options = build_filter_options(rows, _ESTIMATE_COLUMN_FILTER_SPECS)
-    render_estimates_table_pagination_header(len(filtered), _TABLE_KEY)
-    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
-    _render_custom_estimates_table(page_rows, filter_options=filter_options)
-    render_estimates_pagination_footer(len(filtered), _TABLE_KEY)
-    _rerun_if_estimates_detail_pending()
+    render_estimates_table_pagination_header(est_page.total_count, _TABLE_KEY)
+    _render_custom_estimates_table(est_page.rows, filter_options=est_page.filter_options)
+    render_estimates_pagination_footer(est_page.total_count, _TABLE_KEY)
 
 
 def render() -> None:
     from app.pages._core._access import begin_module
+    from app.perf_debug import perf_span
+
     if not begin_module("estimates"):
         return
 
-    if st.session_state.get(ESTIMATES_MODE_KEY) == "detail" and st.session_state.get(SELECTED_ESTIMATE_KEY):
-        inject_estimates_module_css()
-        inject_estimates_page_layout_css()
-        render_estimate_detail(str(st.session_state[SELECTED_ESTIMATE_KEY]))
-        st.stop()
-
-    rows = load_estimates()
+    inject_estimates_module_css()
+    inject_estimates_page_layout_css()
 
     def _estimates_header_actions() -> None:
         st.markdown(
@@ -1921,26 +1937,37 @@ def render() -> None:
                 st.session_state["est_export_ready"] = True
         with new_col:
             if st.button("+ New Estimate", key="est_new", type="primary", use_container_width=True):
-                clear_new_estimate_number_state()
+                if not st.session_state.get(_NEW_ESTIMATE_DIALOG_KEY):
+                    clear_new_estimate_number_state()
                 st.session_state[_NEW_ESTIMATE_DIALOG_KEY] = True
 
     from app.ui.page_header import render_page_header
 
-    render_page_header(
-        "Estimates",
-        "Track and manage estimates",
-        primary_action=_estimates_header_actions,
-        primary_action_width=2.4,
-    )
+    with perf_span("estimates.page_shell"):
+        render_page_header(
+            "Estimates",
+            "Track and manage estimates",
+            primary_action=_estimates_header_actions,
+            primary_action_width=2.4,
+        )
 
-    st.markdown(
-        '<span class="ips-estimates-page ips-page-shell-marker" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
-    inject_estimates_module_css()
-    inject_estimates_page_layout_css()
+        st.markdown(
+            '<span class="ips-estimates-page ips-page-shell-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
 
-    if st.session_state.get(_NEW_ESTIMATE_DIALOG_KEY):
-        _show_new_estimate_dialog()
+        _capture_estimate_detail_query()
+        _show_estimate_detail_query_error_if_any()
 
-    _render_estimates_catalog_fragment(rows)
+        if _estimates_detail_pending():
+            eid = str(st.session_state.get(SELECTED_ESTIMATE_KEY) or "").strip()
+            if eid:
+                render_estimate_detail(eid)
+            if st.session_state.get(_NEW_ESTIMATE_DIALOG_KEY):
+                _show_new_estimate_dialog()
+            return
+
+        if st.session_state.get(_NEW_ESTIMATE_DIALOG_KEY):
+            _show_new_estimate_dialog()
+
+        _render_estimates_catalog_fragment()
