@@ -19,12 +19,14 @@ def test_pg_status_pill_html_includes_class():
     assert "Active" in html_out
 
 
-def test_pg_link_html_uses_open_span():
+def test_pg_link_html_uses_native_anchor():
     html_out = _pg_link_html("pg-1", "Hydraulic hose", extra_class="ips-dash-est-desc-link")
-    assert 'role="button"' in html_out
-    assert 'data-pg-action="open"' in html_out
-    assert 'data-pg-id="pg-1"' in html_out
+    assert '<a ' in html_out
+    assert 'target="_self"' in html_out
     assert "ips-pg-open-link" in html_out
+    assert "pricing_detail=pg-1" in html_out or "pricing_detail=pg-1" in html_out
+    assert "ips_nav=pricing_guide" in html_out
+    assert 'role="button"' not in html_out
     assert "Hydraulic hose" in html_out
 
 
@@ -33,10 +35,10 @@ def test_pg_thumb_link_html_wraps_thumbnail():
         "pg-1",
         {"id": "pg-1", "item": "Hydraulic hose"},
     )
-    assert '<button type="button"' in html_out
+    assert '<a ' in html_out
     assert "ips-pg-thumb-cell-link" in html_out
-    assert 'data-pg-action="open"' in html_out
-    assert 'data-pg-id="pg-1"' in html_out
+    assert 'target="_self"' in html_out
+    assert "pricing_detail=pg-1" in html_out
     assert "ips-pg-thumb-img" in html_out or "ips-pg-thumb-placeholder" in html_out
 
 
@@ -61,8 +63,8 @@ def test_build_pricing_guide_html_table_includes_columns_and_link():
     assert "IMAGE" in html_out
     assert "DESCRIPTION" in html_out
     assert "VENDOR" in html_out
-    assert 'data-pg-action="open"' in html_out
-    assert 'data-pg-id="pg-1"' in html_out
+    assert 'target="_self"' in html_out
+    assert "pricing_detail=pg-1" in html_out
     assert "ips-pg-thumb-cell-link" in html_out
     assert "Hydraulic hose" in html_out
     assert "Acme Supply" in html_out

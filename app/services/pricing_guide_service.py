@@ -507,9 +507,12 @@ def cached_pricing_guide_rows(*, include_inactive: bool = True) -> list[dict[str
 
 
 def clear_pricing_guide_cache() -> None:
+    """Compatibility entry point — prefer invalidate_pricing_guide_directory_cache()."""
     global _last_pricing_guide_fetch
     _last_pricing_guide_fetch = None
-    cached_pricing_guide_rows.clear()
+    from app.services.pricing_guide_directory_service import invalidate_pricing_guide_directory_cache
+
+    invalidate_pricing_guide_directory_cache()
     _cached_lookup_maps.clear()
     try:
         from app.services.item_images import clear_item_image_url_cache

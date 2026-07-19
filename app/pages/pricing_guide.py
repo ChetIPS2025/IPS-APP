@@ -3,103 +3,61 @@
 from __future__ import annotations
 
 import html
+from dataclasses import dataclass
 from typing import Any
 
 import streamlit as st
 
-from app.auth import effective_role
-from app.components.catalog_presence_panel import render_catalog_presence_panel
-from app.components.catalog_stock_policy_panel import render_catalog_stock_policy_panel
+from app.components.headers import render_page_brand_header
+from app.components.labor_rates_panel import render_labor_rates_panel
 from app.components.pricing_guide_actions import render_pricing_guide_action_buttons
-from app.components.pricing_guide_list_table import (
-    build_pricing_guide_html_table,
-    render_pricing_guide_table_bridge_legacy,
-    render_pricing_guide_table_open_buttons,
+from app.components.pricing_guide_detail_tabs import (
+    render_pricing_guide_detail_tabs,
+    reset_pricing_guide_detail_tab,
+    set_pricing_guide_detail_tab_from_query,
 )
+from app.components.pricing_guide_edit_form import render_new_pricing_item_dialog, render_pricing_guide_edit_form
+from app.components.pricing_guide_import_panel import render_pricing_guide_import_panel
+from app.components.pricing_guide_links_panel import render_pricing_guide_links_panel
+from app.components.pricing_guide_list_table import build_pricing_guide_html_table
 from app.components.pricing_guide_page_layout import (
     close_pricing_guide_filter_bar_shell,
     inject_pricing_guide_page_layout_css,
     render_pricing_guide_filter_bar_shell,
 )
-from app.components.headers import render_page_brand_header
-from app.components.item_photo_manager import render_item_photo_manager
 from app.components.layout import render_filter_bar as layout_filter_bar
-from app.components.table_filters import (
-    apply_column_filters,
-    build_filter_options,
-    clear_table_filters,
-    render_table_header_cell,
-)
-from app.components.table_pagination import (
-    paginate_rows,
-    render_table_pagination_footer,
-    render_table_pagination_header,
-    reset_table_page,
-)
 from app.components.record_modal import (
-    build_modal_cache,
     clear_edit_modes,
     clear_record_modal,
-    detail_field_html,
-    dialog_card_html,
     get_modal_record,
     is_edit_mode,
     open_record_modal,
-    placeholder_html,
     record_session_key,
-    render_edit_form_header,
     render_missing_record,
     render_modal_edit_button,
     render_modal_header,
     render_modal_meta_grid,
     render_modal_shell,
-    render_save_cancel_actions,
-    safe_value,
-    set_view_mode,
-    status_pill_html as modal_status_pill_html,
 )
-from app.components.labor_rates_panel import render_labor_rates_panel
+from app.components.table_filters import clear_table_filters, render_table_header_cell, sanitize_column_filters
+from app.components.table_pagination import (
+    render_table_pagination_footer,
+    render_table_pagination_header,
+    reset_table_page,
+)
 from app.components.tabs import render_tabs
-from app.db import fetch_table, fetch_table_admin
-from app.pages._core._crud import apply_persist_feedback, is_demo_id
-from app.pages._core._data import load_assets, load_inventory
 from app.pages._core._session import select_key
-from app.services.pricing_guide_service import (
-    PRICING_ITEM_CLASSES,
-    PRICING_ITEM_TYPES,
-    calc_sell_price,
-    cached_pricing_guide_rows,
-    class_pill_html,
-    clear_pricing_guide_cache,
-    fetch_price_history,
-    fetch_pricing_guide_catalog,
-    normalize_pricing_row,
-    pricing_guide_fetch_status,
-    save_pricing_item,
-    search_pricing_rows,
-    pricing_guide_summary,
-    type_pill_html,
+from app.services.pricing_guide_detail_service import (
+    get_pricing_guide_item_detail,
+    put_pricing_guide_in_modal_cache,
 )
-from app.services.catalog_import_service import parse_catalog_csv
-from app.services.catalog_image_review_service import (
-    DECISION_APPROVE,
-    DECISION_PENDING,
-    DECISION_REPLACE,
-    DECISION_SKIP,
-    ImportImageReviewRow,
-    build_import_image_review,
-    import_catalog_with_review,
-)
-from app.services.pricing_guide_images import (
-    clear_pricing_guide_image,
-    pricing_guide_display_record,
-    pricing_guide_image_is_inherited,
-    upload_pricing_guide_image,
-)
-from app.services.item_images import ITEM_IMAGE_UPLOAD_TYPES
+from app.services.pricing_guide_directory_service import list_pricing_guide_page
+from app.services.pricing_guide_images import get_pricing_guide_image_url
+from app.services.pricing_guide_service import normalize_pricing_row, pricing_guide_fetch_status, save_pricing_item
 from app.styles import inject_pricing_guide_module_css
-from app.ui.streamlit_perf import fragment, fragment_rerun, ips_app_rerun
+from app.ui.streamlit_perf import fragment, fragment_rerun
 from app.utils.formatting import fmt_currency
+
 _SEL = select_key("pricing_guide")
 _MODULE = "pricing_guide"
 _TABLE_KEY = "pg_list"
@@ -107,7 +65,9 @@ _MODAL_KEY = "ips_pg_detail_modal_id"
 _CACHE_KEY = "_ips_pg_modal_by_id"
 SELECTED_PG_KEY = "selected_pricing_guide_id"
 SHOW_PG_MODAL_KEY = "show_pricing_guide_detail_modal"
-_ALL_PG_IDS_KEY = "_ips_pg_visible_ids"
+_PRICING_DETAIL_QUERY_KEY = "pricing_detail"
+_PRICING_DETAIL_TAB_QUERY_KEY = "pricing_tab"
+_PRICING_DETAIL_QUERY_ERROR_KEY = "_ips_pg_detail_query_error"
 _PG_FILTER_SPECS: list[tuple[str, str]] = [
     ("CLASS", "item_class"),
     ("CATEGORY", "category"),
@@ -115,120 +75,85 @@ _PG_FILTER_SPECS: list[tuple[str, str]] = [
     ("STATUS", "status"),
 ]
 _FILTER_FIELDS = ["item_class", "category", "vendor", "status"]
-_COLUMN_FILTER_SPECS: list[tuple[str, object]] = [
-    ("item_class", lambda r: str(r.get("item_class") or "Non-Inventory")),
-    ("category", lambda r: str(r.get("category") or "—")),
-    ("vendor", lambda r: str(r.get("vendor") or "—")),
-    ("status", lambda r: str(r.get("status") or "Active")),
-]
-_DETAIL_TABS = (
-    "Overview",
-    "Pricing",
-    "Links",
-    "Price History",
-    "Notes",
-)
+
+
+@dataclass(frozen=True)
+class PricingGuidePermissions:
+    role: str
+    user_id: str
+    user_name: str
+    can_manage: bool
+    can_edit: bool
+    can_delete: bool
+    can_import: bool
+    can_manage_stock_policy: bool
+
+
+def _pricing_permissions() -> PricingGuidePermissions:
+    role = str(st.session_state.get("role") or st.session_state.get("user_role") or "").strip().lower()
+    if not role:
+        try:
+            from app.auth import effective_role
+
+            role = str(effective_role() or "").strip().lower()
+        except Exception:
+            role = ""
+    user = st.session_state.get("user") if isinstance(st.session_state.get("user"), dict) else {}
+    user_id = str(user.get("id") or st.session_state.get("user_id") or "").strip()
+    user_name = str(user.get("name") or st.session_state.get("user_name") or "").strip()
+    can_manage = role in {"admin", "supervisor", "manager"}
+    return PricingGuidePermissions(
+        role=role,
+        user_id=user_id,
+        user_name=user_name,
+        can_manage=can_manage,
+        can_edit=can_manage,
+        can_delete=can_manage,
+        can_import=can_manage,
+        can_manage_stock_policy=can_manage,
+    )
 
 
 def _normalize_row(raw: dict[str, Any]) -> dict[str, Any]:
     return normalize_pricing_row(raw)
 
 
-def _fitting_detail_fields_html(row: dict[str, Any]) -> str:
-    """Extra spec lines for fittings (unions, adapters) when catalog columns are set."""
-    if not str(row.get("connection_type") or row.get("dash_size") or "").strip():
-        return ""
-    parts: list[str] = []
-    for label, key in (
-        ("Product type", "product_type"),
-        ("Connection", "connection_type"),
-        ("Pipe size", "pipe_size"),
-        ("Dash size", "dash_size"),
-        ("Pressure class", "pressure_class"),
-        ("Body shape", "body_shape"),
-        ("Material", "material_grade"),
-        ("Max pressure", "max_pressure_temp"),
-        ("Max steam pressure", "max_steam_pressure_temp"),
-    ):
-        val = str(row.get(key) or "").strip()
-        if val:
-            parts.append(detail_field_html(label, val))
-    return "".join(parts)
+def _persist_row(data: dict[str, Any], row_id: str | None = None) -> tuple[bool, str]:
+    return save_pricing_item(data, row_id=row_id)
 
 
-def _load_rows() -> list[dict[str, Any]]:
-    if not st.session_state.get("_pg_catalog_status_checked"):
-        fetch_pricing_guide_catalog(include_inactive=True)
-        st.session_state["_pg_catalog_status_checked"] = True
-    return cached_pricing_guide_rows(include_inactive=True)
-
-
-def _render_catalog_status_banner() -> None:
-    status = pricing_guide_fetch_status()
-    if not status or not status.warning:
-        return
-    if status.fetch_failed:
-        st.error(status.warning)
+def _render_catalog_status_banner(warning: str | None, *, fetch_failed: bool = False) -> None:
+    if not warning:
+        status = pricing_guide_fetch_status()
+        if not status or not status.warning:
+            return
+        warning = status.warning
+        fetch_failed = bool(status.fetch_failed)
+    if fetch_failed:
+        st.error(warning)
     else:
-        st.warning(status.warning)
+        st.warning(warning)
 
 
-def _vendor_options() -> list[tuple[str, str]]:
-    opts: list[tuple[str, str]] = [("— None —", "")]
-    try:
-        rows = list(fetch_table_admin("vendors", limit=5000, order_by="vendor_name") or [])
-    except Exception:
-        try:
-            rows = list(fetch_table("vendors", limit=5000, order_by="vendor_name") or [])
-        except Exception:
-            rows = []
-    for r in rows:
-        if not isinstance(r, dict) or r.get("is_active") is False:
-            continue
-        vid = str(r.get("id") or "").strip()
-        name = str(r.get("vendor_name") or r.get("name") or "").strip()
-        if vid and name:
-            opts.append((name, vid))
-    return opts
+def _render_summary_cards(summary: dict[str, Any]) -> None:
+    from app.perf_debug import perf_span
 
-
-def _inventory_options() -> list[tuple[str, str]]:
-    opts: list[tuple[str, str]] = [("— None —", "")]
-    for r in load_inventory():
-        iid = str(r.get("id") or "").strip()
-        label = str(r.get("item_name") or r.get("name") or r.get("description") or "").strip()
-        if iid and label:
-            opts.append((label, iid))
-    return opts
-
-
-def _asset_options() -> list[tuple[str, str]]:
-    opts: list[tuple[str, str]] = [("— None —", "")]
-    for r in load_assets():
-        aid = str(r.get("id") or "").strip()
-        label = str(r.get("asset_name") or r.get("name") or "").strip()
-        if aid and label:
-            opts.append((label, aid))
-    return opts
-
-
-def _render_summary_cards(rows: list[dict[str, Any]]) -> None:
-    stats = pricing_guide_summary(rows)
-    cards = [
-        ("Active Items", str(stats["active_count"])),
-        ("Inventory Class", str(stats["inventory_class"])),
-        ("Asset Class", str(stats["asset_class"])),
-        ("Non-Inventory", str(stats["non_inventory_class"])),
-        ("Stock Linked", str(stats["inventory_linked"])),
-        ("Asset Linked", str(stats["asset_linked"])),
-        ("Avg Markup", f"{stats['avg_markup']:.1f}%"),
-    ]
-    html_cards = "".join(
-        f'<div class="ips-pg-summary-card"><div class="lbl">{html.escape(lbl)}</div>'
-        f'<div class="val">{html.escape(val)}</div></div>'
-        for lbl, val in cards
-    )
-    st.markdown(f'<div class="ips-pg-summary-grid">{html_cards}</div>', unsafe_allow_html=True)
+    with perf_span("pricing_guide.summary"):
+        cards = [
+            ("Active Items", str(summary.get("active_count", 0))),
+            ("Inventory Class", str(summary.get("inventory_class", 0))),
+            ("Asset Class", str(summary.get("asset_class", 0))),
+            ("Non-Inventory", str(summary.get("non_inventory_class", 0))),
+            ("Stock Linked", str(summary.get("inventory_linked", 0))),
+            ("Asset Linked", str(summary.get("asset_linked", 0))),
+            ("Avg Markup", f"{float(summary.get('avg_markup') or 0):.1f}%"),
+        ]
+        html_cards = "".join(
+            f'<div class="ips-pg-summary-card"><div class="lbl">{html.escape(lbl)}</div>'
+            f'<div class="val">{html.escape(val)}</div></div>'
+            for lbl, val in cards
+        )
+        st.markdown(f'<div class="ips-pg-summary-grid">{html_cards}</div>', unsafe_allow_html=True)
 
 
 def _clear_modal() -> None:
@@ -240,6 +165,10 @@ def _clear_modal() -> None:
         modal_key=_MODAL_KEY,
         module=_MODULE,
     )
+    if _PRICING_DETAIL_QUERY_KEY in st.query_params:
+        del st.query_params[_PRICING_DETAIL_QUERY_KEY]
+    if _PRICING_DETAIL_TAB_QUERY_KEY in st.query_params:
+        del st.query_params[_PRICING_DETAIL_TAB_QUERY_KEY]
 
 
 def _open_modal(row_id: str, row: dict | None = None) -> None:
@@ -258,36 +187,52 @@ def _open_modal(row_id: str, row: dict | None = None) -> None:
     )
 
 
-def _prepare_open_pg_table_item(row_id: str, row: dict | None = None) -> None:
-    """Set selected pricing item state (bridge escalates to app rerun)."""
-    rid = str(row_id or "").strip()
-    if not rid:
-        return
-    cache = st.session_state.get(_CACHE_KEY) or {}
-    cached = cache.get(rid) if isinstance(cache, dict) else None
-    record = cached if isinstance(cached, dict) else row
-    _open_modal(rid, record)
-
-
-def _open_pg_table_item(row_id: str, row: dict | None = None) -> None:
-    _prepare_open_pg_table_item(row_id, row)
-
-
-def _rerun_if_pg_modal_pending() -> None:
-    """Escalate fragment list interactions to a full app rerun for @st.dialog."""
-    if st.session_state.get(SHOW_PG_MODAL_KEY) or str(st.session_state.get(_MODAL_KEY) or "").strip():
-        ips_app_rerun()
-
-
 def _clear_pg_selection() -> None:
     st.session_state[SELECTED_PG_KEY] = None
     st.session_state[SHOW_PG_MODAL_KEY] = False
 
 
-def _render_pricing_guide_table_column_filters(
-    *,
-    filter_options: dict[str, list[str]],
-) -> None:
+def _pg_detail_pending() -> bool:
+    return bool(
+        st.session_state.get(SHOW_PG_MODAL_KEY)
+        or str(st.session_state.get(_MODAL_KEY) or "").strip()
+    )
+
+
+def _capture_pricing_detail_query() -> None:
+    from app.perf_debug import perf_span
+
+    with perf_span("pricing_guide.detail_lookup"):
+        requested_id = str(st.query_params.get(_PRICING_DETAIL_QUERY_KEY) or "").strip()
+        if not requested_id:
+            return
+        current_modal_id = str(st.session_state.get(_MODAL_KEY) or "").strip()
+        if requested_id == current_modal_id and st.session_state.get(SHOW_PG_MODAL_KEY):
+            tab_focus = str(st.query_params.get(_PRICING_DETAIL_TAB_QUERY_KEY) or "").strip()
+            if tab_focus:
+                set_pricing_guide_detail_tab_from_query(tab_focus)
+            return
+        row = get_pricing_guide_item_detail(requested_id)
+        if not row:
+            st.session_state[_PRICING_DETAIL_QUERY_ERROR_KEY] = requested_id
+            if _PRICING_DETAIL_QUERY_KEY in st.query_params:
+                del st.query_params[_PRICING_DETAIL_QUERY_KEY]
+            if _PRICING_DETAIL_TAB_QUERY_KEY in st.query_params:
+                del st.query_params[_PRICING_DETAIL_TAB_QUERY_KEY]
+            return
+        tab_focus = str(st.query_params.get(_PRICING_DETAIL_TAB_QUERY_KEY) or "").strip()
+        _open_modal(requested_id, row)
+        reset_pricing_guide_detail_tab(default="Overview")
+        if tab_focus:
+            set_pricing_guide_detail_tab_from_query(tab_focus)
+
+
+def _show_pricing_detail_query_error_if_any() -> None:
+    if st.session_state.pop(_PRICING_DETAIL_QUERY_ERROR_KEY, None):
+        st.warning("The selected Pricing Guide item could not be found.")
+
+
+def _render_pricing_guide_table_column_filters(*, filter_options: dict[str, list[str]]) -> None:
     if not _PG_FILTER_SPECS:
         return
     st.markdown('<div class="ips-pg-table-filter-toolbar">', unsafe_allow_html=True)
@@ -305,564 +250,62 @@ def _render_pricing_guide_table_column_filters(
 
 
 def _render_custom_pricing_guide_table(
-    filtered: list[dict[str, Any]],
+    page_rows: list[dict[str, Any]],
     *,
     filter_options: dict[str, list[str]],
-) -> list[str]:
-    if not filtered:
+) -> None:
+    from app.perf_debug import perf_span
+
+    if not page_rows:
         st.info("No pricing guide items match your filters.")
-        st.session_state[_ALL_PG_IDS_KEY] = []
-        return []
-
-    all_row_ids = [str(r.get("id") or "").strip() for r in filtered if str(r.get("id") or "").strip()]
-    st.session_state[_ALL_PG_IDS_KEY] = all_row_ids
-
-    rows_by_id = {
-        str(r.get("id") or "").strip(): r
-        for r in filtered
-        if str(r.get("id") or "").strip()
-    }
-
+        return
+    for row in page_rows:
+        rid = str(row.get("id") or "").strip()
+        if rid:
+            put_pricing_guide_in_modal_cache(rid, row)
     with st.container(key="pricing_guide_table_wrap"):
-        _render_pricing_guide_table_column_filters(filter_options=filter_options)
-        st.markdown(
-            build_pricing_guide_html_table(filtered),
-            unsafe_allow_html=True,
-        )
-        render_pricing_guide_table_open_buttons(
-            filtered,
-            open_item_fn=_open_pg_table_item,
-        )
-        render_pricing_guide_table_bridge_legacy(
-            rows_by_id,
-            open_item_fn=_open_pg_table_item,
-        )
-
-    return all_row_ids
+        with perf_span("pricing_guide.table_html"):
+            _render_pricing_guide_table_column_filters(filter_options=filter_options)
+            st.markdown(build_pricing_guide_html_table(page_rows), unsafe_allow_html=True)
 
 
-def _can_manage_pricing() -> bool:
-    return str(effective_role() or "").strip().lower() in {"admin", "supervisor", "manager"}
-
-
-def _render_pg_photo_manager(row: dict[str, Any]) -> None:
+def _render_lazy_overview_photo(row: dict[str, Any], *, permissions: PricingGuidePermissions) -> None:
     rid = str(row.get("id") or "").strip()
-    rk = record_session_key(row, "id")
-    display = pricing_guide_display_record(row)
-    render_item_photo_manager(
-        row,
-        record_id=rid,
-        session_prefix=f"pg_photo_{rk}",
-        image_css_class="ips-pg-detail-image",
-        upload_image=upload_pricing_guide_image,
-        clear_image=clear_pricing_guide_image,
-        uploaded_by="",
-        cache_key=_CACHE_KEY,
-        on_change=clear_pricing_guide_cache,
-        readonly=not _can_manage_pricing() or is_demo_id(rid),
-        preview_record=display,
-    )
-    if pricing_guide_image_is_inherited(row):
-        item_class = str(row.get("item_class") or "").strip().lower()
-        if item_class == "asset":
-            st.caption("Photo from linked asset.")
-        elif item_class == "inventory":
-            st.caption("Photo from linked inventory item.")
-        else:
-            st.caption("Photo from linked catalog record.")
-
-
-def _render_pg_detail_image(row: dict[str, Any]) -> None:
-    _render_pg_photo_manager(row)
-
-
-def _filter_rows(rows: list[dict[str, Any]], *, q: str) -> list[dict[str, Any]]:
-    out = search_pricing_rows(rows, q)
-    return apply_column_filters(out, _TABLE_KEY, _COLUMN_FILTER_SPECS)
-
-
-def _persist_row(data: dict[str, Any], row_id: str | None = None) -> tuple[bool, str]:
-    return save_pricing_item(data, row_id=row_id)
-
-
-def _render_conditional_fields(prefix: str, item_class: str, item_type: str) -> dict[str, Any]:
-    extra: dict[str, Any] = {}
-    if item_class == "Inventory":
-        inv_opts = _inventory_options()
-        pick = st.selectbox(
-            "Link inventory item",
-            [label for label, _ in inv_opts],
-            key=f"{prefix}_inv",
-        )
-        inv_map = {label: vid for label, vid in inv_opts}
-        extra["linked_inventory_id"] = inv_map.get(pick) or None
-        extra["inventory_item_id"] = extra["linked_inventory_id"]
-    elif item_class == "Asset":
-        asset_opts = _asset_options()
-        pick = st.selectbox(
-            "Link asset",
-            [label for label, _ in asset_opts],
-            key=f"{prefix}_asset",
-        )
-        asset_map = {label: aid for label, aid in asset_opts}
-        extra["linked_asset_id"] = asset_map.get(pick) or None
-        extra["asset_id"] = extra["linked_asset_id"]
-        extra["equipment_type"] = st.text_input("Equipment type", key=f"{prefix}_eq_type")
-    elif item_type == "Labor":
-        extra["labor_role"] = st.text_input("Labor role", key=f"{prefix}_labor_role")
-    elif item_type == "Travel":
-        extra["travel_type"] = st.selectbox(
-            "Travel type",
-            ["Mileage", "Per Diem", "Lodging", "Mobilization", "Fuel surcharge", "Other"],
-            key=f"{prefix}_travel_type",
-        )
-    elif item_type == "Subcontractor":
-        vendor_opts = _vendor_options()
-        pick = st.selectbox("Vendor", [label for label, _ in vendor_opts], key=f"{prefix}_vendor")
-        vendor_map = {label: vid for label, vid in vendor_opts}
-        extra["vendor_id"] = vendor_map.get(pick) or None
-    elif item_type == "Service":
-        extra["category"] = st.text_input("Service category", key=f"{prefix}_svc_cat")
-    elif item_type == "Assembly":
-        st.caption("Assembly packages: component grouping will be added in a future release.")
-    return extra
-
-
-def _render_csv_import() -> None:
-    with st.expander("Import Catalog CSV", expanded=False):
-        st.caption(
-            "Imports Pricing Guide, Inventory, and Asset records from CSV. "
-            "Item photos require manual review — nothing is auto-attached from cropped thumbnails."
-        )
-        uploaded = st.file_uploader(
-            "CSV file",
-            type=["csv"],
-            key="pg_csv_upload",
-            label_visibility="collapsed",
-        )
-        image_uploads = st.file_uploader(
-            "Candidate item images (optional — match by model #, item #, SKU, then description)",
-            type=list(ITEM_IMAGE_UPLOAD_TYPES),
-            accept_multiple_files=True,
-            key="pg_csv_images",
-        )
-        st.caption(
-            "Approved images are saved under assets/item_images/inventory/ and assets/item_images/assets/. "
-            "Existing approved photos are never overwritten."
-        )
-
-        if uploaded is None:
-            return
-
-        text = uploaded.getvalue().decode("utf-8-sig", errors="replace")
-        image_files: list[tuple[str, bytes]] = []
-        for f in image_uploads or []:
-            image_files.append((str(getattr(f, "name", "") or "image.jpg"), f.getvalue()))
-
-        c1, c2 = st.columns(2)
-        with c1:
-            prepare = st.button("Prepare Import Review", key="pg_csv_prepare", type="primary")
-        with c2:
-            if st.button("Clear Review", key="pg_csv_clear_review"):
-                for key in list(st.session_state.keys()):
-                    if isinstance(key, str) and key.startswith("pg_import_"):
-                        del st.session_state[key]
-                st.rerun()
-
-        if prepare:
-            rows = parse_catalog_csv(text)
-            if not rows:
-                st.error("No valid rows found in CSV.")
-                return
-            review = build_import_image_review(rows, image_files or None)
-            st.session_state["pg_import_csv_text"] = text
-            st.session_state["pg_import_review_meta"] = [
-                {
-                    "row_index": r.row_index,
-                    "description": r.description,
-                    "model_number": r.model_number,
-                    "item_number": r.item_number,
-                    "sku": r.sku,
-                    "item_class": r.item_class,
-                    "match_filename": r.match_filename,
-                    "match_field": r.match_field,
-                    "confidence": r.confidence,
-                    "decision": r.decision,
-                    "existing_approved": r.existing_approved,
-                    "row": r.row,
-                }
-                for r in review
-            ]
-            blob_cache: dict[str, bytes] = {}
-            for r in review:
-                if r.suggested_bytes:
-                    blob_cache[str(r.row_index)] = r.suggested_bytes
-            st.session_state["pg_import_image_blobs"] = blob_cache
-            for r in review:
-                st.session_state[f"pg_import_decision_{r.row_index}"] = r.decision
-            st.rerun()
-
-        meta = st.session_state.get("pg_import_review_meta")
-        if not meta:
-            return
-
-        st.markdown("### Image review (required before photos are saved)")
-        suggested = sum(1 for m in meta if m.get("match_filename"))
-        st.caption(
-            f"{len(meta)} catalog row(s) · {suggested} with suggested image(s). "
-            "Approve, replace, or skip each photo before import."
-        )
-
-        page_size = 10
-        total_pages = max(1, (len(meta) + page_size - 1) // page_size)
-        page = int(st.number_input("Review page", min_value=1, max_value=total_pages, value=1, key="pg_import_review_page"))
-        start = (page - 1) * page_size
-        batch = meta[start : start + page_size]
-        blobs: dict[str, bytes] = st.session_state.get("pg_import_image_blobs") or {}
-
-        for entry in batch:
-            idx = int(entry["row_index"])
-            decision_key = f"pg_import_decision_{idx}"
-            if decision_key not in st.session_state:
-                st.session_state[decision_key] = str(entry.get("decision") or DECISION_SKIP)
-
-            with st.container(border=True):
-                left, mid, right = st.columns([2.2, 1.2, 1.3])
-                with left:
-                    st.markdown(f"**{entry.get('description', '')[:120]}**")
-                    st.caption(
-                        f"Class: {entry.get('item_class')} · "
-                        f"Model: {entry.get('model_number') or '—'} · "
-                        f"Item #: {entry.get('item_number') or '—'} · "
-                        f"SKU: {entry.get('sku') or '—'}"
-                    )
-                    if entry.get("existing_approved"):
-                        st.info("Existing approved photo — will not be overwritten.")
-                with mid:
-                    blob = blobs.get(str(idx))
-                    if blob:
-                        st.image(blob, caption=entry.get("match_filename") or "Suggested", use_container_width=True)
-                        conf = str(entry.get("confidence") or "none")
-                        field = str(entry.get("match_field") or "")
-                        st.caption(f"Match: {field or '—'} ({conf})")
-                    else:
-                        st.caption("No suggested image")
-                with right:
-                    options = [DECISION_PENDING, DECISION_APPROVE, DECISION_SKIP, DECISION_REPLACE]
-                    if entry.get("existing_approved"):
-                        options = [DECISION_SKIP]
-                    current = str(st.session_state.get(decision_key) or entry.get("decision") or DECISION_PENDING)
-                    if current not in options:
-                        current = options[0]
-                    choice = st.selectbox(
-                        "Decision",
-                        options,
-                        index=options.index(current),
-                        key=f"pg_import_decision_select_{idx}",
-                        disabled=bool(entry.get("existing_approved")),
-                    )
-                    st.session_state[decision_key] = choice
-                    if choice == DECISION_REPLACE:
-                        repl = st.file_uploader(
-                            "Replacement image",
-                            type=list(ITEM_IMAGE_UPLOAD_TYPES),
-                            key=f"pg_import_replace_{idx}",
-                            label_visibility="collapsed",
-                        )
-                        if repl is not None:
-                            st.session_state[f"pg_import_replace_bytes_{idx}"] = repl.getvalue()
-                            st.session_state[f"pg_import_replace_name_{idx}"] = str(getattr(repl, "name", "") or "replacement.jpg")
-
-        if st.button("Import Catalog + Approved Images", key="pg_csv_import", type="primary"):
-            csv_text = str(st.session_state.get("pg_import_csv_text") or text)
-            review_rows: list[ImportImageReviewRow] = []
-            for entry in meta:
-                idx = int(entry["row_index"])
-                decision = str(st.session_state.get(f"pg_import_decision_{idx}") or DECISION_SKIP)
-                suggested_bytes = blobs.get(str(idx))
-                replace_bytes = st.session_state.get(f"pg_import_replace_bytes_{idx}")
-                replace_name = str(st.session_state.get(f"pg_import_replace_name_{idx}") or "")
-                review_rows.append(
-                    ImportImageReviewRow(
-                        row_index=idx,
-                        row=dict(entry.get("row") or {}),
-                        description=str(entry.get("description") or ""),
-                        model_number=str(entry.get("model_number") or ""),
-                        item_number=str(entry.get("item_number") or ""),
-                        sku=str(entry.get("sku") or ""),
-                        item_class=str(entry.get("item_class") or ""),
-                        match_filename=str(entry.get("match_filename") or ""),
-                        match_field=str(entry.get("match_field") or ""),
-                        confidence=str(entry.get("confidence") or "none"),
-                        suggested_bytes=suggested_bytes if isinstance(suggested_bytes, (bytes, bytearray)) else None,
-                        decision=decision,
-                        replace_filename=replace_name,
-                        replace_bytes=replace_bytes if isinstance(replace_bytes, (bytes, bytearray)) else None,
-                        existing_approved=bool(entry.get("existing_approved")),
-                    )
-                )
-            result, _img = import_catalog_with_review(csv_text, review_rows)
-            if result.ok:
-                st.success(result.message)
-                if result.errors:
-                    for err in result.errors[:20]:
-                        st.warning(err)
-                for key in list(st.session_state.keys()):
-                    if isinstance(key, str) and key.startswith("pg_import_"):
-                        del st.session_state[key]
-                st.rerun()
-            else:
-                st.error(result.message)
-
-
-def _render_add_form() -> None:
-    with st.expander("New Pricing Item", expanded=True):
-        c1, c2 = st.columns(2, gap="small")
-        with c1:
-            description = st.text_input("Description *", key="pg_new_desc")
-            item_class = st.selectbox("Item Class *", list(PRICING_ITEM_CLASSES), key="pg_new_class")
-            item_type = st.selectbox("Estimate Line Type *", list(PRICING_ITEM_TYPES), key="pg_new_type")
-            unit = st.text_input("Unit *", value="EA", key="pg_new_unit")
-            category = st.text_input("Category", key="pg_new_cat")
-        with c2:
-            cost = st.number_input("Cost *", min_value=0.0, value=0.0, key="pg_new_cost")
-            markup = st.number_input("Markup % *", min_value=0.0, value=25.0, key="pg_new_mk")
-            sell = calc_sell_price(float(st.session_state.get("pg_new_cost") or 0), float(st.session_state.get("pg_new_mk") or 0))
-            st.metric("Sell Price", fmt_currency(sell))
-            active = st.checkbox("Active", value=True, key="pg_new_active")
-
-        extra = _render_conditional_fields("pg_new", item_class, item_type)
-
-        if st.button("Save Pricing Item", key="pg_new_save", type="primary"):
-            payload = {
-                "description": description,
-                "item_class": item_class,
-                "item_type": item_type,
-                "unit": unit,
-                "category": extra.get("category") or category,
-                "default_cost": cost,
-                "default_markup_percent": markup,
-                "default_sell_price": sell,
-                "is_active": active,
-                **extra,
-            }
-            ok, msg = _persist_row(payload)
-            if apply_persist_feedback(ok, msg, clear_keys=("pg_add_form",)):
-                st.rerun()
-
-
-def _render_item_tabs(row: dict[str, Any]) -> None:
-    tab = render_tabs(list(_DETAIL_TABS), session_key=f"ips_pg_tab_{row.get('id')}", default="Overview")
-    if tab == "Overview":
-        media, details = st.columns([1.0, 2.2])
-        with media:
-            st.markdown("**Item Image**")
-            _render_pg_detail_image(row)
-        with details:
-            st.markdown(
-                dialog_card_html(
-                    "Overview",
-                    f"{detail_field_html('Description', row.get('item'))}"
-                    f"{detail_field_html('Item code', row.get('item_code') or row.get('item_key'))}"
-                    f'{detail_field_html("Class", row.get("item_class"), html_value=class_pill_html(str(row.get("item_class") or "")))}'
-                    f'{detail_field_html("Estimate type", row.get("item_type"), html_value=type_pill_html(str(row.get("item_type") or "")))}'
-                    f"{detail_field_html('SKU', row.get('sku') or '—')}"
-                    f"{detail_field_html('Item #', row.get('item_number') or '—')}"
-                    f"{detail_field_html('Model #', row.get('model_number') or '—')}"
-                    f"{detail_field_html('Image status', row.get('image_status') or 'missing')}"
-                    f"{detail_field_html('Category', row.get('category'))}"
-                    f"{detail_field_html('Subcategory', row.get('subcategory') or '—')}"
-                    f"{_fitting_detail_fields_html(row)}"
-                    f"{detail_field_html('Unit', row.get('unit'))}"
-                    f'{detail_field_html("Status", row.get("status"), html_value=modal_status_pill_html(str(row.get("status") or "")))}',
-                ),
-                unsafe_allow_html=True,
-            )
-    elif tab == "Pricing":
-        mk = float(row.get("markup_pct") or 0)
+    manage_key = f"ips_pg_manage_photo_{rid}"
+    image_url = get_pricing_guide_image_url(row)
+    if image_url:
         st.markdown(
-            dialog_card_html(
-                "Pricing",
-                f"{detail_field_html('Cost', fmt_currency(row.get('default_cost')))}"
-                f"{detail_field_html('Markup %', f'{mk:.1f}%')}"
-                f"{detail_field_html('Sell price', fmt_currency(row.get('customer_price')))}"
-                f"{detail_field_html('Taxable', 'Yes' if row.get('taxable') is not False else 'No')}",
-            ),
+            f'<img class="ips-pg-detail-image" src="{html.escape(image_url, quote=True)}" alt="" />',
             unsafe_allow_html=True,
         )
-    elif tab == "Links":
-        inv_label = str(row.get("inventory_label") or "").strip() or "Not linked"
-        asset_label = str(row.get("asset_label") or "").strip() or "Not linked"
-        body = (
-            f"{detail_field_html('Inventory item', inv_label)}"
-            f"{detail_field_html('Asset / equipment', asset_label)}"
-            f"{detail_field_html('Stock policy', row.get('stock_policy_label') or 'Not stocked')}"
-            f"{detail_field_html('Default reorder point', int(float(row.get('default_reorder_point') or 0)))}"
-            f"{detail_field_html('Vendor', row.get('vendor') or '—')}"
-            f"{detail_field_html('Labor role', row.get('labor_role') or '—')}"
-            f"{detail_field_html('Equipment type', row.get('equipment_type') or '—')}"
-            f"{detail_field_html('Travel type', row.get('travel_type') or '—')}"
-        )
-        st.markdown(dialog_card_html("Linked Records", body), unsafe_allow_html=True)
-    elif tab == "Price History":
-        history = fetch_price_history(str(row.get("id") or ""))
-        if not history:
-            st.markdown(
-                dialog_card_html("Price History", placeholder_html("No price changes recorded yet.")),
-                unsafe_allow_html=True,
-            )
-        else:
-            rows_html = "".join(
-                f"<tr><td>{html.escape(str(h.get('changed_at') or '')[:10])}</td>"
-                f"<td>{html.escape(fmt_currency(h.get('old_cost')))}</td>"
-                f"<td>{html.escape(fmt_currency(h.get('new_cost')))}</td>"
-                f"<td>{html.escape(str(h.get('changed_by') or '—'))}</td></tr>"
-                for h in history
-            )
-            table = (
-                '<table class="ips-est-line-table"><thead><tr>'
-                "<th>Date</th><th>Old Cost</th><th>New Cost</th><th>Changed By</th>"
-                f"</tr></thead><tbody>{rows_html}</tbody></table>"
-            )
-            st.markdown(dialog_card_html("Price History", table), unsafe_allow_html=True)
     else:
-        notes = safe_value(row.get("notes"), "No notes.")
-        st.markdown(
-            dialog_card_html("Notes", f"<p style='margin:0;font-size:0.875rem;'>{html.escape(notes)}</p>"),
-            unsafe_allow_html=True,
+        st.caption("No photo on file.")
+    if not permissions.can_manage:
+        return
+    if not st.session_state.get(manage_key):
+        if st.button("Manage Photo", key=f"pg_manage_photo_btn_{rid}"):
+            st.session_state[manage_key] = True
+            fragment_rerun()
+        return
+    from app.components.pricing_guide_edit_form import render_pg_photo_manager
+
+    with st.expander("Photo management", expanded=True):
+        render_pg_photo_manager(
+            row,
+            cache_key=_CACHE_KEY,
+            module=_MODULE,
+            permissions=permissions,
+            record_session_key_fn=record_session_key,
         )
 
 
-def _render_edit_form(row: dict[str, Any]) -> None:
-    rk = record_session_key(row, "id")
-    render_edit_form_header("Edit Pricing Item")
-    c1, c2 = st.columns(2)
-    with c1:
-        description = st.text_input(
-            "Description",
-            value=str(row.get("description") or row.get("item") or ""),
-            key=f"pg_edit_desc_{rk}",
-        )
-        item_class = st.selectbox(
-            "Item Class",
-            list(PRICING_ITEM_CLASSES),
-            index=list(PRICING_ITEM_CLASSES).index(str(row.get("item_class") or "Non-Inventory"))
-            if str(row.get("item_class") or "Non-Inventory") in PRICING_ITEM_CLASSES
-            else 2,
-            key=f"pg_edit_class_{rk}",
-        )
-        item_type = st.selectbox(
-            "Estimate Line Type",
-            list(PRICING_ITEM_TYPES),
-            index=list(PRICING_ITEM_TYPES).index(str(row.get("item_type") or "Material"))
-            if str(row.get("item_type") or "Material") in PRICING_ITEM_TYPES
-            else 0,
-            key=f"pg_edit_type_{rk}",
-        )
-        unit = st.text_input("Unit", value=str(row.get("unit") or "EA"), key=f"pg_edit_unit_{rk}")
-        category = st.text_input("Category", value=str(row.get("category") or ""), key=f"pg_edit_cat_{rk}")
-        stock_labels = [
-            "Not stocked",
-            "Optional (extras only)",
-            "Mandatory (reorder when low)",
-        ]
-        stock_keys = ["none", "optional", "mandatory"]
-        cur_policy = str(row.get("stock_policy") or "none")
-        stock_ix = stock_keys.index(cur_policy) if cur_policy in stock_keys else 0
-        stock_label = st.selectbox(
-            "Stock policy",
-            stock_labels,
-            index=stock_ix,
-            key=f"pg_edit_stock_{rk}",
-        )
-        stock_policy = stock_keys[stock_labels.index(stock_label)]
-        default_reorder = st.number_input(
-            "Default reorder point",
-            min_value=0,
-            value=int(round(float(row.get("default_reorder_point") or 0))),
-            step=1,
-            format="%d",
-            key=f"pg_edit_reorder_{rk}",
-            disabled=stock_policy == "none",
-        )
-    with c2:
-        purchase = st.number_input(
-            "Cost",
-            min_value=0.0,
-            value=float(row.get("default_cost") or 0),
-            key=f"pg_edit_cost_{rk}",
-        )
-        markup = st.number_input(
-            "Markup %",
-            min_value=0.0,
-            value=float(row.get("markup_pct") or 0),
-            key=f"pg_edit_mk_{rk}",
-        )
-        sell = calc_sell_price(
-            float(st.session_state.get(f"pg_edit_cost_{rk}", purchase)),
-            float(st.session_state.get(f"pg_edit_mk_{rk}", markup)),
-        )
-        st.metric("Sell Price", fmt_currency(sell))
-        active = st.checkbox("Active", value=bool(row.get("is_active", True)), key=f"pg_edit_active_{rk}")
-
-    extra = _render_conditional_fields(f"pg_edit_{rk}", item_class, item_type)
-    notes = st.text_area("Notes", value=str(row.get("notes") or ""), key=f"pg_edit_notes_{rk}")
-    st.markdown("**Item Photo**")
-    _render_pg_photo_manager(row)
-
-    cancelled, saved = render_save_cancel_actions(
-        module=_MODULE,
-        record_key=rk,
-        cancel_key=f"pg_edit_cancel_{rk}",
-        save_key=f"pg_edit_save_{rk}",
-    )
-    if cancelled:
-        st.rerun()
-    if saved:
-        ok, msg = _persist_row(
-            {
-                "description": description,
-                "item_class": item_class,
-                "item_type": item_type,
-                "category": extra.get("category") or category,
-                "unit": unit,
-                "default_cost": purchase,
-                "default_markup_percent": markup,
-                "default_sell_price": sell,
-                "is_active": active,
-                "notes": notes,
-                "stock_policy": stock_policy,
-                "default_reorder_point": int(round(default_reorder)),
-                "item_code": row.get("item_code") or row.get("item_key"),
-                **extra,
-            },
-            row_id=str(row.get("id") or ""),
-        )
-        if apply_persist_feedback(ok, msg):
-            try:
-                from app.services.catalog_stock_policy_service import save_pricing_stock_settings
-
-                save_pricing_stock_settings(
-                    {**row, "id": row.get("id"), "stock_policy": stock_policy, "default_reorder_point": float(default_reorder)},
-                    stock_policy=stock_policy,
-                    default_reorder_point=int(round(default_reorder)),
-                    ensure_inventory=True,
-                )
-            except Exception:
-                pass
-            set_view_mode(_MODULE, rk)
-            st.rerun()
-        st.error(msg or "Could not save pricing item.")
-
-
-def _render_pricing_actions_panel(row: dict) -> None:
+def _render_pricing_actions_panel(row: dict[str, Any], *, permissions: PricingGuidePermissions) -> None:
     rk = record_session_key(row, "id")
     if is_edit_mode(_MODULE, rk):
         return
-
     render_pricing_guide_action_buttons(
         row,
-        can_manage=_can_manage_pricing(),
+        can_manage=permissions.can_manage,
         on_deactivate=_clear_modal,
         on_delete=_clear_modal,
     )
@@ -870,6 +313,7 @@ def _render_pricing_actions_panel(row: dict) -> None:
 
 @st.dialog("Pricing Guide Item", width="large", on_dismiss=_clear_modal)
 def _show_detail_modal() -> None:
+    permissions = _pricing_permissions()
     row = get_modal_record(cache_key=_CACHE_KEY, modal_key=_MODAL_KEY, session_select_key=_SEL)
     if not row:
         render_missing_record(_clear_modal, close_key="pg_modal_missing_close")
@@ -882,7 +326,7 @@ def _show_detail_modal() -> None:
         subtitle=str(row.get("item_code") or row.get("item_key") or ""),
         status=str(row.get("status") or ""),
     )
-    if effective_role() in {"admin", "supervisor", "manager"}:
+    if permissions.can_edit:
         render_modal_edit_button(module=_MODULE, record_key=rk)
     render_modal_meta_grid(
         [
@@ -896,29 +340,27 @@ def _show_detail_modal() -> None:
     )
     render_modal_shell()
     if edit_mode:
-        _render_edit_form(row)
+        render_pricing_guide_edit_form(
+            row,
+            module=_MODULE,
+            cache_key=_CACHE_KEY,
+            permissions=permissions,
+            record_session_key_fn=record_session_key,
+            persist_fn=_persist_row,
+        )
     else:
-        render_catalog_presence_panel(
+        _render_pricing_actions_panel(row, permissions=permissions)
+        render_pricing_guide_detail_tabs(
             row,
-            can_manage=_can_manage_pricing(),
-            on_change=clear_pricing_guide_cache,
+            permissions=permissions,
+            render_overview_photo_fn=_render_lazy_overview_photo,
+            render_links_panel_fn=render_pricing_guide_links_panel,
         )
-        render_catalog_stock_policy_panel(
-            row,
-            can_manage=_can_manage_pricing(),
-            on_change=clear_pricing_guide_cache,
-        )
-        _render_pricing_actions_panel(row)
-        _render_item_tabs(row)
 
 
 @fragment
-def _render_pricing_guide_catalog_fragment(
-    rows: list[dict],
-    *,
-    filter_options: dict[str, list[str]],
-) -> None:
-    """Pricing guide search, filters, and catalog table — local reruns for list interactions."""
+def _render_pricing_guide_catalog_fragment(*, permissions: PricingGuidePermissions) -> None:
+    """Pricing guide search, filters, summary, import, and catalog table — local reruns."""
 
     def _filters() -> None:
         c1, c2 = st.columns([5, 0.6])
@@ -931,11 +373,7 @@ def _render_pricing_guide_catalog_fragment(
             )
         with c2:
             if st.button("Clear", key="pg_clear", use_container_width=True):
-                clear_table_filters(
-                    _TABLE_KEY,
-                    _FILTER_FIELDS,
-                    extra_keys=["pg_search"],
-                )
+                clear_table_filters(_TABLE_KEY, _FILTER_FIELDS, extra_keys=["pg_search"])
                 _clear_pg_selection()
                 reset_table_page(_TABLE_KEY)
                 fragment_rerun()
@@ -944,63 +382,81 @@ def _render_pricing_guide_catalog_fragment(
     layout_filter_bar(_filters)
     close_pricing_guide_filter_bar_shell()
 
-    filtered = _filter_rows(
-        rows,
-        q=str(st.session_state.get("pg_search") or "").strip(),
-    )
+    search = str(st.session_state.get("pg_search") or "").strip()
+    pg_page = list_pricing_guide_page(search=search, table_key=_TABLE_KEY)
+    if sanitize_column_filters(_TABLE_KEY, pg_page.filter_options, filter_fields=_FILTER_FIELDS):
+        pg_page = list_pricing_guide_page(search=search, table_key=_TABLE_KEY)
 
-    build_modal_cache(filtered, cache_key=_CACHE_KEY)
-    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="item")
-    page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
-    _render_custom_pricing_guide_table(page_rows, filter_options=filter_options)
-    render_table_pagination_footer(len(filtered), _TABLE_KEY)
-    _rerun_if_pg_modal_pending()
+    _render_summary_cards(pg_page.summary)
+    render_pricing_guide_import_panel(can_import=permissions.can_import)
+
+    with st.container():
+        from app.perf_debug import perf_span
+
+        with perf_span("pricing_guide.pagination"):
+            render_table_pagination_header(pg_page.total_count, _TABLE_KEY, item_label="item")
+            _render_custom_pricing_guide_table(pg_page.rows, filter_options=pg_page.filter_options)
+            render_table_pagination_footer(pg_page.total_count, _TABLE_KEY)
 
 
 def render() -> None:
     from app.pages._core._access import begin_module
+    from app.perf_debug import perf_span
+
     if not begin_module("pricing_guide"):
         return
 
-    inject_pricing_guide_module_css()
-    inject_pricing_guide_page_layout_css()
-    st.markdown(
-        '<span class="ips-pricing-guide-page ips-page-shell-marker" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
+    with perf_span("pricing_guide.page_shell"):
+        inject_pricing_guide_module_css()
+        inject_pricing_guide_page_layout_css()
+        st.markdown(
+            '<span class="ips-pricing-guide-page ips-page-shell-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        permissions = _pricing_permissions()
 
-    def _pg_new() -> None:
-        if st.button("+ New Pricing Item", key="pg_add", type="primary", use_container_width=True):
-            st.session_state["pg_add_form"] = True
+        def _pg_new() -> None:
+            if permissions.can_manage and st.button(
+                "+ New Pricing Item",
+                key="pg_add",
+                type="primary",
+                use_container_width=True,
+            ):
+                st.session_state["pg_new_dialog_open"] = True
 
-    render_page_brand_header(
-        "Pricing Guide",
-        "Master estimating catalog: materials, asset rentals, default labor rates, travel, and estimate-only items.",
-        actions=[_pg_new],
-    )
+        render_page_brand_header(
+            "Pricing Guide",
+            "Master estimating catalog: materials, asset rentals, default labor rates, travel, and estimate-only items.",
+            actions=[_pg_new],
+        )
 
-    main_tab = render_tabs(
-        ["Catalog", "Labor Rates"],
-        session_key="pg_main_tab",
-        default="Catalog",
-    )
+        _capture_pricing_detail_query()
+        _show_pricing_detail_query_error_if_any()
 
-    if main_tab == "Labor Rates":
-        render_labor_rates_panel(key_prefix="pg_labor", show_header=False)
-        return
+        if _pg_detail_pending():
+            _show_detail_modal()
+            return
 
-    _render_catalog_status_banner()
-    rows = _load_rows()
-    filter_options = build_filter_options(rows, _COLUMN_FILTER_SPECS)
+        main_tab = render_tabs(
+            ["Catalog", "Labor Rates"],
+            session_key="pg_main_tab",
+            default="Catalog",
+        )
 
-    _render_summary_cards(rows)
+        if main_tab == "Labor Rates":
+            with perf_span("pricing_guide.labor_rates"):
+                render_labor_rates_panel(key_prefix="pg_labor", show_header=False)
+            return
 
-    _render_csv_import()
+        _render_catalog_status_banner(None)
+        _render_pricing_guide_catalog_fragment(permissions=permissions)
 
-    if st.session_state.get("pg_add_form"):
-        _render_add_form()
+        if st.session_state.get("pg_new_dialog_open"):
+            render_new_pricing_item_dialog(
+                module=_MODULE,
+                permissions=permissions,
+                persist_fn=_persist_row,
+            )
 
-    _render_pricing_guide_catalog_fragment(rows, filter_options=filter_options)
-
-    if st.session_state.get(SHOW_PG_MODAL_KEY) or str(st.session_state.get(_MODAL_KEY) or "").strip():
-        _show_detail_modal()
+        if _pg_detail_pending():
+            _show_detail_modal()
