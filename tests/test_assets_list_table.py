@@ -231,6 +231,16 @@ def test_clear_assets_detail_modal_removes_only_asset_detail_query_param() -> No
     assert st.query_params.get("foo") == "bar"
 
 
+def test_custom_assets_table_wires_bridge_without_per_row_open_buttons() -> None:
+    from pathlib import Path
+
+    src = Path(__file__).resolve().parents[1].joinpath("app", "pages", "assets.py").read_text(encoding="utf-8")
+    block = src.split("def _render_custom_assets_table(")[1].split("def _render_small_tools_table_column_filters")[0]
+    assert "render_assets_table_bridge_legacy" in block
+    assert "render_assets_table_open_buttons" not in block
+    assert "if field_mode:" in block
+
+
 def test_prepare_open_assets_table_item_sets_modal_session_keys() -> None:
     import streamlit as st
 

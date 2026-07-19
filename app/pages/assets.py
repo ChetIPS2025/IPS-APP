@@ -983,9 +983,6 @@ def _render_small_tools_table(
             build_serialized_tools_html_table(display_rows, is_row_selected=_is_row_selected),
             unsafe_allow_html=True,
         )
-        from app.components.serialized_tools_list_table import render_serialized_tools_table_open_buttons
-
-        render_serialized_tools_table_open_buttons(display_rows, open_row_fn=_open_row)
         render_serialized_tools_table_bridge_legacy(
             row_by_id,
             open_row_fn=_open_row,
@@ -1021,7 +1018,15 @@ def _render_equipment_list(
     rows: list[dict],
 ) -> None:
     """Equipment tab filters and table — local reruns avoid full page reload."""
-    equipment_rows = [r for r in rows if is_equipment_tab_asset(r)]
+    from app.pages._core.page_data_cache import page_data_cache_get
+
+    def _equipment_rows() -> list[dict]:
+        return [r for r in rows if is_equipment_tab_asset(r)]
+
+    equipment_rows = page_data_cache_get(
+        f"assets_equipment_tab_{len(rows)}",
+        _equipment_rows,
+    )
     filter_options = build_filter_options(equipment_rows, _COLUMN_FILTER_SPECS)
     status_options = sorted(
         {_normalize_asset_status(r.get("status")) for r in equipment_rows if _normalize_asset_status(r.get("status"))}
@@ -2205,7 +2210,6 @@ def render() -> None:
         '<span class="ips-assets-page ips-page-shell-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
-    rows = load_assets()
 
     if st.session_state.get(QUICK_ADD_OPEN_KEY):
         show_quick_add_tool_dialog(uploaded_by=_current_user_id())
@@ -2290,6 +2294,10 @@ def render() -> None:
         default=_ASSETS_MAIN_TABS[0],
     )
 
+    rows: list[dict] = []
+    if active_tab in ("Equipment", "Serialized Tools"):
+        rows = load_assets()
+
     if active_tab == "Equipment":
         with st.expander("Tool Trailers & Kits", expanded=False):
             if st.button("Load kit summary", key="ast_kit_summary_load", use_container_width=True):
@@ -2305,7 +2313,7 @@ def render() -> None:
         )
         _render_small_tools_list(rows)
     else:
-        render_hand_tools_tab(rows, on_open_tool=_open_hand_tool_row)
+        render_hand_tools_tab(on_open_tool=_open_hand_tool_row)
 
     if st.session_state.get(SHOW_ASSET_MODAL_KEY) or str(
         st.session_state.get(_ASSETS_MODAL_KEY) or ""

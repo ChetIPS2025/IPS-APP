@@ -807,6 +807,9 @@ def clear_assets_catalog_cache() -> None:
     clear_catalog_session_key("assets")
     clear_dashboard_page_data_cache()
     clear_page_data_cache_key("assets_serialized_context")
+    from app.pages._core.page_data_cache import clear_page_data_cache_prefix
+
+    clear_page_data_cache_prefix("assets_equipment_tab_")
     from app.services.assets_service import invalidate_assets_modal_cache
 
     invalidate_assets_modal_cache()
