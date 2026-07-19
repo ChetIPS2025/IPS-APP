@@ -12,9 +12,17 @@ from app.components.headers import render_page_brand_header
 from app.components.customers_list_table import (
     build_customers_html_table,
     normalize_customer_status,
-    render_customers_table_bridge_legacy,
-    render_customers_table_open_buttons,
 )
+from app.components.customers_directory_table import (
+    contact_detail_query_key,
+    customer_detail_query_key,
+    customer_tab_query_key,
+    location_detail_query_key,
+)
+from app.components.customer_contacts_table import build_customer_contacts_html_table
+from app.components.customer_locations_table import build_customer_locations_html_table
+from app.components.customer_permissions import load_customer_permissions
+from app.components.tabs import render_tabs
 from app.components.customers_page_layout import (
     close_customers_filter_bar_shell,
     inject_customers_page_layout_css,
@@ -22,21 +30,19 @@ from app.components.customers_page_layout import (
 )
 from app.components.layout import render_filter_bar as layout_filter_bar
 from app.components.table_filters import (
-    apply_column_filters,
-    build_filter_options,
     clear_table_filters,
+    get_column_filter_values,
     has_active_column_filters,
     render_table_header_cell,
-    sanitize_column_filters,
 )
 from app.components.table_pagination import (
-    paginate_rows,
+    pagination_meta,
+    page_size_key,
     render_table_pagination_footer,
     render_table_pagination_header,
     reset_table_page,
 )
 from app.components.record_modal import (
-    build_modal_cache,
     clear_edit_modes,
     clear_record_modal,
     detail_field_html,
@@ -61,8 +67,14 @@ from app.components.record_modal import (
 from app.components.status import status_pill_html
 from app.components.tables import render_data_table
 from app.pages._core._crud import apply_persist_feedback, is_demo_id
-from app.pages._core._data import estimates_for_customer, jobs_for_customer, load_estimates, load_jobs
+from app.pages._core._data import estimates_for_customer, jobs_for_customer
 from app.pages._core._session import select_key
+from app.services.customer_detail_service import get_customer_detail, put_customer_in_modal_cache
+from app.services.customer_contacts_service import get_customer_contact_detail, list_customer_contacts
+from app.services.customer_locations_service import get_customer_location_detail, list_customer_locations
+from app.services.customer_relationships_service import list_estimates_for_customer, list_jobs_for_customer
+from app.services.customers_cache import invalidate_customers_directory_cache
+from app.services.customers_directory_service import CUSTOMERS_DEFAULT_PAGE_SIZE, list_customers_page
 from app.services.customers_service import (
     CONTACT_ROLE_TYPES,
     LOCATION_TYPES,
@@ -131,6 +143,10 @@ _CONTACT_TABS = [
     "Activity",
 ]
 
+_CUSTOMER_DETAIL_ACTIVE_TAB_KEY = "ips_customer_detail_active_tab"
+_DETAIL_QUERY_ERROR_KEY = "_ips_customer_detail_query_error"
+_NEW_CUSTOMER_DIALOG_KEY = "ips_cust_new_dialog_open"
+_FILTER_SNAPSHOT_KEY = "_cust_filter_snapshot"
 SELECTED_CUSTOMER_KEY = "selected_customer_id"
 CUSTOMERS_MODE_KEY = "customers_mode"
 CUSTOMERS_SELECTED_ID_KEY = "customers_selected_id"
@@ -204,6 +220,7 @@ def _clear_customer_selection(customer_ids: list[str] | None = None) -> None:
     for key in list(st.session_state.keys()):
         if isinstance(key, str) and key.startswith("customer_select_"):
             st.session_state[key] = False
+    _clear_customer_detail_query_params()
 
 
 def _open_customer_detail(customer_id: str) -> None:
@@ -214,6 +231,109 @@ def _open_customer_detail(customer_id: str) -> None:
     st.session_state[CUSTOMERS_MODE_KEY] = "detail"
     st.session_state[SELECTED_CUSTOMER_KEY] = cid
     st.session_state[SHOW_CUSTOMER_MODAL_KEY] = False
+
+
+def _customers_detail_pending() -> bool:
+    return bool(
+        (
+            st.session_state.get(CUSTOMERS_MODE_KEY) == "detail"
+            and str(st.session_state.get(CUSTOMERS_SELECTED_ID_KEY) or "").strip()
+        )
+        or str(st.session_state.get(_CUSTOMERS_MODAL_KEY) or "").strip()
+    )
+
+
+def _set_customer_detail_tab_from_query(tab: str) -> None:
+    raw = str(tab or "").strip()
+    if not raw:
+        return
+    alias = {
+        "overview": "Overview",
+        "locations": "Locations",
+        "contacts": "Contacts",
+        "jobs": "Jobs",
+        "estimates": "Estimates",
+        "documents": "Documents",
+        "notes": "Notes",
+        "activity": "Activity",
+    }
+    resolved = alias.get(raw.lower(), raw)
+    if resolved in _CUSTOMER_TABS:
+        st.session_state[_CUSTOMER_DETAIL_ACTIVE_TAB_KEY] = resolved
+
+
+def _clear_customer_detail_query_params() -> None:
+    for key in (customer_detail_query_key(), customer_tab_query_key(), location_detail_query_key(), contact_detail_query_key()):
+        if key in st.query_params:
+            del st.query_params[key]
+
+
+def _capture_customer_detail_query() -> None:
+    from app.perf_debug import perf_span
+
+    with perf_span("customers.detail_lookup"):
+        requested_id = str(st.query_params.get(customer_detail_query_key()) or "").strip()
+        if not requested_id:
+            return
+        current_id = str(st.session_state.get(CUSTOMERS_SELECTED_ID_KEY) or "").strip()
+        if requested_id == current_id and st.session_state.get(CUSTOMERS_MODE_KEY) == "detail":
+            tab_focus = str(st.query_params.get(customer_tab_query_key()) or "").strip()
+            if tab_focus:
+                _set_customer_detail_tab_from_query(tab_focus)
+            _capture_nested_customer_detail_query(requested_id)
+            return
+        customer = get_customer_detail(requested_id)
+        if not customer:
+            st.session_state[_DETAIL_QUERY_ERROR_KEY] = requested_id
+            _clear_customer_detail_query_params()
+            return
+        put_customer_in_modal_cache(requested_id, customer)
+        _open_customer_detail(requested_id)
+        st.session_state[_CUSTOMER_DETAIL_ACTIVE_TAB_KEY] = "Overview"
+        tab_focus = str(st.query_params.get(customer_tab_query_key()) or "").strip()
+        if tab_focus:
+            _set_customer_detail_tab_from_query(tab_focus)
+        _capture_nested_customer_detail_query(requested_id)
+
+
+def _capture_nested_customer_detail_query(customer_id: str) -> None:
+    cid = str(customer_id or "").strip()
+    loc_id = str(st.query_params.get(location_detail_query_key()) or "").strip()
+    ct_id = str(st.query_params.get(contact_detail_query_key()) or "").strip()
+    if loc_id:
+        loc = get_customer_location_detail(loc_id)
+        if loc and str(loc.get("customer_id") or "") == cid:
+            st.session_state[_selected_customer_location_key(cid)] = loc_id
+            st.session_state[_show_customer_location_detail_key(cid)] = True
+        else:
+            st.warning("The selected location could not be found.")
+            if location_detail_query_key() in st.query_params:
+                del st.query_params[location_detail_query_key()]
+    if ct_id:
+        contact = get_customer_contact_detail(ct_id)
+        if contact and str(contact.get("customer_id") or "") == cid:
+            st.session_state[_selected_customer_contact_key(cid)] = ct_id
+            st.session_state[_show_customer_contact_detail_key(cid)] = True
+        else:
+            st.warning("The selected contact could not be found.")
+            if contact_detail_query_key() in st.query_params:
+                del st.query_params[contact_detail_query_key()]
+
+
+def _show_customer_detail_query_error_if_any() -> None:
+    if st.session_state.pop(_DETAIL_QUERY_ERROR_KEY, None):
+        st.warning("The selected customer could not be found.")
+
+
+def _maybe_reset_customers_page_on_filter_change() -> None:
+    current = (
+        str(st.session_state.get("cust_search") or ""),
+        tuple(get_column_filter_values(_CUSTOMERS_TABLE_KEY, field) for field in _CUSTOMER_BAR_FILTER_FIELDS),
+    )
+    prev = st.session_state.get(_FILTER_SNAPSHOT_KEY)
+    if prev is not None and prev != current:
+        reset_table_page(_CUSTOMERS_TABLE_KEY)
+    st.session_state[_FILTER_SNAPSHOT_KEY] = current
 
 
 def _prepare_open_customer_table_row(customer_id: str, _customer: dict) -> None:
@@ -286,26 +406,15 @@ def _render_custom_customers_table(
     ]
     st.session_state[_ALL_CUSTOMER_IDS_KEY] = all_customer_ids
 
-    customers_by_id = {
-        str(c.get("id") or "").strip(): c
-        for c in filtered
-        if str(c.get("id") or "").strip()
-    }
-
-    def _open_row(customer_id: str, customer: dict) -> None:
-        _prepare_open_customer_table_row(customer_id, customer)
+    from app.perf_debug import perf_span
 
     with st.container(key="customers_table_wrap"):
         _render_customers_table_column_filters(filter_options=filter_options)
-        st.markdown(
-            build_customers_html_table(filtered),
-            unsafe_allow_html=True,
-        )
-        render_customers_table_open_buttons(filtered, open_item_fn=_open_row)
-        render_customers_table_bridge_legacy(
-            customers_by_id,
-            open_item_fn=_open_row,
-        )
+        with perf_span("customers.table_html"):
+            st.markdown(
+                build_customers_html_table(filtered),
+                unsafe_allow_html=True,
+            )
 
     return all_customer_ids
 
@@ -357,20 +466,26 @@ def _load_customers_list_rows() -> list[dict]:
 
 
 def _enrich_list_rows(rows: list[dict]) -> list[dict]:
-    from app.perf_debug import perf_span
-    with perf_span("customers.enrich_list_rows"):
-        jobs = load_jobs()
-        estimates = load_estimates()
-        open_jobs_by_name, open_ests_by_name = _open_counts_by_customer_name(jobs, estimates)
-        out: list[dict] = []
-        for row in rows:
-            cname = str(row.get("customer_name") or row.get("company_name") or "")
-            key = cname.strip().lower()
-            enriched = dict(row)
-            enriched["open_jobs"] = open_jobs_by_name.get(key, 0)
-            enriched["open_estimates"] = open_ests_by_name.get(key, 0)
-            out.append(enriched)
-        return out
+    """Legacy enrichment — prefer list_customers_page()."""
+    from app.services.customer_relationships_service import (
+        count_open_estimates_by_customer_ids,
+        count_open_jobs_by_customer_ids,
+    )
+
+    refs = [
+        (str(r.get("id") or ""), str(r.get("customer_name") or r.get("company_name") or ""))
+        for r in rows
+    ]
+    open_jobs = count_open_jobs_by_customer_ids(refs)
+    open_ests = count_open_estimates_by_customer_ids(refs)
+    out: list[dict] = []
+    for row in rows:
+        cid = str(row.get("id") or "")
+        enriched = dict(row)
+        enriched["open_jobs"] = open_jobs.get(cid, 0)
+        enriched["open_estimates"] = open_ests.get(cid, 0)
+        out.append(enriched)
+    return out
 
 
 def _apply_customers_search_filter(rows: list[dict], q: str) -> list[dict]:
@@ -672,91 +787,12 @@ def _render_custom_contacts_table(
         customer_id=str(customer_id or ""),
         location_id=str(location_id or ""),
     )
-    scope = wrap_key
     with st.container(key=wrap_key):
-        st.markdown('<div class="ips-contacts-table-wrap">', unsafe_allow_html=True)
-
-        header_cols = st.columns(_CONTACT_COLS, gap="small", vertical_alignment="center")
-        for col, label in zip(header_cols, _CONTACT_HEADERS):
-            with col:
-                st.markdown(
-                    f'<div class="ips-contacts-header-row ips-contacts-cell">'
-                    f"{html.escape(label)}</div>",
-                    unsafe_allow_html=True,
-                )
-
-        for contact in contacts:
-            ct_id = str(contact.get("id") or "").strip()
-            if not ct_id:
-                continue
-
-            name = _contact_display_name(contact)
-            title = str(contact.get("title") or "—").strip() or "—"
-            location = str(contact.get("location_name") or "—").strip() or "—"
-            role = _normalize_contact_role(contact.get("role_type"), contact.get("title"))
-            email = str(contact.get("email") or "—").strip() or "—"
-            phone = _contact_phone(contact)
-
-            cols = st.columns(_CONTACT_COLS, gap="small", vertical_alignment="center")
-
-            with cols[0]:
-                checkbox_key = (
-                    _customer_contact_select_key(customer_id, ct_id, scope=scope)
-                    if inline and customer_id
-                    else _contact_select_key(ct_id, scope=scope)
-                )
-                checkbox_args = (
-                    (customer_id, ct_id, all_contact_ids, checkbox_key)
-                    if inline and customer_id
-                    else (ct_id, all_contact_ids, checkbox_key)
-                )
-                checkbox_handler = (
-                    _on_customer_contact_checkbox_change
-                    if inline and customer_id
-                    else _on_contact_checkbox_change
-                )
-                st.checkbox(
-                    "",
-                    key=checkbox_key,
-                    label_visibility="collapsed",
-                    on_change=checkbox_handler,
-                    args=checkbox_args,
-                )
-
-            with cols[1]:
-                st.markdown(
-                    f'<div class="ips-contacts-name">{html.escape(name)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[2]:
-                st.markdown(
-                    f'<div class="ips-contacts-cell">{html.escape(title)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[3]:
-                st.markdown(
-                    f'<div class="ips-contacts-cell">{html.escape(location)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[4]:
-                st.markdown(_contact_role_pill_html(role), unsafe_allow_html=True)
-
-            with cols[5]:
-                st.markdown(
-                    f'<div class="ips-contacts-email ips-contacts-cell">{html.escape(email)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[6]:
-                st.markdown(
-                    f'<div class="ips-contacts-muted ips-contacts-cell">{html.escape(phone)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-        st.markdown("</div>", unsafe_allow_html=True)
+        cid = str(customer_id or "").strip()
+        st.markdown(
+            build_customer_contacts_html_table(contacts, customer_id=cid),
+            unsafe_allow_html=True,
+        )
 
     return all_contact_ids
 
@@ -773,7 +809,6 @@ def _render_contacts_table_block(
     if not contacts:
         st.caption(empty_caption)
         return
-    build_modal_cache(contacts, cache_key=_CONTACTS_CACHE_KEY)
     st.caption(f"{len(contacts)} contact(s)")
     customer_id = str((customer or {}).get("id") or "").strip()
     loc_id = str(location_id or "").strip()
@@ -789,12 +824,9 @@ def _render_contacts_table_block(
         selected_contact_id = st.session_state.get(_selected_customer_contact_key(customer_id))
         show_contact_detail = st.session_state.get(_show_customer_contact_detail_key(customer_id), False)
         if selected_contact_id and show_contact_detail:
-            selected_contact = next(
-                (c for c in contacts if str(c.get("id")) == str(selected_contact_id)),
-                None,
-            )
-            if selected_contact:
-                locations = get_customer_locations(customer_id)
+            selected_contact = get_customer_contact_detail(str(selected_contact_id))
+            if selected_contact and str(selected_contact.get("customer_id") or "") == customer_id:
+                locations = list_customer_locations(customer_id).rows
                 _render_contact_inline_detail(selected_contact, customer, locations)
         return
 
@@ -1011,10 +1043,14 @@ def _jobs_table(
         if field == "status":
             return status_pill_html(str(row.get("status") or ""))
         if field == "job_number":
-            return (
-                f'<span style="color:#2563eb;font-weight:600">'
-                f'{html.escape(str(row.get("job_number") or ""))}</span>'
-            )
+            from app.components.jobs_directory_table import job_detail_href
+
+            jid = str(row.get("id") or "").strip()
+            num = html.escape(str(row.get("job_number") or ""))
+            if jid:
+                href = html.escape(job_detail_href(jid), quote=True)
+                return f'<a class="ips-row-open-link" href="{href}" target="_self">{num}</a>'
+            return num
         if field == "location":
             val = row.get("location") or row.get("customer_location") or row.get("site_name")
             return html.escape(str(val or "—"))
@@ -1064,6 +1100,15 @@ def _estimates_table(
     def _cell(field: str, row: dict) -> str:
         if field == "status":
             return status_pill_html(str(row.get("status") or ""))
+        if field == "estimate_number":
+            from app.components.estimates_list_table import estimate_detail_href
+
+            eid = str(row.get("id") or "").strip()
+            num = html.escape(str(row.get("estimate_number") or ""))
+            if eid:
+                href = html.escape(estimate_detail_href(eid), quote=True)
+                return f'<a class="ips-row-open-link" href="{href}" target="_self">{num}</a>'
+            return num
         if field == "location":
             val = row.get("location") or row.get("customer_location") or row.get("site_name")
             return html.escape(str(val or "—"))
@@ -1167,9 +1212,13 @@ def _render_customer_edit_form(customer: dict) -> None:
         }
         ok, msg = _service_feedback(update_customer(cid, payload), success="Customer saved.")
         if ok:
+            invalidate_customers_directory_cache(cid)
+            fresh = get_customer_detail(cid)
+            if fresh:
+                put_customer_in_modal_cache(cid, fresh)
             set_view_mode(_MOD, rk)
             st.success(msg)
-            st.rerun()
+            ips_app_rerun()
         st.error(msg or "Could not save customer.")
 
 
@@ -1240,7 +1289,8 @@ def _render_add_location_form(customer: dict, *, demo: bool) -> None:
             success="Location added.",
         )
         if apply_persist_feedback(ok, msg, clear_keys=(f"{pk}_open",)):
-            st.rerun()
+            invalidate_customers_directory_cache(cid)
+            ips_app_rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -1255,83 +1305,10 @@ def _render_custom_locations_table(locations: list[dict], *, customer_id: str) -
     st.session_state[_ALL_LOCATION_IDS_KEY] = all_location_ids
 
     with st.container(key="locations_table_wrap"):
-        st.markdown('<div class="ips-locations-table-wrap">', unsafe_allow_html=True)
-
-        header_cols = st.columns(_LOCATION_COLS, gap="small", vertical_alignment="center")
-        for col, label in zip(header_cols, _LOCATION_HEADERS):
-            with col:
-                st.markdown(
-                    f'<div class="ips-locations-header-row ips-locations-cell">'
-                    f"{html.escape(label)}</div>",
-                    unsafe_allow_html=True,
-                )
-
-        for location in locations:
-            lid = str(location.get("id") or "").strip()
-            if not lid:
-                continue
-
-            name = _location_display_name(location)
-            loc_type = _location_display_type(location)
-            city = str(location.get("city") or "—").strip() or "—"
-            state = str(location.get("state") or "—").strip() or "—"
-            phone = _format_phone(location.get("phone"))
-            status = _location_display_status(location)
-
-            cols = st.columns(_LOCATION_COLS, gap="small", vertical_alignment="center")
-
-            with cols[0]:
-                st.checkbox(
-                    "",
-                    key=_location_select_key(customer_id, lid),
-                    label_visibility="collapsed",
-                    on_change=_on_customer_location_checkbox_change,
-                    args=(customer_id, lid, all_location_ids),
-                )
-
-            with cols[1]:
-                st.markdown(
-                    f'<div class="ips-locations-name">{html.escape(name)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[2]:
-                st.markdown(
-                    f'<div class="ips-locations-cell">{html.escape(loc_type)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[3]:
-                st.markdown(
-                    f'<div class="ips-locations-cell">{html.escape(city)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[4]:
-                st.markdown(
-                    f'<div class="ips-locations-cell">{html.escape(state)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[5]:
-                st.markdown(
-                    f'<div class="ips-locations-muted ips-locations-cell">{html.escape(phone)}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            with cols[6]:
-                st.markdown(_location_flag_html(location.get("is_primary")), unsafe_allow_html=True)
-
-            with cols[7]:
-                st.markdown(_location_flag_html(location.get("is_billing")), unsafe_allow_html=True)
-
-            with cols[8]:
-                st.markdown(_location_flag_html(location.get("is_shipping")), unsafe_allow_html=True)
-
-            with cols[9]:
-                st.markdown(_location_status_pill_html(status), unsafe_allow_html=True)
-
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown(
+            build_customer_locations_html_table(locations, customer_id=customer_id),
+            unsafe_allow_html=True,
+        )
 
     return all_location_ids
 
@@ -1339,24 +1316,21 @@ def _render_custom_locations_table(locations: list[dict], *, customer_id: str) -
 def _render_customer_locations_tab(customer: dict) -> None:
     cid = str(customer.get("id") or "")
     demo = is_demo_id(cid)
-    locations = get_customer_locations(cid)
     _render_add_location_form(customer, demo=demo)
 
+    loc_page = list_customer_locations(cid)
+    locations = loc_page.rows
     if not locations:
         st.caption("No locations on file for this customer.")
         return
 
-    build_modal_cache(locations, cache_key=_LOCATIONS_CACHE_KEY)
-    st.caption(f"{len(locations)} location(s)")
+    st.caption(f"{loc_page.total_count} location(s)")
     _render_custom_locations_table(locations, customer_id=cid)
 
     selected_location_id = st.session_state.get(_selected_customer_location_key(cid))
     if st.session_state.get(_show_customer_location_detail_key(cid)) and selected_location_id:
-        selected_location = next(
-            (loc for loc in locations if str(loc.get("id")) == str(selected_location_id)),
-            None,
-        )
-        if selected_location:
+        selected_location = get_customer_location_detail(str(selected_location_id))
+        if selected_location and str(selected_location.get("customer_id") or "") == cid:
             _render_location_inline_detail(selected_location, customer)
 
 
@@ -1700,9 +1674,8 @@ def _render_location_inline_detail(location: dict, customer: dict | None = None)
 def _render_customer_contacts_tab(customer: dict) -> None:
     cid = str(customer.get("id") or "")
     demo = is_demo_id(cid)
-    locations = get_customer_locations(cid)
-    all_contacts = get_customer_contacts(cid)
-    enriched = _contacts_with_location_names(all_contacts, locations)
+    loc_page = list_customer_locations(cid)
+    locations = loc_page.rows
 
     filter_labels = ["All Locations"]
     filter_ids = [""]
@@ -1722,11 +1695,8 @@ def _render_customer_contacts_tab(customer: dict) -> None:
         key=pick_key,
     )
     filter_loc = filter_ids[int(pick)]
-    if filter_loc:
-        contacts = [c for c in enriched if str(c.get("location_id") or c.get("customer_location_id") or "") == filter_loc]
-    else:
-        contacts = enriched
-    contacts = _dedupe_contacts_by_id(contacts)
+    ct_page = list_customer_contacts(cid, location_id=filter_loc)
+    contacts = _dedupe_contacts_by_id(ct_page.rows)
 
     _render_add_contact_form(customer, locations=locations, demo=demo)
 
@@ -1742,57 +1712,69 @@ def _render_customer_detail_tabs(customer: dict) -> None:
     cid = str(customer.get("id") or "")
     cname = str(customer.get("customer_name") or customer.get("company_name") or "")
 
-    (
-        tab_overview,
-        tab_locations,
-        tab_contacts,
-        tab_jobs,
-        tab_estimates,
-        tab_documents,
-        tab_notes,
-        tab_activity,
-    ) = st.tabs(_CUSTOMER_TABS)
+    active_tab = render_tabs(
+        list(_CUSTOMER_TABS),
+        session_key=_CUSTOMER_DETAIL_ACTIVE_TAB_KEY,
+        default=str(st.session_state.get(_CUSTOMER_DETAIL_ACTIVE_TAB_KEY) or "Overview"),
+    )
 
-    with tab_overview:
-        status = safe_value(customer.get("status"))
-        overview_html = (
-            f'<div class="ips-detail-grid">'
-            f"{detail_field_html('Company', customer.get('company_name') or cname)}"
-            f"{detail_field_html('Customer #', customer.get('customer_number'))}"
-            f"{detail_field_html('Website', customer.get('website'))}"
-            f"{detail_field_html('Main Phone', customer.get('main_phone'))}"
-            f"{detail_field_html('Main Email', customer.get('main_email'))}"
-            f"{detail_field_html('Billing Email', customer.get('billing_email'))}"
-            f'{detail_field_html("Status", status, html_value=modal_status_pill_html(status))}'
-            f"</div>"
-        )
-        st.markdown(dialog_card_html("Company", overview_html), unsafe_allow_html=True)
-        legacy = (
-            f'<div class="ips-detail-grid">'
-            f"{detail_field_html('Address', customer.get('address'))}"
-            f"{detail_field_html('City', customer.get('city'))}"
-            f"{detail_field_html('State', customer.get('state'))}"
-            f"{detail_field_html('ZIP', customer.get('zip'))}"
-            f"</div>"
-        )
-        st.markdown(dialog_card_html("Legacy Address", legacy), unsafe_allow_html=True)
+    if active_tab == "Overview":
+        from app.perf_debug import perf_span
 
-    with tab_locations:
-        _render_customer_locations_tab(customer)
+        with perf_span("customers.detail.overview"):
+            status = safe_value(customer.get("status"))
+            overview_html = (
+                f'<div class="ips-detail-grid">'
+                f"{detail_field_html('Company', customer.get('company_name') or cname)}"
+                f"{detail_field_html('Customer #', customer.get('customer_number'))}"
+                f"{detail_field_html('Website', customer.get('website'))}"
+                f"{detail_field_html('Main Phone', customer.get('main_phone'))}"
+                f"{detail_field_html('Main Email', customer.get('main_email'))}"
+                f"{detail_field_html('Billing Email', customer.get('billing_email'))}"
+                f'{detail_field_html("Status", status, html_value=modal_status_pill_html(status))}'
+                f"</div>"
+            )
+            st.markdown(dialog_card_html("Company", overview_html), unsafe_allow_html=True)
+            legacy = (
+                f'<div class="ips-detail-grid">'
+                f"{detail_field_html('Address', customer.get('address'))}"
+                f"{detail_field_html('City', customer.get('city'))}"
+                f"{detail_field_html('State', customer.get('state'))}"
+                f"{detail_field_html('ZIP', customer.get('zip'))}"
+                f"</div>"
+            )
+            st.markdown(dialog_card_html("Legacy Address", legacy), unsafe_allow_html=True)
 
-    with tab_contacts:
-        _render_customer_contacts_tab(customer)
+    elif active_tab == "Locations":
+        from app.perf_debug import perf_span
 
-    with tab_jobs:
-        _jobs_table(jobs_for_customer(cname), session_key=f"_cust_jobs_{cid}")
+        with perf_span("customers.detail.locations"):
+            _render_customer_locations_tab(customer)
 
-    with tab_estimates:
-        _estimates_table(estimates_for_customer(cname), session_key=f"_cust_est_{cid}")
+    elif active_tab == "Contacts":
+        from app.perf_debug import perf_span
 
-    with tab_documents:
+        with perf_span("customers.detail.contacts"):
+            _render_customer_contacts_tab(customer)
+
+    elif active_tab == "Jobs":
+        from app.perf_debug import perf_span
+
+        with perf_span("customers.detail.jobs"):
+            jobs_page = list_jobs_for_customer(cid, customer_name=cname)
+            _jobs_table(jobs_page.rows, session_key=f"_cust_jobs_{cid}")
+
+    elif active_tab == "Estimates":
+        from app.perf_debug import perf_span
+
+        with perf_span("customers.detail.estimates"):
+            est_page = list_estimates_for_customer(cid, customer_name=cname)
+            _estimates_table(est_page.rows, session_key=f"_cust_est_{cid}")
+
+    elif active_tab == "Documents":
         placeholder_html("Customer documents will appear here when connected to Supabase.")
 
-    with tab_notes:
+    elif active_tab == "Notes":
         notes_text = safe_value(customer.get("notes"), "No notes entered.")
         notes_html = (
             f'<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
@@ -1801,7 +1783,7 @@ def _render_customer_detail_tabs(customer: dict) -> None:
         )
         st.markdown(dialog_card_html("Notes", notes_html), unsafe_allow_html=True)
 
-    with tab_activity:
+    elif active_tab == "Activity":
         placeholder_html("Customer activity history will appear here when connected to Supabase.")
 
 
@@ -1819,7 +1801,8 @@ def render_customer_detail(customer_id: str) -> None:
         st.session_state[CUSTOMERS_SELECTED_ID_KEY] = None
         st.session_state[SELECTED_CUSTOMER_KEY] = None
         st.session_state[SHOW_CUSTOMER_MODAL_KEY] = False
-        st.rerun()
+        _clear_customer_detail_query_params()
+        ips_app_rerun()
 
     st.markdown(
         '<span class="ips-customers-detail-page" aria-hidden="true"></span>',
@@ -1829,7 +1812,7 @@ def render_customer_detail(customer_id: str) -> None:
     cache = st.session_state.get(_CUSTOMERS_CACHE_KEY) or {}
     customer = cache.get(cid) if isinstance(cache, dict) else None
     if not customer:
-        customer = get_customer(cid)
+        customer = get_customer_detail(cid)
     if not customer:
         render_page_brand_header("Customer Detail", "Customer not found.", icon="🏢", on_back=_back_to_customers_list)
         st.warning("Customer not found.")
@@ -2080,22 +2063,15 @@ def _render_location_detail_tabs(
     lid = str(location.get("id") or "")
     cid = str(location.get("customer_id") or "")
     cname = str((customer or {}).get("customer_name") or (customer or {}).get("company_name") or "")
-    contacts = _contacts_with_location_names(
-        get_customer_contacts(cid, location_id=lid),
-        get_customer_locations(cid),
+    tab_key = f"ips_customer_location_tab_{lid}"
+
+    active_tab = render_tabs(
+        list(_LOCATION_TABS),
+        session_key=tab_key,
+        default="Overview",
     )
 
-    (
-        tab_overview,
-        tab_contacts,
-        tab_jobs,
-        tab_estimates,
-        tab_documents,
-        tab_notes,
-        tab_activity,
-    ) = st.tabs(_LOCATION_TABS)
-
-    with tab_overview:
+    if active_tab == "Overview":
         status = safe_value(location.get("status"))
         overview_html = (
             f'<div class="ips-detail-grid">'
@@ -2117,25 +2093,28 @@ def _render_location_detail_tabs(
         )
         st.markdown(dialog_card_html("Site", overview_html), unsafe_allow_html=True)
 
-    with tab_contacts:
+    elif active_tab == "Contacts":
+        contacts_page = list_customer_contacts(cid, location_id=lid)
         _render_contacts_table_block(
-            contacts,
+            contacts_page.rows,
             empty_caption="No contacts assigned to this location.",
             customer=customer if inline_contacts else None,
             location_id=lid,
             inline=inline_contacts,
         )
 
-    with tab_jobs:
-        _jobs_table(jobs_for_customer(cname), session_key=f"_loc_jobs_{lid}", location_id=lid)
+    elif active_tab == "Jobs":
+        jobs_page = list_jobs_for_customer(cid, customer_name=cname)
+        _jobs_table(jobs_page.rows, session_key=f"_loc_jobs_{lid}", location_id=lid)
 
-    with tab_estimates:
-        _estimates_table(estimates_for_customer(cname), session_key=f"_loc_est_{lid}", location_id=lid)
+    elif active_tab == "Estimates":
+        est_page = list_estimates_for_customer(cid, customer_name=cname)
+        _estimates_table(est_page.rows, session_key=f"_loc_est_{lid}", location_id=lid)
 
-    with tab_documents:
+    elif active_tab == "Documents":
         placeholder_html("Location documents will appear here when connected to Supabase.")
 
-    with tab_notes:
+    elif active_tab == "Notes":
         notes_text = safe_value(location.get("notes"), "No notes entered.")
         notes_html = (
             f'<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
@@ -2144,7 +2123,7 @@ def _render_location_detail_tabs(
         )
         st.markdown(dialog_card_html("Notes", notes_html), unsafe_allow_html=True)
 
-    with tab_activity:
+    elif active_tab == "Activity":
         placeholder_html("Location activity history will appear here when connected to Supabase.")
 
 
@@ -2303,18 +2282,17 @@ def _render_contact_edit_form(contact: dict, *, locations: list[dict]) -> None:
 
 def _render_contact_detail_tabs(contact: dict, customer: dict | None, location: dict | None) -> None:
     ct_id = str(contact.get("id") or "")
+    cid = str(contact.get("customer_id") or (customer or {}).get("id") or "")
     cname = str((customer or {}).get("customer_name") or contact.get("customer_name") or "")
+    tab_key = f"ips_customer_contact_tab_{ct_id}"
 
-    (
-        tab_overview,
-        tab_location,
-        tab_jobs,
-        tab_estimates,
-        tab_notes,
-        tab_activity,
-    ) = st.tabs(_CONTACT_TABS)
+    active_tab = render_tabs(
+        list(_CONTACT_TABS),
+        session_key=tab_key,
+        default="Overview",
+    )
 
-    with tab_overview:
+    if active_tab == "Overview":
         status = safe_value(contact.get("status"))
         role = _normalize_contact_role(contact.get("role_type"), contact.get("title"))
         loc_name = safe_value((location or {}).get("location_name") or contact.get("location_name"))
@@ -2338,7 +2316,7 @@ def _render_contact_detail_tabs(contact: dict, customer: dict | None, location: 
         )
         st.markdown(dialog_card_html("Contact", overview_html), unsafe_allow_html=True)
 
-    with tab_location:
+    elif active_tab == "Location":
         if location:
             loc_html = (
                 f'<div class="ips-detail-grid">'
@@ -2353,8 +2331,9 @@ def _render_contact_detail_tabs(contact: dict, customer: dict | None, location: 
         else:
             st.caption("No location assigned.")
 
-    with tab_jobs:
-        jobs = jobs_for_customer(cname)
+    elif active_tab == "Linked Jobs":
+        jobs_page = list_jobs_for_customer(cid, customer_name=cname)
+        jobs = jobs_page.rows
         contact_name = str(contact.get("full_name") or contact.get("contact_name") or "").strip().lower()
         if contact_name:
             jobs = [
@@ -2365,8 +2344,9 @@ def _render_contact_detail_tabs(contact: dict, customer: dict | None, location: 
             ]
         _jobs_table(jobs, session_key=f"_ct_jobs_{ct_id}")
 
-    with tab_estimates:
-        ests = estimates_for_customer(cname)
+    elif active_tab == "Linked Estimates":
+        est_page = list_estimates_for_customer(cid, customer_name=cname)
+        ests = est_page.rows
         contact_name = str(contact.get("full_name") or contact.get("contact_name") or "").strip().lower()
         if contact_name:
             ests = [
@@ -2377,7 +2357,7 @@ def _render_contact_detail_tabs(contact: dict, customer: dict | None, location: 
             ]
         _estimates_table(ests, session_key=f"_ct_est_{ct_id}")
 
-    with tab_notes:
+    elif active_tab == "Notes":
         notes_text = safe_value(contact.get("notes"), "No notes entered.")
         notes_html = (
             f'<p style="margin:0;font-size:0.875rem;color:#0f172a;line-height:1.5;white-space:pre-wrap;">'
@@ -2386,7 +2366,7 @@ def _render_contact_detail_tabs(contact: dict, customer: dict | None, location: 
         )
         st.markdown(dialog_card_html("Notes", notes_html), unsafe_allow_html=True)
 
-    with tab_activity:
+    elif active_tab == "Activity":
         placeholder_html("Contact activity history will appear here when connected to Supabase.")
 
 
@@ -2459,13 +2439,79 @@ def _show_contact_detail_modal() -> None:
 # --- Page render ---
 
 
+@st.dialog("New Customer", width="large")
+def _show_new_customer_dialog() -> None:
+    legacy_open_key = "cust_new_legacy_open"
+    nc1, nc2 = st.columns(2)
+    with nc1:
+        st.text_input("Company name", key="cust_new_company")
+        st.text_input("Customer #", key="cust_new_number")
+        st.text_input("Website", key="cust_new_website")
+        st.text_input("Main phone", key="cust_new_main_phone")
+    with nc2:
+        st.text_input("Main email", key="cust_new_main_email")
+        st.text_input("Billing email", key="cust_new_billing_email")
+        st.selectbox("Status", ["Active", "Inactive"], key="cust_new_status")
+    st.text_area("Notes", key="cust_new_notes")
+    if not st.session_state.get(legacy_open_key):
+        if st.button("Add legacy address", key="cust_new_legacy_btn"):
+            st.session_state[legacy_open_key] = True
+            st.rerun()
+    else:
+        la1, la2 = st.columns(2)
+        with la1:
+            st.text_input("Address", key="cust_new_addr")
+            st.text_input("City", key="cust_new_city")
+        with la2:
+            st.text_input("State", key="cust_new_state")
+            st.text_input("ZIP", key="cust_new_zip")
+    btn1, btn2 = st.columns(2)
+    with btn1:
+        save = st.button("Save customer", key="cust_save_new", type="primary", use_container_width=True)
+    with btn2:
+        cancel = st.button("Cancel", key="cust_cancel_new", use_container_width=True)
+    if cancel:
+        st.session_state[_NEW_CUSTOMER_DIALOG_KEY] = False
+        st.session_state.pop(legacy_open_key, None)
+        ips_app_rerun()
+    if save:
+        company = str(st.session_state.get("cust_new_company") or "").strip()
+        if not company:
+            st.error("Company name is required.")
+            return
+        payload = {
+            "company_name": company,
+            "customer_name": company,
+            "customer_number": st.session_state.get("cust_new_number"),
+            "website": st.session_state.get("cust_new_website"),
+            "main_phone": st.session_state.get("cust_new_main_phone"),
+            "main_email": st.session_state.get("cust_new_main_email"),
+            "billing_email": st.session_state.get("cust_new_billing_email"),
+            "status": st.session_state.get("cust_new_status"),
+            "notes": st.session_state.get("cust_new_notes"),
+            "address": st.session_state.get("cust_new_addr"),
+            "city": st.session_state.get("cust_new_city"),
+            "state": st.session_state.get("cust_new_state"),
+            "zip": st.session_state.get("cust_new_zip"),
+        }
+        from app.perf_debug import perf_span
+
+        with perf_span("customers.form.customer"):
+            ok, msg = _service_feedback(create_customer(payload), success="Customer saved.")
+        if ok:
+            invalidate_customers_directory_cache()
+            st.session_state[_NEW_CUSTOMER_DIALOG_KEY] = False
+            st.session_state.pop(legacy_open_key, None)
+            if apply_persist_feedback(True, msg):
+                ips_app_rerun()
+        else:
+            st.error(msg or "Could not save customer.")
+
+
 @fragment
-def _render_customers_catalog_fragment(
-    all_rows: list[dict],
-    *,
-    filter_options: dict[str, list[str]],
-) -> None:
+def _render_customers_catalog_fragment() -> None:
     """Customers search, filters, and list table — local reruns for list interactions."""
+    from app.perf_debug import perf_span
 
     def _filters() -> None:
         c1, c2 = st.columns([5.4, 0.6])
@@ -2487,57 +2533,91 @@ def _render_customers_catalog_fragment(
                 _clear_customer_selection(st.session_state.get(_ALL_CUSTOMER_IDS_KEY))
                 fragment_rerun()
 
+    _maybe_reset_customers_page_on_filter_change()
     render_customers_filter_bar_shell()
     layout_filter_bar(_filters)
     close_customers_filter_bar_shell()
 
     search_q = str(st.session_state.get("cust_search") or "").strip()
-    filtered = _filter_customers(all_rows, q=search_q)
+    statuses = get_column_filter_values(_CUSTOMERS_TABLE_KEY, "status")
+    if page_size_key(_CUSTOMERS_TABLE_KEY) not in st.session_state:
+        st.session_state[page_size_key(_CUSTOMERS_TABLE_KEY)] = CUSTOMERS_DEFAULT_PAGE_SIZE
 
-    render_table_pagination_header(len(filtered), _CUSTOMERS_TABLE_KEY, item_label="customer")
-    page_rows, _, _, _ = paginate_rows(filtered, _CUSTOMERS_TABLE_KEY)
+    page_num, page_size, _ = pagination_meta(
+        0,
+        _CUSTOMERS_TABLE_KEY,
+        default_page_size=CUSTOMERS_DEFAULT_PAGE_SIZE,
+    )
 
-    build_modal_cache(filtered, cache_key=_CUSTOMERS_CACHE_KEY)
+    with perf_span("customers.list_query"):
+        cust_page = list_customers_page(
+            search=search_q,
+            statuses=statuses,
+            page=page_num,
+            page_size=page_size,
+        )
+
+    page_num, page_size, _ = pagination_meta(
+        cust_page.total_count,
+        _CUSTOMERS_TABLE_KEY,
+        default_page_size=CUSTOMERS_DEFAULT_PAGE_SIZE,
+    )
+    if page_num != cust_page.page or page_size != cust_page.page_size:
+        with perf_span("customers.list_query"):
+            cust_page = list_customers_page(
+                search=search_q,
+                statuses=statuses,
+                page=page_num,
+                page_size=page_size,
+            )
+
+    if cust_page.warning:
+        st.caption(cust_page.warning)
+
+    with perf_span("customers.pagination"):
+        render_table_pagination_header(
+            cust_page.total_count,
+            _CUSTOMERS_TABLE_KEY,
+            item_label="customer",
+        )
+
+    page_rows = cust_page.rows
+    for row in page_rows:
+        put_customer_in_modal_cache(str(row.get("id") or "").strip(), row)
+
     _render_customers_list_table(
         page_rows,
-        filter_options=filter_options,
-        total_count=len(all_rows),
+        filter_options=cust_page.filter_options,
+        total_count=cust_page.total_count,
         search=search_q,
     )
-    render_table_pagination_footer(len(filtered), _CUSTOMERS_TABLE_KEY)
-    _rerun_if_customers_detail_pending()
+    render_table_pagination_footer(cust_page.total_count, _CUSTOMERS_TABLE_KEY)
 
 
 def render() -> None:
     from app.pages._core._access import begin_module
+    from app.perf_debug import perf_span
+
     if not begin_module("customers"):
         return
 
-    inject_customers_module_css()
-    inject_customers_page_layout_css()
-    st.markdown(
-        '<span class="ips-customers-page ips-page-shell-marker" aria-hidden="true"></span>',
-        unsafe_allow_html=True,
-    )
+    with perf_span("customers.page_shell"):
+        inject_customers_module_css()
+        inject_customers_page_layout_css()
+        st.markdown(
+            '<span class="ips-customers-page ips-page-shell-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
 
-    if (
-        st.session_state.get(CUSTOMERS_MODE_KEY) == "detail"
-        and st.session_state.get(CUSTOMERS_SELECTED_ID_KEY)
-    ):
-        render_customer_detail(str(st.session_state[CUSTOMERS_SELECTED_ID_KEY]))
-        st.stop()
-
-    all_rows = _load_customers_list_rows()
-    filter_options = build_filter_options(all_rows, _CUSTOMER_COLUMN_FILTER_SPECS)
-    if sanitize_column_filters(_CUSTOMERS_TABLE_KEY, filter_options, filter_fields=_CUSTOMER_BAR_FILTER_FIELDS):
-        st.rerun()
+    load_customer_permissions()
 
     def _customers_export() -> None:
         st.button("Export", key="customers_export", use_container_width=True)
 
     def _customers_new() -> None:
         if st.button("+ New Customer", key="cust_new", type="primary", use_container_width=True):
-            st.session_state["ips_cust_form"] = True
+            st.session_state[_NEW_CUSTOMER_DIALOG_KEY] = True
+            ips_app_rerun()
 
     render_page_brand_header(
         "Customers",
@@ -2545,51 +2625,16 @@ def render() -> None:
         actions=[_customers_export, _customers_new],
     )
 
-    if st.session_state.get("ips_cust_form"):
-        with st.expander("New Customer", expanded=True):
-            nc1, nc2 = st.columns(2)
-            with nc1:
-                st.text_input("Company name", key="cust_new_company")
-                st.text_input("Customer #", key="cust_new_number")
-                st.text_input("Website", key="cust_new_website")
-                st.text_input("Main phone", key="cust_new_main_phone")
-            with nc2:
-                st.text_input("Main email", key="cust_new_main_email")
-                st.text_input("Billing email", key="cust_new_billing_email")
-                st.selectbox("Status", ["Active", "Inactive"], key="cust_new_status")
-            st.text_area("Notes", key="cust_new_notes")
-            with st.expander("Legacy address (optional)", expanded=False):
-                la1, la2 = st.columns(2)
-                with la1:
-                    st.text_input("Address", key="cust_new_addr")
-                    st.text_input("City", key="cust_new_city")
-                with la2:
-                    st.text_input("State", key="cust_new_state")
-                    st.text_input("ZIP", key="cust_new_zip")
-            sb1, sb2 = st.columns(2)
-            with sb1:
-                if st.button("Save customer", key="cust_save_new", type="primary", use_container_width=True):
-                    payload = {
-                        "company_name": st.session_state.get("cust_new_company"),
-                        "customer_name": st.session_state.get("cust_new_company"),
-                        "customer_number": st.session_state.get("cust_new_number"),
-                        "website": st.session_state.get("cust_new_website"),
-                        "main_phone": st.session_state.get("cust_new_main_phone"),
-                        "main_email": st.session_state.get("cust_new_main_email"),
-                        "billing_email": st.session_state.get("cust_new_billing_email"),
-                        "status": st.session_state.get("cust_new_status"),
-                        "notes": st.session_state.get("cust_new_notes"),
-                        "address": st.session_state.get("cust_new_addr"),
-                        "city": st.session_state.get("cust_new_city"),
-                        "state": st.session_state.get("cust_new_state"),
-                        "zip": st.session_state.get("cust_new_zip"),
-                    }
-                    ok, msg = _service_feedback(create_customer(payload), success="Customer saved.")
-                    if apply_persist_feedback(ok, msg, clear_keys=("ips_cust_form",)):
-                        st.rerun()
-            with sb2:
-                if st.button("Cancel", key="cust_cancel_new", use_container_width=True):
-                    st.session_state.pop("ips_cust_form", None)
-                    st.rerun()
+    _capture_customer_detail_query()
+    _show_customer_detail_query_error_if_any()
 
-    _render_customers_catalog_fragment(all_rows, filter_options=filter_options)
+    if _customers_detail_pending():
+        if st.session_state.get(_NEW_CUSTOMER_DIALOG_KEY):
+            _show_new_customer_dialog()
+        render_customer_detail(str(st.session_state[CUSTOMERS_SELECTED_ID_KEY]))
+        return
+
+    if st.session_state.get(_NEW_CUSTOMER_DIALOG_KEY):
+        _show_new_customer_dialog()
+
+    _render_customers_catalog_fragment()
