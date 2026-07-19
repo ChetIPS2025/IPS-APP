@@ -171,7 +171,6 @@ def render_kit_items_table(
         render_table_pagination_footer(
             len(filtered),
             KIT_ITEMS_TABLE_KEY,
-            item_label="item",
         )
 
     with st.container(key="asset_kit_table_wrap"):

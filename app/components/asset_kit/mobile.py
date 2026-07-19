@@ -74,7 +74,7 @@ def render_mobile_kit_scan(asset: dict) -> None:
                 f"{kit_item_status_pill_html(str(it.get('status') or ''))}",
                 unsafe_allow_html=True,
             )
-        render_table_pagination_footer(len(items), _MOBILE_TABLE_KEY, item_label="tool")
+        render_table_pagination_footer(len(items), _MOBILE_TABLE_KEY)
         if st.button("← Back", key="kit_scan_back_tools"):
             st.session_state["_kit_scan_view"] = "card"
             st.rerun()
