@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import html
 from collections.abc import Callable
 
 import streamlit as st
@@ -28,6 +27,12 @@ from app.components.record_modal import (
     set_view_mode,
     show_modal_if_pending,
 )
+from app.components.small_hand_tools_list_table import (
+    HAND_TOOLS_TABLE_COL_WIDTHS_PX,
+    build_hand_tools_html_table,
+    render_hand_tools_table_bridge_legacy,
+    render_hand_tools_table_open_buttons,
+)
 from app.components.table_filters import (
     apply_column_filters,
     build_filter_options,
@@ -45,7 +50,7 @@ from app.components.layout import render_filter_bar as layout_filter_bar
 from app.components.item_photo_manager import render_item_photo_manager
 from app.pages._core._data import load_assets, load_inventory
 from app.services.asset_kits_service import get_tool_trailers
-from app.services.catalog_images import CatalogImageContext, build_catalog_image_context, catalog_thumbnail_html
+from app.services.catalog_images import CatalogImageContext, build_catalog_image_context
 from app.services.small_hand_tool_service import (
     HAND_TOOL_CATEGORIES,
     HAND_TOOL_CONDITIONS,
@@ -70,17 +75,21 @@ _HAND_TOOL_SEL = "ht_detail_sel"
 _HAND_TOOL_MODAL_KEY = "ht_detail_modal"
 _HAND_TOOL_CACHE_KEY = "ht_detail_cache"
 _HAND_TOOL_DETAIL_TABLE_KEY = "assets_hand_tools_detail"
-# Eight visible columns — proportions mirror shared CSS grid (--ips-hand-tools-grid).
-_COLS = [3.4, 1.1, 0.65, 0.65, 1.25, 1.1, 0.9, 0.9]
-_HEADER_SPECS: list[tuple[str, str | None]] = [
-    ("Tool", None),
-    ("Category", "category"),
-    ("Expected", None),
-    ("Actual", None),
-    ("Location", "location"),
-    ("Storage", "storage_type"),
-    ("Status", "status"),
-    ("Actions", None),
+_HAND_TOOL_ADJUST_ID_KEY = "ht_adjust_tool_id"
+_HAND_TOOL_FILTER_COLUMN_LAYOUT: list[tuple[str | None, str | None]] = [
+    (None, None),
+    (None, None),
+    ("CATEGORY", "category"),
+    (None, None),
+    (None, None),
+    ("LOCATION", "location"),
+    ("STORAGE", "storage_type"),
+    ("STATUS", "status"),
+    (None, None),
+]
+_HAND_TOOL_FILTER_COL_WEIGHTS: list[int] = [
+    HAND_TOOLS_TABLE_COL_WIDTHS_PX[key]
+    for key in ("image", "name", "category", "expected", "actual", "location", "storage", "status", "actions")
 ]
 _FILTER_SPECS: list[tuple[str, object]] = [
     ("category", lambda r: str(r.get("category") or "")),
@@ -464,53 +473,41 @@ def _show_hand_tool_detail_modal() -> None:
     render_hand_tool_detail_dialog(tool)
 
 
-def _hand_tool_status_pill_html(status: str) -> str:
-    cls_map = {
-        "Available": "ips-asset-status-available",
-        "In Use": "ips-asset-status-assigned",
-        "Low Stock": "ips-asset-status-maintenance-due",
-        "Missing": "ips-asset-status-lost",
-        "Damaged": "ips-asset-status-out-for-repair",
-        "Out of Service": "ips-asset-status-retired",
-        "Retired": "ips-asset-status-retired",
-    }
-    cls = cls_map.get(status, "ips-asset-status-available")
-    return f'<span class="ips-asset-status-pill {cls}">{html.escape(status)}</span>'
-
-
-def _render_hand_tool_adjust_action(row: dict) -> None:
-    rid = str(row.get("id") or "").strip()
-    editable = bool(row.get("editable", True))
-    if not rid or not editable:
-        st.markdown(
-            '<div class="ips-hand-tools-cell ips-assets-muted">—</div>',
-            unsafe_allow_html=True,
-        )
+@st.dialog("Adjust count", width="small", on_dismiss=lambda: st.session_state.pop(_HAND_TOOL_ADJUST_ID_KEY, None))
+def _show_hand_tool_adjust_dialog(tool: dict) -> None:
+    rid = str(tool.get("id") or "").strip()
+    if not rid:
         return
-
-    name = str(row.get("tool_name") or "tool")
-    with st.popover("Adjust count", type="primary"):
-        st.caption(name)
-        delta = st.number_input("Count change (+/−)", value=0.0, step=1.0, key=f"ht_delta_{rid}")
-        adj_notes = st.text_input("Audit notes", key=f"ht_adj_notes_{rid}")
-        ac1, ac2 = st.columns(2)
-        with ac1:
-            if st.button("Apply adjustment", key=f"ht_adj_go_{rid}", use_container_width=True):
-                if delta == 0:
-                    st.warning("Enter a non-zero count change.")
-                else:
-                    result = adjust_hand_tool_quantity(rid, delta, notes=adj_notes)
-                    if result.ok:
-                        st.success("Count adjusted.")
-                        st.rerun()
-                    st.error(result.error or "Adjustment failed.")
-        with ac2:
-            if st.button("Remove", key=f"ht_del_{rid}", use_container_width=True):
-                result = delete_hand_tool(rid)
+    name = str(tool.get("tool_name") or "tool")
+    st.caption(name)
+    delta = st.number_input("Count change (+/−)", value=0.0, step=1.0, key=f"ht_dialog_delta_{rid}")
+    adj_notes = st.text_input("Audit notes", key=f"ht_dialog_notes_{rid}")
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("Apply adjustment", key=f"ht_dialog_apply_{rid}", type="primary", use_container_width=True):
+            if delta == 0:
+                st.warning("Enter a non-zero count change.")
+            else:
+                result = adjust_hand_tool_quantity(rid, delta, notes=adj_notes)
                 if result.ok:
-                    st.success("Hand tool removed.")
+                    st.session_state.pop(_HAND_TOOL_ADJUST_ID_KEY, None)
+                    st.success("Count adjusted.")
                     st.rerun()
-                st.error(result.error or "Remove failed.")
+                st.error(result.error or "Adjustment failed.")
+    with c2:
+        if st.button("Remove tool", key=f"ht_dialog_remove_{rid}", use_container_width=True):
+            result = delete_hand_tool(rid)
+            if result.ok:
+                st.session_state.pop(_HAND_TOOL_ADJUST_ID_KEY, None)
+                st.success("Hand tool removed.")
+                st.rerun()
+            st.error(result.error or "Remove failed.")
+
+
+def _queue_hand_tool_adjust(row: dict) -> None:
+    rid = str(row.get("id") or "").strip()
+    if rid:
+        st.session_state[_HAND_TOOL_ADJUST_ID_KEY] = rid
 
 
 def _filter_rows(rows: list[dict], *, q: str = "") -> list[dict]:
@@ -558,33 +555,28 @@ def _render_hand_tools_pagination_header(total: int) -> None:
                 st.rerun()
 
 
-def _render_tool_column(
-    row: dict,
-    *,
-    name: str,
-    image_context: CatalogImageContext,
-    on_open_tool: Callable[[dict], None] | None,
-    title_attr: str = "",
-) -> None:
-    rid = str(row.get("id") or "").strip()
-    thumb = catalog_thumbnail_html(row, kind="small_tool", context=image_context, alt="Small tool image")
+def _render_hand_tools_table_column_filters(*, filter_options: dict[str, list[str]]) -> None:
     st.markdown(
-        '<span class="ips-hand-tools-row-bridge small-tools-table-row" aria-hidden="true"></span>',
+        '<div class="ips-assets-table-filter-toolbar ips-hand-tools-filter-toolbar">',
         unsafe_allow_html=True,
     )
-    st.markdown(
-        f'<div class="ips-hand-tools-tool-thumb">{thumb}</div>',
-        unsafe_allow_html=True,
-    )
-    if on_open_tool and rid:
-        if st.button(name, key=f"ht_open_name_{rid}", type="tertiary", help=name):
-            on_open_tool(row)
-    else:
-        st.markdown(
-            f'<div class="ips-hand-tools-tool-name ips-hand-tools-tool-name-static"{title_attr} '
-            f'title="{html.escape(name)}">{html.escape(name)}</div>',
-            unsafe_allow_html=True,
-        )
+    cols = st.columns(_HAND_TOOL_FILTER_COL_WEIGHTS, gap="small")
+    for col, (label, field) in zip(cols, _HAND_TOOL_FILTER_COLUMN_LAYOUT):
+        with col:
+            if label and field:
+                render_table_header_cell(
+                    label,
+                    table_key=_TABLE_KEY,
+                    filter_field=field,
+                    filter_options=filter_options.get(field, []),
+                    base_class="ips-assets-filter-toolbar-cell",
+                )
+            else:
+                st.markdown(
+                    '<span class="ips-assets-filter-spacer" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
+                )
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _render_table(
@@ -598,99 +590,38 @@ def _render_table(
         st.info("No small hand tools match your filters.")
         return
 
-    with st.container(key="assets_hand_tools_table_wrap"):
+    row_by_id = {str(row.get("id") or "").strip(): row for row in rows if str(row.get("id") or "").strip()}
+
+    def _open_row(row_id: str, row: dict) -> None:
+        if on_open_tool:
+            on_open_tool(row)
+        else:
+            open_hand_tool_detail(row)
+
+    def _adjust_row(_row_id: str, row: dict) -> None:
+        _queue_hand_tool_adjust(row)
+
+    with st.container(key="assets_table_wrap"):
         st.markdown(
             '<div class="ips-assets-table-wrap ips-hand-tools-table-wrap">',
             unsafe_allow_html=True,
         )
-        header_cols = st.columns(_COLS, gap="small", vertical_alignment="center")
-        for col, (label, field) in zip(header_cols, _HEADER_SPECS):
-            with col:
-                if label == "Tool":
-                    st.markdown(
-                        '<span class="ips-hand-tools-row-bridge small-tools-table-header" aria-hidden="true"></span>',
-                        unsafe_allow_html=True,
-                    )
-                header_class = "ips-assets-header-row ips-hand-tools-cell ips-hand-tools-header-cell"
-                if label == "Tool":
-                    header_class += " ips-hand-tools-header-tool"
-                if field:
-                    render_table_header_cell(
-                        label,
-                        table_key=_TABLE_KEY,
-                        filter_field=field,
-                        filter_options=filter_options.get(field, []),
-                        base_class=header_class,
-                    )
-                else:
-                    render_table_header_cell(label, base_class=header_class)
-
-        for row in rows:
-            rid = str(row.get("id") or "")
-            cols = st.columns(_COLS, gap="small", vertical_alignment="center")
-            name = str(row.get("tool_name") or "—")
-            category = str(row.get("category") or "—")
-            qty_exp = row.get("quantity_expected") or 0
-            qty_act = row.get("quantity_on_hand") or 0
-            qty_short = qty_act < qty_exp
-            location = str(row.get("location_display") or "—")
-            storage = str(row.get("storage_type") or "—")
-            status = str(row.get("status") or "—")
-            editable = bool(row.get("editable", True))
-            title_attr = (
-                ' title="Trailer kit item — edit in Tool Trailer kit tab"'
-                if not editable
-                else ""
-            )
-
-            with cols[0]:
-                _render_tool_column(
-                    row,
-                    name=name,
-                    image_context=image_context,
-                    on_open_tool=on_open_tool,
-                    title_attr=title_attr,
-                )
-            with cols[1]:
-                st.markdown(
-                    f'<div class="ips-hand-tools-cell ips-hand-tools-cell--category" '
-                    f'title="{html.escape(category)}">{html.escape(category)}</div>',
-                    unsafe_allow_html=True,
-                )
-            with cols[2]:
-                st.markdown(
-                    f'<div class="ips-hand-tools-cell ips-hand-tools-cell--qty">{qty_exp:g}</div>',
-                    unsafe_allow_html=True,
-                )
-            with cols[3]:
-                short_cls = " ips-assets-qty-short" if qty_short else ""
-                st.markdown(
-                    f'<div class="ips-hand-tools-cell ips-hand-tools-cell--qty{short_cls}">'
-                    f"<strong>{qty_act:g}</strong></div>",
-                    unsafe_allow_html=True,
-                )
-            with cols[4]:
-                st.markdown(
-                    f'<div class="ips-hand-tools-cell ips-hand-tools-cell--location" '
-                    f'title="{html.escape(location)}">{html.escape(location)}</div>',
-                    unsafe_allow_html=True,
-                )
-            with cols[5]:
-                st.markdown(
-                    f'<div class="ips-hand-tools-cell ips-hand-tools-cell--storage" '
-                    f'title="{html.escape(storage)}">{html.escape(storage)}</div>',
-                    unsafe_allow_html=True,
-                )
-            with cols[6]:
-                st.markdown(
-                    f'<div class="ips-hand-tools-cell ips-hand-tools-cell--status">'
-                    f"{_hand_tool_status_pill_html(status)}</div>",
-                    unsafe_allow_html=True,
-                )
-            with cols[7]:
-                _render_hand_tool_adjust_action(row)
-
+        _render_hand_tools_table_column_filters(filter_options=filter_options)
+        st.markdown(
+            build_hand_tools_html_table(rows, image_context=image_context),
+            unsafe_allow_html=True,
+        )
+        render_hand_tools_table_open_buttons(rows, open_row_fn=_open_row)
+        render_hand_tools_table_bridge_legacy(
+            row_by_id,
+            open_row_fn=_open_row,
+            adjust_row_fn=_adjust_row,
+        )
         st.markdown("</div>", unsafe_allow_html=True)
+
+    adjust_id = str(st.session_state.get(_HAND_TOOL_ADJUST_ID_KEY) or "").strip()
+    if adjust_id and adjust_id in row_by_id:
+        _show_hand_tool_adjust_dialog(row_by_id[adjust_id])
 
 
 def render_hand_tools_tab(

@@ -85,14 +85,13 @@ class TestAssetsPageCss(unittest.TestCase):
         mock_serialized.assert_not_called()
         mock_detail.assert_not_called()
 
-    def test_hand_tools_css_includes_overflow_fix(self) -> None:
-        from app.components.assets_css import HAND_TOOLS_TABLE_FIX_CSS, HAND_TOOLS_TABLE_GRID
+    def test_hand_tools_css_includes_html_table_layout(self) -> None:
+        from app.components.assets_css import HAND_TOOLS_HTML_TABLE_CSS, HAND_TOOLS_TABLE_GRID
 
-        self.assertIn("--ips-hand-tools-grid", HAND_TOOLS_TABLE_FIX_CSS)
-        self.assertIn(HAND_TOOLS_TABLE_GRID.strip(), HAND_TOOLS_TABLE_FIX_CSS)
-        self.assertIn("grid-template-columns: var(--ips-hand-tools-grid)", HAND_TOOLS_TABLE_FIX_CSS)
-        self.assertIn("overflow-x: auto", HAND_TOOLS_TABLE_FIX_CSS)
-        self.assertNotIn("word-break: break-word", HAND_TOOLS_TABLE_FIX_CSS)
+        self.assertIn(".ips-hand-tools-html-table", HAND_TOOLS_HTML_TABLE_CSS)
+        self.assertIn(HAND_TOOLS_TABLE_GRID.strip(), HAND_TOOLS_HTML_TABLE_CSS)
+        self.assertIn("text-overflow: ellipsis", HAND_TOOLS_HTML_TABLE_CSS)
+        self.assertNotIn("word-break: break-word", HAND_TOOLS_HTML_TABLE_CSS)
 
     @patch("app.components.assets_css.inject_assets_detail_css")
     @patch("app.components.assets_css.inject_assets_equipment_css")
