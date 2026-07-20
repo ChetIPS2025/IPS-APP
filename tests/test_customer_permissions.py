@@ -32,6 +32,27 @@ class TestCustomerPermissions(unittest.TestCase):
         self.assertEqual(perms.user_id, "auth-amanda")
         self.assertEqual(perms.user_name, "Amanda M. Robicheaux")
         self.assertTrue(perms.can_create)
+        self.assertTrue(perms.can_delete)
+
+    def test_delete_permission_by_role(self) -> None:
+        cases = {
+            "admin": True,
+            "manager": True,
+            "supervisor": False,
+            "office": False,
+            "employee": False,
+        }
+        for role, expected in cases.items():
+            with self.subTest(role=role):
+                st.session_state.clear()
+                st.session_state[CURRENT_USER_PROFILE_KEY] = {
+                    "id": f"user-{role}",
+                    "full_name": role.title(),
+                    "email": f"{role}@example.com",
+                    "role": role,
+                }
+                perms = load_customer_permissions()
+                self.assertEqual(perms.can_delete, expected)
 
 
 if __name__ == "__main__":

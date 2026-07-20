@@ -38,6 +38,6 @@ def load_customer_permissions() -> CustomerPermissions:
         can_edit_customer=can_manage,
         can_edit_location=can_manage,
         can_edit_contact=can_manage,
-        can_delete=norm in {"admin", "manager"},
+        can_delete=norm in {"admin", "project manager"},
         can_view_documents=can_manage,
     )
