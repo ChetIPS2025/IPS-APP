@@ -514,7 +514,10 @@ def clear_timekeeping_list_caches() -> None:
     clear_timekeeping_assignment_options_cache()
     clear_timekeeping_week_days_cache()
     from app.pages._core.page_data_cache import clear_timekeeping_summaries_page_data_cache
+    from app.services.weekly_timekeeping_service import invalidate_weekly_timekeeping_page_cache
+
     clear_timekeeping_summaries_page_data_cache()
+    invalidate_weekly_timekeeping_page_cache()
 
 
 def _recalculate_visible_week_totals(week_start_d: date) -> None:
@@ -542,6 +545,7 @@ def _ensure_week_days_by_employee(week_start_d: date) -> dict[str, list[dict[str
             return cached
     with perf_span("timekeeping.week_days_batch"):
         from app.services.timekeeping_service import list_timekeeping_days_for_week
+
         rows = list_timekeeping_days_for_week(week_start_d)
     by_eid: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
@@ -576,44 +580,15 @@ def _day_status_from_saved_rows(rows: list[dict[str, Any]]) -> str:
 
 def _list_display_day_rows(employee_id: str, week_start_d: date) -> list[dict[str, Any]]:
     """Lightweight 7-day rows for list UI — reads batch week cache, no session grid."""
+    from app.services.weekly_timekeeping_service import aggregate_daily_display_rows
+
     eid = str(employee_id or "").strip()
     days = week_dates(week_start_d)
     if not eid:
-        return [
-            {"date": day.isoformat(), "st": 0.0, "ot": 0.0, "dt": 0.0, "status": "Draft"}
-            for day in days
-        ]
+        return aggregate_daily_display_rows([], week_start_d)
 
     saved_rows = _day_rows_for_employee(eid, week_start_d)
-    if not saved_rows:
-        return [
-            {"date": day.isoformat(), "st": 0.0, "ot": 0.0, "dt": 0.0, "status": "Draft"}
-            for day in days
-        ]
-
-    by_date: dict[str, list[dict[str, Any]]] = {}
-    for row in saved_rows:
-        iso = str(row.get("work_date") or "")[:10]
-        if iso:
-            by_date.setdefault(iso, []).append(row)
-
-    out: list[dict[str, Any]] = []
-    for day in days:
-        iso = day.isoformat()
-        day_rows = by_date.get(iso) or []
-        if not day_rows:
-            out.append({"date": iso, "st": 0.0, "ot": 0.0, "dt": 0.0, "status": "Draft"})
-            continue
-        out.append(
-            {
-                "date": iso,
-                "st": sum(float(r.get("st_hours") or 0) for r in day_rows),
-                "ot": sum(float(r.get("ot_hours") or 0) for r in day_rows),
-                "dt": sum(float(r.get("dt_hours") or 0) for r in day_rows),
-                "status": _day_status_from_saved_rows(day_rows),
-            }
-        )
-    return out
+    return aggregate_daily_display_rows(saved_rows, week_start_d)
 
 
 def _list_row_day_rows_for_display(employee_id: str, week_start_d: date) -> list[dict[str, Any]]:
@@ -1195,6 +1170,9 @@ def _invalidate_weekly_grid(emp: dict, week_start_d: date) -> None:
     ak = _alloc_state_key(eid)
     st.session_state.pop(ak, None)
     st.session_state.pop(f"{ak}_week", None)
+    from app.services.weekly_timekeeping_service import invalidate_weekly_timekeeping_page_cache
+
+    invalidate_weekly_timekeeping_page_cache(week_start_d)
 
 
 def _alloc_state_key(emp_id: str) -> str:
@@ -5130,7 +5108,8 @@ def _clickable_list_day_cell_html(
     iso = day_d.isoformat()
     day_status = _normalize_timecard_status(day_row.get("status"))
     total = _day_hours_total(day_row)
-    has_hours = total > _ALLOC_TOLERANCE
+    hours_unknown = bool(day_row.get("hours_unknown"))
+    has_hours = total > _ALLOC_TOLERANCE and not hours_unknown
     filled_marker = _list_day_box_marker_classes(
         day_status=day_status,
         alloc_state="",
@@ -5156,6 +5135,7 @@ def _clickable_list_day_cell_html(
             f"{html.escape(_timecard_status_display(day_status).upper())}"
             f"</span>"
         )
+    hours_display = "—" if hours_unknown else _fmt_day_hours(total)
     return (
         f'<span class="timekeeping-day-cell-clickable-marker{weekend_cls}{selected_cls}{filled_marker}" '
         f'aria-hidden="true"></span>'
@@ -5166,7 +5146,9 @@ def _clickable_list_day_cell_html(
         f'<a class="timekeeping-day-native-link" href="{html.escape(href, quote=True)}" '
         f'target="_self" aria-label="{html.escape(aria, quote=True)}">'
         f"{status_html}"
-        f'<span class="{html.escape(hours_cls.strip())}">{html.escape(_fmt_day_hours(total))}</span>'
+        f'<span class="{html.escape(hours_cls.strip())}">'
+        f'<div class="timekeeping-list-day-value">{html.escape(hours_display)}</div>'
+        f"</span>"
         f"</a>"
         f"</div>"
     )
@@ -5211,7 +5193,11 @@ def _render_timekeeping_employee_row_collapsed(
     status = _normalize_timecard_status(row.get("status"))
     day_rows: list[dict] | None = None
     if eid:
-        day_rows = _list_row_day_rows_for_display(eid, week_start_d)
+        embedded = row.get("_daily_display_rows")
+        if isinstance(embedded, list):
+            day_rows = embedded
+        else:
+            day_rows = _list_row_day_rows_for_display(eid, week_start_d)
 
     with st.container(key=f"tk_row_{timecard_id}"):
         st.markdown(
@@ -5506,8 +5492,21 @@ def render() -> None:
         _render_weekly_customer_timesheets_footer(filtered=None, perms=perms)
         return
 
-    summaries = _filter_summaries_for_field_user(load_timekeeping_summaries(ws))
-    built_rows = [_build_timecard_row(row, ws) for row in summaries]
+    from app.services.weekly_timekeeping_service import load_weekly_timekeeping_page, seed_week_days_session_cache
+
+    with st.spinner("Loading weekly timecards…"):
+        from app.perf_debug import perf_span
+
+        with perf_span("timekeeping.page_shell"):
+            page_snapshot = load_weekly_timekeeping_page(
+                week_start=ws,
+                role=perms.role,
+            )
+    if page_snapshot.warning:
+        st.warning(page_snapshot.warning)
+    if page_snapshot.week_days_by_employee:
+        seed_week_days_session_cache(ws, page_snapshot.week_days_by_employee)
+    built_rows = _filter_summaries_for_field_user(page_snapshot.employees)
     filter_options = build_filter_options(built_rows, _TK_COLUMN_FILTER_SPECS)
 
     filtered = _filter_timecards(built_rows)

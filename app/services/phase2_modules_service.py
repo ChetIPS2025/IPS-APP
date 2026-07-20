@@ -6,9 +6,26 @@ import json
 import logging
 import traceback
 from datetime import date, datetime, timezone
+from dataclasses import dataclass
 from typing import Any
 
 _LOG = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class TimekeepingWeekDaysQueryResult:
+    rows: list[dict[str, Any]]
+    ok: bool = True
+    error: str | None = None
+
+
+def _normalize_work_date_field(value: object) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    if "T" in raw:
+        raw = raw.split("T", 1)[0]
+    return raw[:10]
 
 from app.services.repository import (
     ServiceResult,
@@ -1169,7 +1186,7 @@ def _fetch_employee_timekeeping_day_rows(
 
 
 def _work_date_in_week(work_date: str, week_start: date) -> bool:
-    wd = str(work_date or "")[:10]
+    wd = _normalize_work_date_field(work_date)
     if not wd:
         return False
     try:
@@ -1184,7 +1201,7 @@ def _day_row_in_week(row: dict[str, Any], week_start: date) -> bool:
     row_week = str(row.get("week_start") or "")[:10]
     if row_week:
         return row_week == ws
-    return _work_date_in_week(str(row.get("work_date") or ""), week_start)
+    return _work_date_in_week(_normalize_work_date_field(row.get("work_date")), week_start)
 
 
 def list_timekeeping_days(employee_id: str, week_start: date) -> list[dict[str, Any]]:
@@ -1197,18 +1214,43 @@ def list_timekeeping_days(employee_id: str, week_start: date) -> list[dict[str, 
 
 def list_timekeeping_days_for_week(week_start: date, *, limit: int = 5000) -> list[dict[str, Any]]:
     """Load all employee day rows for one week in a single query when possible."""
-    ws = week_start.isoformat()
+    return list_timekeeping_days_for_week_with_status(week_start, limit=limit).rows
+
+
+def list_timekeeping_days_for_week_with_status(
+    week_start: date,
+    *,
+    limit: int = 5000,
+) -> TimekeepingWeekDaysQueryResult:
+    """Load week day rows and report query failures without caching empty as success."""
+    normalized = week_start
+    ws = normalized.isoformat()
+    week_end_d = normalized.fromordinal(normalized.toordinal() + 6)
     from app.db import fetch_by_match
+
     try:
         rows = fetch_by_match("employee_timekeeping_days", {"week_start": ws}, limit=limit) or []
         if rows:
-            return [r for r in rows if _day_row_in_week(r, week_start)]
+            filtered = [r for r in rows if _day_row_in_week(r, normalized)]
+            if filtered:
+                return TimekeepingWeekDaysQueryResult(rows=filtered, ok=True)
     except Exception as exc:
         _LOG.debug("fetch_by_match employee_timekeeping_days week_start failed: %s", exc)
+
     rows, err = fetch_rows("employee_timekeeping_days", limit=limit, order_by="work_date")
     if err:
-        return []
-    return [r for r in rows or [] if _day_row_in_week(r, week_start)]
+        return TimekeepingWeekDaysQueryResult(rows=[], ok=False, error=str(err))
+    filtered = [
+        r
+        for r in rows or []
+        if _normalize_work_date_field(r.get("work_date"))
+        and normalized
+        <= date.fromisoformat(_normalize_work_date_field(r.get("work_date")))
+        <= week_end_d
+    ]
+    if not filtered:
+        filtered = [r for r in rows or [] if _day_row_in_week(r, normalized)]
+    return TimekeepingWeekDaysQueryResult(rows=filtered, ok=True)
 
 
 def _day_row_hours(row: dict[str, Any]) -> float:

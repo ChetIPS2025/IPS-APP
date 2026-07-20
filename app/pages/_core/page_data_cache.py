@@ -75,6 +75,10 @@ def clear_timekeeping_summaries_page_data_cache() -> None:
     clear_page_data_cache_prefix("timekeeping_summaries:")
 
 
+def clear_weekly_timekeeping_page_data_cache() -> None:
+    clear_page_data_cache_prefix("weekly_timekeeping_page:")
+
+
 __all__ = [
     "page_data_cache_get",
     "clear_page_data_cache",
@@ -86,4 +90,5 @@ __all__ = [
     "clear_dashboard_snapshot_cache",
     "clear_inventory_page_data_cache",
     "clear_timekeeping_summaries_page_data_cache",
+    "clear_weekly_timekeeping_page_data_cache",
 ]
