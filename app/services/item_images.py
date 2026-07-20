@@ -66,8 +66,15 @@ _INVALID_IMAGE_TOKENS = frozenset({"", "—", "-", "none", "null", "undefined"})
 _HIGH_CONFIDENCE_FIELDS = frozenset({"model_number", "item_number", "sku"})
 
 from app.config import ROOT_DIR
-from app.db import create_signed_url, update_rows_admin, upload_bytes_admin
-from app.services.repository import ServiceResult, clear_data_cache_for_table, filter_payload_to_table
+from app.db import create_signed_url, upload_bytes_admin
+from app.services.repository import (
+    ServiceResult,
+    clear_data_cache_for_table,
+    filter_payload_to_table,
+    update_row_admin,
+)
+
+
 @dataclass
 class ImageMatchResult:
     filename: str
@@ -355,21 +362,24 @@ def _update_item_image_row(table: str, payload: dict[str, Any], record_id: str) 
     if not rid:
         return ServiceResult(ok=False, error="Missing record id.")
     filtered = filter_payload_to_table(table, payload)
-    try:
-        rows = update_rows_admin(table, filtered, {"id": rid})
-    except Exception as exc:
-        from app.auth import friendly_auth_error_message
+    if not filtered:
         return ServiceResult(
             ok=False,
-            error=friendly_auth_error_message(exc, operation=f"save image for {table}"),
+            error=(
+                f"Could not save image metadata to {table} — photo columns are unavailable. "
+                "Apply pending database migrations, then refresh and try again."
+            ),
         )
-    if not rows:
+    result = update_row_admin(table, filtered, {"id": rid})
+    if not result.ok:
+        return ServiceResult(ok=False, error=result.error or f"Could not save image metadata to {table}.")
+    if not result.data:
         return ServiceResult(
             ok=False,
             error=f"Could not save image metadata to {table} (no row updated).",
         )
     clear_data_cache_for_table(table)
-    return ServiceResult(ok=True, data=rows[0])
+    return ServiceResult(ok=True, data=result.data)
 
 
 def resolve_image_url_by_field_priority(

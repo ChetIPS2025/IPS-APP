@@ -43,6 +43,37 @@ class TestSmallHandToolImages(unittest.TestCase):
         self.assertEqual(url, "https://example.com/owned.jpg")
         mock_owned.assert_called_once()
 
+    @patch("app.services.repository.fetch_rows")
+    def test_filter_payload_keeps_small_hand_tool_image_fields(self, mock_fetch) -> None:
+        from app.services.repository import filter_payload_to_table
+
+        mock_fetch.return_value = (
+            [
+                {
+                    "id": "t1",
+                    "tool_name": "Hammer",
+                    "image_path": "",
+                    "image_url": "",
+                    "image_file_name": "",
+                    "image_mime_type": "",
+                    "image_uploaded_at": None,
+                    "image_uploaded_by": "",
+                    "image_status": "missing",
+                }
+            ],
+            None,
+        )
+        payload = {
+            "image_path": "assets/item_images/small_hand_tools/t1/hammer.jpg",
+            "image_url": "",
+            "image_file_name": "hammer.jpg",
+            "image_mime_type": "image/jpeg",
+            "image_status": "approved",
+        }
+        filtered = filter_payload_to_table("small_hand_tools", payload)
+        self.assertEqual(filtered.get("image_path"), payload["image_path"])
+        self.assertEqual(filtered.get("image_status"), "approved")
+
 
 if __name__ == "__main__":
     unittest.main()

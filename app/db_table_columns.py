@@ -776,9 +776,17 @@ SMALL_HAND_TOOLS_COLUMNS = _cols(
     "model_number",
     "serial_number",
     "notes",
+    "source_asset_id",
     "is_active",
     "created_at",
     "updated_at",
+    "image_path",
+    "image_url",
+    "image_file_name",
+    "image_mime_type",
+    "image_uploaded_at",
+    "image_uploaded_by",
+    "image_status",
 )
 
 TOOL_TRANSACTIONS_COLUMNS = _cols(
