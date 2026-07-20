@@ -139,15 +139,41 @@ class TestWeeklyTimekeepingService(unittest.TestCase):
         self.assertNotIn("ips_tk_week_days_sig", st.session_state)
 
 
+class TestTimekeepingEmployeeIdService(unittest.TestCase):
+    def test_prefers_employee_id_for_batch_grouping(self) -> None:
+        from app.services.weekly_timekeeping_service import _timekeeping_employee_id
+
+        self.assertEqual(
+            _timekeeping_employee_id({"employee_id": "emp-1", "id": "timecard-1"}),
+            "emp-1",
+        )
+
+    def test_build_row_sets_daily_hours_unknown_on_failure(self) -> None:
+        from app.services.weekly_timekeeping_service import _build_employee_row
+
+        week = date(2026, 7, 20)
+        row = _build_employee_row(
+            {"employee_id": "emp-1", "name": "Pat", "status": "Draft"},
+            week_start_d=week,
+            week_days_by_employee={},
+            days_loaded=False,
+            hours_unknown=True,
+        )
+        self.assertTrue(row["_daily_hours_unknown"])
+        self.assertTrue(row["_daily_display_rows"][0]["hours_unknown"])
+
+
 class TestWeeklyTimekeepingRenderGuards(unittest.TestCase):
-    def test_render_uses_weekly_snapshot_service(self) -> None:
+    def test_render_uses_weekly_snapshot_without_spinner(self) -> None:
         source = inspect.getsource(tk.render)
         self.assertIn("load_weekly_timekeeping_page", source)
         self.assertIn("timekeeping.page_shell", source)
+        self.assertNotIn('st.spinner("Loading weekly timecards', source)
 
     def test_collapsed_row_does_not_build_session_grid(self) -> None:
         source = inspect.getsource(tk._render_timekeeping_employee_row_collapsed)
         self.assertNotIn("_ensure_weekly_grid", source)
+        self.assertNotIn("_list_row_day_rows_for_display", source)
         self.assertNotIn("st.number_input", source)
 
     def test_stable_render_does_not_call_st_rerun_in_list_fragment(self) -> None:

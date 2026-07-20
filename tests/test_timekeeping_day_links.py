@@ -57,10 +57,11 @@ class TestTimekeepingDayLinks(unittest.TestCase):
             eid="emp-1",
             timecard_id="tc-1",
         )
-        self.assertIn('<a class="timekeeping-day-native-link"', html_out)
+        self.assertIn('<a class="timekeeping-weekly-day-link"', html_out)
         self.assertIn('href="?', html_out)
         self.assertIn('target="_self"', html_out)
         self.assertIn('aria-label="Open', html_out)
+        self.assertIn(">8<", html_out)
 
     def test_collapsed_day_cells_no_streamlit_button(self) -> None:
         cell_source = inspect.getsource(tk._render_clickable_list_day_cell)

@@ -294,11 +294,33 @@ def _apply_hours_widget_to_row(
 
 
 def _render_timekeeping_inline_html(html_content: str) -> None:
-    """Render list cell HTML without Streamlit <p> wrapper collapsing block layout."""
-    if hasattr(st, "html"):
-        st.html(html_content)
-    else:
-        st.markdown(html_content, unsafe_allow_html=True)
+    """Render list cell HTML in the main DOM (st.html iframes collapse inside columns)."""
+    st.markdown(html_content, unsafe_allow_html=True)
+
+
+def _timekeeping_employee_id(row: dict[str, Any]) -> str:
+    """Normalize employee id from summary or day rows (prefer employee_id over id)."""
+    return str(row.get("employee_id") or row.get("id") or "").strip()
+
+
+def _weekly_day_value_html(
+    *,
+    work_date: date,
+    hours: float,
+    status: str,
+    href: str,
+    hours_unknown: bool = False,
+) -> str:
+    """Compact clickable weekly list day cell — hour value only (date is in the header)."""
+    del status
+    display = "—" if hours_unknown else _fmt_list_summary_hours(hours)
+    aria = f"Open {work_date.strftime('%A %B %d')} time entry"
+    return (
+        f'<a class="timekeeping-weekly-day-link" href="{html.escape(href, quote=True)}" '
+        f'target="_self" aria-label="{html.escape(aria, quote=True)}">'
+        f'<span class="timekeeping-weekly-day-hours">{html.escape(display)}</span>'
+        f"</a>"
+    )
 
 
 def _render_timekeeping_summary_column_header_html(label: str) -> str:
@@ -3640,9 +3662,11 @@ def _toggle_expanded_timecard(timecard_id: str) -> None:
 
 
 def _emp_from_timecard_row(row: dict) -> dict:
+    eid = _timekeeping_employee_id(row)
     return {
         **row,
-        "id": str(row.get("employee_id") or row.get("id") or "").strip(),
+        "id": eid,
+        "employee_id": eid,
         "name": str(row.get("employee_name") or row.get("name") or "—"),
     }
 
@@ -5107,7 +5131,7 @@ def _clickable_list_day_cell_html(
 ) -> str:
     iso = day_d.isoformat()
     day_status = _normalize_timecard_status(day_row.get("status"))
-    total = _day_hours_total(day_row)
+    total = float(_day_hours_total(day_row) or 0.0)
     hours_unknown = bool(day_row.get("hours_unknown"))
     has_hours = total > _ALLOC_TOLERANCE and not hours_unknown
     filled_marker = _list_day_box_marker_classes(
@@ -5121,36 +5145,21 @@ def _clickable_list_day_cell_html(
         if _is_day_cell_selected(eid, iso)
         else ""
     )
-    hours_cls = "timekeeping-day-cell-hours" + _day_approval_ro_hour_class(day_status)
     href = _timekeeping_day_href(
         employee_id=eid,
         work_date=day_d,
         timecard_id=timecard_id,
     )
-    aria = f"Open {day_d.strftime('%A %m/%d')} time entry"
-    status_html = _list_day_status_badge_html(day_status, "")
-    if not status_html.strip():
-        status_html = (
-            f'<span class="timekeeping-day-cell-status">'
-            f"{html.escape(_timecard_status_display(day_status).upper())}"
-            f"</span>"
-        )
-    hours_display = "—" if hours_unknown else _fmt_day_hours(total)
     return (
         f'<span class="timekeeping-day-cell-clickable-marker{weekend_cls}{selected_cls}{filled_marker}" '
         f'aria-hidden="true"></span>'
-        f'<div class="timekeeping-day-cell-card">'
-        f'<div class="timekeeping-day-cell-date">'
-        f"{html.escape(day_d.strftime('%a').upper())} {html.escape(day_d.strftime('%m/%d'))}"
-        f"</div>"
-        f'<a class="timekeeping-day-native-link" href="{html.escape(href, quote=True)}" '
-        f'target="_self" aria-label="{html.escape(aria, quote=True)}">'
-        f"{status_html}"
-        f'<span class="{html.escape(hours_cls.strip())}">'
-        f'<div class="timekeeping-list-day-value">{html.escape(hours_display)}</div>'
-        f"</span>"
-        f"</a>"
-        f"</div>"
+        + _weekly_day_value_html(
+            work_date=day_d,
+            hours=total,
+            status=day_status,
+            href=href,
+            hours_unknown=hours_unknown,
+        )
     )
 
 
@@ -5191,13 +5200,16 @@ def _render_timekeeping_employee_row_collapsed(
     ot_total = float(row.get("ot_total") or 0)
     total_hours = float(row.get("total_hours") or 0)
     status = _normalize_timecard_status(row.get("status"))
-    day_rows: list[dict] | None = None
-    if eid:
-        embedded = row.get("_daily_display_rows")
-        if isinstance(embedded, list):
-            day_rows = embedded
-        else:
-            day_rows = _list_row_day_rows_for_display(eid, week_start_d)
+    batch_failed = bool(row.get("_daily_hours_unknown"))
+    embedded = row.get("_daily_display_rows")
+    if isinstance(embedded, list) and len(embedded) == 7:
+        day_rows: list[dict] | None = embedded
+    elif eid:
+        from app.services.weekly_timekeeping_service import aggregate_daily_display_rows
+
+        day_rows = aggregate_daily_display_rows([], week_start_d, hours_unknown=batch_failed)
+    else:
+        day_rows = None
 
     with st.container(key=f"tk_row_{timecard_id}"):
         st.markdown(
@@ -5226,17 +5238,28 @@ def _render_timekeeping_employee_row_collapsed(
                     )
         else:
             for day_ix, (col, day_d) in enumerate(zip(row_cols[1:8], days)):
+                day_row = day_rows[day_ix] if day_rows and day_ix < len(day_rows) else {}
                 with col:
-                    st.markdown(
-                        f'<div class="timekeeping-day-cell-card">'
-                        f'<div class="timekeeping-day-cell-date">'
-                        f"{html.escape(day_d.strftime('%a').upper())} {html.escape(day_d.strftime('%m/%d'))}"
-                        f"</div>"
-                        f'<div class="timekeeping-day-cell-status">DRAFT</div>'
-                        f'<div class="timekeeping-day-cell-hours">—</div>'
-                        f"</div>",
-                        unsafe_allow_html=True,
-                    )
+                    if eid:
+                        _render_clickable_list_day_cell(
+                            day_d=day_d,
+                            day_ix=day_ix,
+                            day_row=day_row,
+                            eid=eid,
+                            timecard_id=timecard_id,
+                            week_start_d=week_start_d,
+                        )
+                    else:
+                        st.markdown(
+                            _weekly_day_value_html(
+                                work_date=day_d,
+                                hours=0.0,
+                                status="Draft",
+                                href="#",
+                                hours_unknown=True,
+                            ),
+                            unsafe_allow_html=True,
+                        )
 
         with row_cols[8]:
             _render_collapsed_list_summary_cell(
@@ -5273,7 +5296,7 @@ def _render_timekeeping_employee_row_body(
 
     emp = _emp_from_timecard_row(row)
     employee_name = str(row.get("employee_name") or "—")
-    eid = str(emp.get("id") or emp.get("employee_id") or "")
+    eid = _timekeeping_employee_id(row)
     _render_timekeeping_employee_row_collapsed(
         row,
         week_start_d=week_start_d,
@@ -5360,6 +5383,11 @@ def _render_custom_timekeeping_table(
 
         for row in filtered:
             _render_timekeeping_employee_row(row, week_start_d=week_start_d, days=days)
+
+        st.markdown(
+            '<span class="ips-page-ready ips-timekeeping-page-ready" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
 
     return all_timecard_ids
 
@@ -5494,14 +5522,13 @@ def render() -> None:
 
     from app.services.weekly_timekeeping_service import load_weekly_timekeeping_page, seed_week_days_session_cache
 
-    with st.spinner("Loading weekly timecards…"):
-        from app.perf_debug import perf_span
+    from app.perf_debug import perf_span
 
-        with perf_span("timekeeping.page_shell"):
-            page_snapshot = load_weekly_timekeeping_page(
-                week_start=ws,
-                role=perms.role,
-            )
+    with perf_span("timekeeping.page_shell"):
+        page_snapshot = load_weekly_timekeeping_page(
+            week_start=ws,
+            role=perms.role,
+        )
     if page_snapshot.warning:
         st.warning(page_snapshot.warning)
     if page_snapshot.week_days_by_employee:

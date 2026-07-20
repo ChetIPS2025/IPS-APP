@@ -43,9 +43,11 @@ class TestTimekeepingListMasterDetail(unittest.TestCase):
     def test_clickable_day_cell_uses_native_link(self) -> None:
         source = inspect.getsource(tk._render_clickable_list_day_cell)
         html_source = inspect.getsource(tk._clickable_list_day_cell_html)
+        value_source = inspect.getsource(tk._weekly_day_value_html)
         self.assertIn("_clickable_list_day_cell_html", source)
-        self.assertIn("timekeeping-day-native-link", html_source)
-        self.assertIn('target="_self"', html_source)
+        self.assertIn("_weekly_day_value_html", html_source)
+        self.assertIn("timekeeping-weekly-day-link", value_source)
+        self.assertIn('target="_self"', value_source)
         self.assertIn("_is_day_cell_selected", html_source)
         self.assertNotIn("st.button", source)
         self.assertNotIn("_open_day_time_editor", source)
@@ -71,10 +73,11 @@ class TestTimekeepingListMasterDetail(unittest.TestCase):
         self.assertEqual(len(tk._WEEKLY_TS_LIST_ROW_COLS), 12)
 
     @patch("app.pages.timekeeping._ensure_weekly_grid")
-    def test_collapsed_row_uses_list_display_not_session_grid(self, grid_mock) -> None:
+    def test_collapsed_row_uses_embedded_batch_rows_not_session_grid(self, grid_mock) -> None:
         source = inspect.getsource(tk._render_timekeeping_employee_row_collapsed)
-        self.assertIn("_list_row_day_rows_for_display", source)
+        self.assertIn("_daily_display_rows", source)
         self.assertNotIn("_ensure_weekly_grid", source)
+        self.assertNotIn("_list_row_day_rows_for_display", source)
 
     @patch("app.services.timekeeping_service.list_timekeeping_days_for_week")
     def test_list_display_day_rows_uses_batch_cache(self, fetch_mock) -> None:

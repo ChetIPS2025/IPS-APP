@@ -37,6 +37,11 @@ class WeeklyTimekeepingPage:
     week_days_by_employee: dict[str, list[dict[str, Any]]] | None = None
 
 
+def _timekeeping_employee_id(row: dict[str, Any]) -> str:
+    """Normalize employee id from summary or day rows (prefer employee_id over id)."""
+    return str(row.get("employee_id") or row.get("id") or "").strip()
+
+
 def _float_hours(value: object) -> float:
     try:
         return float(value or 0)
@@ -151,7 +156,7 @@ def _attach_daily_hour_fields(row: dict[str, Any], daily_rows: list[dict[str, An
 
 
 def _timecard_id_for_row(row: dict[str, Any], week_start_d: date) -> str:
-    eid = str(row.get("id") or row.get("employee_id") or "").strip()
+    eid = _timekeeping_employee_id(row)
     week_start_str = str(row.get("week_start") or week_start_d.isoformat())[:10]
     return f"{eid}_{week_start_str}"
 
@@ -176,7 +181,7 @@ def _build_employee_row(
     days_loaded: bool,
     hours_unknown: bool,
 ) -> dict[str, Any]:
-    eid = str(summary.get("id") or summary.get("employee_id") or "").strip()
+    eid = _timekeeping_employee_id(summary)
     saved_rows = list(week_days_by_employee.get(eid) or [])
     daily_rows = aggregate_daily_display_rows(
         saved_rows,
@@ -215,6 +220,7 @@ def _build_employee_row(
         "status": _normalize_status(summary.get("status")),
         "_daily_display_rows": daily_rows,
         "_daily_data_incomplete": incomplete,
+        "_daily_hours_unknown": hours_unknown,
     }
     _attach_daily_hour_fields(built, daily_rows)
     return built
@@ -245,7 +251,7 @@ def _load_week_days_batch(week_start_d: date) -> tuple[dict[str, list[dict[str, 
     result = list_timekeeping_days_for_week_with_status(week_start_d)
     by_eid: dict[str, list[dict[str, Any]]] = {}
     for row in result.rows:
-        eid = str(row.get("employee_id") or "").strip()
+        eid = _timekeeping_employee_id(row)
         if eid:
             by_eid.setdefault(eid, []).append(row)
     return by_eid, result.ok, result.error
@@ -391,6 +397,7 @@ def invalidate_weekly_timekeeping_page_cache(week_start_d: date | None = None) -
 
 __all__ = [
     "WeeklyTimekeepingPage",
+    "_timekeeping_employee_id",
     "aggregate_daily_display_rows",
     "invalidate_weekly_timekeeping_page_cache",
     "load_weekly_timekeeping_page",
