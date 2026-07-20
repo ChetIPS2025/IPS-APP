@@ -64,7 +64,7 @@ _HAND_TOOL_SEL = "ht_detail_sel"
 _HAND_TOOL_MODAL_KEY = "ht_detail_modal"
 _HAND_TOOL_CACHE_KEY = "ht_detail_cache"
 _HAND_TOOL_DETAIL_TABLE_KEY = "assets_hand_tools_detail"
-_COLS = [0.22, 0.42, 2.35, 1.0, 0.48, 0.48, 1.0, 0.92, 0.85, 0.78]
+_COLS = [0.12, 0.32, 2.2, 1.15, 0.52, 0.52, 1.15, 1.05, 1.0, 1.1]
 _HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
     ("IMAGE", None),
