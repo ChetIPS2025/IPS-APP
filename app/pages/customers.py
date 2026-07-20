@@ -1413,20 +1413,44 @@ def _render_add_contact_form(customer: dict, *, locations: list[dict], demo: boo
                 st.rerun()
 
 
-def _inline_meta_grid(items: list[tuple[str, str]]) -> None:
-    if not items:
-        return
-    cards = "".join(
+def _inline_meta_card_html(label: str, value: object) -> str:
+    return (
         f'<div class="ips-inline-meta-card">'
         f'<div class="ips-inline-meta-label">{html.escape(label)}</div>'
         f'<div class="ips-inline-meta-value">{html.escape(safe_value(value))}</div>'
         f"</div>"
-        for label, value in items
     )
-    st.markdown(
-        f'<div class="ips-inline-meta-grid">{cards}</div>',
-        unsafe_allow_html=True,
-    )
+
+
+def _inline_meta_grid(
+    items: list[tuple[str, str]],
+    *,
+    section_id: str = "default",
+) -> None:
+    """Render metadata cards in a complete HTML grid inside a keyed container."""
+    if not items:
+        return
+    row1 = items[:4]
+    row2 = items[4:]
+    rows_html = ""
+    if row1:
+        cards = "".join(_inline_meta_card_html(label, value) for label, value in row1)
+        rows_html += (
+            f'<div class="ips-inline-meta-grid ips-inline-meta-grid-primary '
+            f'ips-inline-meta-cols-{len(row1)}">{cards}</div>'
+        )
+    if row2:
+        cards = "".join(_inline_meta_card_html(label, value) for label, value in row2)
+        rows_html += (
+            f'<div class="ips-inline-meta-grid ips-inline-meta-grid-secondary '
+            f'ips-inline-meta-cols-{len(row2)}">{cards}</div>'
+        )
+    with st.container(key=f"inline_contact_meta_{section_id}"):
+        st.markdown(
+            f'<span class="ips-inline-contact-meta-marker" aria-hidden="true"></span>'
+            f'<div class="ips-inline-meta-grid-wrap">{rows_html}</div>',
+            unsafe_allow_html=True,
+        )
 
 
 def _render_contact_inline_edit_form(
@@ -1747,9 +1771,16 @@ def _render_contact_inline_detail(
     permissions = load_customer_permissions()
 
     with st.container(key=f"inline_contact_detail_{ct_id}"):
-        st.markdown('<div class="ips-inline-detail-card">', unsafe_allow_html=True)
-        header_l, header_r = st.columns([4, 2], vertical_alignment="center")
-        with header_l:
+        st.markdown(
+            '<span class="ips-inline-contact-detail-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        header_content, edit_col, delete_col = st.columns(
+            [8, 1, 1.35],
+            gap="small",
+            vertical_alignment="center",
+        )
+        with header_content:
             subtitle = f"{cname} · {loc_name}" if cname and loc_name != "—" else (cname or loc_name or "Contact")
             st.markdown(
                 f'<div class="ips-inline-detail-header">'
@@ -1759,22 +1790,21 @@ def _render_contact_inline_detail(
                 unsafe_allow_html=True,
             )
             st.markdown(modal_status_pill_html(status), unsafe_allow_html=True)
-        with header_r:
+        with edit_col:
             if not editing:
-                edit_col, delete_col = st.columns(2)
-                with edit_col:
-                    if st.button("Edit", key=f"inline_ct_edit_btn_{ct_id}", use_container_width=True):
-                        st.session_state[_inline_contact_edit_key(ct_id)] = True
-                        _seed_contact_edit_form(contact)
-                        st.rerun()
-                with delete_col:
-                    _render_delete_contact_action(
-                        contact,
-                        customer=customer,
-                        permissions=permissions,
-                        inline=True,
-                        render="button",
-                    )
+                if st.button("Edit", key=f"inline_ct_edit_btn_{ct_id}", use_container_width=True):
+                    st.session_state[_inline_contact_edit_key(ct_id)] = True
+                    _seed_contact_edit_form(contact)
+                    st.rerun()
+        with delete_col:
+            if not editing:
+                _render_delete_contact_action(
+                    contact,
+                    customer=customer,
+                    permissions=permissions,
+                    inline=True,
+                    render="button",
+                )
 
         if not editing:
             _render_delete_contact_action(
@@ -1800,45 +1830,56 @@ def _render_contact_inline_detail(
                     ("Email", safe_value(contact.get("email"))),
                     ("Phone", safe_value(contact.get("phone"))),
                     ("Mobile", safe_value(contact.get("mobile"))),
-                ]
+                ],
+                section_id=ct_id,
             )
 
             if location:
-                loc_html = (
-                    f'<div class="ips-detail-grid">'
-                    f"{detail_field_html('Location', location.get('location_name') or location.get('site_name'))}"
-                    f"{detail_field_html('Type', location.get('location_type'))}"
-                    f"{detail_field_html('City', location.get('city'))}"
-                    f"{detail_field_html('State', location.get('state'))}"
-                    f"{detail_field_html('Phone', location.get('phone'))}"
-                    f"</div>"
+                with st.container(key=f"inline_contact_location_{ct_id}"):
+                    st.markdown(
+                        '<span class="ips-inline-contact-location-marker" aria-hidden="true"></span>',
+                        unsafe_allow_html=True,
+                    )
+                    loc_html = (
+                        f'<div class="ips-detail-grid ips-inline-location-grid">'
+                        f"{detail_field_html('Location', location.get('location_name') or location.get('site_name'))}"
+                        f"{detail_field_html('Type', location.get('location_type'))}"
+                        f"{detail_field_html('City', location.get('city'))}"
+                        f"{detail_field_html('State', location.get('state'))}"
+                        f"{detail_field_html('Phone', location.get('phone'))}"
+                        f"</div>"
+                    )
+                    st.markdown(dialog_card_html("Location", loc_html), unsafe_allow_html=True)
+
+            with st.container(key=f"inline_contact_links_{ct_id}"):
+                st.markdown(
+                    '<span class="ips-inline-contact-links-marker" aria-hidden="true"></span>',
+                    unsafe_allow_html=True,
                 )
-                st.markdown(dialog_card_html("Location", loc_html), unsafe_allow_html=True)
+                jobs = jobs_for_customer(cname)
+                contact_name = str(contact.get("full_name") or contact.get("contact_name") or "").strip().lower()
+                if contact_name:
+                    jobs = [
+                        j
+                        for j in jobs
+                        if str(j.get("contact_name") or j.get("customer_contact") or "").strip().lower()
+                        == contact_name
+                        or str(j.get("customer_contact_id") or j.get("contact_id") or "") == ct_id
+                    ]
+                st.markdown("**Linked Jobs**")
+                _jobs_table(jobs, session_key=f"_inline_ct_jobs_{ct_id}")
 
-            jobs = jobs_for_customer(cname)
-            contact_name = str(contact.get("full_name") or contact.get("contact_name") or "").strip().lower()
-            if contact_name:
-                jobs = [
-                    j
-                    for j in jobs
-                    if str(j.get("contact_name") or j.get("customer_contact") or "").strip().lower()
-                    == contact_name
-                    or str(j.get("customer_contact_id") or j.get("contact_id") or "") == ct_id
-                ]
-            st.markdown("**Linked Jobs**")
-            _jobs_table(jobs, session_key=f"_inline_ct_jobs_{ct_id}")
-
-            ests = estimates_for_customer(cname)
-            if contact_name:
-                ests = [
-                    e
-                    for e in ests
-                    if str(e.get("contact_name") or e.get("customer_contact") or "").strip().lower()
-                    == contact_name
-                    or str(e.get("customer_contact_id") or e.get("contact_id") or "") == ct_id
-                ]
-            st.markdown("**Linked Estimates**")
-            _estimates_table(ests, session_key=f"_inline_ct_est_{ct_id}")
+                ests = estimates_for_customer(cname)
+                if contact_name:
+                    ests = [
+                        e
+                        for e in ests
+                        if str(e.get("contact_name") or e.get("customer_contact") or "").strip().lower()
+                        == contact_name
+                        or str(e.get("customer_contact_id") or e.get("contact_id") or "") == ct_id
+                    ]
+                st.markdown("**Linked Estimates**")
+                _estimates_table(ests, session_key=f"_inline_ct_est_{ct_id}")
 
             notes_text = safe_value(contact.get("notes"), "No notes entered.")
             notes_html = (
@@ -1848,8 +1889,6 @@ def _render_contact_inline_detail(
             )
             st.markdown(dialog_card_html("Notes", notes_html), unsafe_allow_html=True)
             placeholder_html("Contact activity history will appear here when connected to Supabase.")
-
-        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _render_location_inline_detail(location: dict, customer: dict | None = None) -> None:
@@ -1861,9 +1900,12 @@ def _render_location_inline_detail(location: dict, customer: dict | None = None)
     editing = bool(st.session_state.get(_inline_location_edit_key(lid)))
 
     with st.container(key=f"inline_location_detail_{lid}"):
-        st.markdown('<div class="ips-inline-detail-card">', unsafe_allow_html=True)
-        header_l, header_r = st.columns([4, 1], vertical_alignment="center")
-        with header_l:
+        st.markdown(
+            '<span class="ips-inline-location-detail-marker" aria-hidden="true"></span>',
+            unsafe_allow_html=True,
+        )
+        header_content, edit_col = st.columns([8, 1], gap="small", vertical_alignment="center")
+        with header_content:
             st.markdown(
                 f'<div class="ips-inline-detail-header">'
                 f'<div class="ips-inline-detail-title">{html.escape(title)}</div>'
@@ -1872,7 +1914,7 @@ def _render_location_inline_detail(location: dict, customer: dict | None = None)
                 unsafe_allow_html=True,
             )
             st.markdown(_location_status_pill_html(status), unsafe_allow_html=True)
-        with header_r:
+        with edit_col:
             if not editing and st.button(
                 "Edit",
                 key=f"inline_loc_edit_btn_{lid}",
@@ -1898,11 +1940,10 @@ def _render_location_inline_detail(location: dict, customer: dict | None = None)
                     ("Primary", _yes_dash(location.get("is_primary"))),
                     ("Billing", _yes_dash(location.get("is_billing"))),
                     ("Shipping", _yes_dash(location.get("is_shipping"))),
-                ]
+                ],
+                section_id=f"loc_{lid}",
             )
             _render_location_detail_tabs(location, customer, inline_contacts=True)
-
-        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _render_customer_contacts_tab(customer: dict) -> None:
