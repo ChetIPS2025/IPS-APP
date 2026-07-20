@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import json
+from urllib.parse import urlencode
 
 import streamlit as st
 
@@ -29,6 +30,59 @@ IPS_SIDEBAR_COLLAPSED_ICON_PX = 18
 IPS_SIDEBAR_COLLAPSED_HEADER_HEIGHT_PX = 56
 IPS_SIDEBAR_COLLAPSED_LOGO_PX = 40
 IPS_SIDEBAR_EXPANDED_LOGO_PX = 52
+IPS_NAV_QUERY_APPLIED_KEY = "_ips_nav_query_applied"
+STALE_MODULE_DETAIL_QUERY_KEYS: frozenset[str] = frozenset(
+    {
+        "customer_detail",
+        "customer_tab",
+        "contact_detail",
+        "location_detail",
+        "asset_detail",
+        "asset_tab",
+        "job_detail",
+        "job_tab",
+        "estimate_detail",
+        "estimate_tab",
+        "task_detail",
+        "task_tab",
+        "pricing_detail",
+        "schedule_detail",
+        "user_detail",
+    }
+)
+
+
+def sidebar_nav_href(slug: str) -> str:
+    """Same-app module link for the desktop nav rail and other top-level navigation."""
+    clean = str(slug or "").strip()
+    return "?" + urlencode({"ips_nav": clean})
+
+
+def _clear_stale_detail_query_params() -> None:
+    for key in STALE_MODULE_DETAIL_QUERY_KEYS:
+        try:
+            if key in st.query_params:
+                del st.query_params[key]
+        except Exception:
+            pass
+
+
+def _resolve_query_nav_slug(raw: str) -> str | None:
+    from app.navigation import ACTIVE_MODULE_SLUGS, LEGACY_PAGE_LABEL_TO_SLUG, normalize_nav_slug
+
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    if text in LEGACY_PAGE_LABEL_TO_SLUG:
+        text = LEGACY_PAGE_LABEL_TO_SLUG[text]
+    slug = text.lower().replace(" ", "_").replace("-", "_")
+    if slug == "users":
+        slug = "employees"
+    if slug in {"scan_inventory", "scan_asset"}:
+        return normalize_nav_slug(slug)
+    if slug in ACTIVE_MODULE_SLUGS:
+        return normalize_nav_slug(slug)
+    return None
 
 
 def _collapsed_sidebar_selectors() -> str:
@@ -133,21 +187,32 @@ def capture_logout_from_query() -> None:
 
 
 def capture_nav_slug_from_query() -> None:
-    """Support ``?ips_nav=jobs`` deep links when sidebar navigation is unavailable."""
+    """Apply ``?ips_nav=<slug>`` as the active module for this render."""
+    guard = st.session_state.get(IPS_NAV_QUERY_APPLIED_KEY)
     try:
         raw = st.query_params.get("ips_nav")
     except Exception:
+        raw = None
+    if guard and not raw:
+        st.session_state.pop(IPS_NAV_QUERY_APPLIED_KEY, None)
         return
     if not raw:
         return
     if isinstance(raw, list):
         raw = raw[0] if raw else ""
-    slug = str(raw or "").strip()
-    if not slug:
+    resolved = _resolve_query_nav_slug(str(raw or ""))
+    if not resolved:
+        try:
+            del st.query_params["ips_nav"]
+        except Exception:
+            pass
         return
     from app.navigation import IPS_NAV_PENDING_KEY, set_nav_slug
+
     st.session_state.pop(IPS_NAV_PENDING_KEY, None)
-    set_nav_slug(slug)
+    set_nav_slug(resolved)
+    st.session_state[IPS_NAV_QUERY_APPLIED_KEY] = resolved
+    _clear_stale_detail_query_params()
     try:
         del st.query_params["ips_nav"]
     except Exception:
@@ -397,11 +462,11 @@ def _desktop_nav_rail_html(rows: list[dict[str, str]], active_slug: str) -> str:
         icon = html.escape(nav_icon_for_slug(slug))
         is_active = _desktop_nav_rail_item_is_active(slug, active_slug)
         active_cls = " is-active" if is_active else ""
-        href = "#"
+        href = html.escape(sidebar_nav_href(slug), quote=True)
         slug_attr = html.escape(slug, quote=True)
         item_bits.append(
             f'<a class="ips-desktop-nav-rail__link{active_cls}" href="{href}" '
-            f'data-ips-rail-slug="{slug_attr}" role="button" '
+            f'target="_self" data-ips-rail-slug="{slug_attr}" '
             f'title="{label}" aria-label="{label}">'
             f'<span class="ips-desktop-nav-rail__icon" aria-hidden="true">{icon}</span>'
             f'<span class="ips-desktop-nav-rail__label">{label}</span>'
@@ -425,7 +490,7 @@ def _desktop_nav_rail_html(rows: list[dict[str, str]], active_slug: str) -> str:
 
 
 def _desktop_nav_rail_click_script() -> str:
-    """Route fixed-rail clicks through hidden Streamlit sidebar nav buttons."""
+    """Desktop rail logout fallback when the hidden Streamlit logout button is unavailable."""
     return """
 <script>
 (function () {
@@ -436,37 +501,8 @@ def _desktop_nav_rail_click_script() -> str:
       return document;
     }
   }
-  function sidebarNavButton(d, slug) {
-    if (!slug) return null;
-    return d.querySelector(
-      'section[data-testid="stSidebar"] [class*="st-key-nav_' + slug + '"] button'
-    );
-  }
-  function fallbackNav(slug) {
-    try {
-      var top = window.top || window.parent || window;
-      top.location.href = '?ips_nav=' + encodeURIComponent(slug);
-    } catch (e2) {
-      window.location.href = '?ips_nav=' + encodeURIComponent(slug);
-    }
-  }
   function wireDesktopNavRail(d) {
     if (!d || !d.body) return;
-    d.querySelectorAll('.ips-desktop-nav-rail__link[data-ips-rail-slug]').forEach(function (link) {
-      if (link.dataset.ipsRailNavWired === '1') return;
-      link.dataset.ipsRailNavWired = '1';
-      link.addEventListener('click', function (ev) {
-        ev.preventDefault();
-        var slug = link.getAttribute('data-ips-rail-slug');
-        if (!slug) return;
-        var btn = sidebarNavButton(d, slug);
-        if (btn) {
-          btn.click();
-          return;
-        }
-        fallbackNav(slug);
-      });
-    });
     d.querySelectorAll('.ips-desktop-nav-rail__link[data-ips-rail-logout="1"]').forEach(function (link) {
       if (link.dataset.ipsRailLogoutWired === '1') return;
       link.dataset.ipsRailLogoutWired = '1';
