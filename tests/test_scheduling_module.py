@@ -185,6 +185,17 @@ def test_scheduling_page_header_precedes_filters_and_snapshot():
     assert "load_employees()" not in source
 
 
+def test_scheduling_new_event_primary_action_waits_for_button_click():
+    import inspect
+
+    from app.pages import scheduling as sched_page
+
+    source = inspect.getsource(sched_page.render)
+    new_event_block = source.split("def _new_event")[1].split("render_page_header")[0]
+    assert "if st.button" in new_event_block
+    assert new_event_block.index("if st.button") < new_event_block.index("open_new_schedule_dialog()")
+
+
 def test_upcoming_employee_schedule_skips_cancelled(monkeypatch):
     from app.services.scheduling_service import list_upcoming_employee_schedule
 

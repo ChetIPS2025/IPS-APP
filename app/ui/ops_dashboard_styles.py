@@ -6,8 +6,8 @@ import streamlit as st
 
 from app.ui.css_inject import inject_css_once
 
-IPS_OPS_DASHBOARD_STYLES_KEY = "ips_ops_dashboard_styles_v32"
-IPS_OPS_DASHBOARD_STYLE_ID = "ips-ops-dashboard-v32"
+IPS_OPS_DASHBOARD_STYLES_KEY = "ips_ops_dashboard_styles_v33"
+IPS_OPS_DASHBOARD_STYLE_ID = "ips-ops-dashboard-v33"
 
 
 def inject_ops_dashboard_styles() -> None:
@@ -16,11 +16,11 @@ def inject_ops_dashboard_styles() -> None:
         return
     st.markdown(
         """
-<style id="ips-ops-dashboard-v32">
+<style id="ips-ops-dashboard-v33">
 .stApp:has(.ips-ops-dashboard-marker) section[data-testid="stMain"] {
   background: #f1f5f9 !important;
 }
-section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"]:has(style#ips-ops-dashboard-v32) {
+section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stElementContainer"]:has(style#ips-ops-dashboard-v33) {
   display: none !important;
   height: 0 !important;
   min-height: 0 !important;
@@ -383,6 +383,14 @@ section[data-testid="stMain"]:has(.ips-ops-dashboard-marker) [data-testid="stEle
 .ips-dash-ops-panel-link:focus {
   color: #1d4ed8;
   text-decoration: underline;
+}
+.ips-dash-panels-loading {
+  margin: 0 0 8px;
+  font-size: 0.8125rem;
+  color: #94a3b8;
+}
+section[data-testid="stMain"]:has(.dashboard-main-grid) .ips-dash-panels-loading {
+  display: none !important;
 }
 
 @media (max-width: 1500px) {

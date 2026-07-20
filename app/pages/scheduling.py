@@ -238,8 +238,8 @@ def render() -> None:
     from app.ui.page_header import render_page_header
 
     def _new_event() -> None:
-        open_new_schedule_dialog()
-        ips_app_rerun()
+        if st.button("+ New Event", key="sched_new_event", type="primary", use_container_width=True):
+            open_new_schedule_dialog()
 
     def _refresh() -> None:
         clear_prepared_export()
