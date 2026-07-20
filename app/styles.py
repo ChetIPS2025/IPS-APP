@@ -1024,12 +1024,14 @@ def inject_customers_module_css() -> None:
   grid-template-columns: repeat(4, minmax(120px, 1fr));
   gap: 10px;
   margin-top: 10px;
+  width: 100%;
 }}
 .ips-inline-meta-card {{
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 10px 12px;
+  min-width: 0;
 }}
 .ips-inline-meta-label {{
   font-size: 0.6875rem;

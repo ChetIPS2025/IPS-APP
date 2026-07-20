@@ -1415,19 +1415,17 @@ def _render_add_contact_form(customer: dict, *, locations: list[dict], demo: boo
 def _inline_meta_grid(items: list[tuple[str, str]]) -> None:
     if not items:
         return
-    st.markdown('<div class="ips-inline-meta-grid">', unsafe_allow_html=True)
-    cols = st.columns(min(len(items), 4))
-    for idx, (label, value) in enumerate(items):
-        with cols[idx % len(cols)]:
-            val = safe_value(value)
-            st.markdown(
-                f'<div class="ips-inline-meta-card">'
-                f'<div class="ips-inline-meta-label">{html.escape(label)}</div>'
-                f'<div class="ips-inline-meta-value">{html.escape(val)}</div>'
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-    st.markdown("</div>", unsafe_allow_html=True)
+    cards = "".join(
+        f'<div class="ips-inline-meta-card">'
+        f'<div class="ips-inline-meta-label">{html.escape(label)}</div>'
+        f'<div class="ips-inline-meta-value">{html.escape(safe_value(value))}</div>'
+        f"</div>"
+        for label, value in items
+    )
+    st.markdown(
+        f'<div class="ips-inline-meta-grid">{cards}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def _render_contact_inline_edit_form(

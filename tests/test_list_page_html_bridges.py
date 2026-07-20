@@ -54,6 +54,15 @@ def test_customers_list_table_uses_native_detail_links() -> None:
     assert "customer_name_link_html" in list_table_src
 
 
+def test_inline_meta_grid_renders_html_grid_without_streamlit_columns() -> None:
+    from app.pages import customers as customers_page
+
+    src = inspect.getsource(customers_page._inline_meta_grid)
+    assert "st.columns" not in src
+    assert 'class="ips-inline-meta-grid"' in src
+    assert "ips-inline-meta-card" in src
+
+
 def test_customers_catalog_fragment_uses_directory_service() -> None:
     src = _customers_source().replace("\r\n", "\n")
     fragment_block = src.split("@fragment\ndef _render_customers_catalog_fragment")[1].split(
