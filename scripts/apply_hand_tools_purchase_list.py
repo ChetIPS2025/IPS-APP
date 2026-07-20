@@ -25,7 +25,7 @@ def main() -> int:
     parser.add_argument(
         "--batch",
         default="1",
-        help="Purchase batch to apply: 1, 2, or all (default: 1).",
+        help="Purchase batch to apply: 1, 2, 3, or all (default: 1).",
     )
     parser.add_argument(
         "--dry-run",

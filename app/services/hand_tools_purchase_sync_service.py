@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from typing import Any
 
 from app.data.hand_tools_purchase_list import purchase_items_for_batch
-from app.services.repository import ServiceResult, fetch_rows, insert_row_admin, update_row_admin
+from app.services.repository import (
+    ServiceResult,
+    fetch_rows_admin,
+    insert_row_admin,
+    update_row_admin,
+)
 from app.services.serialized_tool_service import is_serialized_tool_asset
 from app.services.small_hand_tool_service import clear_hand_tools_list_cache, import_hand_tool_row
 
@@ -33,10 +39,30 @@ def _normalize_name(raw: object) -> str:
     return _clean(raw).casefold()
 
 
-def _load_hand_tools_index() -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+def _normalize_tool_key(raw: object) -> str:
+    text = _clean(raw).casefold()
+    text = text.replace("–", "-").replace("—", "-")
+    text = text.encode("ascii", "ignore").decode()
+    text = re.sub(r"[^\w\s/\"'.-]", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    for suffix in (" vertical capacity", " vertical"):
+        if text.endswith(suffix):
+            text = text[: -len(suffix)].strip()
+    text = text.replace(" padlocks", " padlock")
+    if "ag1202fz" in text:
+        return "flexzilla x3 blow gun ag1202fz"
+    return text
+
+
+def _load_hand_tools_index() -> tuple[
+    dict[str, dict[str, Any]],
+    dict[str, dict[str, Any]],
+    dict[str, dict[str, Any]],
+]:
     by_model: dict[str, dict[str, Any]] = {}
     by_name: dict[str, dict[str, Any]] = {}
-    rows, _ = fetch_rows(_HAND_TOOLS, limit=10000, order_by="tool_name")
+    by_tool_key: dict[str, dict[str, Any]] = {}
+    rows, _ = fetch_rows_admin(_HAND_TOOLS, limit=10000, order_by="tool_name")
     for row in rows or []:
         if not isinstance(row, dict) or row.get("is_active") is False:
             continue
@@ -46,11 +72,18 @@ def _load_hand_tools_index() -> tuple[dict[str, dict[str, Any]], dict[str, dict[
         name_key = _normalize_name(row.get("tool_name"))
         if name_key and name_key not in by_name:
             by_name[name_key] = row
-    return by_model, by_name
+        tool_key = _normalize_tool_key(row.get("tool_name"))
+        if tool_key and tool_key not in by_tool_key:
+            by_tool_key[tool_key] = row
+        if model_key and tool_key:
+            composite = f"{model_key}|{tool_key}"
+            if composite not in by_tool_key:
+                by_tool_key[composite] = row
+    return by_model, by_name, by_tool_key
 
 
 def _load_serialized_assets() -> list[dict[str, Any]]:
-    rows, _ = fetch_rows(_ASSETS, limit=10000, order_by="asset_name")
+    rows, _ = fetch_rows_admin(_ASSETS, limit=10000, order_by="asset_name")
     out: list[dict[str, Any]] = []
     for row in rows or []:
         if not isinstance(row, dict) or row.get("is_active") is False:
@@ -65,18 +98,102 @@ def find_hand_tool_match(
     *,
     by_model: dict[str, dict[str, Any]] | None = None,
     by_name: dict[str, dict[str, Any]] | None = None,
+    by_tool_key: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
-    if by_model is None or by_name is None:
-        by_model, by_name = _load_hand_tools_index()
+    if by_model is None or by_name is None or by_tool_key is None:
+        by_model, by_name, by_tool_key = _load_hand_tools_index()
     model_key = _normalize_name(item.get("model_number"))
     if model_key:
         match = by_model.get(model_key)
         if match:
             return match
+        composite = f"{model_key}|{_normalize_tool_key(item.get('tool_name'))}"
+        match = by_tool_key.get(composite)
+        if match:
+            return match
     name_key = _normalize_name(item.get("tool_name"))
     if name_key:
-        return by_name.get(name_key)
+        match = by_name.get(name_key)
+        if match:
+            return match
+    tool_key = _normalize_tool_key(item.get("tool_name"))
+    if tool_key:
+        return by_tool_key.get(tool_key)
     return None
+
+
+def consolidate_hand_tool_duplicates(*, dry_run: bool = False) -> ServiceResult:
+    """Merge duplicate small hand tool rows that share a normalized tool key."""
+    rows, err = fetch_rows_admin(_HAND_TOOLS, limit=10000, order_by="tool_name")
+    if err:
+        return ServiceResult(ok=False, error=err)
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for row in rows or []:
+        if not isinstance(row, dict) or row.get("is_active") is False:
+            continue
+        key = _normalize_tool_key(row.get("tool_name"))
+        if not key:
+            continue
+        groups.setdefault(key, []).append(row)
+
+    merged = 0
+    deactivated = 0
+    for key, group in groups.items():
+        if len(group) < 2:
+            continue
+        group.sort(key=lambda r: str(r.get("created_at") or r.get("id") or ""))
+        keeper = group[0]
+        keeper_id = _clean(keeper.get("id"))
+        if not keeper_id:
+            continue
+        total_qty = sum(max(0.0, _f(r.get("quantity_on_hand"))) for r in group)
+        total_exp = sum(max(0.0, _f(r.get("quantity_expected"))) for r in group)
+        unit_value = max(_f(r.get("unit_value")) for r in group)
+        model_number = _clean(keeper.get("model_number"))
+        for row in group:
+            if not model_number:
+                model_number = _clean(row.get("model_number"))
+        if dry_run:
+            merged += 1
+            deactivated += len(group) - 1
+            continue
+        result = update_row_admin(
+            _HAND_TOOLS,
+            {
+                "quantity_on_hand": total_qty,
+                "quantity_expected": max(total_exp, total_qty),
+                "unit_value": unit_value,
+                "model_number": model_number or None,
+                "updated_at": _now_iso(),
+            },
+            {"id": keeper_id},
+        )
+        if not result.ok:
+            return result
+        for row in group[1:]:
+            row_id = _clean(row.get("id"))
+            if not row_id:
+                continue
+            deactivate = update_row_admin(
+                _HAND_TOOLS,
+                {"is_active": False, "updated_at": _now_iso()},
+                {"id": row_id},
+            )
+            if not deactivate.ok:
+                return deactivate
+            deactivated += 1
+        merged += 1
+
+    if merged and not dry_run:
+        clear_hand_tools_list_cache()
+    return ServiceResult(
+        ok=True,
+        data={
+            "merged_groups": merged,
+            "deactivated_rows": deactivated,
+            "dry_run": dry_run,
+        },
+    )
 
 
 def _name_matches(asset_name: str, purchase_name: str) -> bool:
@@ -311,6 +428,7 @@ def sync_hand_tools_purchase_list(
 
 
 __all__ = [
+    "consolidate_hand_tool_duplicates",
     "find_hand_tool_match",
     "find_serialized_matches",
     "sync_hand_tools_purchase_list",

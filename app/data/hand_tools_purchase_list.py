@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from app.data.hand_tools_purchase_list_batch2 import HAND_TOOLS_PURCHASE_ITEMS_BATCH2
+from app.data.hand_tools_purchase_list_batch3 import HAND_TOOLS_PURCHASE_ITEMS_BATCH3
 
 TrackingMode = Literal["quantity", "serialized"]
 
@@ -225,14 +226,20 @@ HAND_TOOLS_PURCHASE_ITEMS = HAND_TOOLS_PURCHASE_ITEMS_BATCH1
 
 
 def purchase_items_for_batch(batch: int | str | None = None) -> tuple[dict[str, Any], ...]:
-    """Return purchase rows for batch 1, batch 2, or both combined."""
+    """Return purchase rows for batch 1, 2, 3, or all combined."""
     key = str(batch or "1").strip().casefold()
     if key in {"1", "batch1", "batch-1"}:
         return HAND_TOOLS_PURCHASE_ITEMS_BATCH1
     if key in {"2", "batch2", "batch-2"}:
         return HAND_TOOLS_PURCHASE_ITEMS_BATCH2
+    if key in {"3", "batch3", "batch-3"}:
+        return HAND_TOOLS_PURCHASE_ITEMS_BATCH3
     if key in {"all", "both", "combined"}:
-        return HAND_TOOLS_PURCHASE_ITEMS_BATCH1 + HAND_TOOLS_PURCHASE_ITEMS_BATCH2
+        return (
+            HAND_TOOLS_PURCHASE_ITEMS_BATCH1
+            + HAND_TOOLS_PURCHASE_ITEMS_BATCH2
+            + HAND_TOOLS_PURCHASE_ITEMS_BATCH3
+        )
     return HAND_TOOLS_PURCHASE_ITEMS_BATCH1
 
 
