@@ -45,6 +45,8 @@ def _normalize_tool_key(raw: object) -> str:
     text = text.encode("ascii", "ignore").decode()
     text = re.sub(r"[^\w\s/\"'.-]", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"\bone-?key\b", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
     for suffix in (" vertical capacity", " vertical"):
         if text.endswith(suffix):
             text = text[: -len(suffix)].strip()
