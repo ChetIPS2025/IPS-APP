@@ -7,11 +7,12 @@ import io
 import re
 from typing import Any
 
-from app.services.repository import ServiceResult
+from app.services.repository import ServiceResult, fetch_rows, update_row_admin
 from app.services.small_hand_tool_service import (
     HAND_TOOL_CATEGORIES,
     HAND_TOOL_CONDITIONS,
     HAND_TOOL_STATUSES,
+    clear_hand_tools_list_cache,
     import_hand_tool_row,
 )
 _TEMPLATE_HEADERS = (
@@ -26,6 +27,7 @@ _TEMPLATE_HEADERS = (
     "job",
     "status",
     "condition",
+    "unit_value",
     "notes",
 )
 
@@ -41,6 +43,7 @@ _TEMPLATE_SAMPLE = (
     "",
     "Available",
     "Good",
+    "24.99",
     "Example row — delete before import",
 )
 
@@ -74,6 +77,10 @@ _IMPORT_ALIASES: dict[str, str] = {
     "assigned_job": "job",
     "status": "status",
     "condition": "condition",
+    "unit_value": "unit_value",
+    "unit_price": "unit_value",
+    "unit_cost": "unit_value",
+    "price": "unit_value",
     "notes": "notes",
     "note": "notes",
 }
@@ -86,6 +93,16 @@ def _clean(raw: object) -> str:
 def _norm_col(name: str) -> str:
     key = re.sub(r"[^a-z0-9]+", "_", str(name or "").strip().casefold()).strip("_")
     return _IMPORT_ALIASES.get(key, key)
+
+
+def _parse_money(raw: object) -> float | None:
+    if raw is None or (isinstance(raw, str) and not str(raw).strip()):
+        return None
+    text = str(raw).strip().replace("$", "").replace(",", "")
+    try:
+        return float(text)
+    except (TypeError, ValueError):
+        return None
 
 
 def _parse_qty(raw: object) -> float | None:
@@ -286,6 +303,7 @@ def validate_hand_tool_import_rows(
             "Serial": _clean(row.get("serial_number")),
             "Expected": expected if expected is not None else "—",
             "Actual": _parse_qty(row.get("actual_qty")),
+            "Unit $": _parse_money(row.get("unit_value")),
             "Location": _clean(row.get("location")),
             "Trailer": trailer_ref or "—",
             "Job": job_ref or "—",
@@ -300,6 +318,7 @@ def validate_hand_tool_import_rows(
             actual = expected
         preview["Actual"] = actual if actual is not None else "—"
 
+        unit_value = _parse_money(row.get("unit_value"))
         storage_type = "Tool Trailer" if trailer_id else "Warehouse"
         valid.append(
             {
@@ -311,6 +330,7 @@ def validate_hand_tool_import_rows(
                 "serial_number": _clean(row.get("serial_number")),
                 "quantity_expected": expected,
                 "quantity_on_hand": max(0.0, actual or 0.0),
+                "unit_value": max(0.0, unit_value or 0.0),
                 "storage_location": _clean(row.get("location")),
                 "storage_type": storage_type,
                 "container_asset_id": trailer_id or None,
@@ -324,33 +344,75 @@ def validate_hand_tool_import_rows(
     return valid, invalid
 
 
-def bulk_import_hand_tools(rows: list[dict[str, Any]]) -> ServiceResult:
+def _find_existing_hand_tool(model_number: str, tool_name: str) -> dict[str, Any] | None:
+    model_key = _clean(model_number).casefold()
+    name_key = _clean(tool_name).casefold()
+    rows, _ = fetch_rows("small_hand_tools", limit=10000, order_by="tool_name")
+    model_match = None
+    name_match = None
+    for row in rows or []:
+        if not isinstance(row, dict) or row.get("is_active") is False:
+            continue
+        if model_key and _clean(row.get("model_number")).casefold() == model_key:
+            model_match = row
+            break
+        if name_key and _clean(row.get("tool_name")).casefold() == name_key and name_match is None:
+            name_match = row
+    return model_match or name_match
+
+
+def bulk_import_hand_tools(rows: list[dict[str, Any]], *, upsert: bool = False) -> ServiceResult:
     """Import validated hand-tool payloads; rows should come from validate_hand_tool_import_rows."""
     created = 0
+    updated = 0
     errors: list[str] = []
 
     for row in rows:
         row_num = row.get("_row_num") or "?"
         payload = {k: v for k, v in row.items() if not str(k).startswith("_")}
+        existing = None
+        if upsert:
+            existing = _find_existing_hand_tool(
+                str(payload.get("model_number") or ""),
+                str(payload.get("tool_name") or ""),
+            )
+        if existing:
+            row_id = _clean(existing.get("id"))
+            result = update_row_admin(
+                "small_hand_tools",
+                {**payload, "is_active": True},
+                {"id": row_id},
+            )
+            if result.ok:
+                updated += 1
+            else:
+                errors.append(f"Row {row_num}: {result.error or 'failed'}")
+            continue
+
         result = import_hand_tool_row(payload)
         if result.ok:
             created += 1
         else:
             errors.append(f"Row {row_num}: {result.error or 'failed'}")
 
-    if created == 0 and errors:
+    if created == 0 and updated == 0 and errors:
         return ServiceResult(
             ok=False,
             error=errors[0] if len(errors) == 1 else "; ".join(errors[:5]),
-            data={"created": 0, "errors": errors},
+            data={"created": 0, "updated": 0, "errors": errors},
         )
 
+    if created or updated:
+        clear_hand_tools_list_cache()
+
     message = f"Imported {created} small hand tool(s)."
+    if updated:
+        message += f" Updated {updated} existing row(s)."
     if errors:
         message += f" {len(errors)} row(s) failed."
     return ServiceResult(
         ok=True,
-        data={"created": created, "errors": errors, "message": message},
+        data={"created": created, "updated": updated, "errors": errors, "message": message},
     )
 
 

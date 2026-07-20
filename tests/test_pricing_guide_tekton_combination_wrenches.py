@@ -16,8 +16,8 @@ from app.data.pricing_guide_tekton_combination_wrenches import (
 
 def test_tekton_combination_wrench_source_and_catalog_counts():
     items = tekton_combination_wrench_catalog_items()
-    assert TEKTON_COMBINATION_WRENCH_SOURCE_ROW_COUNT == 6
-    assert len(items) == 6
+    assert TEKTON_COMBINATION_WRENCH_SOURCE_ROW_COUNT == 12
+    assert len(items) == 12
 
 
 def test_tekton_combination_wrench_category_and_vendor():
@@ -33,13 +33,24 @@ def test_tekton_combination_wrench_part_numbers_and_descriptions():
     items = tekton_combination_wrench_catalog_items()
     by_part = {r["item_code"]: r for r in items}
     assert set(by_part) == {
-        "WCB23043",
-        "WCB23046",
-        "WCB23050",
         "18268",
+        "18269",
+        "WCB23035",
+        "WCB23036",
         "WCB23041",
+        "WCB23040",
+        "WCB23043",
+        "WCB23044",
+        "WCB23046",
+        "WCB23048",
         "WCB23049",
+        "WCB23050",
     }
+
+    row_18268 = by_part["18268"]
+    assert row_18268["description"] == 'TEKTON 1-1/8" Combination Wrench'
+    assert row_18268["model_number"] == "18268"
+    assert row_18268["default_cost"] == 21.00
 
     row_43 = by_part["WCB23043"]
     assert row_43["description"] == 'TEKTON 1-11/16" Combination Wrench'
@@ -56,17 +67,12 @@ def test_tekton_combination_wrench_part_numbers_and_descriptions():
     assert row_50["description"] == 'TEKTON 2" Combination Wrench'
     assert row_50["default_cost"] == 90.00
 
-    row_18268 = by_part["18268"]
-    assert row_18268["description"] == '1-1/8" Combination Wrench'
-    assert row_18268["model_number"] == "18268"
-    assert row_18268["default_cost"] == 21.00
-
     row_41 = by_part["WCB23041"]
-    assert row_41["description"] == '1-5/8" Combination Wrench'
+    assert row_41["description"] == 'TEKTON 1-5/8" Combination Wrench'
     assert row_41["default_cost"] == 59.95
 
     row_49 = by_part["WCB23049"]
-    assert row_49["description"] == '1-15/16" Combination Wrench'
+    assert row_49["description"] == 'TEKTON 1-15/16" Combination Wrench'
     assert row_49["default_cost"] == 90.00
 
 
@@ -77,6 +83,8 @@ def test_tekton_combination_wrench_prices_use_decimal_precision():
     assert prices["WCB23046"] == Decimal("75.00")
     assert prices["WCB23050"] == Decimal("90.00")
     assert prices["18268"] == Decimal("21.00")
+    assert prices["18269"] == Decimal("23.00")
+    assert prices["WCB23035"] == Decimal("34.21")
     assert prices["WCB23041"] == Decimal("59.95")
     assert prices["WCB23049"] == Decimal("90.00")
 
