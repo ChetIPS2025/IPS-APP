@@ -14382,6 +14382,22 @@ def _inject_timekeeping_list_row_gap_css() -> None:
   color: #64748b !important;
   background: #f8fafc !important;
 }
+.timekeeping-list-day-value {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 42px !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  color: inherit !important;
+  font-variant-numeric: tabular-nums !important;
+}
+.st-key-timekeeping_table_wrap .timekeeping-day-cell-hours .timekeeping-list-day-value {
+  color: #0f172a !important;
+}
 .timekeeping-alloc-type-hint {
   margin-top: 2px !important;
   font-size: 11px !important;

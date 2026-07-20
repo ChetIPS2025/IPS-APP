@@ -128,8 +128,8 @@ class TestTimekeepingModalTabs(unittest.TestCase):
     def test_modal_fast_path_skips_table_before_summaries(self) -> None:
         render_src = inspect.getsource(tk.render)
         modal_idx = render_src.index("_timecard_detail_modal_pending()")
-        summaries_idx = render_src.index("summaries = _filter_summaries_for_field_user")
-        self.assertLess(modal_idx, summaries_idx)
+        snapshot_idx = render_src.index("load_weekly_timekeeping_page(")
+        self.assertLess(modal_idx, snapshot_idx)
 
     def test_closing_modal_clears_selection(self) -> None:
         st.session_state[tk.SELECTED_TIMECARD_KEY] = "emp-1_2026-07-06"

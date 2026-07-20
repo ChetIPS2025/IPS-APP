@@ -123,8 +123,8 @@ class TestTimekeepingDayLinks(unittest.TestCase):
     def test_render_fast_path_skips_employee_list(self) -> None:
         render_source = inspect.getsource(tk.render)
         fast_idx = render_source.index("_is_day_editor_active()")
-        summaries_idx = render_source.index("load_timekeeping_summaries(ws)")
-        self.assertLess(fast_idx, summaries_idx)
+        snapshot_idx = render_source.index("load_weekly_timekeeping_page(")
+        self.assertLess(fast_idx, snapshot_idx)
         self.assertIn("_capture_timekeeping_day_query()", render_source)
         self.assertIn("_render_timekeeping_table_area", render_source)
 
