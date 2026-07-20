@@ -358,7 +358,30 @@ def _clear_current_user_snapshot() -> None:
         st.session_state.pop(key, None)
 
 
+def _coerce_profile_dict(raw: Any) -> dict[str, Any]:
+    """Return a profile mapping; ignore Supabase auth User objects stored by mistake."""
+    if isinstance(raw, dict):
+        return dict(raw)
+    return {}
+
+
+def _loaded_session_profile() -> dict[str, Any]:
+    """First valid profile dict from session keys (auth profile, then cached snapshots)."""
+    for key in ("auth_profile", CURRENT_USER_PROFILE_KEY, USER_PROFILE_KEY):
+        coerced = _coerce_profile_dict(st.session_state.get(key))
+        if coerced:
+            return coerced
+    return {}
+
+
+def _auth_profile_session_corrupt() -> bool:
+    raw = st.session_state.get("auth_profile")
+    return raw is not None and not isinstance(raw, dict)
+
+
 def _profile_matches_auth_user(profile: dict[str, Any], auth_user_id: str) -> bool:
+    if not isinstance(profile, dict):
+        return False
     uid = str(auth_user_id or "").strip()
     if not uid:
         return False
@@ -503,12 +526,14 @@ def ensure_authenticated_user_identity(
             or _auth_user_id()
             or ""
         ).strip()
-        prof = st.session_state.get("auth_profile") or {}
+        prof = _loaded_session_profile()
+        profile_corrupt = _auth_profile_session_corrupt()
 
         session_usable = (
             auth_user is not None
             and bool(auth_uid)
             and bool(prof)
+            and not profile_corrupt
             and _profile_matches_auth_user(prof, auth_uid)
         )
         stored_uid = str(st.session_state.get(CURRENT_USER_ID_KEY) or "").strip()
@@ -545,6 +570,7 @@ def ensure_authenticated_user_identity(
         identity_changed = stored_uid != live_uid or session_uid != live_uid
         profile_stale = (
             force_profile_reload
+            or profile_corrupt
             or not prof
             or not _profile_matches_auth_user(prof, live_uid)
         )
@@ -1042,16 +1068,12 @@ def current_profile() -> dict:
     from app.perf_debug import perf_span
 
     with perf_span("auth.profile_lookup"):
-        profile = (
-            st.session_state.get("auth_profile")
-            or st.session_state.get(CURRENT_USER_PROFILE_KEY)
-            or {}
-        )
+        profile = _loaded_session_profile()
         if profile:
-            return dict(profile)
+            return profile
         if is_authenticated():
             ensure_authenticated_user_identity()
-        return dict(st.session_state.get("auth_profile") or {})
+        return _loaded_session_profile()
 
 
 def verify_identity_binding_or_stop() -> None:
@@ -1094,11 +1116,7 @@ def verify_identity_binding_or_stop() -> None:
                 or ""
             ).strip()
 
-        prof = (
-            st.session_state.get("auth_profile")
-            or st.session_state.get(CURRENT_USER_PROFILE_KEY)
-            or {}
-        )
+        prof = _loaded_session_profile()
         profile_auth_id = str(prof.get("id") or prof.get("user_id") or "").strip()
         if profile_auth_id and profile_auth_id != authenticated_id:
             _log.error(
@@ -1113,7 +1131,7 @@ def verify_identity_binding_or_stop() -> None:
                 _clear_cached_identity_keys(preserve_auth_checked=True)
                 st.error("Your account profile could not be verified. Please sign in again.")
                 st.stop()
-            prof = st.session_state.get("auth_profile") or {}
+            prof = _loaded_session_profile()
             profile_auth_id = str(prof.get("id") or prof.get("user_id") or "").strip()
             if profile_auth_id and profile_auth_id != authenticated_id:
                 _clear_cached_identity_keys(preserve_auth_checked=True)
@@ -1128,11 +1146,7 @@ def verify_identity_binding_or_stop() -> None:
 
 def current_user_display_name() -> str:
     """Display name for greetings — always the authenticated profile, never preview/employee cache."""
-    prof = (
-        st.session_state.get("auth_profile")
-        or st.session_state.get(CURRENT_USER_PROFILE_KEY)
-        or {}
-    )
+    prof = _loaded_session_profile()
     nm = str(prof.get("full_name") or prof.get("name") or "").strip()
     if nm:
         return nm
@@ -1157,7 +1171,7 @@ def render_auth_identity_debug_panel() -> None:
         return
     session_uid = _auth_user_id()
     stored_uid = str(st.session_state.get(CURRENT_USER_ID_KEY) or "").strip()
-    prof = st.session_state.get("auth_profile") or st.session_state.get(CURRENT_USER_PROFILE_KEY) or {}
+    prof = _loaded_session_profile()
     prof_name = str(prof.get("full_name") or prof.get("name") or "").strip() or "—"
     auth_email = _auth_user_email() or str(st.session_state.get(AUTH_EMAIL_KEY) or "—")
     from app.utils.view_as import is_view_as_active, view_as_display_label
@@ -1198,11 +1212,7 @@ def current_role() -> str:
 
     Supported roles: admin, supervisor, project manager, employee, viewer.
     """
-    prof = (
-        st.session_state.get("auth_profile")
-        or st.session_state.get(CURRENT_USER_PROFILE_KEY)
-        or {}
-    )
+    prof = _loaded_session_profile()
     raw = str(prof.get("role", "viewer") or "viewer").strip().lower()
     aliases = {
         "admin": "admin",

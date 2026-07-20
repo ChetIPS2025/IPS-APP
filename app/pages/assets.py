@@ -651,20 +651,9 @@ def _asset_image_src(asset: dict) -> str | None:
 
 
 def _current_user_id() -> str | None:
-    from app.auth import AUTH_USER_ID_KEY, CURRENT_USER_ID_KEY, CURRENT_USER_PROFILE_KEY
+    from app.auth import current_profile
 
-    uid = str(
-        st.session_state.get(AUTH_USER_ID_KEY)
-        or st.session_state.get(CURRENT_USER_ID_KEY)
-        or ""
-    ).strip()
-    if uid:
-        return uid
-    prof = (
-        st.session_state.get("auth_profile")
-        or st.session_state.get(CURRENT_USER_PROFILE_KEY)
-        or {}
-    )
+    prof = current_profile() or {}
     uid = str(prof.get("id") or prof.get("user_id") or "").strip()
     return uid or None
 

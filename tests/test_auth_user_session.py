@@ -21,6 +21,7 @@ from app.auth import (
     _persist_auth_tokens,
     _sync_current_user_snapshot,
     current_user_display_name,
+    current_profile,
     ensure_authenticated_user_identity,
     sign_out,
     try_restore_supabase_session_from_cookies,
@@ -90,6 +91,24 @@ class TestAuthUserSession(unittest.TestCase):
         self.assertEqual(st.session_state[CURRENT_USER_ID_KEY], "auth-chet")
         self.assertEqual(st.session_state["auth_profile"]["full_name"], "Chet Breaux")
         self.assertEqual(st.session_state[IPS_CURRENT_USER_FULL_NAME_KEY], "Chet Breaux")
+
+    def test_current_user_display_name_ignores_corrupt_auth_profile_user_object(
+        self,
+    ) -> None:
+        class UserObj:
+            id = "auth-chet"
+            email = "chet@example.com"
+
+        st.session_state["auth_profile"] = UserObj()
+        st.session_state[CURRENT_USER_PROFILE_KEY] = {
+            "id": "auth-chet",
+            "full_name": "Chet Breaux",
+            "email": "chet@example.com",
+            "role": "admin",
+        }
+
+        self.assertEqual(current_user_display_name(), "Chet Breaux")
+        self.assertEqual(current_profile()["full_name"], "Chet Breaux")
 
     @patch("app.auth._live_auth_user_from_client")
     def test_current_user_display_name_uses_loaded_profile_only(
