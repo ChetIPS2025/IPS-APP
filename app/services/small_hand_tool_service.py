@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
@@ -130,7 +131,135 @@ def _location_display(tool: dict[str, Any]) -> str:
     return loc or storage or "—"
 
 
-_KIT_ITEMS_TABLE = "asset_kit_items"
+def _norm_status(raw: object) -> str:
+    return str(raw or "").strip().lower().replace("_", " ")
+
+
+def _hand_tool_row_active(row: dict[str, Any]) -> bool:
+    if row.get("is_active") is False:
+        return False
+    status = _norm_status(row.get("status"))
+    if status in {"retired", "deleted", "inactive", "disposed", "scrapped", "out of service"}:
+        return False
+    condition = _norm_status(row.get("condition"))
+    if condition in {"retired"}:
+        return False
+    return True
+
+
+def _actual_hand_tool_quantity(row: dict[str, Any]) -> float:
+    for key in ("quantity_on_hand", "quantity_actual", "quantity"):
+        raw = row.get(key)
+        if raw not in (None, ""):
+            return max(0.0, _f(raw))
+    return 0.0
+
+
+def _actual_kit_item_quantity(row: dict[str, Any]) -> float:
+    for key in ("quantity_actual", "quantity_on_hand", "quantity_expected", "quantity"):
+        raw = row.get(key)
+        if raw not in (None, ""):
+            return max(0.0, _f(raw))
+    return 0.0
+
+
+def _line_value_for_quantity_row(row: dict[str, Any], *, actual_qty: float) -> tuple[float, bool]:
+    """Return (line_value, missing_unit_value). Uses actual/on-hand quantity, not expected."""
+    unit_val = _f(row.get("unit_value"))
+    if unit_val > 0:
+        return round(actual_qty * unit_val, 2), False
+    stored_total = row.get("total_value")
+    if stored_total not in (None, ""):
+        return round(_f(stored_total), 2), False
+    return 0.0, True
+
+
+@dataclass(frozen=True)
+class SmallHandToolsValueSummary:
+    total_value: float
+    tool_type_count: int
+    total_quantity: float
+    missing_value_count: int
+
+
+def get_small_hand_tools_value_summary(
+    *,
+    excluded_asset_ids: set[str] | frozenset[str] | None = None,
+    include_kit_items: bool = True,
+) -> SmallHandToolsValueSummary:
+    """Monetary aggregate for quantity-based tools without Jobs/Employees hydration."""
+    excluded = {str(x).strip() for x in (excluded_asset_ids or ()) if str(x).strip()}
+    hand_rows, kit_rows = _cached_hand_tools_sources(include_kit_items=include_kit_items)
+
+    total_value = 0.0
+    total_quantity = 0.0
+    tool_type_count = 0
+    missing_value_count = 0
+    seen_hand_ids: set[str] = set()
+    seen_kit_ids: set[str] = set()
+
+    for row in hand_rows:
+        if not isinstance(row, dict) or not _hand_tool_row_active(row):
+            continue
+        tool_id = _clean_text(row.get("id"))
+        if not tool_id or tool_id in seen_hand_ids:
+            continue
+        seen_hand_ids.add(tool_id)
+
+        # Avoid double counting when the same property is already in Equipment/Serialized subtotals.
+        source_asset_id = _clean_text(row.get("source_asset_id"))
+        if source_asset_id and source_asset_id in excluded:
+            continue
+        if _has_serial(row.get("serial_number")):
+            continue
+
+        actual_qty = _actual_hand_tool_quantity(row)
+        line_value, missing = _line_value_for_quantity_row(row, actual_qty=actual_qty)
+        total_value += line_value
+        total_quantity += actual_qty
+        tool_type_count += 1
+        if missing:
+            missing_value_count += 1
+
+    if include_kit_items:
+        for raw in kit_rows:
+            if not isinstance(raw, dict) or not _hand_tool_row_active(raw):
+                continue
+            item = normalize_kit_item(raw)
+            kit_id = _clean_text(item.get("id"))
+            if not kit_id or kit_id in seen_kit_ids:
+                continue
+            seen_kit_ids.add(kit_id)
+
+            if _has_serial(item.get("serial_number")):
+                continue
+            # Serialized/linked child assets are valued in the assets catalog, not here.
+            if _clean_text(item.get("child_asset_id")):
+                continue
+
+            actual_qty = _actual_kit_item_quantity(item)
+            line_value, missing = _line_value_for_quantity_row(item, actual_qty=actual_qty)
+            total_value += line_value
+            total_quantity += actual_qty
+            tool_type_count += 1
+            if missing:
+                missing_value_count += 1
+
+    return SmallHandToolsValueSummary(
+        total_value=round(total_value, 2),
+        tool_type_count=tool_type_count,
+        total_quantity=round(total_quantity, 2),
+        missing_value_count=missing_value_count,
+    )
+
+
+def _notify_small_hand_tools_data_changed() -> None:
+    try:
+        from app.pages._core._data import clear_small_hand_tools_catalog_cache
+
+        clear_small_hand_tools_catalog_cache()
+    except Exception:
+        pass
 
 
 def _resolve_catalog_maps(
@@ -175,6 +304,10 @@ def _cached_hand_tools_sources(*, include_kit_items: bool) -> tuple[tuple[dict[s
 
 def clear_hand_tools_list_cache() -> None:
     _cached_hand_tools_sources.clear()
+    _notify_small_hand_tools_data_changed()
+
+
+_KIT_ITEMS_TABLE = "asset_kit_items"
 
 
 def _build_hand_tools_list(
@@ -559,9 +692,11 @@ __all__ = [
     "HAND_TOOL_CONDITIONS",
     "HAND_TOOL_STATUSES",
     "STORAGE_TYPES",
+    "SmallHandToolsValueSummary",
     "adjust_hand_tool_quantity",
     "clear_hand_tools_list_cache",
     "delete_hand_tool",
+    "get_small_hand_tools_value_summary",
     "list_hand_tools",
     "normalize_hand_tool",
     "import_hand_tool_row",

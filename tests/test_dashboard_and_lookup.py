@@ -61,13 +61,17 @@ def test_total_active_asset_value_uses_value_field_priority():
     assert total == 1950.0
 
 
-def test_compute_dashboard_kpis_includes_inventory_and_asset_totals():
+def test_compute_dashboard_kpis_includes_inventory_and_asset_totals(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.small_hand_tool_service._cached_hand_tools_sources",
+        lambda *, include_kit_items: ((), ()),
+    )
     today = date.today()
     kpis = compute_dashboard_kpis(
         [],
         [],
         [{"quantity_on_hand": 4, "unit_cost": 10, "is_active": True}],
-        [{"status": "In Service", "current_value": 3000}],
+        [{"status": "In Service", "current_value": 3000, "id": "eq1"}],
         period_start=today.replace(day=1),
         period_end=today,
     )

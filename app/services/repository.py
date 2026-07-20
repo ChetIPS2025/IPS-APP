@@ -279,9 +279,9 @@ def _clear_all_data_caches_impl() -> None:
 
 
 def _clear_hand_tools_list_cache() -> None:
-    from app.services.small_hand_tool_service import clear_hand_tools_list_cache
+    from app.pages._core._data import clear_small_hand_tools_catalog_cache
 
-    clear_hand_tools_list_cache()
+    clear_small_hand_tools_catalog_cache()
 
 
 def _clear_kit_derived_list_caches() -> None:

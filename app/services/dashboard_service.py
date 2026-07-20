@@ -36,6 +36,8 @@ class DashboardSnapshot:
     inventory_value: float
     asset_value: float
     is_live: bool
+    asset_value_caption: str = ""
+    asset_value_title: str = ""
     warnings: tuple[str, ...] = ()
 
 
@@ -63,6 +65,7 @@ def dashboard_data_version_token() -> str:
         estimates_catalog_data_version,
         inventory_catalog_data_version,
         jobs_catalog_data_version,
+        small_hand_tools_data_version,
         tasks_catalog_data_version,
         timekeeping_catalog_data_version,
     )
@@ -72,6 +75,7 @@ def dashboard_data_version_token() -> str:
         for part in (
             jobs_catalog_data_version(),
             assets_catalog_data_version(),
+            small_hand_tools_data_version(),
             tasks_catalog_data_version(),
             estimates_catalog_data_version(),
             inventory_catalog_data_version(),
@@ -237,6 +241,8 @@ def _load_dashboard_snapshot_uncached(
             inventory_value=float(kpis.get("total_inventory_value") or 0),
             asset_value=float(kpis.get("total_asset_value") or 0),
             is_live=is_live,
+            asset_value_caption=str(kpis.get("total_asset_caption") or ""),
+            asset_value_title=str(kpis.get("asset_value_title") or ""),
             warnings=tuple(warnings),
         )
 
