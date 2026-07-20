@@ -35,7 +35,6 @@ from app.services.scheduling_service import (
     list_employee_assignments_in_range,
     list_schedule_events,
     scheduling_data_version,
-    week_range,
 )
 
 CONFLICT_PAD_DAYS = 14
@@ -68,6 +67,28 @@ class SchedulingPageSnapshot:
 def _filters_cache_token(filters: dict[str, str]) -> str:
     payload = json.dumps(filters or {}, sort_keys=True, default=str)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def _empty_page_snapshot(
+    *,
+    week_start: date,
+    week_end: date,
+    warning: str | None = None,
+) -> SchedulingPageSnapshot:
+    return SchedulingPageSnapshot(
+        week_start=week_start,
+        week_end=week_end,
+        events=[],
+        employee_assignments_by_event={},
+        asset_assignments_by_event={},
+        conflict_event_ids=set(),
+        jobs_by_id={},
+        employees_by_id={},
+        assets_by_id={},
+        customers_by_id={},
+        assignment_snapshot=None,
+        warning=warning,
+    )
 
 
 def _assignment_maps_from_rows(
@@ -139,11 +160,6 @@ def _collect_reference_ids(
                 if aid:
                     asset_ids.add(aid)
 
-    if view_mode == "Equipment":
-        pass  # asset_ids already collected
-    elif view_mode not in {"Week", "Day", "Crew", "Jobs"}:
-        pass
-
     if view_mode == "Crew" and show_unassigned:
         for row in list_active_employee_roster():
             eid = str(row.get("id") or "").strip()
@@ -176,6 +192,7 @@ def load_scheduling_page_snapshot(
     include_conflicts: bool | None = None,
     force_refresh: bool = False,
 ) -> SchedulingPageSnapshot:
+    del force_refresh
     if include_conflicts is None:
         include_conflicts = view_mode_needs_conflict_flags(view_mode)
 
@@ -198,35 +215,26 @@ def load_scheduling_page_snapshot(
     def _build() -> SchedulingPageSnapshot:
         warnings: list[str] = []
         with perf_span("scheduling.snapshot"):
+            with perf_span("scheduling.visible_events_query"):
+                events = list_schedule_events(query_start, query_end, filters=filt)
+
+            if not events:
+                with perf_span("scheduling.empty_fast_path"):
+                    return _empty_page_snapshot(week_start=week_start, week_end=week_end)
+
             pad_start = week_start - timedelta(days=CONFLICT_PAD_DAYS)
             pad_end = week_end + timedelta(days=CONFLICT_PAD_DAYS)
-
-            with perf_span("scheduling.events_query"):
-                pad_events = list_schedule_events(pad_start, pad_end, filters=filt)
-
-            def _event_in_range(ev: dict[str, Any], start: date, end: date) -> bool:
-                from app.services.scheduling_conflicts import parse_dt
-
-                ev_start = parse_dt(ev.get("start_at"))
-                ev_end = parse_dt(ev.get("end_at"))
-                if not ev_start or not ev_end:
-                    return False
-                range_start = datetime.combine(start, time.min, tzinfo=timezone.utc)
-                range_end = datetime.combine(end, time.min, tzinfo=timezone.utc)
-                return ev_start < range_end and ev_end > range_start
-
-            events = [
-                ev
-                for ev in pad_events
-                if _event_in_range(ev, query_start, query_end)
-            ]
+            assignment_start = pad_start if include_conflicts else query_start
+            assignment_end = pad_end if include_conflicts else query_end
 
             with perf_span("scheduling.employee_assignments"):
-                emp_rows_pad = list_employee_assignments_in_range(pad_start, pad_end)
+                emp_rows_pad = list_employee_assignments_in_range(assignment_start, assignment_end)
             with perf_span("scheduling.asset_assignments"):
-                asset_rows_pad = list_asset_assignments_in_range(pad_start, pad_end)
+                asset_rows_pad = list_asset_assignments_in_range(assignment_start, assignment_end)
 
-            event_ids = {str(ev.get("id") or "").strip() for ev in events if str(ev.get("id") or "").strip()}
+            event_ids = {
+                str(ev.get("id") or "").strip() for ev in events if str(ev.get("id") or "").strip()
+            }
             emp_rows, asset_rows = _filter_assignments_to_events(
                 emp_rows_pad, asset_rows_pad, event_ids
             )
@@ -248,7 +256,9 @@ def load_scheduling_page_snapshot(
 
             employees_by_id = rows_to_by_id(get_people_by_ids(sorted(employee_ids)))
             assets_by_id = rows_to_by_id(get_assets_by_ids(sorted(asset_ids))) if asset_ids else {}
-            customers_by_id = rows_to_by_id(get_customers_by_ids(sorted(customer_ids))) if customer_ids else {}
+            customers_by_id = (
+                rows_to_by_id(get_customers_by_ids(sorted(customer_ids))) if customer_ids else {}
+            )
 
             if view_mode == "Crew" and show_unassigned:
                 for row in list_active_employee_roster():
@@ -266,6 +276,9 @@ def load_scheduling_page_snapshot(
 
             conflict_ids: set[str] = set()
             if include_conflicts and enriched:
+                with perf_span("scheduling.padded_events_query"):
+                    pad_events = list_schedule_events(pad_start, pad_end, filters=filt)
+
                 required_types: set[str] = set()
                 for ev in enriched:
                     for cert in ev.get("required_certifications") or []:
@@ -275,15 +288,16 @@ def load_scheduling_page_snapshot(
 
                 employee_certs: list[dict[str, Any]] = []
                 if required_types:
-                    try:
-                        employee_certs = list_relevant_certifications(
-                            sorted(employee_ids),
-                            sorted(required_types),
-                        )
-                    except Exception:
-                        warnings.append(
-                            "Schedule loaded, but certification conflicts could not be checked."
-                        )
+                    with perf_span("scheduling.conflicts"):
+                        try:
+                            employee_certs = list_relevant_certifications(
+                                sorted(employee_ids),
+                                sorted(required_types),
+                            )
+                        except Exception:
+                            warnings.append(
+                                "Schedule loaded, but certification conflicts could not be checked."
+                            )
 
                 supervisor_events = [
                     ev for ev in pad_events if str(ev.get("supervisor_id") or "").strip()
@@ -303,18 +317,19 @@ def load_scheduling_page_snapshot(
                     )
 
                 try:
-                    conflict_ids = find_conflicting_schedule_event_ids(
-                        enriched,
-                        employee_assignments=emp_rows_pad,
-                        asset_assignments=asset_rows_pad,
-                        supervisor_events=supervisor_events,
-                        availability_rows=availability,
-                        employee_certs=employee_certs,
-                        assets_by_id=assets_by_id,
-                        employees_by_id=employees_by_id,
-                        employee_rows_by_event=emp_by_event,
-                        asset_rows_by_event=asset_by_event,
-                    )
+                    with perf_span("scheduling.conflicts"):
+                        conflict_ids = find_conflicting_schedule_event_ids(
+                            enriched,
+                            employee_assignments=emp_rows_pad,
+                            asset_assignments=asset_rows_pad,
+                            supervisor_events=supervisor_events,
+                            availability_rows=availability,
+                            employee_certs=employee_certs,
+                            assets_by_id=assets_by_id,
+                            employees_by_id=employees_by_id,
+                            employee_rows_by_event=emp_by_event,
+                            asset_rows_by_event=asset_by_event,
+                        )
                 except Exception:
                     warnings.append("Schedule loaded, but conflict checks could not be completed.")
 
