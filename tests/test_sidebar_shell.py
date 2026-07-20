@@ -144,20 +144,22 @@ def test_inject_sidebar_shell_injects_layout_on_every_render():
     assert "if st.session_state.get(IPS_SIDEBAR_SHELL_KEY)" not in source
 
 
-def test_desktop_nav_rail_renders_sidebar_bridge_links():
-    from app.components.sidebar_shell import _desktop_nav_rail_click_script, _desktop_nav_rail_html
+def test_desktop_nav_rail_renders_direct_module_links():
+    from app.components.sidebar_shell import _desktop_nav_rail_click_script, _desktop_nav_rail_html, sidebar_nav_href
 
     rows = [{"slug": "jobs", "label": "Jobs", "icon": "💼"}, {"slug": "timekeeping", "label": "Timekeeping", "icon": "⏱"}]
     markup = _desktop_nav_rail_html(rows, "dashboard")
     assert "ips-desktop-nav-rail" in markup
     assert 'data-ips-rail-slug="jobs"' in markup
     assert 'data-ips-rail-slug="timekeeping"' in markup
+    assert 'href="?ips_nav=jobs"' in markup
+    assert 'href="?ips_nav=timekeeping"' in markup
+    assert sidebar_nav_href("timekeeping") == "?ips_nav=timekeeping"
     assert 'data-ips-rail-logout="1"' in markup
-    assert "?ips_nav=" not in markup
 
     script = _desktop_nav_rail_click_script()
-    assert "st-key-nav_" in script
-    assert "data-ips-rail-slug" in script
+    assert "st-key-nav_" not in script
+    assert "data-ips-rail-logout" in script
 
 
 def test_desktop_nav_rail_item_active_for_scan_aliases():

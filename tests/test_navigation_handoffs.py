@@ -25,6 +25,7 @@ from app.navigation import (
     open_jobs_job_costing,
     set_nav_slug,
 )
+from app.utils.constants import SESSION_NAV_KEY
 
 
 class TestNavigationHandoffs(unittest.TestCase):
@@ -103,6 +104,25 @@ class TestNavigationHandoffs(unittest.TestCase):
 
         self.assertEqual(st.session_state["ips_nav_page"], "timekeeping")
         self.assertNotIn(IPS_NAV_PENDING_KEY, st.session_state)
+
+    def test_capture_nav_slug_rejects_unknown_module(self) -> None:
+        from app.components.sidebar_shell import capture_nav_slug_from_query
+
+        st.session_state[SESSION_NAV_KEY] = "dashboard"
+
+        class _QueryParams(dict):
+            def get(self, key, default=None):
+                if key == "ips_nav":
+                    return "not_a_real_page"
+                return default
+
+            def __delitem__(self, key):
+                super().pop(key, None)
+
+        with mock.patch.object(st, "query_params", _QueryParams()):
+            capture_nav_slug_from_query()
+
+        self.assertEqual(st.session_state[SESSION_NAV_KEY], "dashboard")
 
 
 if __name__ == "__main__":
