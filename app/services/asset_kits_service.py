@@ -206,10 +206,11 @@ def list_all_kit_items_enriched(
 ) -> list[dict[str, Any]]:
     """All active kit items with parent asset context for cross-kit lists."""
     if assets_by_id is None:
-        from app.services.phase2_modules_service import list_assets, normalize_asset
+        from app.pages._core._data import load_assets
+
         assets_by_id = {
-            str(a.get("id") or "").strip(): normalize_asset(a)
-            for a in list_assets()
+            str(a.get("id") or "").strip(): a
+            for a in load_assets()
             if str(a.get("id") or "").strip()
         }
     out: list[dict[str, Any]] = []

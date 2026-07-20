@@ -138,11 +138,11 @@ def _resolve_catalog_maps(
     jobs_by_id: dict[str, dict[str, Any]] | None,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
     if assets_by_id is None:
-        from app.services.phase2_modules_service import list_assets, normalize_asset
+        from app.pages._core._data import load_assets
 
         assets_by_id = {
-            str(a.get("id") or "").strip(): normalize_asset(a)
-            for a in list_assets()
+            str(a.get("id") or "").strip(): a
+            for a in load_assets()
             if str(a.get("id") or "").strip()
         }
     if jobs_by_id is None:
