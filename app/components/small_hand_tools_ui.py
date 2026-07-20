@@ -67,15 +67,15 @@ _HAND_TOOL_DETAIL_TABLE_KEY = "assets_hand_tools_detail"
 _COLS = [0.12, 0.32, 2.2, 1.15, 0.52, 0.52, 1.15, 1.05, 1.0, 1.1]
 _HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
-    ("IMAGE", None),
-    ("TOOL", None),
-    ("CATEGORY", "category"),
-    ("EXPECTED", None),
-    ("ACTUAL", None),
-    ("LOCATION", "location"),
-    ("STORAGE", "storage_type"),
-    ("STATUS", "status"),
-    ("ACTIONS", None),
+    ("Image", None),
+    ("Tool", None),
+    ("Category", "category"),
+    ("Expected", None),
+    ("Actual", None),
+    ("Location", "location"),
+    ("Storage", "storage_type"),
+    ("Status", "status"),
+    ("Actions", None),
 ]
 _FILTER_SPECS: list[tuple[str, object]] = [
     ("category", lambda r: str(r.get("category") or "")),
@@ -535,11 +535,12 @@ def _render_hand_tool_name_cell(
             f'<span class="ips-hand-tools-name-anchor"{title_attr} aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        if st.button(name, key=f"ht_open_name_{rid}", type="tertiary"):
+        if st.button(name, key=f"ht_open_name_{rid}", type="tertiary", help=name):
             on_open_tool(row)
         return
     st.markdown(
-        f'<div class="ips-assets-title ips-hand-tools-cell"{title_attr}>{html.escape(name)}</div>',
+        f'<div class="ips-assets-title ips-hand-tools-cell ips-hand-tools-name-text"{title_attr} '
+        f'title="{html.escape(name)}">{html.escape(name)}</div>',
         unsafe_allow_html=True,
     )
 

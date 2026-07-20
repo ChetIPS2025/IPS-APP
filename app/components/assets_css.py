@@ -20,6 +20,88 @@ _EQUIPMENT_TAB = "Equipment"
 _SERIALIZED_TAB = "Serialized Tools"
 _HAND_TOOLS_TAB = "Small Tools"
 
+# Small Hand Tools tab — clip long tool names and keep headers readable.
+HAND_TOOLS_TABLE_FIX_CSS = """
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-header),
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) {
+  grid-template-columns:
+    28px
+    56px
+    minmax(200px, 2.8fr)
+    minmax(88px, 0.95fr)
+    56px
+    56px
+    minmax(88px, 1fr)
+    minmax(88px, 0.9fr)
+    minmax(92px, 0.9fr)
+    minmax(120px, 138px) !important;
+  column-gap: 10px !important;
+}
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) > [data-testid="column"]:not(:last-child),
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:not(:last-child) {
+  overflow: hidden !important;
+  min-width: 0 !important;
+}
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) > [data-testid="column"]:nth-child(3),
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:nth-child(3) {
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:nth-child(3)
+[data-testid="stVerticalBlock"],
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:nth-child(3)
+[data-testid="stElementContainer"],
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:nth-child(3)
+.stButton {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) .ips-hand-tools-cell,
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) .ips-assets-header-row,
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) .ips-table-header-filter-text {
+  white-space: normal !important;
+  overflow: hidden !important;
+  text-overflow: clip !important;
+  line-height: 1.15 !important;
+  word-break: break-word !important;
+}
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap .ips-hand-tools-name-text {
+  display: block !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+"""
+
 # Serialized tools tab — same equipment table card + column-aligned filter row.
 SERIALIZED_TOOLS_TAB_CSS = """
 .st-key-assets_table_wrap:has(.ips-serialized-tools-html-table)
@@ -142,7 +224,10 @@ def inject_assets_serialized_css() -> None:
 
 
 def inject_assets_hand_tools_css() -> None:
-    _inject_sidebar_css("ips-assets-hand-tools-v3", PAGE_HAND_TOOLS_CSS)
+    _inject_sidebar_css(
+        "ips-assets-hand-tools-v4",
+        "\n\n".join((PAGE_HAND_TOOLS_CSS, HAND_TOOLS_TABLE_FIX_CSS)),
+    )
 
 
 def inject_assets_shared_module_css() -> None:

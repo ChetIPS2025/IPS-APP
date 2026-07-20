@@ -85,6 +85,12 @@ class TestAssetsPageCss(unittest.TestCase):
         mock_serialized.assert_not_called()
         mock_detail.assert_not_called()
 
+    def test_hand_tools_css_includes_overflow_fix(self) -> None:
+        from app.components.assets_css import HAND_TOOLS_TABLE_FIX_CSS
+
+        self.assertIn("overflow: hidden !important", HAND_TOOLS_TABLE_FIX_CSS)
+        self.assertIn("text-overflow: ellipsis", HAND_TOOLS_TABLE_FIX_CSS)
+
     @patch("app.components.assets_css.inject_assets_detail_css")
     @patch("app.components.assets_css.inject_assets_equipment_css")
     @patch("app.components.assets_css.inject_assets_shared_module_css")
