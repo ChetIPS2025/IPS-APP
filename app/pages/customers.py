@@ -21,7 +21,7 @@ from app.components.customers_directory_table import (
 )
 from app.components.customer_contacts_table import build_customer_contacts_html_table
 from app.components.customer_locations_table import build_customer_locations_html_table
-from app.components.customer_permissions import load_customer_permissions
+from app.components.customer_permissions import CustomerPermissions, load_customer_permissions
 from app.components.tabs import render_tabs
 from app.components.customers_page_layout import (
     close_customers_filter_bar_shell,
@@ -81,6 +81,7 @@ from app.services.customers_service import (
     create_customer,
     create_customer_contact,
     create_customer_location,
+    delete_customer_contact_record,
     get_customer,
     get_customer_contact,
     get_customer_contacts,
@@ -1512,6 +1513,220 @@ def _render_contact_inline_edit_form(
         st.error(msg or "Could not save contact.")
 
 
+def _contact_delete_confirm_key(contact_id: str) -> str:
+    return f"ips_delete_contact_confirm_{str(contact_id or '').strip()}"
+
+
+def _contact_delete_display_name(contact: dict[str, Any]) -> str:
+    first = str(contact.get("first_name") or "").strip()
+    last = str(contact.get("last_name") or "").strip()
+    if first or last:
+        return f"{first} {last}".strip()
+    return (
+        str(contact.get("full_name") or contact.get("contact_name") or contact.get("name") or "Contact").strip()
+        or "Contact"
+    )
+
+
+def _contact_delete_feedback(result: Any, *, success: str) -> tuple[bool, str]:
+    ok, msg = _service_feedback(result, success=success)
+    if ok:
+        return ok, msg
+    low = str(msg or "").casefold()
+    if "23503" in low or "foreign key" in low or "could not link" in low:
+        return False, "This contact could not be deleted because it is still linked to another record."
+    return ok, msg
+
+
+def _validate_contact_delete(
+    contact: dict[str, Any],
+    *,
+    customer: dict[str, Any] | None,
+    permissions: CustomerPermissions,
+) -> str | None:
+    if not permissions.can_delete:
+        return "You do not have permission to delete contacts."
+    ct_id = str(contact.get("id") or "").strip()
+    if not ct_id:
+        return "Contact not found."
+    if is_demo_id(ct_id):
+        return "Sample contacts cannot be deleted."
+    contact_customer_id = str(contact.get("customer_id") or "").strip()
+    if not contact_customer_id:
+        return "Contact not found."
+    if is_demo_id(contact_customer_id):
+        return "Sample contacts cannot be deleted."
+    active_customer_id = str((customer or {}).get("id") or "").strip()
+    if active_customer_id and contact_customer_id != active_customer_id:
+        return "You do not have permission to delete contacts."
+    return None
+
+
+def _clear_contact_edit_widget_state(contact: dict[str, Any]) -> None:
+    rk = record_session_key(contact, "id", "full_name", "contact_name")
+    for suffix in ("name", "title", "role", "email", "phone", "mobile", "status", "primary", "notes", "loc"):
+        st.session_state.pop(f"ct_edit_{suffix}_{rk}", None)
+    set_view_mode(_CT_MOD, rk)
+
+
+def _clear_contact_delete_state(contact_id: str, *, contact: dict[str, Any] | None = None) -> None:
+    ct_id = str(contact_id or "").strip()
+    if not ct_id:
+        return
+    st.session_state.pop(_contact_delete_confirm_key(ct_id), None)
+    st.session_state[_inline_contact_edit_key(ct_id)] = False
+    if contact:
+        _clear_contact_edit_widget_state(contact)
+
+
+def _remove_contact_from_modal_cache(contact_id: str) -> None:
+    ct_id = str(contact_id or "").strip()
+    if not ct_id:
+        return
+    cache = st.session_state.get(_CONTACTS_CACHE_KEY)
+    if not isinstance(cache, dict) or ct_id not in cache:
+        return
+    updated = dict(cache)
+    updated.pop(ct_id, None)
+    st.session_state[_CONTACTS_CACHE_KEY] = updated
+
+
+def _execute_contact_delete(
+    contact: dict[str, Any],
+    *,
+    customer: dict[str, Any] | None,
+    permissions: CustomerPermissions,
+    inline: bool,
+) -> None:
+    err = _validate_contact_delete(contact, customer=customer, permissions=permissions)
+    if err:
+        st.error(err)
+        return
+
+    ct_id = str(contact.get("id") or "").strip()
+    customer_id = str((customer or {}).get("id") or contact.get("customer_id") or "").strip()
+    result = delete_customer_contact_record(ct_id)
+    ok, msg = _contact_delete_feedback(result, success="Contact deleted.")
+    if not ok:
+        st.error(msg or "Could not delete contact.")
+        return
+
+    _clear_contact_delete_state(ct_id, contact=contact)
+    _remove_contact_from_modal_cache(ct_id)
+
+    if inline and customer_id:
+        _clear_customer_contact_selection(
+            customer_id,
+            [str(x) for x in (st.session_state.get(_ALL_CONTACT_IDS_KEY) or [])],
+        )
+        if contact_detail_query_key() in st.query_params:
+            del st.query_params[contact_detail_query_key()]
+        invalidate_customers_directory_cache(customer_id)
+        fresh = get_customer_detail(customer_id)
+        if fresh:
+            put_customer_in_modal_cache(customer_id, fresh)
+        st.session_state[_CUSTOMER_DETAIL_ACTIVE_TAB_KEY] = "Contacts"
+        st.success(msg)
+        ips_app_rerun()
+        return
+
+    contact_ids = st.session_state.get(_ALL_CONTACT_IDS_KEY) or []
+    _clear_contact_selection([str(x) for x in contact_ids])
+    clear_edit_modes(_CT_MOD)
+    clear_record_modal(
+        table_key=_CONTACTS_TABLE_KEY,
+        session_select_key=_CT_SEL,
+        modal_key=_CONTACT_MODAL_KEY,
+        module=_CT_MOD,
+    )
+    if customer_id:
+        invalidate_customers_directory_cache(customer_id)
+    st.success(msg)
+    ips_app_rerun()
+
+
+def _render_contact_delete_confirm_panel(
+    contact: dict[str, Any],
+    *,
+    customer: dict[str, Any] | None,
+    permissions: CustomerPermissions,
+    inline: bool,
+) -> None:
+    ct_id = str(contact.get("id") or "").strip()
+    confirm_key = _contact_delete_confirm_key(ct_id)
+    prefix = "inline" if inline else "modal"
+    safe_name = html.escape(_contact_delete_display_name(contact))
+    st.markdown(
+        f'<div class="ips-contact-delete-confirm">'
+        f"<p><strong>Delete this contact?</strong></p>"
+        f"<p>This will permanently remove:</p>"
+        f"<p><strong>{safe_name}</strong></p>"
+        f"<p>The contact will no longer be available on this customer, location, Jobs, or Estimates.</p>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+    confirm_col, cancel_col = st.columns(2)
+    with confirm_col:
+        if st.button(
+            "Confirm Delete",
+            key=f"{prefix}_ct_delete_confirm_{ct_id}",
+            type="primary",
+            use_container_width=True,
+        ):
+            _execute_contact_delete(
+                contact,
+                customer=customer,
+                permissions=permissions,
+                inline=inline,
+            )
+    with cancel_col:
+        if st.button(
+            "Cancel",
+            key=f"{prefix}_ct_delete_cancel_{ct_id}",
+            use_container_width=True,
+        ):
+            st.session_state.pop(confirm_key, None)
+            st.rerun()
+
+
+def _render_delete_contact_action(
+    contact: dict[str, Any],
+    *,
+    customer: dict[str, Any] | None,
+    permissions: CustomerPermissions,
+    inline: bool,
+    render: str = "auto",
+) -> None:
+    if not permissions.can_delete:
+        return
+    ct_id = str(contact.get("id") or "").strip()
+    if not ct_id:
+        return
+    confirm_key = _contact_delete_confirm_key(ct_id)
+    confirm_active = bool(st.session_state.get(confirm_key))
+    show_button = render in {"auto", "button"}
+    show_confirm = render in {"auto", "confirm"}
+    if show_confirm and confirm_active:
+        _render_contact_delete_confirm_panel(
+            contact,
+            customer=customer,
+            permissions=permissions,
+            inline=inline,
+        )
+        return
+    if not show_button or confirm_active:
+        return
+    prefix = "inline" if inline else "modal"
+    if st.button(
+        "Delete Contact",
+        key=f"{prefix}_ct_delete_btn_{ct_id}",
+        type="secondary",
+        use_container_width=True,
+    ):
+        st.session_state[confirm_key] = True
+        st.rerun()
+
+
 def _render_contact_inline_detail(
     contact: dict,
     customer: dict | None = None,
@@ -1529,10 +1744,11 @@ def _render_contact_inline_detail(
     if location:
         loc_name = safe_value(location.get("location_name") or location.get("site_name"))
     editing = bool(st.session_state.get(_inline_contact_edit_key(ct_id)))
+    permissions = load_customer_permissions()
 
     with st.container(key=f"inline_contact_detail_{ct_id}"):
         st.markdown('<div class="ips-inline-detail-card">', unsafe_allow_html=True)
-        header_l, header_r = st.columns([4, 1], vertical_alignment="center")
+        header_l, header_r = st.columns([4, 2], vertical_alignment="center")
         with header_l:
             subtitle = f"{cname} · {loc_name}" if cname and loc_name != "—" else (cname or loc_name or "Contact")
             st.markdown(
@@ -1544,10 +1760,30 @@ def _render_contact_inline_detail(
             )
             st.markdown(modal_status_pill_html(status), unsafe_allow_html=True)
         with header_r:
-            if not editing and st.button("Edit", key=f"inline_ct_edit_btn_{ct_id}", use_container_width=True):
-                st.session_state[_inline_contact_edit_key(ct_id)] = True
-                _seed_contact_edit_form(contact)
-                st.rerun()
+            if not editing:
+                edit_col, delete_col = st.columns(2)
+                with edit_col:
+                    if st.button("Edit", key=f"inline_ct_edit_btn_{ct_id}", use_container_width=True):
+                        st.session_state[_inline_contact_edit_key(ct_id)] = True
+                        _seed_contact_edit_form(contact)
+                        st.rerun()
+                with delete_col:
+                    _render_delete_contact_action(
+                        contact,
+                        customer=customer,
+                        permissions=permissions,
+                        inline=True,
+                        render="button",
+                    )
+
+        if not editing:
+            _render_delete_contact_action(
+                contact,
+                customer=customer,
+                permissions=permissions,
+                inline=True,
+                render="confirm",
+            )
 
         if editing:
             _render_contact_inline_edit_form(
@@ -2386,12 +2622,34 @@ def render_contact_detail_dialog(contact: dict) -> None:
         status=status,
     )
 
-    render_modal_edit_button(
-        module=_CT_MOD,
-        record_key=rk,
-        on_edit=lambda: _set_contact_edit_mode(contact),
-        key_prefix=f"contact_modal_{rk}",
-    )
+    permissions = load_customer_permissions()
+    if not is_edit_mode(_CT_MOD, rk):
+        _action_left, action_right = st.columns([8, 2], gap="small")
+        with action_right:
+            edit_col, delete_col = st.columns(2, gap="small")
+            with edit_col:
+                if st.button(
+                    "Edit",
+                    key=f"contact_modal_{rk}_edit",
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    _set_contact_edit_mode(contact)
+            with delete_col:
+                _render_delete_contact_action(
+                    contact,
+                    customer=customer,
+                    permissions=permissions,
+                    inline=False,
+                    render="button",
+                )
+        _render_delete_contact_action(
+            contact,
+            customer=customer,
+            permissions=permissions,
+            inline=False,
+            render="confirm",
+        )
 
     render_modal_meta_grid(
         [
