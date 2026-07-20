@@ -1,4 +1,4 @@
-"""HTML serialized-tools table with click bridge (fast fragment reruns)."""
+"""HTML serialized-tools table with native detail links (field mode uses expand bridge)."""
 
 from __future__ import annotations
 
@@ -13,6 +13,20 @@ from app.services.catalog_images import catalog_thumbnail_html
 from app.ui.streamlit_perf import fragment_rerun, ips_app_rerun
 
 SERIALIZED_TOOLS_TABLE_LAST_ACTION_KEY = "serialized_tools_list_last_action"
+
+
+def serialized_tool_detail_href(row: dict[str, Any]) -> str:
+    """Native Asset Detail URL for a serialized tool or kit-item row."""
+    detail_id = str(row.get("_detail_asset_id") or row.get("id") or "").strip()
+    if not detail_id:
+        return "#"
+    tab = str(row.get("_detail_tab") or "").strip()
+    if not tab and str(row.get("row_type") or "") == "kit_item":
+        child_id = str(row.get("child_asset_id") or "").strip()
+        if not child_id:
+            tab = "kit"
+            detail_id = str(row.get("parent_asset_id") or detail_id).strip()
+    return asset_detail_href(detail_id, tab=tab)
 
 
 def serialized_tools_bridge_button_key(row: dict[str, Any]) -> str:
@@ -51,23 +65,21 @@ def _cell_wrapper(inner: str, *, extra_class: str = "", align: str = "left") -> 
     return f'<div class="{html.escape(cls)}">{inner}</div>'
 
 
-def _tool_link_html(row_id: str, label: str) -> str:
-    aid = str(row_id or "").strip()
+def _tool_link_html(row: dict[str, Any], label: str) -> str:
     text = html.escape(label)
     title = html.escape(label, quote=True)
-    href = html.escape(asset_detail_href(aid), quote=True)
-    asset_id = html.escape(aid, quote=True)
+    href = html.escape(serialized_tool_detail_href(row), quote=True)
+    asset_id = html.escape(str(row.get("_detail_asset_id") or row.get("id") or "").strip(), quote=True)
     return (
         f'<a class="ips-row-open-link ips-dash-est-link ips-inventory-desc-link '
         f'ips-assets-open-link ips-serialized-tool-open-link" href="{href}" target="_self" '
-        f'data-asset-id="{asset_id}" data-row-id="{asset_id}" title="{title}">{text}</a>'
+        f'data-asset-id="{asset_id}" title="{title}">{text}</a>'
     )
 
 
-def _tool_thumb_link_html(row_id: str, thumb_asset: dict[str, Any]) -> str:
-    aid = str(row_id or "").strip()
-    href = html.escape(asset_detail_href(aid), quote=True)
-    asset_id = html.escape(aid, quote=True)
+def _tool_thumb_link_html(row: dict[str, Any], thumb_asset: dict[str, Any]) -> str:
+    href = html.escape(serialized_tool_detail_href(row), quote=True)
+    asset_id = html.escape(str(row.get("_detail_asset_id") or row.get("id") or "").strip(), quote=True)
     thumb = catalog_thumbnail_html(
         thumb_asset,
         kind="asset",
@@ -77,7 +89,7 @@ def _tool_thumb_link_html(row_id: str, thumb_asset: dict[str, Any]) -> str:
     )
     return (
         f'<a class="ips-inventory-thumb-cell-link ips-assets-open-link ips-serialized-tool-open-link" '
-        f'href="{href}" target="_self" data-asset-id="{asset_id}" data-row-id="{asset_id}" '
+        f'href="{href}" target="_self" data-asset-id="{asset_id}" '
         f'title="View tool" aria-label="View tool">{thumb}</a>'
     )
 
@@ -85,12 +97,25 @@ def _tool_thumb_link_html(row_id: str, thumb_asset: dict[str, Any]) -> str:
 def build_serialized_tools_html_table(
     rows: list[dict[str, Any]],
     *,
-    is_row_selected: Callable[[str], bool],
+    field_mode: bool = False,
+    is_row_selected: Callable[[str], bool] | None = None,
 ) -> str:
+    active_headers = (
+        SERIALIZED_TOOLS_TABLE_HEADERS
+        if field_mode
+        else tuple(h for h in SERIALIZED_TOOLS_TABLE_HEADERS if h[0] != "select")
+    )
     col_parts = [
         f'<col class="ips-dash-est-col-{html.escape(key)}" style="width:{px}px;" />'
         for key, px in SERIALIZED_TOOLS_TABLE_COL_WIDTHS_PX.items()
+        if not field_mode or key != "select" or field_mode
     ]
+    if not field_mode:
+        col_parts = [
+            f'<col class="ips-dash-est-col-{html.escape(key)}" style="width:{px}px;" />'
+            for key, px in SERIALIZED_TOOLS_TABLE_COL_WIDTHS_PX.items()
+            if key != "select"
+        ]
     head_parts = [
         (
             f'<th scope="col" class="ips-dash-est-th ips-dash-est-th-{html.escape(key)}" '
@@ -98,7 +123,7 @@ def build_serialized_tools_html_table(
             f'max-width:{SERIALIZED_TOOLS_TABLE_COL_WIDTHS_PX[key]}px;">'
             f"{html.escape(label)}</th>"
         )
-        for key, label in SERIALIZED_TOOLS_TABLE_HEADERS
+        for key, label in active_headers
     ]
 
     body_rows: list[str] = []
@@ -107,7 +132,6 @@ def build_serialized_tools_html_table(
         if not row_id:
             continue
 
-        bridge_key = serialized_tools_bridge_button_key(row)
         name = str(row.get("_display_name") or "—").strip() or "—"
         name_label = name if name != "—" else "View tool"
         model_no = str(row.get("_display_model") or "—").strip() or "—"
@@ -117,75 +141,80 @@ def build_serialized_tools_html_table(
         status = str(row.get("_display_status") or "—").strip() or "—"
         condition = str(row.get("_display_condition") or "—").strip() or "—"
         thumb_asset = row.get("_thumb_asset") if isinstance(row.get("_thumb_asset"), dict) else row
-        checked = " checked" if is_row_selected(row_id) else ""
-
-        select_cell = (
-            f'<input type="checkbox" class="ips-serialized-tool-row-select" '
-            f'data-st-action="select" data-row-id="{html.escape(row_id, quote=True)}" '
-            f'aria-label="Select tool"{checked} />'
-        )
-        name_inner = _tool_link_html(row_id, name_label)
+        name_inner = _tool_link_html(row, name_label)
 
         row_parity = "even" if row_idx % 2 else "odd"
-        cells = [
-            ("select", "center", _cell_wrapper(select_cell, align="center")),
-            (
-                "image",
-                "center",
-                _cell_wrapper(
-                    _tool_thumb_link_html(row_id, thumb_asset),
-                    extra_class="ips-inventory-image-td",
-                    align="center",
+        cells: list[tuple[str, str, str]] = []
+        if field_mode:
+            checked = ""
+            if is_row_selected is not None:
+                checked = " checked" if is_row_selected(row_id) else ""
+            select_cell = (
+                f'<input type="checkbox" class="ips-serialized-tool-row-select" '
+                f'data-st-action="select" data-row-id="{html.escape(row_id, quote=True)}" '
+                f'aria-label="Select tool"{checked} />'
+            )
+            cells.append(("select", "center", _cell_wrapper(select_cell, align="center")))
+        cells.extend(
+            [
+                (
+                    "image",
+                    "center",
+                    _cell_wrapper(
+                        _tool_thumb_link_html(row, thumb_asset),
+                        extra_class="ips-inventory-image-td",
+                        align="center",
+                    ),
                 ),
-            ),
-            ("name", "left", _cell_wrapper(name_inner, extra_class="ips-dash-est-desc-cell")),
-            (
-                "model",
-                "left",
-                _cell_wrapper(
-                    f'<span class="ips-inventory-text-cell ips-serialized-tool-text-cell">'
-                    f"{html.escape(model_no)}</span>"
+                ("name", "left", _cell_wrapper(name_inner, extra_class="ips-dash-est-desc-cell")),
+                (
+                    "model",
+                    "left",
+                    _cell_wrapper(
+                        f'<span class="ips-inventory-text-cell ips-serialized-tool-text-cell">'
+                        f"{html.escape(model_no)}</span>"
+                    ),
                 ),
-            ),
-            (
-                "serial",
-                "left",
-                _cell_wrapper(
-                    f'<span class="ips-inventory-text-cell ips-serialized-tool-text-cell">'
-                    f"{html.escape(serial)}</span>"
+                (
+                    "serial",
+                    "left",
+                    _cell_wrapper(
+                        f'<span class="ips-inventory-text-cell ips-serialized-tool-text-cell">'
+                        f"{html.escape(serial)}</span>"
+                    ),
                 ),
-            ),
-            (
-                "trailer",
-                "left",
-                _cell_wrapper(
-                    f'<span class="ips-inventory-muted">{html.escape(trailer)}</span>'
+                (
+                    "trailer",
+                    "left",
+                    _cell_wrapper(
+                        f'<span class="ips-inventory-muted">{html.escape(trailer)}</span>'
+                    ),
                 ),
-            ),
-            (
-                "job",
-                "left",
-                _cell_wrapper(
-                    f'<span class="ips-inventory-muted">{html.escape(job_label)}</span>'
+                (
+                    "job",
+                    "left",
+                    _cell_wrapper(
+                        f'<span class="ips-inventory-muted">{html.escape(job_label)}</span>'
+                    ),
                 ),
-            ),
-            (
-                "status",
-                "center",
-                _cell_wrapper(
-                    asset_status_pill_html(status),
-                    extra_class="ips-dash-est-status-cell",
-                    align="center",
+                (
+                    "status",
+                    "center",
+                    _cell_wrapper(
+                        asset_status_pill_html(status),
+                        extra_class="ips-dash-est-status-cell",
+                        align="center",
+                    ),
                 ),
-            ),
-            (
-                "condition",
-                "left",
-                _cell_wrapper(
-                    f'<span class="ips-inventory-muted">{html.escape(condition)}</span>'
+                (
+                    "condition",
+                    "left",
+                    _cell_wrapper(
+                        f'<span class="ips-inventory-muted">{html.escape(condition)}</span>'
+                    ),
                 ),
-            ),
-        ]
+            ]
+        )
 
         tds = "".join(
             (
@@ -196,16 +225,20 @@ def build_serialized_tools_html_table(
             )
             for key, _align, content in cells
         )
+        expand_attr = ' data-asset-action="expand"' if field_mode else ""
         body_rows.append(
-            f'<tr class="ips-dash-est-tr ips-dash-est-row-{row_parity} ips-serialized-tool-row" '
+            f'<tr class="ips-dash-est-tr ips-dash-est-row-{row_parity} ips-serialized-tool-row{expand_attr}" '
             f'data-row-id="{html.escape(row_id, quote=True)}" '
-            f'data-asset-id="{html.escape(row_id, quote=True)}" '
-            f'data-bridge-key="{html.escape(bridge_key, quote=True)}">'
+            f'data-asset-id="{html.escape(str(row.get("_detail_asset_id") or row_id), quote=True)}">'
             f"{tds}"
             f"</tr>"
         )
 
-    min_width = sum(SERIALIZED_TOOLS_TABLE_COL_WIDTHS_PX.values())
+    min_width = sum(
+        px
+        for key, px in SERIALIZED_TOOLS_TABLE_COL_WIDTHS_PX.items()
+        if field_mode or key != "select"
+    )
     return (
         f'<div class="ips-dash-est-table-scroll" style="min-width:0;">'
         f'<table class="ips-dash-est-html-table ips-assets-html-equipment-table ips-serialized-tools-html-table" '
@@ -258,50 +291,16 @@ def handle_serialized_tools_table_action(
     ips_app_rerun()
 
 
-def render_serialized_tools_table_open_buttons(
-    rows: list[dict[str, Any]],
-    *,
-    open_row_fn: Callable[[str, dict[str, Any]], None],
-) -> None:
-    """Hidden Streamlit buttons — HTML name clicks trigger these via the bridge script."""
-    with st.container(key="serialized_tools_open_button_harness"):
-        for row in rows:
-            row_id = str(row.get("_row_id") or "").strip()
-            if not row_id:
-                continue
-            bridge_key = serialized_tools_bridge_button_key(row)
-
-            def _open(_row_id: str = row_id, _row: dict = row) -> None:
-                open_row_fn(_row_id, _row)
-
-            st.button(
-                "Open tool",
-                key=bridge_key,
-                type="tertiary",
-                on_click=_open,
-            )
-
-
-def render_serialized_tools_table_open_bridge(
-    *,
-    component_key: str = "ips_serialized_tools_open_bridge",
-) -> str | None:
-    """Return clicked serialized tool row id via the shared clean-table link bridge."""
-    from app.ui.clean_table import render_clean_table_click_bridge
-
-    return render_clean_table_click_bridge(
-        table_selector=".ips-serialized-tools-html-table",
-        row_selector=".ips-serialized-tools-html-table tbody tr[data-row-id]",
-        component_key=component_key,
-    )
-
-
 def render_serialized_tools_table_bridge(
     *,
     component_key: str = "ips_serialized_tools_list_bridge",
     hook_key: str = "ipsSerializedToolsList::action",
+    field_mode: bool = False,
 ) -> str | None:
     from app.ui.clean_table import _components_html
+
+    if not field_mode:
+        return None
 
     return _components_html(
         f"""
@@ -397,27 +396,18 @@ def render_serialized_tools_table_bridge_legacy(
     last_action_key: str = SERIALIZED_TOOLS_TABLE_LAST_ACTION_KEY,
     open_row_fn: Callable[[str, dict[str, Any]], None],
     select_row_fn: Callable[[str, bool], None],
+    field_mode: bool = False,
 ) -> None:
+    if not field_mode:
+        return
     st.markdown(
         '<span class="ips-serialized-tools-table-link-bridge-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
-    picked_open = render_serialized_tools_table_open_bridge()
-    if picked_open:
-        row_id = str(picked_open).strip()
-        row = row_by_id.get(row_id)
-        if row:
-            handle_serialized_tools_table_action(
-                row_id,
-                row_by_id,
-                last_action_key=last_action_key,
-                open_row_fn=open_row_fn,
-                select_row_fn=select_row_fn,
-            )
-            return
     picked = render_serialized_tools_table_bridge(
         component_key=component_key,
         hook_key=hook_key,
+        field_mode=field_mode,
     )
     apply_serialized_tools_table_bridge_action(
         picked,

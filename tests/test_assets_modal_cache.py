@@ -49,11 +49,11 @@ def test_clear_assets_cache_delegates_to_repository() -> None:
     mock_table.assert_called_once_with("assets")
 
 
-def test_cached_asset_for_modal_falls_back_to_load_assets() -> None:
+def test_cached_asset_for_modal_falls_back_to_demo_assets() -> None:
     demo_asset = {"id": "ast4", "asset_name": "Trailer - Utility 14ft", "asset_number": "AST-1004"}
 
     with patch("app.services.repository.fetch_by_id", return_value=None):
-        with patch("app.pages.assets.load_assets", return_value=[demo_asset]):
+        with patch("app.pages._core._data._DEMO_ASSETS", [demo_asset]):
             with patch("app.pages.assets.st.session_state", {}, create=True):
                 from app.pages.assets import _cached_asset_for_modal
 

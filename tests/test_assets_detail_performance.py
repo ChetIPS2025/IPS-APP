@@ -20,7 +20,7 @@ class TestAssetsDetailPerformance(unittest.TestCase):
 
         with patch("app.pages._core._access.begin_module", return_value=True):
             with patch.object(assets_page, "_render_equipment_list") as equip_mock:
-                with patch.object(assets_page, "load_assets") as load_mock:
+                with patch("app.pages.assets.list_equipment_page") as list_mock:
                     with patch.object(assets_page, "_show_assets_modal_if_selected") as modal_mock:
                         with patch.object(assets_page, "inject_assets_page_css"):
                             with patch("app.ui.page_header.render_page_header"):
@@ -28,22 +28,24 @@ class TestAssetsDetailPerformance(unittest.TestCase):
                                     assets_page.render()
 
         equip_mock.assert_not_called()
-        load_mock.assert_not_called()
+        list_mock.assert_not_called()
         modal_mock.assert_called_once()
 
-    def test_detail_fast_path_does_not_call_load_assets(self) -> None:
+    def test_detail_fast_path_does_not_call_directory_services(self) -> None:
         st.session_state[assets_page.SHOW_ASSET_MODAL_KEY] = True
         st.session_state[assets_page._ASSETS_MODAL_KEY] = "asset-2"
 
         with patch("app.pages._core._access.begin_module", return_value=True):
-            with patch.object(assets_page, "load_assets") as load_mock:
-                with patch.object(assets_page, "_show_assets_modal_if_selected"):
-                    with patch.object(assets_page, "inject_assets_page_css"):
-                        with patch("app.ui.page_header.render_page_header"):
-                            with patch.object(assets_page.st, "markdown"):
-                                assets_page.render()
+            with patch("app.pages.assets.list_equipment_page") as equip_mock:
+                with patch("app.pages.assets.list_serialized_tools_page") as serialized_mock:
+                    with patch.object(assets_page, "_show_assets_modal_if_selected"):
+                        with patch.object(assets_page, "inject_assets_page_css"):
+                            with patch("app.ui.page_header.render_page_header"):
+                                with patch.object(assets_page.st, "markdown"):
+                                    assets_page.render()
 
-        load_mock.assert_not_called()
+        equip_mock.assert_not_called()
+        serialized_mock.assert_not_called()
 
     def test_overview_tab_only_runs_overview_renderers(self) -> None:
         asset = {
@@ -151,16 +153,15 @@ class TestAssetsDetailPerformance(unittest.TestCase):
         assert "_BULK_MOVE_OPEN_KEY" in equip_block
         assert "render_equipment_bulk_move_toolbar" in equip_block
 
-    def test_equipment_cache_key_uses_catalog_version(self) -> None:
+    def test_equipment_fragment_uses_directory_service(self) -> None:
         from pathlib import Path
 
         src = Path("app/pages/assets.py").read_text(encoding="utf-8")
-        assert "_assets_catalog_version()" in src
-        assert "assets_equipment_tab_" in src
-        assert "assets_equipment_filter_meta_" in src
-        assert "len(rows)" not in src.split("def _render_equipment_list")[1].split(
+        equip_block = src.split("@fragment\ndef _render_equipment_list")[1].split(
             "@fragment\ndef _render_small_tools_list"
         )[0]
+        assert "list_equipment_page" in equip_block
+        assert "load_assets()" not in equip_block
 
     def test_assets_catalog_version_increments_on_cache_clear(self) -> None:
         from app.pages._core._data import assets_catalog_data_version, clear_assets_catalog_cache
