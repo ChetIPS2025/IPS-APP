@@ -308,7 +308,7 @@ def save_hand_tool(ui: dict[str, Any], *, row_id: str | None = None) -> ServiceR
         payload["created_at"] = _now_iso()
         result = insert_row(_TABLE, payload)
 
-    if result.ok and storage == "Tool Trailer" and container_id:
+    if result.ok and storage == "Tool Trailer" and container_id and not ui.get("skip_kit_sync"):
         _sync_kit_item_for_hand_tool(container_id, result.data or payload, row_id=row_id)
     return result
 
@@ -324,7 +324,7 @@ def import_hand_tool_row(ui: dict[str, Any]) -> ServiceResult:
     container_id = data.get("container_id") or ""
     payload["created_at"] = _now_iso()
     result = insert_row_admin(_TABLE, payload)
-    if result.ok and storage == "Tool Trailer" and container_id:
+    if result.ok and storage == "Tool Trailer" and container_id and not ui.get("skip_kit_sync"):
         row_id = _clean_text((result.data or {}).get("id"))
         _sync_kit_item_for_hand_tool(container_id, result.data or payload, row_id=row_id or None)
     return result
@@ -361,6 +361,7 @@ def _sync_kit_item_for_hand_tool(
         "condition": _clean_text(tool_row.get("condition") or "Good"),
         "status": "Present",
         "notes": f"{_clean_text(tool_row.get('notes'))} hand_tool:{hand_id}".strip(),
+        "skip_master_sync": True,
     }
     if existing:
         update_asset_kit_item(str(existing.get("id")), data)

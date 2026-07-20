@@ -471,14 +471,24 @@ def create_asset_kit_item(parent_asset_id: str, data: dict[str, Any]) -> Service
     if data.get("qr_token"):
         payload["qr_token"] = data["qr_token"]
         payload["qr_code_value"] = data.get("qr_value") or data.get("qr_code_value") or ""
+    if not data.get("skip_master_sync"):
+        from app.services.kit_item_sync_service import resolve_kit_item_tracking_mode, validate_serialized_serial_for_kit
+
+        mode = resolve_kit_item_tracking_mode({**data, **payload})
+        if mode == "serialized":
+            dup = validate_serialized_serial_for_kit(str(payload.get("serial_number") or "").strip())
+            if dup:
+                return dup
+
     result = insert_row(_KIT_ITEMS, payload)
     if result.ok:
         recalculate_asset_kit_value(pid)
         invalidate_asset_kit_cache(pid)
+        kit_item_id = (result.data or {}).get("id") if isinstance(result.data, dict) else None
         create_asset_kit_transaction(
             {
                 "parent_asset_id": pid,
-                "kit_item_id": (result.data or {}).get("id") if isinstance(result.data, dict) else None,
+                "kit_item_id": kit_item_id,
                 "transaction_type": "Add Item",
                 "quantity": qty_exp,
                 "performed_by_name": data.get("performed_by_name"),
@@ -487,6 +497,15 @@ def create_asset_kit_item(parent_asset_id: str, data: dict[str, Any]) -> Service
                 "notes": f"Added kit item: {name}",
             }
         )
+        if kit_item_id and not data.get("skip_master_sync"):
+            from app.services.kit_item_sync_service import sync_master_from_kit_item_create
+
+            sync_row = {**payload, "id": kit_item_id}
+            sync_result = sync_master_from_kit_item_create(pid, str(kit_item_id), sync_row)
+            if not sync_result.ok:
+                return sync_result
+            if isinstance(result.data, dict) and isinstance(sync_result.data, dict):
+                result.data["master_sync"] = sync_result.data
     return result
 
 
@@ -541,6 +560,13 @@ def update_asset_kit_item(item_id: str, data: dict[str, Any]) -> ServiceResult:
                     "performed_by_phone": data.get("performed_by_phone"),
                 }
             )
+        if not data.get("skip_master_sync"):
+            from app.services.kit_item_sync_service import sync_master_from_kit_item_update
+
+            merged = {**existing, **payload, "id": iid, "parent_asset_id": pid}
+            sync_result = sync_master_from_kit_item_update(merged, previous=existing)
+            if not sync_result.ok:
+                return sync_result
     return result
 
 
@@ -562,9 +588,13 @@ def delete_asset_kit_item(item_id: str) -> ServiceResult:
     existing = get_asset_kit_item(iid) or {}
     pid = str(existing.get("parent_asset_id") or "")
     result = delete_row(_KIT_ITEMS, {"id": iid})
-    if result.ok and pid:
-        recalculate_asset_kit_value(pid)
-        invalidate_asset_kit_cache(pid)
+    if result.ok:
+        from app.services.kit_item_sync_service import sync_master_on_kit_item_delete
+
+        sync_master_on_kit_item_delete(existing)
+        if pid:
+            recalculate_asset_kit_value(pid)
+            invalidate_asset_kit_cache(pid)
     return result
 
 

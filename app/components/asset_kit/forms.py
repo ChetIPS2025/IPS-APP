@@ -77,7 +77,8 @@ def render_add_kit_item_form(asset: dict, aid: str) -> None:
     st.markdown("##### Add Kit Item")
     st.caption(
         "For multiple physical units of the same item, enter the quantity and a serial number for each unit. "
-        "Each unit is tracked as its own row in the kit."
+        "Each unit is tracked as its own row in the kit. "
+        "Tools are also added to Serialized Tools (with a serial) or Small Hand Tools (quantity items) and stay in sync."
     )
     with st.form(f"kit_add_item_{aid}"):
         name = st.text_input("Item name *")

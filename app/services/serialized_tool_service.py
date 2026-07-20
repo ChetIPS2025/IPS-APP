@@ -216,6 +216,7 @@ def _sync_kit_item_for_tool(
                 "manufacturer": _clean_text(tool_row.get("manufacturer")),
                 "model": _clean_text(tool_row.get("model")),
                 "child_asset_id": tool_id,
+                "skip_master_sync": True,
             },
         )
     return create_asset_kit_item(
@@ -232,6 +233,7 @@ def _sync_kit_item_for_tool(
             "condition": _clean_text(tool_row.get("condition") or "Good"),
             "unit_value": float(tool_row.get("current_value") or tool_row.get("value") or 0),
             "description": _clean_text(tool_row.get("model")),
+            "skip_master_sync": True,
         },
     )
 
@@ -390,7 +392,7 @@ def create_serialized_tool(data: dict[str, Any]) -> ServiceResult:
     tool_id = str((result.data or {}).get("id") or "")
     if tool_id:
         ensure_asset_qr_tokens([result.data or {}])
-        if trailer_id:
+        if trailer_id and not data.get("skip_kit_sync"):
             kit_result = _sync_kit_item_for_tool(tool_id, trailer_id, tool_row=result.data or payload)
             if not kit_result or not kit_result.ok:
                 warning = (kit_result.error if kit_result else "Could not link tool to trailer.")
@@ -476,7 +478,7 @@ def dispatch_trailer_to_job(
             else:
                 update_asset_kit_item(
                     str(item.get("id")),
-                    {"status": "Present"},
+                    {"status": "Present", "skip_master_sync": True},
                 )
     return result
 
@@ -529,6 +531,7 @@ def checkout_serialized_tool(
                     "status": "Checked Out",
                     "assigned_to_employee_id": eid,
                     "assigned_to_name": employee_name,
+                    "skip_master_sync": True,
                 },
             )
     from app.services.rental_equipment_inspection_hooks import notify_rental_equipment_assigned
@@ -579,6 +582,7 @@ def checkin_serialized_tool(tool_id: str, *, notes: str = "") -> ServiceResult:
                     "status": "Present",
                     "assigned_to_employee_id": None,
                     "assigned_to_name": "",
+                    "skip_master_sync": True,
                 },
             )
     return result
@@ -624,6 +628,7 @@ def mark_serialized_tool_status(
                 {
                     "status": kit_status,
                     "condition": payload.get("condition") or _clean_text(kit_item.get("condition")),
+                    "skip_master_sync": True,
                 },
             )
     return result
