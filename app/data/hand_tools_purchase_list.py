@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+from app.data.hand_tools_purchase_list_batch2 import HAND_TOOLS_PURCHASE_ITEMS_BATCH2
+
 TrackingMode = Literal["quantity", "serialized"]
 
-# Qty and unit prices from the Jul 2026 purchase list (52 units, $3,590.19 total).
-HAND_TOOLS_PURCHASE_ITEMS: tuple[dict[str, Any], ...] = (
+# Qty and unit prices from the Jul 2026 purchase list batch 1 (52 units, $3,590.19 total).
+HAND_TOOLS_PURCHASE_ITEMS_BATCH1: tuple[dict[str, Any], ...] = (
     {
         "tool_name": 'TEKTON 1-1/8" Combination Wrench',
         "model_number": "18268",
@@ -219,16 +221,34 @@ HAND_TOOLS_PURCHASE_ITEMS: tuple[dict[str, Any], ...] = (
 )
 
 
-def hand_tools_purchase_item_count() -> int:
-    return len(HAND_TOOLS_PURCHASE_ITEMS)
+HAND_TOOLS_PURCHASE_ITEMS = HAND_TOOLS_PURCHASE_ITEMS_BATCH1
 
 
-def hand_tools_purchase_total_qty() -> int:
-    return sum(int(item.get("qty") or 0) for item in HAND_TOOLS_PURCHASE_ITEMS)
+def purchase_items_for_batch(batch: int | str | None = None) -> tuple[dict[str, Any], ...]:
+    """Return purchase rows for batch 1, batch 2, or both combined."""
+    key = str(batch or "1").strip().casefold()
+    if key in {"1", "batch1", "batch-1"}:
+        return HAND_TOOLS_PURCHASE_ITEMS_BATCH1
+    if key in {"2", "batch2", "batch-2"}:
+        return HAND_TOOLS_PURCHASE_ITEMS_BATCH2
+    if key in {"all", "both", "combined"}:
+        return HAND_TOOLS_PURCHASE_ITEMS_BATCH1 + HAND_TOOLS_PURCHASE_ITEMS_BATCH2
+    return HAND_TOOLS_PURCHASE_ITEMS_BATCH1
 
 
-def hand_tools_purchase_total_value() -> float:
+def hand_tools_purchase_item_count(*, batch: int | str | None = None) -> int:
+    return len(purchase_items_for_batch(batch))
+
+
+def hand_tools_purchase_total_qty(*, batch: int | str | None = None) -> int:
+    return sum(int(item.get("qty") or 0) for item in purchase_items_for_batch(batch))
+
+
+def hand_tools_purchase_total_value(*, batch: int | str | None = None) -> float:
     return round(
-        sum(float(item.get("unit_value") or 0) * int(item.get("qty") or 0) for item in HAND_TOOLS_PURCHASE_ITEMS),
+        sum(
+            float(item.get("unit_value") or 0) * int(item.get("qty") or 0)
+            for item in purchase_items_for_batch(batch)
+        ),
         2,
     )

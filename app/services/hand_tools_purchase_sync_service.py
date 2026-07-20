@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from app.data.hand_tools_purchase_list import HAND_TOOLS_PURCHASE_ITEMS
+from app.data.hand_tools_purchase_list import purchase_items_for_batch
 from app.services.repository import ServiceResult, fetch_rows, insert_row_admin, update_row_admin
 from app.services.serialized_tool_service import is_serialized_tool_asset
 from app.services.small_hand_tool_service import clear_hand_tools_list_cache, import_hand_tool_row
@@ -104,9 +104,19 @@ def find_serialized_matches(item: dict[str, Any], assets: list[dict[str, Any]] |
     return matches
 
 
-def _hand_tool_payload(item: dict[str, Any]) -> dict[str, Any]:
-    qty = max(0.0, _f(item.get("qty")))
+def _hand_tool_payload(
+    item: dict[str, Any],
+    *,
+    existing: dict[str, Any] | None = None,
+    increment_qty: bool = False,
+) -> dict[str, Any]:
+    purchase_qty = max(0.0, _f(item.get("qty")))
     unit_value = max(0.0, _f(item.get("unit_value")))
+    if existing and increment_qty:
+        current_qty = max(0.0, _f(existing.get("quantity_on_hand")))
+        qty = current_qty + purchase_qty
+    else:
+        qty = purchase_qty
     return {
         "tool_name": _clean(item.get("tool_name")),
         "category": _clean(item.get("category") or "Other") or "Other",
@@ -123,16 +133,29 @@ def _hand_tool_payload(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def upsert_hand_tool_from_purchase(item: dict[str, Any], *, dry_run: bool = False) -> ServiceResult:
-    payload = _hand_tool_payload(item)
+def upsert_hand_tool_from_purchase(
+    item: dict[str, Any],
+    *,
+    dry_run: bool = False,
+    increment_qty: bool = False,
+) -> ServiceResult:
+    existing = find_hand_tool_match(item)
+    payload = _hand_tool_payload(item, existing=existing, increment_qty=increment_qty)
     if not payload["tool_name"]:
         return ServiceResult(ok=False, error="tool_name is required.")
 
-    existing = find_hand_tool_match(item)
     if existing:
         row_id = _clean(existing.get("id"))
         if dry_run:
-            return ServiceResult(ok=True, data={"action": "update", "row_id": row_id, "payload": payload})
+            return ServiceResult(
+                ok=True,
+                data={
+                    "action": "update",
+                    "row_id": row_id,
+                    "payload": payload,
+                    "increment_qty": increment_qty,
+                },
+            )
         result = update_row_admin(
             _HAND_TOOLS,
             {**payload, "updated_at": _now_iso()},
@@ -140,7 +163,10 @@ def upsert_hand_tool_from_purchase(item: dict[str, Any], *, dry_run: bool = Fals
         )
         if result.ok:
             clear_hand_tools_list_cache()
-            return ServiceResult(ok=True, data={"action": "updated", "row_id": row_id, "payload": payload})
+            return ServiceResult(
+                ok=True,
+                data={"action": "updated", "row_id": row_id, "payload": payload, "increment_qty": increment_qty},
+            )
         return result
 
     if dry_run:
@@ -207,15 +233,20 @@ def update_serialized_from_purchase(item: dict[str, Any], *, dry_run: bool = Fal
 def sync_hand_tools_purchase_list(
     *,
     items: list[dict[str, Any]] | None = None,
+    batch: int | str | None = None,
     dry_run: bool = False,
+    increment_qty: bool = True,
 ) -> ServiceResult:
-    source = items if items is not None else list(HAND_TOOLS_PURCHASE_ITEMS)
+    source = list(items) if items is not None else list(purchase_items_for_batch(batch))
     summary: dict[str, Any] = {
         "dry_run": dry_run,
+        "increment_qty": increment_qty,
+        "batch": batch,
         "hand_tools_created": 0,
         "hand_tools_updated": 0,
         "serialized_updated": 0,
         "serialized_not_found": 0,
+        "serialized_fallback_hand_tools": 0,
         "errors": [],
         "warnings": [],
         "details": [],
@@ -227,8 +258,22 @@ def sync_hand_tools_purchase_list(
         try:
             if tracking == "serialized":
                 result = update_serialized_from_purchase(item, dry_run=dry_run)
+                data = result.data or {}
+                if result.ok and data.get("action") == "not_found":
+                    summary["serialized_not_found"] += 1
+                    result = upsert_hand_tool_from_purchase(
+                        item,
+                        dry_run=dry_run,
+                        increment_qty=increment_qty,
+                    )
+                    tracking = "quantity"
+                    summary["serialized_fallback_hand_tools"] += 1
             else:
-                result = upsert_hand_tool_from_purchase(item, dry_run=dry_run)
+                result = upsert_hand_tool_from_purchase(
+                    item,
+                    dry_run=dry_run,
+                    increment_qty=increment_qty,
+                )
         except Exception as exc:  # pragma: no cover - defensive guard for batch script
             summary["errors"].append(f"{label}: {exc}")
             continue
@@ -243,9 +288,6 @@ def sync_hand_tools_purchase_list(
         if tracking == "serialized":
             if action in {"updated", "would_update"}:
                 summary["serialized_updated"] += int(data.get("updated") or 0)
-            elif action == "not_found":
-                summary["serialized_not_found"] += 1
-                summary["warnings"].append(str(data.get("message") or f"No serialized asset for {label}"))
             warning = _clean(data.get("warning"))
             if warning:
                 summary["warnings"].append(warning)
@@ -261,8 +303,8 @@ def sync_hand_tools_purchase_list(
         f"{summary['hand_tools_updated']} updated, "
         f"{summary['serialized_updated']} serialized asset value(s) updated."
     )
-    if summary["serialized_not_found"]:
-        message += f" {summary['serialized_not_found']} serialized line(s) had no match."
+    if summary["serialized_fallback_hand_tools"]:
+        message += f" {summary['serialized_fallback_hand_tools']} serialized line(s) added as small hand tools."
     if summary["errors"]:
         message += f" {len(summary['errors'])} error(s)."
     return ServiceResult(ok=ok, data=summary, error=summary["errors"][0] if summary["errors"] else None)

@@ -19,10 +19,23 @@ from app.services.hand_tools_purchase_sync_service import (
 
 
 class TestPurchaseListData(unittest.TestCase):
-    def test_purchase_list_totals(self) -> None:
-        self.assertEqual(hand_tools_purchase_item_count(), 26)
-        self.assertEqual(hand_tools_purchase_total_qty(), 52)
-        self.assertEqual(hand_tools_purchase_total_value(), 3590.19)
+    def test_batch1_totals(self) -> None:
+        self.assertEqual(hand_tools_purchase_item_count(batch=1), 26)
+        self.assertEqual(hand_tools_purchase_total_qty(batch=1), 52)
+        self.assertEqual(hand_tools_purchase_total_value(batch=1), 3590.19)
+
+    def test_batch2_totals(self) -> None:
+        from app.data.hand_tools_purchase_list_batch2 import (
+            BATCH2_ITEM_COUNT,
+            BATCH2_TOTAL_QTY,
+            BATCH2_TOTAL_VALUE,
+        )
+
+        self.assertEqual(hand_tools_purchase_item_count(batch=2), BATCH2_ITEM_COUNT)
+        self.assertEqual(hand_tools_purchase_total_qty(batch=2), BATCH2_TOTAL_QTY)
+        self.assertEqual(hand_tools_purchase_total_value(batch=2), BATCH2_TOTAL_VALUE)
+        self.assertEqual(BATCH2_TOTAL_QTY, 133)
+        self.assertAlmostEqual(BATCH2_TOTAL_VALUE, 7750.16, delta=0.02)
 
 
 class TestPurchaseMatching(unittest.TestCase):
@@ -66,7 +79,7 @@ class TestPurchaseSync(unittest.TestCase):
             "qty": 1,
             "unit_value": 21.0,
         }
-        result = upsert_hand_tool_from_purchase(item)
+        result = upsert_hand_tool_from_purchase(item, increment_qty=False)
         self.assertTrue(result.ok)
         self.assertEqual((result.data or {}).get("action"), "updated")
         mock_update.assert_called_once()
@@ -95,3 +108,26 @@ class TestPurchaseSync(unittest.TestCase):
         summary = result.data or {}
         self.assertEqual(summary.get("hand_tools_updated"), 1)
         self.assertEqual(summary.get("serialized_updated"), 1)
+
+    @patch("app.services.hand_tools_purchase_sync_service.update_row_admin")
+    @patch("app.services.hand_tools_purchase_sync_service.find_hand_tool_match")
+    def test_upsert_increments_existing_qty(
+        self,
+        mock_find: unittest.mock.MagicMock,
+        mock_update: unittest.mock.MagicMock,
+    ) -> None:
+        mock_find.return_value = {
+            "id": "ht-99",
+            "tool_name": "Socket",
+            "model_number": "560D",
+            "quantity_on_hand": 2,
+        }
+        mock_update.return_value = type("R", (), {"ok": True, "data": {}})()
+
+        result = upsert_hand_tool_from_purchase(
+            {"tool_name": "Socket", "model_number": "560D", "qty": 1, "unit_value": 30.0},
+            increment_qty=True,
+        )
+        self.assertTrue(result.ok)
+        payload = mock_update.call_args.args[1]
+        self.assertEqual(payload["quantity_on_hand"], 3.0)

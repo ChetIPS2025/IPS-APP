@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply the Jul 2026 hand-tools purchase list to Small Hand Tools and Serialized Tools."""
+"""Apply hand-tools purchase lists to Small Hand Tools and Serialized Tools."""
 
 from __future__ import annotations
 
@@ -23,9 +23,19 @@ from app.services.hand_tools_purchase_sync_service import sync_hand_tools_purcha
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "--batch",
+        default="1",
+        help="Purchase batch to apply: 1, 2, or all (default: 1).",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Preview matches and actions without writing to the database.",
+    )
+    parser.add_argument(
+        "--replace-qty",
+        action="store_true",
+        help="Set on-hand qty to the purchase qty instead of adding to existing stock.",
     )
     parser.add_argument(
         "--json",
@@ -33,16 +43,23 @@ def main() -> int:
         help="Print full sync summary as JSON.",
     )
     args = parser.parse_args()
+    batch = args.batch
 
     print(
-        f"Purchase list: {hand_tools_purchase_item_count()} line items, "
-        f"{hand_tools_purchase_total_qty()} units, "
-        f"${hand_tools_purchase_total_value():,.2f} extended."
+        f"Purchase list batch {batch}: {hand_tools_purchase_item_count(batch=batch)} line items, "
+        f"{hand_tools_purchase_total_qty(batch=batch)} units, "
+        f"${hand_tools_purchase_total_value(batch=batch):,.2f} extended."
     )
     if args.dry_run:
         print("Dry run — no database writes.")
+    if not args.replace_qty:
+        print("Increment mode — existing small-tool quantities will be increased by purchase qty.")
 
-    result = sync_hand_tools_purchase_list(dry_run=args.dry_run)
+    result = sync_hand_tools_purchase_list(
+        batch=batch,
+        dry_run=args.dry_run,
+        increment_qty=not args.replace_qty,
+    )
     summary = result.data or {}
 
     if args.json:
@@ -54,7 +71,7 @@ def main() -> int:
         )
         print(
             f"Serialized tools: {summary.get('serialized_updated', 0)} asset value(s) updated; "
-            f"{summary.get('serialized_not_found', 0)} line(s) unmatched."
+            f"{summary.get('serialized_fallback_hand_tools', 0)} added as small hand tools."
         )
         for warning in summary.get("warnings") or []:
             print(f"WARN: {warning}")
