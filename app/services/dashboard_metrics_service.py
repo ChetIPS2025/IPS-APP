@@ -199,14 +199,22 @@ def compute_dashboard_kpis(
     open_invoices = _open_quotes_value()
     open_est = _open_estimates_count()
     inv_value = _inventory_on_hand_value(inventory)
-    asset_rows = list(assets or [])
     total_inventory_value = _total_active_inventory_value(inventory)
-    total_asset_value = _total_active_asset_value(asset_rows)
     active_inventory_count = sum(
         1 for item in inventory if isinstance(item, dict) and _inventory_item_active(item)
     )
-    active_asset_count = sum(
-        1 for row in asset_rows if isinstance(row, dict) and _asset_row_active(row)
+
+    asset_rows = list(assets or [])
+    from app.services.asset_value_service import (
+        asset_value_breakdown_caption,
+        asset_value_breakdown_title,
+        compute_asset_value_breakdown,
+    )
+
+    breakdown = compute_asset_value_breakdown(asset_rows)
+    total_asset_value = breakdown.total_asset_value
+    active_asset_count = (
+        breakdown.equipment_count + breakdown.serialized_tools_count + breakdown.small_tools_count
     )
 
     prev_open = sum(
@@ -224,6 +232,15 @@ def compute_dashboard_kpis(
         "inventory_value": inv_value,
         "total_inventory_value": total_inventory_value,
         "total_asset_value": total_asset_value,
+        "asset_value": total_asset_value,
+        "equipment_value": breakdown.equipment_value,
+        "serialized_tools_value": breakdown.serialized_tools_value,
+        "small_tools_value": breakdown.small_tools_value,
+        "equipment_count": breakdown.equipment_count,
+        "serialized_tools_count": breakdown.serialized_tools_count,
+        "small_tools_count": breakdown.small_tools_count,
+        "small_tools_missing_value_count": breakdown.small_tools_missing_value_count,
+        "asset_value_title": asset_value_breakdown_title(breakdown),
         "sales_caption": sales_caption,
         "sales_trend": sales_trend,
         "quotes_caption": quotes_caption if open_invoices else "No sent quotes outstanding",
@@ -236,14 +253,17 @@ def compute_dashboard_kpis(
             f"{active_inventory_count} active SKU{'s' if active_inventory_count != 1 else ''}"
         ),
         "total_inventory_trend": "flat",
-        "total_asset_caption": (
-            f"{active_asset_count} active asset{'s' if active_asset_count != 1 else ''}"
+        "total_asset_caption": asset_value_breakdown_caption(breakdown),
+        "total_asset_detail": (
+            f"{active_asset_count} valued line{'s' if active_asset_count != 1 else ''}"
         ),
         "total_asset_trend": "flat",
         **dashboard_job_metrics(jobs),
         "period_start": start.isoformat(),
         "period_end": end.isoformat(),
-        "has_live_data": bool(estimates or jobs or inventory or asset_rows),
+        "has_live_data": bool(
+            estimates or jobs or inventory or asset_rows or breakdown.small_tools_count > 0
+        ),
     }
 
 

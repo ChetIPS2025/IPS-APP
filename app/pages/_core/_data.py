@@ -27,6 +27,7 @@ _ESTIMATES_CATALOG_VERSION_KEY = "_ips_estimates_catalog_version"
 _INVENTORY_CATALOG_VERSION_KEY = "_ips_inventory_catalog_version"
 _TIMEKEEPING_CATALOG_VERSION_KEY = "_ips_timekeeping_catalog_version"
 _PRICING_GUIDE_CATALOG_VERSION_KEY = "_ips_pricing_guide_catalog_version"
+_SMALL_HAND_TOOLS_CATALOG_VERSION_KEY = "_ips_small_hand_tools_catalog_version"
 _JOBS_LIST_COST_CACHE_KEY = "_ips_jobs_list_cost_by_id"
 
 
@@ -68,6 +69,23 @@ def timekeeping_catalog_data_version() -> int:
 def pricing_guide_catalog_data_version() -> int:
     """Monotonic token bumped whenever the Pricing Guide catalog cache is invalidated."""
     return int(st.session_state.get(_PRICING_GUIDE_CATALOG_VERSION_KEY) or 0)
+
+
+def small_hand_tools_data_version() -> int:
+    """Monotonic token bumped whenever small hand tools or kit-item value data changes."""
+    return int(st.session_state.get(_SMALL_HAND_TOOLS_CATALOG_VERSION_KEY) or 0)
+
+
+def bump_small_hand_tools_data_version() -> None:
+    st.session_state[_SMALL_HAND_TOOLS_CATALOG_VERSION_KEY] = small_hand_tools_data_version() + 1
+
+
+def clear_small_hand_tools_catalog_cache() -> None:
+    bump_small_hand_tools_data_version()
+    from app.services.small_hand_tool_service import _cached_hand_tools_sources
+
+    _cached_hand_tools_sources.clear()
+    clear_dashboard_page_data_cache()
 
 
 def _bump_assets_catalog_data_version() -> None:

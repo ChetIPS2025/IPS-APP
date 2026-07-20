@@ -217,6 +217,8 @@ def render() -> None:
                     _format_currency(snapshot.asset_value),
                     "🚛",
                     "#fce7f3",
+                    snapshot.asset_value_caption,
+                    snapshot.asset_value_title,
                 ),
             ]
 

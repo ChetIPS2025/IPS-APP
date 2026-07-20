@@ -18,14 +18,21 @@ def _dashboard_metric_card_html(
     text_class: str,
     value_class: str,
     label_class: str,
+    caption: str = "",
+    title: str = "",
 ) -> str:
     ot = "d" + "iv"
+    title_attr = f' title="{html.escape(title)}"' if title else ""
+    caption_html = (
+        f'<p class="dashboard-value-caption">{html.escape(caption)}</p>' if caption else ""
+    )
     return (
-        f'<{ot} class="{card_class}">'
+        f'<{ot} class="{card_class}"{title_attr}>'
         f'<{ot} class="{icon_class}" style="background:{html.escape(icon_bg)}">{icon}</{ot}>'
         f'<{ot} class="{text_class}">'
         f'<p class="{value_class}">{html.escape(value)}</p>'
         f'<p class="{label_class}">{html.escape(label)}</p>'
+        f"{caption_html}"
         f"</{ot}></{ot}>"
     )
 
@@ -44,7 +51,15 @@ def _ops_kpi_card_html(label: str, value: str, icon: str, icon_bg: str) -> str:
     )
 
 
-def _ops_value_card_html(label: str, value: str, icon: str, icon_bg: str) -> str:
+def _ops_value_card_html(
+    label: str,
+    value: str,
+    icon: str,
+    icon_bg: str,
+    *,
+    caption: str = "",
+    title: str = "",
+) -> str:
     return _dashboard_metric_card_html(
         label,
         value,
@@ -55,6 +70,8 @@ def _ops_value_card_html(label: str, value: str, icon: str, icon_bg: str) -> str
         text_class="dashboard-value-text",
         value_class="dashboard-value-amount",
         label_class="dashboard-value-label",
+        caption=caption,
+        title=title,
     )
 
 
@@ -65,11 +82,16 @@ def render_ops_kpi_grid(items: list[tuple[str, str, str, str]]) -> None:
     st.markdown(f'<{ot} class="dashboard-kpi-grid">{cards}</{ot}>', unsafe_allow_html=True)
 
 
-def render_ops_value_grid(items: list[tuple[str, str, str, str]]) -> None:
+def render_ops_value_grid(items: list[tuple[str, ...]]) -> None:
     """Render inventory/asset value tiles in their own row."""
     ot = "d" + "iv"
-    cards = "".join(_ops_value_card_html(label, value, icon, bg) for label, value, icon, bg in items)
-    st.markdown(f'<{ot} class="dashboard-value-grid">{cards}</{ot}>', unsafe_allow_html=True)
+    cards = []
+    for item in items:
+        label, value, icon, bg = item[0], item[1], item[2], item[3]
+        caption = item[4] if len(item) > 4 else ""
+        title = item[5] if len(item) > 5 else ""
+        cards.append(_ops_value_card_html(label, value, icon, bg, caption=caption, title=title))
+    st.markdown(f'<{ot} class="dashboard-value-grid">{"".join(cards)}</{ot}>', unsafe_allow_html=True)
 
 
 def render_ops_kpi_row(items: list[tuple[str, str, str, str]]) -> None:
