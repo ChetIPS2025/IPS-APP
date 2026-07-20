@@ -142,7 +142,7 @@ def inject_assets_serialized_css() -> None:
 
 
 def inject_assets_hand_tools_css() -> None:
-    _inject_sidebar_css("ips-assets-hand-tools-v1", PAGE_HAND_TOOLS_CSS)
+    _inject_sidebar_css("ips-assets-hand-tools-v3", PAGE_HAND_TOOLS_CSS)
 
 
 def inject_assets_shared_module_css() -> None:
