@@ -63,6 +63,19 @@ class TestPurchaseListData(unittest.TestCase):
         self.assertEqual(BATCH4_TOTAL_QTY, 304)
         self.assertAlmostEqual(BATCH4_TOTAL_VALUE, 17456.08, delta=0.02)
 
+    def test_batch5_totals(self) -> None:
+        from app.data.hand_tools_purchase_list_batch5 import (
+            BATCH5_ITEM_COUNT,
+            BATCH5_TOTAL_QTY,
+            BATCH5_TOTAL_VALUE,
+        )
+
+        self.assertEqual(hand_tools_purchase_item_count(batch=5), BATCH5_ITEM_COUNT)
+        self.assertEqual(hand_tools_purchase_total_qty(batch=5), BATCH5_TOTAL_QTY)
+        self.assertEqual(hand_tools_purchase_total_value(batch=5), BATCH5_TOTAL_VALUE)
+        self.assertEqual(BATCH5_TOTAL_QTY, 39)
+        self.assertAlmostEqual(BATCH5_TOTAL_VALUE, 5346.93, delta=0.02)
+
 
 class TestPurchaseMatching(unittest.TestCase):
     def test_find_hand_tool_by_model(self) -> None:
