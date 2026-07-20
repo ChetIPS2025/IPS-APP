@@ -4398,7 +4398,7 @@ def _inject_timekeeping_daily_hour_focus_script() -> None:
 
 def inject_timekeeping_module_css() -> None:
     """Timekeeping list custom table styling."""
-    if not inject_css_once("ips-timekeeping-module-v108"):
+    if not inject_css_once("ips-timekeeping-module-v109"):
         return
     tk_expand = ".st-key-timekeeping_table_wrap [class*='st-key-tk_expand_detail_']"
     tk_list_detail_excl = (
@@ -4507,7 +4507,7 @@ def inject_timekeeping_module_css() -> None:
     with st.sidebar:
         st.markdown(
             f"""
-<style id="ips-timekeeping-module-v108">
+<style id="ips-timekeeping-module-v109">
 .ips-timekeeping-page {{
   background: #f1f5f9 !important;
 }}
@@ -14393,6 +14393,42 @@ def _inject_timekeeping_list_row_gap_css() -> None:
   font-weight: 700 !important;
   line-height: 1 !important;
   color: inherit !important;
+  font-variant-numeric: tabular-nums !important;
+}
+.ips-timekeeping-page .timekeeping-weekly-day-link {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 42px !important;
+  color: #0f172a !important;
+  text-decoration: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  position: relative !important;
+  z-index: 1 !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  box-sizing: border-box !important;
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+}
+.ips-timekeeping-page .timekeeping-weekly-day-link:hover {
+  border-color: #2563eb !important;
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+}
+.ips-timekeeping-page .timekeeping-weekly-day-hours {
+  display: block !important;
+  color: #0f172a !important;
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
   font-variant-numeric: tabular-nums !important;
 }
 .st-key-timekeeping_table_wrap .timekeeping-day-cell-hours .timekeeping-list-day-value {
