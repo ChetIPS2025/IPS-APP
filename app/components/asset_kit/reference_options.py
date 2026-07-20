@@ -22,9 +22,10 @@ class KitReferenceOptions:
     jobs: tuple[tuple[str, str], ...]
     assets: tuple[tuple[str, dict[str, Any]], ...]
     inventory: tuple[tuple[str, dict[str, Any]], ...]
+    hand_tools: tuple[tuple[str, dict[str, Any]], ...]
 
 
-_EMPTY = KitReferenceOptions((), (), (), ())
+_EMPTY = KitReferenceOptions((), (), (), (), ())
 
 
 def _employee_options() -> tuple[tuple[str, dict[str, Any]], ...]:
@@ -66,17 +67,35 @@ def _inventory_options() -> tuple[tuple[str, dict[str, Any]], ...]:
     return tuple(out)
 
 
+def _hand_tool_options(trailer_id: str) -> tuple[tuple[str, dict[str, Any]], ...]:
+    from app.services.small_hand_tool_service import (
+        hand_tool_kit_option_label,
+        list_hand_tools_for_kit_import,
+    )
+
+    out: list[tuple[str, dict[str, Any]]] = []
+    for row in list_hand_tools_for_kit_import(trailer_id=trailer_id):
+        label = hand_tool_kit_option_label(row)
+        iid = str(row.get("id") or "").strip()
+        if iid:
+            out.append((label, row))
+    out.sort(key=lambda pair: pair[0].casefold())
+    return tuple(out)
+
+
 def get_kit_reference_options(
     *,
     include_employees: bool = False,
     include_jobs: bool = False,
     include_assets: bool = False,
     include_inventory: bool = False,
+    include_hand_tools: bool = False,
     exclude_asset_id: str = "",
+    trailer_id: str = "",
 ) -> KitReferenceOptions:
     from app.perf_debug import perf_span
 
-    if not any((include_employees, include_jobs, include_assets, include_inventory)):
+    if not any((include_employees, include_jobs, include_assets, include_inventory, include_hand_tools)):
         return _EMPTY
 
     version_parts = []
@@ -88,7 +107,9 @@ def get_kit_reference_options(
         version_parts.append(f"ast{assets_catalog_data_version()}")
     if include_inventory:
         version_parts.append(f"inv{len(load_inventory())}")
-    cache_key = f"kit_ref_{'_'.join(version_parts)}_{exclude_asset_id}"
+    if include_hand_tools:
+        version_parts.append(f"ht{len(_hand_tool_options(trailer_id))}")
+    cache_key = f"kit_ref_{'_'.join(version_parts)}_{exclude_asset_id}_{trailer_id}"
 
     def _load() -> KitReferenceOptions:
         with perf_span("asset_kit.reference_options"):
@@ -97,6 +118,7 @@ def get_kit_reference_options(
                 jobs=_job_options() if include_jobs else (),
                 assets=_asset_options(exclude_asset_id) if include_assets else (),
                 inventory=_inventory_options() if include_inventory else (),
+                hand_tools=_hand_tool_options(trailer_id) if include_hand_tools else (),
             )
 
     return page_data_cache_get(cache_key, _load)

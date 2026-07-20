@@ -11,6 +11,7 @@ from app.components.asset_kit.audit import render_audit_form, render_recent_audi
 from app.components.asset_kit.exports import get_kit_export_bytes
 from app.components.asset_kit.forms import (
     render_add_kit_item_form,
+    render_import_hand_tools_form,
     render_import_inventory_form,
     render_link_asset_form,
 )
@@ -74,6 +75,9 @@ def render_kit_contents_fragment(asset: dict) -> None:
     if view == "import":
         render_import_inventory_form(asset, aid)
         return
+    if view == "import_hand":
+        render_import_hand_tools_form(asset, aid)
+        return
     if view == "link":
         render_link_asset_form(asset, aid)
         return
@@ -81,17 +85,20 @@ def render_kit_contents_fragment(asset: dict) -> None:
         render_audit_form(asset, aid, items)
         return
 
-    b1, b2, b3, b4, b5, b6 = st.columns(6, gap="small")
+    b1, b2, b3, b4, b5, b6, b7 = st.columns(7, gap="small")
     if b1.button("+ Add Kit Item", key=f"kit_btn_add_{aid}", use_container_width=True):
         st.session_state[sk(aid, "view")] = "add"
         fragment_rerun()
     if b2.button("Import Inventory", key=f"kit_btn_imp_{aid}", use_container_width=True):
         st.session_state[sk(aid, "view")] = "import"
         fragment_rerun()
-    if b3.button("Link Asset", key=f"kit_btn_link_{aid}", use_container_width=True):
+    if b3.button("Import Small Tools", key=f"kit_btn_imp_hand_{aid}", use_container_width=True):
+        st.session_state[sk(aid, "view")] = "import_hand"
+        fragment_rerun()
+    if b4.button("Link Asset", key=f"kit_btn_link_{aid}", use_container_width=True):
         st.session_state[sk(aid, "view")] = "link"
         fragment_rerun()
-    if b4.button("Start Audit", key=f"kit_btn_audit_{aid}", use_container_width=True):
+    if b5.button("Start Audit", key=f"kit_btn_audit_{aid}", use_container_width=True):
         st.session_state[sk(aid, "view")] = "audit"
         fragment_rerun()
 
@@ -102,7 +109,7 @@ def render_kit_contents_fragment(asset: dict) -> None:
             checklist = get_kit_export_bytes(asset, items, export_kind="checklist").decode("utf-8")
             csv_bytes = get_kit_export_bytes(asset, items, export_kind="csv")
 
-    b5.download_button(
+    b6.download_button(
         "Print Checklist",
         checklist.encode("utf-8"),
         file_name=f"kit_checklist_{asset.get('asset_number') or aid}.txt",
@@ -110,7 +117,7 @@ def render_kit_contents_fragment(asset: dict) -> None:
         key=f"kit_btn_print_{aid}",
         use_container_width=True,
     )
-    b6.download_button(
+    b7.download_button(
         "Export List",
         csv_bytes,
         file_name=f"kit_items_{asset.get('asset_number') or aid}.csv",
@@ -121,7 +128,9 @@ def render_kit_contents_fragment(asset: dict) -> None:
 
     st.markdown("##### Kit Items")
     if not items:
-        st.caption("No kit items yet. Add items, import from inventory, or link an existing asset.")
+        st.caption(
+            "No kit items yet. Add items, import from inventory or small hand tools, or link an existing asset."
+        )
     else:
         sel_id = selected_kit_item_id(aid)
         if sel_id and st.session_state.get(sk(aid, "view")) == "detail":

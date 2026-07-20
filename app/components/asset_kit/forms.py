@@ -179,6 +179,90 @@ def render_import_inventory_form(asset: dict, aid: str) -> None:
                     st.error(result.error or "Import failed.")
 
 
+def render_import_hand_tools_form(asset: dict, aid: str) -> None:
+    if st.button("← Back to kit list", key=f"kit_back_hand_{aid}"):
+        st.session_state[sk(aid, "view")] = "list"
+        st.rerun()
+    st.markdown("##### Import From Small Hand Tools")
+    st.caption(
+        "Link existing quantity tools from Small Hand Tools to this trailer kit. "
+        "Storage is set to Tool Trailer and kit inventory stays in sync. "
+        "Serialized tools must use Link Asset instead."
+    )
+    refs = get_kit_reference_options(include_hand_tools=True, trailer_id=aid)
+    tool_opts = list(refs.hand_tools)
+    if not tool_opts:
+        st.info("No eligible small hand tools found. Add quantity tools on the Small Hand Tools tab first.")
+        return
+
+    labels = [x[0] for x in tool_opts]
+    label_to_row = {label: row for label, row in tool_opts}
+    warehouse_only = st.checkbox(
+        "Show warehouse/shop tools only (hide items already on a trailer)",
+        value=False,
+        key=f"kit_imp_hand_wh_only_{aid}",
+    )
+    if warehouse_only:
+        filtered = [
+            (label, row)
+            for label, row in tool_opts
+            if str(row.get("storage_type") or "").strip() not in {"Tool Trailer"}
+        ]
+        labels = [x[0] for x in filtered]
+        label_to_row = {label: row for label, row in filtered}
+        if not labels:
+            st.warning("All eligible tools are already assigned to a Tool Trailer.")
+            return
+
+    with st.form(f"kit_import_hand_{aid}"):
+        picked = st.multiselect(
+            "Small hand tools",
+            labels,
+            key=f"kit_imp_hand_pick_{aid}",
+            help="Select one or more tools to add to this kit.",
+        )
+        use_custom_qty = st.checkbox(
+            "Set kit quantity for all selected tools",
+            value=False,
+            key=f"kit_imp_hand_custom_qty_{aid}",
+        )
+        kit_qty = 1.0
+        if use_custom_qty:
+            kit_qty = st.number_input(
+                "Kit quantity (each selected tool)",
+                min_value=1.0,
+                value=1.0,
+                step=1.0,
+                key=f"kit_imp_hand_qty_{aid}",
+            )
+        if st.form_submit_button("Import Selected Tools", type="primary"):
+            if not picked:
+                st.error("Select at least one hand tool.")
+            else:
+                ids: list[str] = []
+                qty_map: dict[str, float] = {}
+                for label in picked:
+                    row = label_to_row.get(label) or {}
+                    hid = str(row.get("id") or "").strip()
+                    if not hid:
+                        continue
+                    ids.append(hid)
+                    if use_custom_qty:
+                        qty_map[hid] = float(kit_qty)
+                from app.services.small_hand_tool_service import link_hand_tools_to_kit
+
+                result = link_hand_tools_to_kit(aid, ids, kit_qty_by_id=qty_map or None)
+                if result.ok:
+                    st.session_state[sk(aid, "view")] = "list"
+                    linked = int((result.data or {}).get("linked") or len(ids))
+                    st.success(f"Linked {linked} tool(s) to this kit.")
+                    if result.error:
+                        st.warning(result.error)
+                    ips_app_rerun()
+                else:
+                    st.error(result.error or "Import failed.")
+
+
 def render_link_asset_form(asset: dict, aid: str) -> None:
     if st.button("← Back to kit list", key=f"kit_back_link_{aid}"):
         st.session_state[sk(aid, "view")] = "list"

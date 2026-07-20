@@ -59,6 +59,7 @@ from app.services.small_hand_tool_service import (
     adjust_hand_tool_quantity,
     clear_hand_tools_list_cache,
     delete_hand_tool,
+    link_hand_tool_to_kit,
     list_hand_tools,
     save_hand_tool,
 )
@@ -154,6 +155,52 @@ def _job_options() -> tuple[list[str], dict[str, str]]:
         labels.append(label)
         label_to_id[label] = jid
     return labels, label_to_id
+
+
+def _render_assign_hand_tool_to_kit(tool: dict) -> None:
+    rid = str(tool.get("id") or "").strip()
+    if not rid or tool.get("row_type") != "hand_tool":
+        return
+    if str(tool.get("serial_number") or "").strip():
+        return
+
+    trailers, trailer_map = _trailer_options()
+    pick_labels = [label for label in trailers if label != "— None —"]
+    if not pick_labels:
+        return
+
+    current_cid = str(tool.get("container_asset_id") or "").strip()
+    with st.expander("Assign to Tool Trailer kit", expanded=False):
+        st.caption(
+            "Adds this tool to the selected trailer kit and sets storage to Tool Trailer. "
+            "If the tool is on another trailer, its old kit line is removed."
+        )
+        default_idx = 0
+        for idx, label in enumerate(pick_labels):
+            if trailer_map.get(label) == current_cid:
+                default_idx = idx
+                break
+        pick = st.selectbox(
+            "Tool Trailer",
+            pick_labels,
+            index=default_idx,
+            key=f"ht_kit_assign_trailer_{rid}",
+        )
+        kit_qty = st.number_input(
+            "Kit quantity",
+            min_value=1.0,
+            value=float(tool.get("quantity_on_hand") or 1),
+            step=1.0,
+            key=f"ht_kit_assign_qty_{rid}",
+        )
+        if st.button("Add to kit", key=f"ht_kit_assign_btn_{rid}", type="primary"):
+            trailer_id = trailer_map.get(pick) or ""
+            result = link_hand_tool_to_kit(rid, trailer_id, kit_qty=kit_qty)
+            if result.ok:
+                clear_hand_tools_list_cache()
+                st.success("Tool linked to trailer kit.")
+                st.rerun()
+            st.error(result.error or "Could not assign tool to kit.")
 
 
 def _render_add_hand_tool_form() -> None:
@@ -423,6 +470,7 @@ def render_hand_tool_detail_dialog(tool: dict) -> None:
 
     if can_edit:
         _render_hand_tool_photo_manager(tool)
+        _render_assign_hand_tool_to_kit(tool)
 
     meta: list[tuple[str, object]] = []
     if model:

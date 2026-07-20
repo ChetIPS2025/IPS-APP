@@ -369,6 +369,148 @@ def _sync_kit_item_for_hand_tool(
         create_asset_kit_item(trailer_id, data)
 
 
+def _deactivate_kit_item_for_hand_tool(hand_tool_id: str, trailer_id: str) -> None:
+    """Remove kit mirror row without deactivating the master hand tool."""
+    from app.services.kit_item_sync_service import hand_tool_id_from_notes
+
+    hid = _clean_text(hand_tool_id)
+    tid = _clean_text(trailer_id)
+    if not hid or not tid:
+        return
+    for item in get_asset_kit_items(tid):
+        if hand_tool_id_from_notes(item.get("notes")) != hid:
+            continue
+        iid = _clean_text(item.get("id"))
+        if not iid:
+            continue
+        update_row(
+            "asset_kit_items",
+            {"is_active": False, "updated_at": _now_iso()},
+            {"id": iid},
+        )
+        from app.services.asset_kits_service import invalidate_asset_kit_cache, recalculate_asset_kit_value
+
+        recalculate_asset_kit_value(tid)
+        invalidate_asset_kit_cache(tid)
+        break
+
+
+def hand_tool_kit_option_label(row: dict[str, Any]) -> str:
+    name = _clean_text(row.get("tool_name"))
+    cat = _clean_text(row.get("category") or "Other")
+    qty = _f(row.get("quantity_on_hand") or 0)
+    loc = _clean_text(row.get("location_display") or row.get("storage_type") or "—") or "—"
+    return f"{name} · {cat} · qty {qty:g} · {loc}"
+
+
+def list_hand_tools_for_kit_import(
+    *,
+    trailer_id: str = "",
+    assets_by_id: dict[str, dict[str, Any]] | None = None,
+    jobs_by_id: dict[str, dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """Master quantity hand tools that can be linked to a trailer kit."""
+    _ = trailer_id
+    rows = list_hand_tools(
+        assets_by_id=assets_by_id,
+        jobs_by_id=jobs_by_id,
+        include_kit_items=False,
+    )
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        if row.get("row_type") != "hand_tool":
+            continue
+        if not row.get("is_active", True):
+            continue
+        if _has_serial(row.get("serial_number")):
+            continue
+        out.append(row)
+    return out
+
+
+def link_hand_tool_to_kit(
+    hand_tool_id: str,
+    trailer_id: str,
+    *,
+    kit_qty: float | None = None,
+) -> ServiceResult:
+    """Assign a master hand tool to a Tool Trailer and mirror it into the kit inventory."""
+    from app.services.asset_kits_service import asset_is_kit, invalidate_asset_kit_cache
+    from app.services.repository import fetch_by_id
+
+    hid = _clean_text(hand_tool_id)
+    tid = _clean_text(trailer_id)
+    if not hid or not tid:
+        return ServiceResult(ok=False, error="Missing hand tool or trailer id.")
+    trailer = fetch_by_id("assets", tid) or {}
+    if not asset_is_kit(trailer):
+        return ServiceResult(ok=False, error="Selected asset is not a Tool Trailer kit.")
+
+    row = fetch_by_id(_TABLE, hid)
+    if not row or row.get("is_active") is False:
+        return ServiceResult(ok=False, error="Hand tool not found.")
+    if _has_serial(row.get("serial_number")):
+        return ServiceResult(
+            ok=False,
+            error="Tools with serial numbers must be linked from the kit tab using Link Asset.",
+        )
+
+    old_trailer = _clean_text(row.get("container_asset_id"))
+    if old_trailer and old_trailer != tid:
+        _deactivate_kit_item_for_hand_tool(hid, old_trailer)
+
+    qty = max(0.0, _f(kit_qty if kit_qty is not None else row.get("quantity_on_hand"), 1.0))
+    expected = max(_f(row.get("quantity_expected")), qty)
+    update_payload = {
+        "storage_type": "Tool Trailer",
+        "container_asset_id": tid,
+        "quantity_on_hand": qty,
+        "quantity_expected": expected,
+        "updated_at": _now_iso(),
+    }
+    result = update_row(_TABLE, update_payload, {"id": hid})
+    if not result.ok:
+        return result
+
+    merged = {**row, **update_payload, "id": hid}
+    _sync_kit_item_for_hand_tool(tid, merged, row_id=hid)
+    clear_hand_tools_list_cache()
+    invalidate_asset_kit_cache(tid)
+    if old_trailer and old_trailer != tid:
+        invalidate_asset_kit_cache(old_trailer)
+    return ServiceResult(ok=True, data={"hand_tool_id": hid, "trailer_id": tid, "quantity": qty})
+
+
+def link_hand_tools_to_kit(
+    trailer_id: str,
+    hand_tool_ids: list[str],
+    *,
+    kit_qty_by_id: dict[str, float] | None = None,
+) -> ServiceResult:
+    """Bulk-assign master hand tools to a Tool Trailer kit."""
+    ids = [_clean_text(x) for x in hand_tool_ids if _clean_text(x)]
+    if not ids:
+        return ServiceResult(ok=False, error="Select at least one hand tool.")
+    qty_map = kit_qty_by_id or {}
+    linked = 0
+    errors: list[str] = []
+    for hid in ids:
+        result = link_hand_tool_to_kit(hid, trailer_id, kit_qty=qty_map.get(hid))
+        if result.ok:
+            linked += 1
+        else:
+            errors.append(f"{hid[:8]}: {result.error or 'failed'}")
+    if linked and not errors:
+        return ServiceResult(ok=True, data={"linked": linked})
+    if linked:
+        return ServiceResult(
+            ok=True,
+            data={"linked": linked, "errors": errors},
+            error=f"Linked {linked} tool(s); {len(errors)} failed.",
+        )
+    return ServiceResult(ok=False, error=errors[0] if errors else "Could not link hand tools.")
+
+
 def adjust_hand_tool_quantity(tool_id: str, delta: float, *, notes: str = "") -> ServiceResult:
     tid = _clean_text(tool_id)
     if not tid:
@@ -423,5 +565,9 @@ __all__ = [
     "list_hand_tools",
     "normalize_hand_tool",
     "import_hand_tool_row",
+    "hand_tool_kit_option_label",
+    "link_hand_tool_to_kit",
+    "link_hand_tools_to_kit",
+    "list_hand_tools_for_kit_import",
     "save_hand_tool",
 ]
