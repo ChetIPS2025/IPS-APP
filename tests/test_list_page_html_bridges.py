@@ -57,10 +57,12 @@ def test_customers_list_table_uses_native_detail_links() -> None:
 def test_inline_meta_grid_renders_html_grid_without_streamlit_columns() -> None:
     from app.pages import customers as customers_page
 
-    src = inspect.getsource(customers_page._inline_meta_grid)
-    assert "st.columns" not in src
-    assert 'class="ips-inline-meta-grid"' in src
-    assert "ips-inline-meta-card" in src
+    grid_src = inspect.getsource(customers_page._inline_meta_grid)
+    card_src = inspect.getsource(customers_page._inline_meta_card_html)
+    assert "st.columns" not in grid_src
+    assert "ips-inline-meta-grid" in grid_src
+    assert "ips-inline-meta-card" in card_src
+    assert "inline_contact_meta_" in grid_src
 
 
 def test_customers_catalog_fragment_uses_directory_service() -> None:

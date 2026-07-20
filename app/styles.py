@@ -600,11 +600,11 @@ def inject_documents_module_css() -> None:
 
 def inject_customers_module_css() -> None:
     """Customers list custom table styling."""
-    if not inject_css_once("ips-customers-module-v7"):
+    if not inject_css_once("ips-customers-module-v8"):
         return
     st.markdown(
         f"""
-<style id="ips-customers-module-v7">
+<style id="ips-customers-module-v8">
 .ips-customers-table-wrap {{
   background: #ffffff;
   border: 1px solid #e2e8f0;
@@ -854,11 +854,50 @@ def inject_customers_module_css() -> None:
   margin: 0 !important;
 }}
 .ips-contacts-table-wrap {{
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
   overflow: hidden;
   margin-bottom: 0.5rem;
+}}
+.ips-contacts-html-table {{
+  width: 100%;
+  table-layout: auto;
+  border-collapse: collapse;
+}}
+.ips-contacts-html-table .ips-contacts-th,
+.ips-contacts-html-table .ips-contacts-td {{
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid #e2e8f0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}}
+.ips-contacts-html-table .ips-contacts-th {{
+  background: #f8fafc;
+  font-size: 12px;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}}
+.ips-contacts-html-table .ips-contacts-tr:hover {{
+  background: #eef5ff;
+}}
+.ips-contacts-html-table .ips-contacts-td {{
+  font-size: 0.8125rem;
+  color: #0f172a;
+  line-height: 1.35;
+}}
+.ips-contacts-html-table .ips-contacts-name {{
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
 }}
 .ips-contacts-header-row {{
   background: #f8fafc;
@@ -990,48 +1029,85 @@ def inject_customers_module_css() -> None:
   min-height: 24px !important;
   margin: 0 !important;
 }}
-.ips-inline-detail-card {{
-  margin-top: 14px;
-  background: #ffffff;
-  border: 1px solid #dbe3ee;
-  border-radius: 14px;
-  padding: 14px;
+[class*="st-key-inline_contact_detail_"]:has(.ips-inline-contact-detail-marker) {{
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  background: #ffffff !important;
+  border: 1px solid #dbe4f0 !important;
+  border-radius: 12px !important;
+  padding: 16px !important;
+  margin: 16px 0 !important;
+  overflow: visible !important;
+  position: relative !important;
 }}
-.ips-inline-detail-header {{
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 12px;
+[class*="st-key-inline_contact_detail_"]:has(.ips-inline-contact-detail-marker) > [data-testid="stVerticalBlock"] {{
+  gap: 0.75rem !important;
 }}
-.ips-inline-detail-title {{
+[class*="st-key-inline_contact_detail_"]:has(.ips-inline-contact-detail-marker) .ips-inline-detail-header {{
+  min-width: 0 !important;
+  margin: 0 !important;
+}}
+[class*="st-key-inline_contact_detail_"]:has(.ips-inline-contact-detail-marker) .ips-inline-detail-title {{
   font-size: 18px;
   font-weight: 800;
   color: #0f172a;
   line-height: 1.2;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }}
-.ips-inline-detail-subtitle {{
+[class*="st-key-inline_contact_detail_"]:has(.ips-inline-contact-detail-marker) .ips-inline-detail-subtitle {{
   font-size: 13px;
   color: #64748b;
   margin-top: 3px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.3;
 }}
-.ips-inline-detail-actions {{
+[class*="st-key-inline_location_detail_"]:has(.ips-inline-location-detail-marker) {{
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  background: #ffffff !important;
+  border: 1px solid #dbe4f0 !important;
+  border-radius: 12px !important;
+  padding: 16px !important;
+  margin: 16px 0 !important;
+  overflow: visible !important;
+  position: relative !important;
+}}
+.ips-inline-meta-grid-wrap {{
+  width: 100%;
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
+  gap: 10px;
 }}
 .ips-inline-meta-grid {{
   display: grid;
-  grid-template-columns: repeat(4, minmax(120px, 1fr));
   gap: 10px;
-  margin-top: 10px;
   width: 100%;
+  min-width: 0;
+}}
+.ips-inline-meta-grid-primary {{
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}}
+.ips-inline-meta-grid-secondary {{
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 100%;
 }}
 .ips-inline-meta-card {{
   background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 10px 12px;
+  border: 1px solid #dbe4f0;
+  border-radius: 10px;
+  padding: 12px;
   min-width: 0;
+  min-height: 74px;
+  height: auto;
+  box-sizing: border-box;
+  overflow: visible;
 }}
 .ips-inline-meta-label {{
   font-size: 0.6875rem;
@@ -1044,8 +1120,75 @@ def inject_customers_module_css() -> None:
 .ips-inline-meta-value {{
   font-size: 0.8125rem;
   color: #0f172a;
-  line-height: 1.25;
+  white-space: normal;
+  overflow-wrap: anywhere;
   word-break: break-word;
+  line-height: 1.35;
+}}
+[class*="st-key-inline_contact_meta_"]:has(.ips-inline-contact-meta-marker) {{
+  width: 100% !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}}
+[class*="st-key-inline_contact_location_"]:has(.ips-inline-contact-location-marker) {{
+  width: 100% !important;
+  min-width: 0 !important;
+  margin-top: 16px !important;
+  overflow: visible !important;
+}}
+[class*="st-key-inline_contact_location_"]:has(.ips-inline-contact-location-marker) .ips-inline-location-grid {{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 24px;
+}}
+[class*="st-key-inline_contact_links_"]:has(.ips-inline-contact-links-marker) {{
+  width: 100% !important;
+  min-width: 0 !important;
+  margin-top: 18px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}}
+.ips-contact-delete-confirm {{
+  position: static !important;
+  width: 100% !important;
+  margin-top: 12px !important;
+  box-sizing: border-box !important;
+  padding: 12px 14px;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fef2f2;
+  color: #7f1d1d;
+}}
+@media (max-width: 1024px) {{
+  .ips-inline-meta-grid-primary {{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }}
+  .ips-inline-meta-grid-secondary {{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }}
+  [class*="st-key-inline_contact_location_"]:has(.ips-inline-contact-location-marker) .ips-inline-location-grid {{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }}
+}}
+@media (max-width: 768px) {{
+  [class*="st-key-inline_contact_detail_"]:has(.ips-inline-contact-detail-marker) > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type {{
+    flex-wrap: wrap !important;
+  }}
+  [class*="st-key-inline_contact_detail_"]:has(.ips-inline-contact-detail-marker) > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"] {{
+    flex: 1 1 100% !important;
+    min-width: 0 !important;
+  }}
+  [class*="st-key-inline_contact_detail_"]:has(.ips-inline-contact-detail-marker) > [data-testid="stVerticalBlock"] > [data-testid="stHorizontalBlock"]:first-of-type > [data-testid="column"]:nth-child(n+2) {{
+    flex: 1 1 calc(50% - 0.5rem) !important;
+  }}
+  .ips-inline-meta-grid-primary,
+  .ips-inline-meta-grid-secondary {{
+    grid-template-columns: 1fr;
+  }}
+  [class*="st-key-inline_contact_location_"]:has(.ips-inline-contact-location-marker) .ips-inline-location-grid {{
+    grid-template-columns: 1fr;
+  }}
 }}
 .ips-locations-table-wrap {{
   background: #ffffff;

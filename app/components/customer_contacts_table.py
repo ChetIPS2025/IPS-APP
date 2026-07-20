@@ -20,6 +20,11 @@ def _role_pill(role: str) -> str:
     return f'<span class="ips-contact-role-pill">{text}</span>'
 
 
+def _cell_text(value: object) -> tuple[str, str]:
+    text = str(value or "—").strip() or "—"
+    return html.escape(text), html.escape(text, quote=True)
+
+
 def build_customer_contacts_html_table(
     contacts: list[dict],
     *,
@@ -43,13 +48,15 @@ def build_customer_contacts_html_table(
             f"{html.escape(name)}</a>"
         )
         role = str(contact.get("role_type") or contact.get("display_role") or contact.get("title") or "—")
+        email_text, email_title = _cell_text(contact.get("email"))
+        phone_text, phone_title = _cell_text(contact.get("phone") or contact.get("mobile"))
         cells = [
             name_cell,
             html.escape(str(contact.get("title") or "—")),
             html.escape(str(contact.get("location_name") or "—")),
             _role_pill(role),
-            html.escape(str(contact.get("email") or "—")),
-            html.escape(str(contact.get("phone") or contact.get("mobile") or "—")),
+            f'<span class="ips-contacts-email" title="{email_title}">{email_text}</span>',
+            f'<span class="ips-contacts-phone" title="{phone_title}">{phone_text}</span>',
         ]
         tds = "".join(f'<td class="ips-contacts-td">{c}</td>' for c in cells)
         body += f'<tr class="ips-contacts-tr">{tds}</tr>'
