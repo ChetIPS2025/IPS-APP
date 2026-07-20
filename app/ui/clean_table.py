@@ -615,9 +615,26 @@ def render_clean_table_click_bridge(
     ));
   }}
 
+  function bridgeScopeForTable(tblSel) {{
+    const anchor = doc.querySelector(tblSel);
+    if (!anchor) return null;
+    return anchor.closest('div[data-testid="stVerticalBlockBorderWrapper"]') || anchor.parentElement;
+  }}
+
+  function openLinkInBridgeScope(link) {{
+    const reg = doc.ipsCleanTableBridgeRegistry || {{}};
+    for (const cfg of Object.values(reg)) {{
+      if (!cfg || !cfg.tbl) continue;
+      const scope = bridgeScopeForTable(cfg.tbl);
+      if (scope && scope.contains(link)) return true;
+    }}
+    return false;
+  }}
+
   function activateOpenLink(link, e) {{
     const id = link.getAttribute("data-row-id");
     if (!id) return false;
+    if (!openLinkInBridgeScope(link)) return false;
     if (e) {{
       e.preventDefault();
       e.stopPropagation();
@@ -699,7 +716,7 @@ def render_clean_table_click_bridge(
       if (!t || !t.closest) return;
       const openLink = rowOpenLink(t);
       if (openLink) {{
-        activateOpenLink(openLink, e);
+        if (activateOpenLink(openLink, e)) return;
         return;
       }}
       if (isInteractive(t)) return;

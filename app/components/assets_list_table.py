@@ -151,7 +151,7 @@ def _asset_link_html(
     ).strip()
     return (
         f'<a class="{html.escape(cls)}" href="{href}" target="_self" '
-        f'data-asset-id="{asset_id}" data-row-id="{asset_id}" '
+        f'data-asset-id="{asset_id}" '
         f'title="{title}">{text}</a>'
     )
 
@@ -171,7 +171,7 @@ def _asset_thumb_link_html(
     )
     return (
         f'<a class="ips-inventory-thumb-cell-link ips-assets-open-link" '
-        f'href="{href}" target="_self" data-asset-id="{asset_id}" data-row-id="{asset_id}" '
+        f'href="{href}" target="_self" data-asset-id="{asset_id}" '
         f'title="View asset" aria-label="View asset">{thumb}</a>'
     )
 

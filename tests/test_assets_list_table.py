@@ -60,6 +60,8 @@ def test_asset_link_html_uses_native_anchor_href():
     assert 'type="button"' not in html_out
     assert "clickBridgeButton" not in html_out
     assert "sendValue" not in html_out
+    assert "data-row-id" not in html_out
+    assert 'data-asset-id="ast-2"' in html_out
 
 
 def test_asset_thumb_link_html_uses_native_href():
@@ -73,6 +75,7 @@ def test_asset_thumb_link_html_uses_native_href():
     assert "asset_detail=ast-1" in html_out
     assert "ips-inventory-thumb-cell-link" in html_out
     assert 'data-asset-id="ast-1"' in html_out
+    assert "data-row-id" not in html_out
 
 
 def test_equipment_asset_links_do_not_require_open_button_harness():
@@ -145,6 +148,14 @@ def test_assets_table_bridge_field_mode_ignores_link_clicks() -> None:
     assert "sendValue" in src
     assert "expand:" in src
     assert 'data-asset-action="expand"' not in src
+
+
+def test_clean_table_open_link_requires_bridge_scope() -> None:
+    from app.ui.clean_table import render_clean_table_click_bridge
+
+    src = inspect.getsource(render_clean_table_click_bridge)
+    assert "openLinkInBridgeScope" in src
+    assert "if (!openLinkInBridgeScope(link)) return false;" in src
 
 
 def test_capture_asset_detail_query_opens_modal_without_rerun() -> None:
