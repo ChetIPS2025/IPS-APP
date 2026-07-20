@@ -90,6 +90,8 @@ class TestAssetsPageCss(unittest.TestCase):
 
         self.assertIn("overflow: hidden !important", HAND_TOOLS_TABLE_FIX_CSS)
         self.assertIn("text-overflow: ellipsis", HAND_TOOLS_TABLE_FIX_CSS)
+        self.assertIn("white-space: nowrap !important", HAND_TOOLS_TABLE_FIX_CSS)
+        self.assertNotIn("word-break: break-word", HAND_TOOLS_TABLE_FIX_CSS)
 
     @patch("app.components.assets_css.inject_assets_detail_css")
     @patch("app.components.assets_css.inject_assets_equipment_css")

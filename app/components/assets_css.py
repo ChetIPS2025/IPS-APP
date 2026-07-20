@@ -23,50 +23,87 @@ _HAND_TOOLS_TAB = "Small Tools"
 # Small Hand Tools tab — clip long tool names and keep headers readable.
 HAND_TOOLS_TABLE_FIX_CSS = """
 section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+section[data-testid="stMain"]:has(.ips-assets-page)
 .st-key-assets_hand_tools_table_wrap
 [data-testid="stHorizontalBlock"]:has(.small-tools-table-header),
 section[data-testid="stMain"]:has(.ips-assets-page)
 .st-key-assets_hand_tools_table_wrap
 [data-testid="stHorizontalBlock"]:has(.small-tools-table-row) {
+  display: grid !important;
   grid-template-columns:
-    28px
-    56px
-    minmax(200px, 2.8fr)
-    minmax(88px, 0.95fr)
-    56px
-    56px
-    minmax(88px, 1fr)
-    minmax(88px, 0.9fr)
-    minmax(92px, 0.9fr)
-    minmax(120px, 138px) !important;
-  column-gap: 10px !important;
+    20px
+    48px
+    minmax(240px, 3fr)
+    minmax(76px, 0.8fr)
+    48px
+    48px
+    minmax(108px, 1.05fr)
+    minmax(78px, 0.85fr)
+    minmax(74px, 0.8fr)
+    minmax(116px, 128px) !important;
+  column-gap: 8px !important;
+  align-items: center !important;
+  width: 100% !important;
+  min-width: 1180px !important;
+  box-sizing: border-box !important;
+  flex-wrap: nowrap !important;
 }
 section[data-testid="stMain"]:has(.ips-assets-page)
 .st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) > [data-testid="column"]:not(:last-child),
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) > [data-testid="column"],
 section[data-testid="stMain"]:has(.ips-assets-page)
 .st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:not(:last-child) {
-  overflow: hidden !important;
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"] {
+  flex: none !important;
+  width: auto !important;
   min-width: 0 !important;
-}
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) > [data-testid="column"]:nth-child(3),
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:nth-child(3) {
-  min-width: 0 !important;
+  max-width: none !important;
   overflow: hidden !important;
+  box-sizing: border-box !important;
 }
 section[data-testid="stMain"]:has(.ips-assets-page)
 .st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:nth-child(3)
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) > [data-testid="column"]:last-child,
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:last-child {
+  overflow: visible !important;
+}
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) > [data-testid="column"]
 [data-testid="stVerticalBlock"],
 section[data-testid="stMain"]:has(.ips-assets-page)
 .st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:nth-child(3)
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]
+[data-testid="stVerticalBlock"],
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) > [data-testid="column"]
 [data-testid="stElementContainer"],
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]
+[data-testid="stElementContainer"] {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) > [data-testid="column"]
+[data-testid="stHorizontalBlock"] {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  gap: 2px !important;
+}
 section[data-testid="stMain"]:has(.ips-assets-page)
 .st-key-assets_hand_tools_table_wrap
 [data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:nth-child(3)
@@ -78,6 +115,49 @@ section[data-testid="stMain"]:has(.ips-assets-page)
 }
 section[data-testid="stMain"]:has(.ips-assets-page)
 .st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:nth-child(3)
+.stButton > button {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: auto !important;
+  height: auto !important;
+  padding: 0 !important;
+  white-space: normal !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  line-height: 1.2 !important;
+  text-align: left !important;
+  justify-content: flex-start !important;
+  align-items: flex-start !important;
+  word-break: normal !important;
+  overflow-wrap: anywhere !important;
+}
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:nth-child(3)
+.stButton > button p,
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:nth-child(3)
+.stButton > button span,
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:nth-child(3)
+.stButton > button div {
+  white-space: normal !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  word-break: normal !important;
+  overflow-wrap: anywhere !important;
+}
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap
 [data-testid="stHorizontalBlock"]:has(.small-tools-table-header) .ips-hand-tools-cell,
 section[data-testid="stMain"]:has(.ips-assets-page)
 .st-key-assets_hand_tools_table_wrap
@@ -85,11 +165,25 @@ section[data-testid="stMain"]:has(.ips-assets-page)
 section[data-testid="stMain"]:has(.ips-assets-page)
 .st-key-assets_hand_tools_table_wrap
 [data-testid="stHorizontalBlock"]:has(.small-tools-table-header) .ips-table-header-filter-text {
-  white-space: normal !important;
+  white-space: nowrap !important;
   overflow: hidden !important;
-  text-overflow: clip !important;
-  line-height: 1.15 !important;
-  word-break: break-word !important;
+  text-overflow: ellipsis !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  line-height: 1.2 !important;
+  font-size: 0.68rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.02em !important;
+}
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap .ips-hand-tools-cell,
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap .ips-assets-muted.ips-hand-tools-cell {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
 }
 section[data-testid="stMain"]:has(.ips-assets-page)
 .st-key-assets_hand_tools_table_wrap .ips-hand-tools-name-text {
@@ -99,6 +193,14 @@ section[data-testid="stMain"]:has(.ips-assets-page)
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
+  word-break: normal !important;
+}
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap .ips-asset-thumb-wrap,
+section[data-testid="stMain"]:has(.ips-assets-page)
+.st-key-assets_hand_tools_table_wrap .ips-asset-thumb-img {
+  max-width: 40px !important;
+  max-height: 40px !important;
 }
 """
 
@@ -225,7 +327,7 @@ def inject_assets_serialized_css() -> None:
 
 def inject_assets_hand_tools_css() -> None:
     _inject_sidebar_css(
-        "ips-assets-hand-tools-v4",
+        "ips-assets-hand-tools-v5",
         "\n\n".join((PAGE_HAND_TOOLS_CSS, HAND_TOOLS_TABLE_FIX_CSS)),
     )
 

@@ -67,14 +67,14 @@ _HAND_TOOL_DETAIL_TABLE_KEY = "assets_hand_tools_detail"
 _COLS = [0.12, 0.32, 2.2, 1.15, 0.52, 0.52, 1.15, 1.05, 1.0, 1.1]
 _HEADER_SPECS: list[tuple[str, str | None]] = [
     ("", None),
-    ("Image", None),
+    ("", None),
     ("Tool", None),
-    ("Category", "category"),
-    ("Expected", None),
-    ("Actual", None),
-    ("Location", "location"),
-    ("Storage", "storage_type"),
-    ("Status", "status"),
+    ("Cat.", "category"),
+    ("Exp.", None),
+    ("Act.", None),
+    ("Loc.", "location"),
+    ("Stor.", "storage_type"),
+    ("Stat.", "status"),
     ("Actions", None),
 ]
 _FILTER_SPECS: list[tuple[str, object]] = [
@@ -522,6 +522,13 @@ def _filter_rows(rows: list[dict], *, q: str = "") -> list[dict]:
     return apply_column_filters(out, _TABLE_KEY, _FILTER_SPECS)
 
 
+def _truncate_table_label(text: str, *, max_len: int = 56) -> str:
+    cleaned = str(text or "").strip()
+    if len(cleaned) <= max_len:
+        return cleaned
+    return f"{cleaned[: max_len - 1].rstrip()}…"
+
+
 def _render_hand_tool_name_cell(
     row: dict,
     name: str,
@@ -530,17 +537,18 @@ def _render_hand_tool_name_cell(
     title_attr: str = "",
 ) -> None:
     rid = str(row.get("id") or "").strip()
+    display_name = _truncate_table_label(name)
     if on_open_tool and rid:
         st.markdown(
             f'<span class="ips-hand-tools-name-anchor"{title_attr} aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-        if st.button(name, key=f"ht_open_name_{rid}", type="tertiary", help=name):
+        if st.button(display_name, key=f"ht_open_name_{rid}", type="tertiary", help=name):
             on_open_tool(row)
         return
     st.markdown(
         f'<div class="ips-assets-title ips-hand-tools-cell ips-hand-tools-name-text"{title_attr} '
-        f'title="{html.escape(name)}">{html.escape(name)}</div>',
+        f'title="{html.escape(name)}">{html.escape(display_name)}</div>',
         unsafe_allow_html=True,
     )
 
@@ -620,7 +628,7 @@ def _render_table(
                 )
             with cols[3]:
                 st.markdown(
-                    f'<div class="ips-hand-tools-cell">{html.escape(category)}</div>',
+                    f'<div class="ips-hand-tools-cell" title="{html.escape(category)}">{html.escape(category)}</div>',
                     unsafe_allow_html=True,
                 )
             with cols[4]:
@@ -636,12 +644,13 @@ def _render_table(
                 )
             with cols[6]:
                 st.markdown(
-                    f'<div class="ips-assets-muted ips-hand-tools-cell">{html.escape(location)}</div>',
+                    f'<div class="ips-assets-muted ips-hand-tools-cell" title="{html.escape(location)}">'
+                    f"{html.escape(location)}</div>",
                     unsafe_allow_html=True,
                 )
             with cols[7]:
                 st.markdown(
-                    f'<div class="ips-hand-tools-cell">{html.escape(storage)}</div>',
+                    f'<div class="ips-hand-tools-cell" title="{html.escape(storage)}">{html.escape(storage)}</div>',
                     unsafe_allow_html=True,
                 )
             with cols[8]:
