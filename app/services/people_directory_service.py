@@ -180,7 +180,7 @@ def filter_people_rows(rows: list[dict[str, Any]], *, search: str = "") -> list[
 
 def _load_list_projection_uncached() -> tuple[list[dict[str, Any]], bool]:
     from app.pages._core._data import _DEMO_EMPLOYEES
-    from app.services.repository import fetch_rows
+    from app.services.repository import fetch_rows, fetch_rows_admin
 
     rows, err = fetch_rows(
         "employees",
@@ -190,7 +190,17 @@ def _load_list_projection_uncached() -> tuple[list[dict[str, Any]], bool]:
     )
     if rows:
         return [normalize_employee(r) for r in rows], True
-    if err:
+
+    admin_rows, admin_err = fetch_rows_admin(
+        "employees",
+        columns=_PEOPLE_LIST_COLUMNS,
+        limit=10000,
+        order_by="name",
+    )
+    if admin_rows:
+        return [normalize_employee(r) for r in admin_rows if r], True
+
+    if err or admin_err:
         st.session_state["_ips_people_list_warning"] = "User list is temporarily unavailable."
     demo = [normalize_employee(r) for r in _DEMO_EMPLOYEES]
     return demo, False

@@ -1054,6 +1054,10 @@ def _render_users_catalog_fragment(*, permissions: PeoplePermissions) -> None:
 
     with perf_span("people.pagination"):
         people_page = list_people_page(search=search_q)
+    if not people_page.is_live:
+        from app.pages._core._access import mark_demo_data
+
+        mark_demo_data()
     if people_page.warning:
         st.warning(people_page.warning)
 

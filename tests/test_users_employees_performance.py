@@ -94,6 +94,30 @@ def test_filter_people_rows_search_is_scoped():
     assert len(filter_people_rows(rows, search="")) == 2
 
 
+def test_load_list_projection_falls_back_to_admin_read(monkeypatch):
+    import app.services.people_directory_service as svc
+
+    admin_fetch = [
+        {"id": "u-1", "name": "Live User", "status": "Active"},
+        {"id": "u-2", "name": "Saved User", "status": "Active"},
+    ]
+
+    monkeypatch.setattr(
+        "app.services.repository.fetch_rows",
+        lambda *args, **kwargs: ([], None),
+    )
+    monkeypatch.setattr(
+        "app.services.repository.fetch_rows_admin",
+        lambda *args, **kwargs: (admin_fetch, None),
+    )
+
+    rows, is_live = svc._load_list_projection_uncached()
+
+    assert is_live is True
+    assert len(rows) == 2
+    assert {row["name"] for row in rows} == {"Live User", "Saved User"}
+
+
 def test_employees_source_has_no_hidden_open_buttons():
     source = Path("app/pages/employees.py").read_text(encoding="utf-8")
     assert "render_users_table_open_buttons" not in source
