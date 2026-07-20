@@ -287,7 +287,9 @@ def render() -> None:
     render_view_tabs(session_key=_VIEW_KEY, default="Week")
     ctx = _build_render_context(filters=filt)
 
-    with st.spinner("Loading schedule…"):
+    loading_placeholder = st.empty()
+    loading_placeholder.caption("Loading schedule…")
+    try:
         with perf_span("scheduling.page_shell"):
             snapshot = load_scheduling_page_snapshot(
                 week_start=ctx.week_start,
@@ -297,6 +299,8 @@ def render() -> None:
                 filters=ctx.filters,
                 show_unassigned=show_unassigned_enabled(),
             )
+    finally:
+        loading_placeholder.empty()
 
     if snapshot.warning:
         st.warning(snapshot.warning)
@@ -313,6 +317,11 @@ def render() -> None:
 
     with st.container(key="scheduling_page_wrap"):
         _render_scheduling_view_content(ctx=ctx, snapshot=snapshot, on_open_event=_open_event)
+
+    with perf_span("scheduling.render_complete"):
+        from app.ui.page_loading_indicator import render_page_ready_marker
+
+        render_page_ready_marker(module="scheduling")
 
     if st.session_state.get(SCHED_FORM_KEY):
         with perf_span("scheduling.dialog_options"):

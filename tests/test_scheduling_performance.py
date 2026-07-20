@@ -73,8 +73,135 @@ class TestSchedulingReferenceLoading(unittest.TestCase):
 
 
 class TestSchedulingAssignmentDedup(unittest.TestCase):
-    def test_snapshot_queries_assignments_once(self) -> None:
+    def test_empty_visible_week_skips_assignment_queries(self) -> None:
+        calls: list[str] = []
+
+        def _events(start, end, **kwargs):
+            calls.append("events")
+            return []
+
+        def _emp(start, end, **kwargs):
+            calls.append("emp")
+            return []
+
+        def _asset(start, end, **kwargs):
+            calls.append("asset")
+            return []
+
+        with patch("app.services.scheduling_page_service.list_schedule_events", side_effect=_events):
+            with patch(
+                "app.services.scheduling_page_service.list_employee_assignments_in_range",
+                side_effect=_emp,
+            ):
+                with patch(
+                    "app.services.scheduling_page_service.list_asset_assignments_in_range",
+                    side_effect=_asset,
+                ):
+                    with patch(
+                        "app.services.scheduling_page_service.page_data_cache_get",
+                        side_effect=lambda _k, loader: loader(),
+                    ):
+                        snap = load_scheduling_page_snapshot(
+                            week_start=date(2026, 7, 13),
+                            week_end=date(2026, 7, 20),
+                            selected_day=date(2026, 7, 13),
+                            view_mode="Week",
+                            filters={},
+                            include_conflicts=True,
+                        )
+        assert calls == ["events"]
+        assert snap.events == []
+
+    def test_empty_week_does_not_query_availability_or_conflicts(self) -> None:
+        with patch("app.services.scheduling_page_service.list_schedule_events", return_value=[]):
+            with patch(
+                "app.services.scheduling_page_service.list_availability_in_range",
+            ) as availability_mock:
+                with patch(
+                    "app.services.scheduling_page_service.list_relevant_certifications",
+                ) as cert_mock:
+                    with patch(
+                        "app.services.scheduling_page_service.find_conflicting_schedule_event_ids",
+                    ) as conflict_mock:
+                        with patch(
+                            "app.services.scheduling_page_service.page_data_cache_get",
+                            side_effect=lambda _k, loader: loader(),
+                        ):
+                            load_scheduling_page_snapshot(
+                                week_start=date(2026, 7, 13),
+                                week_end=date(2026, 7, 20),
+                                selected_day=date(2026, 7, 13),
+                                view_mode="Week",
+                                filters={},
+                                include_conflicts=True,
+                            )
+        availability_mock.assert_not_called()
+        cert_mock.assert_not_called()
+        conflict_mock.assert_not_called()
+
+    def test_empty_week_snapshot_is_cached(self) -> None:
+        st.session_state.clear()
+        calls = {"events": 0}
+
+        def _events(*_a, **_k):
+            calls["events"] += 1
+            return []
+
+        with patch("app.services.scheduling_page_service.list_schedule_events", side_effect=_events):
+            first = load_scheduling_page_snapshot(
+                week_start=date(2026, 7, 13),
+                week_end=date(2026, 7, 20),
+                selected_day=date(2026, 7, 13),
+                view_mode="Week",
+                filters={"job_id": "job-1"},
+            )
+            second = load_scheduling_page_snapshot(
+                week_start=date(2026, 7, 13),
+                week_end=date(2026, 7, 20),
+                selected_day=date(2026, 7, 13),
+                view_mode="Week",
+                filters={"job_id": "job-1"},
+            )
+        assert first.events == []
+        assert second.events == []
+        assert calls["events"] == 1
+
+    def test_job_filter_reaches_initial_event_query(self) -> None:
+        captured: dict[str, object] = {}
+
+        def _events(start, end, *, filters=None, **kwargs):
+            captured["start"] = start
+            captured["end"] = end
+            captured["filters"] = dict(filters or {})
+            return []
+
+        with patch("app.services.scheduling_page_service.list_schedule_events", side_effect=_events):
+            with patch(
+                "app.services.scheduling_page_service.page_data_cache_get",
+                side_effect=lambda _k, loader: loader(),
+            ):
+                load_scheduling_page_snapshot(
+                    week_start=date(2026, 7, 13),
+                    week_end=date(2026, 7, 20),
+                    selected_day=date(2026, 7, 13),
+                    view_mode="Week",
+                    filters={"job_id": "job-42"},
+                )
+        assert captured["filters"] == {"job_id": "job-42"}
+        assert captured["start"] == date(2026, 7, 13)
+        assert captured["end"] == date(2026, 7, 20)
+
+    def test_snapshot_queries_assignments_once_when_events_exist(self) -> None:
         calls: list[tuple[str, tuple]] = []
+        sample_event = {
+            "id": "ev-1",
+            "start_at": "2026-07-14T08:00:00+00:00",
+            "end_at": "2026-07-14T16:00:00+00:00",
+        }
+
+        def _events(start, end, **kwargs):
+            calls.append(("events", (start, end)))
+            return [sample_event]
 
         def _emp(start, end, **kwargs):
             calls.append(("emp", (start, end)))
@@ -84,7 +211,7 @@ class TestSchedulingAssignmentDedup(unittest.TestCase):
             calls.append(("asset", (start, end)))
             return []
 
-        with patch("app.services.scheduling_page_service.list_schedule_events", return_value=[]):
+        with patch("app.services.scheduling_page_service.list_schedule_events", side_effect=_events):
             with patch("app.services.scheduling_page_service.list_employee_assignments_in_range", side_effect=_emp):
                 with patch("app.services.scheduling_page_service.list_asset_assignments_in_range", side_effect=_asset):
                     with patch(
@@ -99,8 +226,8 @@ class TestSchedulingAssignmentDedup(unittest.TestCase):
                             filters={},
                             include_conflicts=False,
                         )
-        assert calls.count(("emp", (date(2026, 6, 29), date(2026, 8, 3)))) == 1
-        assert calls.count(("asset", (date(2026, 6, 29), date(2026, 8, 3)))) == 1
+        assert calls.count(("emp", (date(2026, 7, 13), date(2026, 7, 20)))) == 1
+        assert calls.count(("asset", (date(2026, 7, 13), date(2026, 7, 20)))) == 1
 
 
 class TestSchedulingConflictLazy(unittest.TestCase):
@@ -172,6 +299,25 @@ class TestSchedulingNativeLink(unittest.TestCase):
         href = scheduling_page.schedule_detail_href("ev-123")
         assert "ips_nav=scheduling" in href
         assert "schedule_detail=ev-123" in href
+
+
+class TestSchedulingPageReadyMarker(unittest.TestCase):
+    def test_render_emits_page_ready_marker_after_view(self) -> None:
+        src = inspect.getsource(scheduling_page.render)
+        view_idx = src.index("_render_scheduling_view_content(")
+        ready_idx = src.index("render_page_ready_marker")
+        assert view_idx < ready_idx
+        assert "scheduling.render_complete" in src
+
+    def test_render_does_not_use_st_spinner(self) -> None:
+        src = inspect.getsource(scheduling_page.render)
+        assert 'st.spinner("Loading schedule' not in src
+        assert "loading_placeholder.empty()" in src
+
+    def test_stable_render_does_not_call_rerun(self) -> None:
+        src = inspect.getsource(scheduling_page.render)
+        assert "st.rerun()" not in src
+        assert "fragment_rerun()" not in src
 
 
 if __name__ == "__main__":
