@@ -86,11 +86,12 @@ class TestAssetsPageCss(unittest.TestCase):
         mock_detail.assert_not_called()
 
     def test_hand_tools_css_includes_overflow_fix(self) -> None:
-        from app.components.assets_css import HAND_TOOLS_TABLE_FIX_CSS
+        from app.components.assets_css import HAND_TOOLS_TABLE_FIX_CSS, HAND_TOOLS_TABLE_GRID
 
-        self.assertIn("overflow: hidden !important", HAND_TOOLS_TABLE_FIX_CSS)
-        self.assertIn("text-overflow: ellipsis", HAND_TOOLS_TABLE_FIX_CSS)
-        self.assertIn("white-space: nowrap !important", HAND_TOOLS_TABLE_FIX_CSS)
+        self.assertIn("--ips-hand-tools-grid", HAND_TOOLS_TABLE_FIX_CSS)
+        self.assertIn(HAND_TOOLS_TABLE_GRID.strip(), HAND_TOOLS_TABLE_FIX_CSS)
+        self.assertIn("grid-template-columns: var(--ips-hand-tools-grid)", HAND_TOOLS_TABLE_FIX_CSS)
+        self.assertIn("overflow-x: auto", HAND_TOOLS_TABLE_FIX_CSS)
         self.assertNotIn("word-break: break-word", HAND_TOOLS_TABLE_FIX_CSS)
 
     @patch("app.components.assets_css.inject_assets_detail_css")

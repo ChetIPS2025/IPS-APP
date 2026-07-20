@@ -20,188 +20,335 @@ _EQUIPMENT_TAB = "Equipment"
 _SERIALIZED_TAB = "Serialized Tools"
 _HAND_TOOLS_TAB = "Small Tools"
 
-# Small Hand Tools tab — clip long tool names and keep headers readable.
-HAND_TOOLS_TABLE_FIX_CSS = """
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap {
-  overflow-x: auto !important;
-  -webkit-overflow-scrolling: touch !important;
+# Shared 8-column grid for Small Hand Tools header + data rows.
+HAND_TOOLS_TABLE_GRID = (
+    "minmax(320px, 3.4fr) "
+    "minmax(130px, 1.1fr) "
+    "minmax(80px, 0.65fr) "
+    "minmax(80px, 0.65fr) "
+    "minmax(150px, 1.25fr) "
+    "minmax(140px, 1.1fr) "
+    "minmax(120px, 0.9fr) "
+    "minmax(135px, 0.9fr)"
+)
+
+# Small Hand Tools tab — unified grid, tool thumb+name column, readable headers.
+HAND_TOOLS_TABLE_FIX_CSS = f"""
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_pg_header {{
   width: 100% !important;
-  min-width: 0 !important;
-}
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-header),
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) {
-  display: grid !important;
-  grid-template-columns:
-    20px
-    48px
-    minmax(240px, 3fr)
-    minmax(76px, 0.8fr)
-    48px
-    48px
-    minmax(108px, 1.05fr)
-    minmax(78px, 0.85fr)
-    minmax(74px, 0.8fr)
-    minmax(116px, 128px) !important;
-  column-gap: 8px !important;
+  max-width: 100% !important;
+  margin: 0 0 0.35rem 0 !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_pg_header
+[data-testid="stHorizontalBlock"] {{
+  display: flex !important;
   align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  width: 100% !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_pg_header
+[data-testid="stHorizontalBlock"] > [data-testid="column"]:last-child {{
+  display: flex !important;
+  justify-content: flex-end !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap {{
+  --ips-hand-tools-grid: {HAND_TOOLS_TABLE_GRID};
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  -webkit-overflow-scrolling: touch !important;
+  min-width: 0 !important;
+  padding-right: 12px !important;
+  box-sizing: border-box !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-header),
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) {{
+  display: grid !important;
+  grid-template-columns: var(--ips-hand-tools-grid) !important;
+  column-gap: 0 !important;
+  row-gap: 0 !important;
+  align-items: center !important;
+  min-height: 52px !important;
   width: 100% !important;
   min-width: 1180px !important;
+  max-width: none !important;
   box-sizing: border-box !important;
   flex-wrap: nowrap !important;
-}
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap
+  padding: 0 !important;
+  margin: 0 !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) {{
+  background: #f8fafc !important;
+  border-bottom: 1px solid #e8edf4 !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
 [data-testid="stHorizontalBlock"]:has(.small-tools-table-header) > [data-testid="column"],
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"] {
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"] {{
   flex: none !important;
   width: auto !important;
   min-width: 0 !important;
   max-width: none !important;
-  overflow: hidden !important;
-  box-sizing: border-box !important;
-}
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) > [data-testid="column"]:last-child,
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:last-child {
   overflow: visible !important;
-}
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) > [data-testid="column"]
-[data-testid="stVerticalBlock"],
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]
-[data-testid="stVerticalBlock"],
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) > [data-testid="column"]
-[data-testid="stElementContainer"],
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]
-[data-testid="stElementContainer"] {
+  box-sizing: border-box !important;
+  padding: 8px 10px !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:last-child,
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) > [data-testid="column"]:last-child {{
+  padding-right: 14px !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:first-child
+> [data-testid="stVerticalBlock"],
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) > [data-testid="column"]:first-child
+> [data-testid="stVerticalBlock"] {{
+  display: grid !important;
+  grid-template-columns: 40px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 10px !important;
+  min-width: 0 !important;
+  width: 100% !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+.ips-hand-tools-row-bridge {{
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+  pointer-events: none !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+.ips-hand-tools-tool-thumb {{
+  grid-column: 1 !important;
+  width: 40px !important;
+  min-width: 40px !important;
+  max-width: 40px !important;
+  flex-shrink: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+.ips-hand-tools-tool-thumb .ips-asset-thumb-wrap,
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+.ips-hand-tools-tool-thumb .ips-asset-thumb-img {{
+  width: 36px !important;
+  height: 36px !important;
+  max-width: 36px !important;
+  max-height: 36px !important;
+  object-fit: contain !important;
+  flex-shrink: 0 !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:first-child
+.stButton {{
+  grid-column: 2 !important;
+  width: 100% !important;
   min-width: 0 !important;
   max-width: 100% !important;
-  overflow: hidden !important;
-}
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) > [data-testid="column"]
-[data-testid="stHorizontalBlock"] {
-  min-width: 0 !important;
-  max-width: 100% !important;
-  overflow: hidden !important;
-  gap: 2px !important;
-}
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:nth-child(3)
-.stButton {
+  margin: 0 !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:first-child
+.stButton > button {{
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
-  overflow: hidden !important;
-}
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:nth-child(3)
-.stButton > button {
-  width: 100% !important;
-  max-width: 100% !important;
   min-height: auto !important;
   height: auto !important;
   padding: 0 !important;
-  white-space: normal !important;
-  display: -webkit-box !important;
-  -webkit-line-clamp: 2 !important;
-  -webkit-box-orient: vertical !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  line-height: 1.2 !important;
+  margin: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #2563eb !important;
+  font-weight: 700 !important;
+  font-size: 0.8125rem !important;
   text-align: left !important;
   justify-content: flex-start !important;
   align-items: flex-start !important;
-  word-break: normal !important;
-  overflow-wrap: anywhere !important;
-}
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:nth-child(3)
-.stButton > button p,
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:nth-child(3)
-.stButton > button span,
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:nth-child(3)
-.stButton > button div {
   white-space: normal !important;
   display: -webkit-box !important;
   -webkit-line-clamp: 2 !important;
   -webkit-box-orient: vertical !important;
   overflow: hidden !important;
-  text-overflow: ellipsis !important;
+  line-height: 1.25 !important;
   word-break: normal !important;
   overflow-wrap: anywhere !important;
-}
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) .ips-hand-tools-cell,
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) .ips-assets-header-row,
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap
-[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) .ips-table-header-filter-text {
-  white-space: nowrap !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:first-child
+.stButton > button p,
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:first-child
+.stButton > button span,
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:first-child
+.stButton > button div {{
+  color: #2563eb !important;
+  font-weight: 700 !important;
+  white-space: normal !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
   overflow: hidden !important;
-  text-overflow: ellipsis !important;
+  line-height: 1.25 !important;
+  text-align: left !important;
+  word-break: normal !important;
+  overflow-wrap: anywhere !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+.ips-hand-tools-tool-name-static {{
+  grid-column: 2 !important;
+  min-width: 0 !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  white-space: normal !important;
+  line-height: 1.25 !important;
+  color: #2563eb !important;
+  font-weight: 700 !important;
+  font-size: 0.8125rem !important;
+  word-break: normal !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+.ips-hand-tools-header-tool {{
+  grid-column: 1 / -1 !important;
+  padding-left: 50px !important;
+  text-align: left !important;
+  justify-content: flex-start !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+.ips-hand-tools-header-cell,
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+.ips-hand-tools-header-cell .ips-table-header-filter-text {{
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 1.15 !important;
+  min-width: 0 !important;
   word-break: normal !important;
   overflow-wrap: normal !important;
-  line-height: 1.2 !important;
   font-size: 0.68rem !important;
   font-weight: 700 !important;
-  letter-spacing: 0.02em !important;
-}
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap .ips-hand-tools-cell,
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap .ips-assets-muted.ips-hand-tools-cell {
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  word-break: normal !important;
-  overflow-wrap: normal !important;
-}
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap .ips-hand-tools-name-text {
-  display: block !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+  color: #64748b !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+.ips-hand-tools-header-tool {{
+  text-align: left !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) > [data-testid="column"]:not(:first-child)
+.ips-hand-tools-header-cell {{
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-header) > [data-testid="column"]
+[data-testid="stHorizontalBlock"] {{
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
   min-width: 0 !important;
-  max-width: 100% !important;
+  width: 100% !important;
+  overflow: visible !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+.ips-hand-tools-cell--category,
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+.ips-hand-tools-cell--location,
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+.ips-hand-tools-cell--storage {{
+  min-width: 0 !important;
+  white-space: normal !important;
   overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  line-height: 1.25 !important;
   word-break: normal !important;
-}
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap .ips-asset-thumb-wrap,
-section[data-testid="stMain"]:has(.ips-assets-page)
-.st-key-assets_hand_tools_table_wrap .ips-asset-thumb-img {
-  max-width: 40px !important;
-  max-height: 40px !important;
-}
+  overflow-wrap: anywhere !important;
+  font-size: 0.8125rem !important;
+  color: #334155 !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+.ips-hand-tools-cell--location {{
+  color: #64748b !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+.ips-hand-tools-cell--qty {{
+  text-align: center !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  font-size: 0.8125rem !important;
+  font-variant-numeric: tabular-nums !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+.ips-hand-tools-cell--status {{
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: visible !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+.ips-hand-tools-cell--status .ips-asset-status-pill {{
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:last-child
+[data-testid="stVerticalBlock"],
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:last-child
+[data-testid="stElementContainer"] {{
+  width: 100% !important;
+  min-width: 130px !important;
+  overflow: visible !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:last-child
+.stButton,
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:last-child
+.stPopover {{
+  width: 100% !important;
+  min-width: 130px !important;
+}}
+section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+[data-testid="stHorizontalBlock"]:has(.small-tools-table-row) > [data-testid="column"]:last-child
+button[data-testid="stBaseButton-popover"] {{
+  width: 100% !important;
+  min-width: 130px !important;
+  white-space: nowrap !important;
+}}
+@media (max-width: 1279px) {{
+  section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+  [data-testid="stHorizontalBlock"]:has(.small-tools-table-header),
+  section[data-testid="stMain"]:has(.ips-assets-page) .st-key-assets_hand_tools_table_wrap
+  [data-testid="stHorizontalBlock"]:has(.small-tools-table-row) {{
+    min-width: 1180px !important;
+  }}
+}}
 """
 
 # Serialized tools tab — same equipment table card + column-aligned filter row.
@@ -327,7 +474,7 @@ def inject_assets_serialized_css() -> None:
 
 def inject_assets_hand_tools_css() -> None:
     _inject_sidebar_css(
-        "ips-assets-hand-tools-v5",
+        "ips-assets-hand-tools-v6",
         "\n\n".join((PAGE_HAND_TOOLS_CSS, HAND_TOOLS_TABLE_FIX_CSS)),
     )
 

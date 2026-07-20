@@ -33,7 +33,13 @@ from app.components.table_filters import (
     build_filter_options,
     render_table_header_cell,
 )
-from app.components.table_pagination import paginate_rows, render_table_pagination_footer, render_table_pagination_header, reset_table_page
+from app.components.table_pagination import (
+    DEFAULT_CATALOG_PAGE_SIZE,
+    paginate_rows,
+    pagination_meta,
+    render_table_pagination_footer,
+    reset_table_page,
+)
 from app.components.table_filters import clear_table_filters
 from app.components.layout import render_filter_bar as layout_filter_bar
 from app.components.item_photo_manager import render_item_photo_manager
@@ -64,17 +70,16 @@ _HAND_TOOL_SEL = "ht_detail_sel"
 _HAND_TOOL_MODAL_KEY = "ht_detail_modal"
 _HAND_TOOL_CACHE_KEY = "ht_detail_cache"
 _HAND_TOOL_DETAIL_TABLE_KEY = "assets_hand_tools_detail"
-_COLS = [0.12, 0.32, 2.2, 1.15, 0.52, 0.52, 1.15, 1.05, 1.0, 1.1]
+# Eight visible columns — proportions mirror shared CSS grid (--ips-hand-tools-grid).
+_COLS = [3.4, 1.1, 0.65, 0.65, 1.25, 1.1, 0.9, 0.9]
 _HEADER_SPECS: list[tuple[str, str | None]] = [
-    ("", None),
-    ("", None),
     ("Tool", None),
-    ("Cat.", "category"),
-    ("Exp.", None),
-    ("Act.", None),
-    ("Loc.", "location"),
-    ("Stor.", "storage_type"),
-    ("Stat.", "status"),
+    ("Category", "category"),
+    ("Expected", None),
+    ("Actual", None),
+    ("Location", "location"),
+    ("Storage", "storage_type"),
+    ("Status", "status"),
     ("Actions", None),
 ]
 _FILTER_SPECS: list[tuple[str, object]] = [
@@ -522,35 +527,64 @@ def _filter_rows(rows: list[dict], *, q: str = "") -> list[dict]:
     return apply_column_filters(out, _TABLE_KEY, _FILTER_SPECS)
 
 
-def _truncate_table_label(text: str, *, max_len: int = 56) -> str:
-    cleaned = str(text or "").strip()
-    if len(cleaned) <= max_len:
-        return cleaned
-    return f"{cleaned[: max_len - 1].rstrip()}…"
+_PAGE_SIZE_OPTIONS = (50, 75, 100, 150)
 
 
-def _render_hand_tool_name_cell(
+def _render_hand_tools_pagination_header(total: int) -> None:
+    """Pagination summary aligned with the hand-tools table width."""
+    page, page_size, total_pages = pagination_meta(total, _TABLE_KEY)
+    with st.container(key="assets_hand_tools_pg_header"):
+        c1, c2 = st.columns([2.2, 1], gap="small")
+        with c1:
+            st.caption(
+                f"{total:,} tool{'' if total == 1 else 's'}"
+                + (f" · page {page} of {total_pages}" if total_pages > 1 else "")
+            )
+        with c2:
+            picked = st.selectbox(
+                "Rows per page",
+                list(_PAGE_SIZE_OPTIONS),
+                index=_PAGE_SIZE_OPTIONS.index(page_size)
+                if page_size in _PAGE_SIZE_OPTIONS
+                else _PAGE_SIZE_OPTIONS.index(DEFAULT_CATALOG_PAGE_SIZE),
+                key=f"{_TABLE_KEY}_pg_size_select",
+                label_visibility="collapsed",
+            )
+            if int(picked) != page_size:
+                from app.components.table_pagination import page_size_key
+
+                st.session_state[page_size_key(_TABLE_KEY)] = int(picked)
+                reset_table_page(_TABLE_KEY)
+                st.rerun()
+
+
+def _render_tool_column(
     row: dict,
-    name: str,
     *,
+    name: str,
+    image_context: CatalogImageContext,
     on_open_tool: Callable[[dict], None] | None,
     title_attr: str = "",
 ) -> None:
     rid = str(row.get("id") or "").strip()
-    display_name = _truncate_table_label(name)
-    if on_open_tool and rid:
-        st.markdown(
-            f'<span class="ips-hand-tools-name-anchor"{title_attr} aria-hidden="true"></span>',
-            unsafe_allow_html=True,
-        )
-        if st.button(display_name, key=f"ht_open_name_{rid}", type="tertiary", help=name):
-            on_open_tool(row)
-        return
+    thumb = catalog_thumbnail_html(row, kind="small_tool", context=image_context, alt="Small tool image")
     st.markdown(
-        f'<div class="ips-assets-title ips-hand-tools-cell ips-hand-tools-name-text"{title_attr} '
-        f'title="{html.escape(name)}">{html.escape(display_name)}</div>',
+        '<span class="ips-hand-tools-row-bridge small-tools-table-row" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
+    st.markdown(
+        f'<div class="ips-hand-tools-tool-thumb">{thumb}</div>',
+        unsafe_allow_html=True,
+    )
+    if on_open_tool and rid:
+        if st.button(name, key=f"ht_open_name_{rid}", type="tertiary", help=name):
+            on_open_tool(row)
+    else:
+        st.markdown(
+            f'<div class="ips-hand-tools-tool-name ips-hand-tools-tool-name-static"{title_attr} '
+            f'title="{html.escape(name)}">{html.escape(name)}</div>',
+            unsafe_allow_html=True,
+        )
 
 
 def _render_table(
@@ -570,26 +604,26 @@ def _render_table(
             unsafe_allow_html=True,
         )
         header_cols = st.columns(_COLS, gap="small", vertical_alignment="center")
-        for idx, (col, (label, field)) in enumerate(zip(header_cols, _HEADER_SPECS)):
+        for col, (label, field) in zip(header_cols, _HEADER_SPECS):
             with col:
-                if idx == 0:
+                if label == "Tool":
                     st.markdown(
-                        '<span class="small-tools-table-header" aria-hidden="true"></span>',
+                        '<span class="ips-hand-tools-row-bridge small-tools-table-header" aria-hidden="true"></span>',
                         unsafe_allow_html=True,
                     )
+                header_class = "ips-assets-header-row ips-hand-tools-cell ips-hand-tools-header-cell"
+                if label == "Tool":
+                    header_class += " ips-hand-tools-header-tool"
                 if field:
                     render_table_header_cell(
                         label,
                         table_key=_TABLE_KEY,
                         filter_field=field,
                         filter_options=filter_options.get(field, []),
-                        base_class="ips-assets-header-row ips-hand-tools-cell",
+                        base_class=header_class,
                     )
                 else:
-                    render_table_header_cell(
-                        label,
-                        base_class="ips-assets-header-row ips-hand-tools-cell",
-                    )
+                    render_table_header_cell(label, base_class=header_class)
 
         for row in rows:
             rid = str(row.get("id") or "")
@@ -610,52 +644,50 @@ def _render_table(
             )
 
             with cols[0]:
-                st.markdown(
-                    '<span class="ips-hand-tools-row-marker small-tools-table-row" aria-hidden="true"></span>',
-                    unsafe_allow_html=True,
-                )
-            with cols[1]:
-                st.markdown(
-                    catalog_thumbnail_html(row, kind="small_tool", context=image_context, alt="Small tool image"),
-                    unsafe_allow_html=True,
-                )
-            with cols[2]:
-                _render_hand_tool_name_cell(
+                _render_tool_column(
                     row,
-                    name,
+                    name=name,
+                    image_context=image_context,
                     on_open_tool=on_open_tool,
                     title_attr=title_attr,
                 )
-            with cols[3]:
+            with cols[1]:
                 st.markdown(
-                    f'<div class="ips-hand-tools-cell" title="{html.escape(category)}">{html.escape(category)}</div>',
+                    f'<div class="ips-hand-tools-cell ips-hand-tools-cell--category" '
+                    f'title="{html.escape(category)}">{html.escape(category)}</div>',
+                    unsafe_allow_html=True,
+                )
+            with cols[2]:
+                st.markdown(
+                    f'<div class="ips-hand-tools-cell ips-hand-tools-cell--qty">{qty_exp:g}</div>',
+                    unsafe_allow_html=True,
+                )
+            with cols[3]:
+                short_cls = " ips-assets-qty-short" if qty_short else ""
+                st.markdown(
+                    f'<div class="ips-hand-tools-cell ips-hand-tools-cell--qty{short_cls}">'
+                    f"<strong>{qty_act:g}</strong></div>",
                     unsafe_allow_html=True,
                 )
             with cols[4]:
                 st.markdown(
-                    f'<div class="ips-hand-tools-cell ips-hand-tools-qty">{qty_exp:g}</div>',
+                    f'<div class="ips-hand-tools-cell ips-hand-tools-cell--location" '
+                    f'title="{html.escape(location)}">{html.escape(location)}</div>',
                     unsafe_allow_html=True,
                 )
             with cols[5]:
-                short_cls = " ips-assets-qty-short" if qty_short else ""
                 st.markdown(
-                    f'<div class="ips-hand-tools-cell ips-hand-tools-qty{short_cls}"><strong>{qty_act:g}</strong></div>',
+                    f'<div class="ips-hand-tools-cell ips-hand-tools-cell--storage" '
+                    f'title="{html.escape(storage)}">{html.escape(storage)}</div>',
                     unsafe_allow_html=True,
                 )
             with cols[6]:
                 st.markdown(
-                    f'<div class="ips-assets-muted ips-hand-tools-cell" title="{html.escape(location)}">'
-                    f"{html.escape(location)}</div>",
+                    f'<div class="ips-hand-tools-cell ips-hand-tools-cell--status">'
+                    f"{_hand_tool_status_pill_html(status)}</div>",
                     unsafe_allow_html=True,
                 )
             with cols[7]:
-                st.markdown(
-                    f'<div class="ips-hand-tools-cell" title="{html.escape(storage)}">{html.escape(storage)}</div>',
-                    unsafe_allow_html=True,
-                )
-            with cols[8]:
-                st.markdown(_hand_tool_status_pill_html(status), unsafe_allow_html=True)
-            with cols[9]:
                 _render_hand_tool_adjust_action(row)
 
         st.markdown("</div>", unsafe_allow_html=True)
@@ -738,7 +770,7 @@ def render_hand_tools_tab(
     if loc != "All Locations":
         filtered = [r for r in filtered if str(r.get("location_display") or "") == loc]
 
-    render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="tool")
+    _render_hand_tools_pagination_header(len(filtered))
     page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
     _render_table(
         page_rows,
