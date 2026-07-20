@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.auth import effective_role
+from app.auth import current_profile, effective_role
 from app.utils.permissions import normalize_role
 
 
@@ -24,14 +24,11 @@ class CustomerPermissions:
 def load_customer_permissions() -> CustomerPermissions:
     role = str(effective_role() or "").strip()
     norm = normalize_role(role)
-    try:
-        import streamlit as st
-
-        user = st.session_state.get("user") or {}
-    except Exception:
-        user = {}
-    user_id = str(user.get("id") or user.get("sub") or "")
-    user_name = str(user.get("name") or user.get("email") or "")
+    prof = current_profile() or {}
+    user_id = str(prof.get("id") or prof.get("user_id") or "").strip()
+    user_name = str(
+        prof.get("full_name") or prof.get("name") or prof.get("email") or ""
+    ).strip()
     can_manage = norm in {"admin", "supervisor", "manager", "office"}
     return CustomerPermissions(
         role=role,
