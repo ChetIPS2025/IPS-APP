@@ -106,6 +106,23 @@ class TestCustomersDetailFastPath(unittest.TestCase):
         catalog_mock.assert_not_called()
         detail_mock.assert_called()
 
+    def test_detail_pending_skips_list_page_header(self) -> None:
+        st.session_state[customers_page.CUSTOMERS_MODE_KEY] = "detail"
+        st.session_state[customers_page.CUSTOMERS_SELECTED_ID_KEY] = "cust-1"
+
+        with patch("app.pages._core._access.begin_module", return_value=True):
+            with patch.object(customers_page, "render_page_brand_header") as header_mock:
+                with patch.object(customers_page, "render_customer_detail") as detail_mock:
+                    with patch.object(customers_page, "_capture_customer_detail_query"):
+                        with patch.object(customers_page, "load_customer_permissions"):
+                            with patch.object(customers_page, "inject_customers_module_css"):
+                                with patch.object(customers_page, "inject_customers_page_layout_css"):
+                                    with patch.object(customers_page.st, "markdown"):
+                                        customers_page.render()
+
+        header_mock.assert_not_called()
+        detail_mock.assert_called_once()
+
 
 class TestCustomersHeaderBeforeList(unittest.TestCase):
     def test_render_page_header_before_catalog_fragment(self) -> None:

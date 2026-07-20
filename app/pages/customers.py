@@ -2619,12 +2619,6 @@ def render() -> None:
             st.session_state[_NEW_CUSTOMER_DIALOG_KEY] = True
             ips_app_rerun()
 
-    render_page_brand_header(
-        "Customers",
-        "Manage customer companies, locations, and contacts.",
-        actions=[_customers_export, _customers_new],
-    )
-
     _capture_customer_detail_query()
     _show_customer_detail_query_error_if_any()
 
@@ -2633,6 +2627,12 @@ def render() -> None:
             _show_new_customer_dialog()
         render_customer_detail(str(st.session_state[CUSTOMERS_SELECTED_ID_KEY]))
         return
+
+    render_page_brand_header(
+        "Customers",
+        "Manage customer companies, locations, and contacts.",
+        actions=[_customers_export, _customers_new],
+    )
 
     if st.session_state.get(_NEW_CUSTOMER_DIALOG_KEY):
         _show_new_customer_dialog()
