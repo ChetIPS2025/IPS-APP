@@ -17,15 +17,16 @@ def test_build_serialized_tools_html_table_renders_open_links() -> None:
                 "_display_job": "Job 1",
                 "_display_status": "Available",
                 "_display_condition": "Good",
+                "_detail_asset_id": "tool-1",
                 "_thumb_asset": {"id": "tool-1", "asset_name": "M18 Drill"},
             }
         ],
-        is_row_selected=lambda _rid: False,
+        field_mode=False,
     )
     assert 'data-st-action="open"' not in html
     assert 'href="' in html
     assert "asset_detail" in html
     assert "<a " in html
     assert "M18 Drill" in html
-    assert 'data-st-action="select"' in html
+    assert 'data-st-action="select"' not in html
     assert "ips-assets-html-equipment-table" in html

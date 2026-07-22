@@ -25,6 +25,13 @@ def test_asset_detail_href_url_encodes_special_characters():
     assert "ips_nav=assets" in href
 
 
+def test_asset_detail_href_supports_tab_query() -> None:
+    href = asset_detail_href("ast-1", tab="kit")
+    assert "asset_detail=ast-1" in href
+    assert "asset_tab=kit" in href
+    assert "ips_nav=assets" in href
+
+
 def test_asset_detail_href_empty_id_returns_hash():
     assert asset_detail_href("") == "#"
     assert asset_detail_href("   ") == "#"

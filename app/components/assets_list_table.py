@@ -20,17 +20,19 @@ _ASSETS_NAV_QUERY_KEY = "ips_nav"
 _ASSETS_NAV_SLUG = "assets"
 
 
-def asset_detail_href(asset_id: str) -> str:
+def asset_detail_href(asset_id: str, *, tab: str = "") -> str:
     aid = str(asset_id or "").strip()
     if not aid:
         return "#"
 
-    return "?" + urlencode(
-        {
-            _ASSETS_NAV_QUERY_KEY: _ASSETS_NAV_SLUG,
-            "asset_detail": aid,
-        }
-    )
+    params: dict[str, str] = {
+        _ASSETS_NAV_QUERY_KEY: _ASSETS_NAV_SLUG,
+        "asset_detail": aid,
+    }
+    tab_val = str(tab or "").strip()
+    if tab_val:
+        params["asset_tab"] = tab_val
+    return "?" + urlencode(params)
 
 
 def assets_bridge_button_key(asset: dict[str, Any]) -> str:

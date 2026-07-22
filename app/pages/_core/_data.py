@@ -910,6 +910,11 @@ def clear_assets_catalog_cache() -> None:
     from app.pages._core.page_data_cache import clear_page_data_cache_prefix
 
     clear_page_data_cache_prefix("assets_equipment_tab_")
+    from app.services.assets_directory_service import invalidate_assets_directory_cache
+    from app.services.serialized_tools_directory_service import invalidate_serialized_tools_directory_cache
+
+    invalidate_assets_directory_cache()
+    invalidate_serialized_tools_directory_cache()
     from app.services.assets_service import invalidate_assets_modal_cache
 
     invalidate_assets_modal_cache()

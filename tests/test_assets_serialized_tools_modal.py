@@ -1,9 +1,13 @@
-"""Regression tests: Serialized Tools must app-rerun to open asset detail modal."""
+"""Regression tests: Serialized Tools native links and field-mode bridge."""
 
 from __future__ import annotations
 
-import inspect
 from pathlib import Path
+
+from app.components.serialized_tools_list_table import (
+    build_serialized_tools_html_table,
+    serialized_tool_detail_href,
+)
 
 
 def _assets_source() -> str:
@@ -11,49 +15,61 @@ def _assets_source() -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_serialized_tools_open_bridge_uses_clean_table() -> None:
-    from app.components.serialized_tools_list_table import render_serialized_tools_table_open_bridge
-
-    src = inspect.getsource(render_serialized_tools_table_open_bridge)
-    assert "render_clean_table_click_bridge" in src
-    assert ".ips-serialized-tools-html-table" in src
-
-
-def test_serialized_tools_open_buttons_use_on_click_callback() -> None:
-    from app.components.serialized_tools_list_table import render_serialized_tools_table_open_buttons
-
-    src = inspect.getsource(render_serialized_tools_table_open_buttons)
-    assert "on_click=_open" in src
-    assert "ips_app_rerun()" not in src
+def test_serialized_tool_detail_href_uses_asset_detail_query() -> None:
+    href = serialized_tool_detail_href(
+        {
+            "row_type": "asset",
+            "id": "tool-1",
+            "_detail_asset_id": "tool-1",
+        }
+    )
+    assert "asset_detail=tool-1" in href
+    assert "ips_nav=assets" in href
 
 
-def test_serialized_tool_table_open_prepares_modal() -> None:
-    from app.pages import assets as assets_page
-
-    src = inspect.getsource(assets_page._open_serialized_tool_table_row)
-    assert "_prepare_open_small_tool_row(" in src
-    assert "ips_app_rerun()" not in src
-
-
-def test_serialized_tool_table_select_prepares_modal_without_callback_rerun() -> None:
-    from app.pages import assets as assets_page
-
-    select_src = inspect.getsource(assets_page._select_serialized_tool_table_row)
-    assert "_prepare_open_small_tool_row(" in select_src
-    assert "ips_app_rerun()" not in select_src
+def test_serialized_kit_item_links_to_parent_kit_tab() -> None:
+    href = serialized_tool_detail_href(
+        {
+            "row_type": "kit_item",
+            "parent_asset_id": "parent-1",
+            "_detail_asset_id": "parent-1",
+            "_detail_tab": "kit",
+        }
+    )
+    assert "asset_detail=parent-1" in href
+    assert "asset_tab=kit" in href
 
 
-def test_serialized_tools_table_uses_html_bridge() -> None:
+def test_serialized_tools_table_uses_native_links_without_open_bridge() -> None:
     src = _assets_source()
-    assert "build_serialized_tools_html_table" in src
-    assert "render_serialized_tools_table_bridge_legacy" in src
-    table_block = src.split("def _render_small_tools_table(")[1].split("def _equipment_summary_counts")[0]
-    assert "_render_serialized_tool_name_cell" not in src
-    assert "_on_small_tool_checkbox_change" not in src
-    assert 'key="assets_table_wrap"' in table_block
-    assert "assets_small_tools_table_wrap" not in table_block
-    assert "render_serialized_tools_table_open_buttons" not in table_block
+    table_block = src.split("def _render_small_tools_table(")[1].split("@fragment\ndef _render_equipment_list")[0]
+    assert "build_serialized_tools_html_table" in table_block
     assert "render_serialized_tools_table_bridge_legacy" in table_block
+    assert "if field_mode:" in table_block
+    assert "render_serialized_tools_table_open_buttons" not in table_block
+
+
+def test_serialized_tools_normal_mode_html_has_no_select_column() -> None:
+    html = build_serialized_tools_html_table(
+        [
+            {
+                "_row_id": "tool-1",
+                "_display_name": "Drill",
+                "_display_model": "M18",
+                "_display_serial": "SN-1",
+                "_display_trailer": "Trailer",
+                "_display_job": "—",
+                "_display_status": "Available",
+                "_display_condition": "Good",
+                "_detail_asset_id": "tool-1",
+                "_thumb_asset": {"id": "tool-1", "asset_name": "Drill"},
+            }
+        ],
+        field_mode=False,
+    )
+    assert 'data-st-action="select"' not in html
+    assert "<a " in html
+    assert "asset_detail=tool-1" in html
 
 
 def test_equipment_table_uses_field_mode_bridge_only() -> None:
@@ -75,10 +91,11 @@ def test_asset_fragments_escalate_modal_to_app_rerun() -> None:
     )[0]
     assert "_rerun_if_assets_modal_pending()" in equipment_block
     assert "_rerun_if_assets_modal_pending()" in serialized_block
-    assert "_show_assets_modal_if_selected" not in equipment_block
-    assert "_show_assets_modal_if_selected" not in serialized_block
 
 
-def test_asset_modal_shown_from_render_not_fragments() -> None:
+def test_render_uses_directory_services_not_load_assets() -> None:
     src = _assets_source()
-    assert src.count("_show_assets_modal_if_selected()") == 2  # definition + render()
+    render_block = src.split("def render() -> None:")[1]
+    assert "load_assets()" not in render_block
+    assert "list_equipment_page" in src
+    assert "list_serialized_tools_page" in src

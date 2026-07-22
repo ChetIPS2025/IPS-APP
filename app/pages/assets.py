@@ -27,12 +27,10 @@ from app.components.item_photo_manager import render_item_photo_manager
 from app.components.layout import render_filter_bar as layout_filter_bar
 from app.components.table_filters import (
     apply_column_filters,
-    build_filter_options,
     clear_table_filters,
     render_table_header_cell,
 )
 from app.components.table_pagination import (
-    paginate_rows,
     render_table_pagination_footer,
     render_table_pagination_header,
     reset_table_page,
@@ -57,7 +55,7 @@ from app.components.record_modal import (
     set_view_mode,
     show_modal_if_pending,
 )
-from app.pages._core._data import load_assets, lookup_options, persist_asset
+from app.pages._core._data import lookup_options, persist_asset
 from app.pages._core._crud import is_demo_id
 from app.pages._core._session import select_key
 from app.components.assets_css import inject_assets_page_css
@@ -89,7 +87,6 @@ from app.services.asset_rental_service import (
     primary_rental_rate_from_asset,
 )
 from app.services.phase2_modules_service import asset_is_rentable
-from app.services.asset_kits_service import list_all_kit_items_enriched
 from app.components.serialized_tools_ui import (
     render_serialized_tool_tracking_panel,
     render_serialized_tools_toolbar,
@@ -112,6 +109,8 @@ from app.components.serialized_tools_list_table import (
     build_serialized_tools_html_table,
     render_serialized_tools_table_bridge_legacy,
 )
+from app.services.assets_directory_service import list_equipment_page
+from app.services.serialized_tools_directory_service import list_serialized_tools_page
 from app.components.assets_page_layout import (
     close_assets_filter_bar_shell,
     render_assets_filter_bar_shell,
@@ -128,8 +127,8 @@ from app.components.small_hand_tools_import_ui import (
     show_hand_tool_import_dialog,
 )
 from app.pages.asset_kits_ui import render_kit_accountability_summary, render_kit_contents_tab
-from app.services.asset_classification_service import is_equipment_tab_asset, tracking_type_label
-from app.services.serialized_tool_service import is_serialized_tool_asset, serialized_tool_view
+from app.services.asset_classification_service import tracking_type_label
+from app.services.serialized_tool_service import is_serialized_tool_asset
 from app.utils.field_context import (
     FIELD_EXPANDED_ASSET_KEY,
     clear_field_expanded,
@@ -172,13 +171,6 @@ _SMALL_TOOL_FILTER_COLUMN_LAYOUT: list[tuple[str | None, str | None]] = [
 _SMALL_TOOL_FILTER_COL_WEIGHTS: list[int] = [
     SERIALIZED_TOOLS_TABLE_COL_WIDTHS_PX[key]
     for key in ("select", "image", "name", "model", "serial", "trailer", "job", "status", "condition")
-]
-_SMALL_TOOL_FILTER_SPECS: list[tuple[str, object]] = [
-    ("model_number", lambda r: _small_tool_model_number(r)),
-    ("trailer", lambda r: _small_tool_trailer_label(r)),
-    ("job", lambda r: _small_tool_job_label(r)),
-    ("status", lambda r: _small_tool_status(r)),
-    ("condition", lambda r: _small_tool_condition_label(r)),
 ]
 _ASSETS_FILTER_SPECS: list[tuple[str, str]] = [
     ("CATEGORY", "category"),
@@ -236,228 +228,6 @@ def _asset_rentable_badge_html(row: dict) -> str:
     return '<span class="ips-asset-rental-badge" title="Rental equipment">RENTAL</span>'
 
 
-def _is_serialized_tab_asset(row: dict) -> bool:
-    """Assets that belong on the Serialized Tools tab."""
-    return is_serialized_tool_asset(row)
-
-
-def _small_tool_context_maps(rows: list[dict]) -> tuple[dict[str, dict], dict[str, dict], dict[str, dict]]:
-    from app.pages._core._data import load_employees, load_jobs
-    from app.pages._core.page_data_cache import page_data_cache_get
-
-    assets_by_id = {
-        str(a.get("id") or "").strip(): a for a in rows if str(a.get("id") or "").strip()
-    }
-
-    def _load_reference_maps() -> tuple[dict[str, dict], dict[str, dict]]:
-        employees_by_id = {
-            str(e.get("id") or "").strip(): e
-            for e in load_employees()
-            if str(e.get("id") or "").strip()
-        }
-        jobs_by_id = {
-            str(j.get("id") or "").strip(): j for j in load_jobs() if str(j.get("id") or "").strip()
-        }
-        return employees_by_id, jobs_by_id
-
-    employees_by_id, jobs_by_id = page_data_cache_get(
-        "assets_serialized_context",
-        _load_reference_maps,
-    )
-    return assets_by_id, employees_by_id, jobs_by_id
-
-
-def _small_tool_tracking_view(
-    row: dict,
-    *,
-    assets_by_id: dict[str, dict],
-    employees_by_id: dict[str, dict],
-    jobs_by_id: dict[str, dict],
-) -> dict:
-    return serialized_tool_view(
-        row,
-        assets_by_id=assets_by_id,
-        employees_by_id=employees_by_id,
-        jobs_by_id=jobs_by_id,
-    )
-
-
-def _asset_model_number(row: dict) -> str:
-    val = str(row.get("model_number") or row.get("model") or "").strip()
-    return val if val and val != "—" else "—"
-
-
-def _small_tool_model_number(row: dict, *, view: dict | None = None) -> str:
-    v = view or {}
-    val = str(v.get("model_number") or v.get("model") or "").strip()
-    if val and val != "—":
-        return val
-    return _asset_model_number(row)
-
-
-def _small_tool_serial(row: dict, *, view: dict | None = None) -> str:
-    v = view or {}
-    serial = str(v.get("serial_number") or "").strip()
-    if serial:
-        return serial
-    if str(row.get("row_type") or "") == "kit_item":
-        return _small_tool_asset_number(row)
-    return _asset_serial(row)
-
-
-def _small_tool_trailer_label(row: dict, *, view: dict | None = None) -> str:
-    v = view or {}
-    label = str(v.get("current_container_label") or "").strip()
-    if label:
-        return label
-    return _small_tool_parent_kit(row)
-
-
-def _small_tool_job_label(row: dict, *, view: dict | None = None) -> str:
-    v = view or {}
-    return str(v.get("current_job_label") or "").strip() or "—"
-
-
-def _small_tool_condition_label(row: dict, *, view: dict | None = None) -> str:
-    v = view or {}
-    return str(v.get("condition") or row.get("condition") or "Good").strip() or "Good"
-
-
-def _small_tool_row_id(row: dict) -> str:
-    if str(row.get("row_type") or "") == "kit_item":
-        return f"kititem_{row.get('id') or ''}"
-    return str(row.get("id") or "")
-
-
-def _small_tool_name(row: dict) -> str:
-    if str(row.get("row_type") or "") == "kit_item":
-        return str(row.get("item_name") or "—").strip() or "—"
-    return _asset_name(row)
-
-
-def _small_tool_asset_number(row: dict) -> str:
-    if str(row.get("row_type") or "") == "kit_item":
-        serial = str(row.get("serial_number") or "").strip()
-        if serial:
-            return serial
-        return "—"
-    return _asset_number(row)
-
-
-def _small_tool_parent_kit(row: dict) -> str:
-    if str(row.get("row_type") or "") == "kit_item":
-        parent = str(row.get("parent_asset_name") or "—").strip() or "—"
-        number = str(row.get("parent_asset_number") or "").strip()
-        if number and number != "—":
-            return f"{number} · {parent}"
-        return parent
-    return "—"
-
-
-def _small_tool_status(row: dict) -> str:
-    if str(row.get("row_type") or "") == "kit_item":
-        return str(row.get("status") or "Present").strip() or "Present"
-    return _normalize_asset_status(row.get("status"))
-
-
-def _kit_item_has_serial(item: dict) -> bool:
-    serial = str(item.get("serial_number") or "").strip()
-    return bool(serial and serial not in {"—", "-", "none", "null"})
-
-
-def _build_serialized_tool_list(all_assets: list[dict]) -> list[dict]:
-    """Milwaukee / serial-numbered tools only — quantity hand tools use the Small Tools tab."""
-    assets_by_id = {
-        str(a.get("id") or "").strip(): a for a in all_assets if str(a.get("id") or "").strip()
-    }
-    tool_asset_ids = {str(a.get("id") or "").strip() for a in all_assets if _is_serialized_tab_asset(a)}
-
-    unified: list[dict] = []
-    for asset in all_assets:
-        if _is_serialized_tab_asset(asset):
-            unified.append({**asset, "row_type": "asset"})
-
-    for item in list_all_kit_items_enriched(assets_by_id):
-        child_id = str(item.get("child_asset_id") or "").strip()
-        if child_id and child_id in tool_asset_ids:
-            continue
-        if not _kit_item_has_serial(item) and not child_id:
-            continue
-        unified.append(item)
-
-    return unified
-
-
-def _filter_small_tool_rows(
-    rows: list[dict],
-    *,
-    q: str = "",
-    status: str = "All Statuses",
-    parent_kit: str = "All Trailers",
-    assets_by_id: dict[str, dict] | None = None,
-    employees_by_id: dict[str, dict] | None = None,
-    jobs_by_id: dict[str, dict] | None = None,
-) -> list[dict]:
-    assets_by_id = assets_by_id or {}
-    employees_by_id = employees_by_id or {}
-    jobs_by_id = jobs_by_id or {}
-    out = list(rows)
-    if q:
-        ql = q.lower()
-        out = [
-            r
-            for r in out
-            if ql in _small_tool_name(r).lower()
-            or ql in _small_tool_model_number(
-                r,
-                view=_small_tool_tracking_view(
-                    r,
-                    assets_by_id=assets_by_id,
-                    employees_by_id=employees_by_id,
-                    jobs_by_id=jobs_by_id,
-                ),
-            ).lower()
-            or ql in _small_tool_serial(
-                r,
-                view=_small_tool_tracking_view(
-                    r,
-                    assets_by_id=assets_by_id,
-                    employees_by_id=employees_by_id,
-                    jobs_by_id=jobs_by_id,
-                ),
-            ).lower()
-            or ql in _small_tool_trailer_label(
-                r,
-                view=_small_tool_tracking_view(
-                    r,
-                    assets_by_id=assets_by_id,
-                    employees_by_id=employees_by_id,
-                    jobs_by_id=jobs_by_id,
-                ),
-            ).lower()
-        ]
-    status_val = str(status or "All Statuses").strip()
-    if status_val and status_val != "All Statuses":
-        out = [r for r in out if _small_tool_status(r) == status_val]
-    parent_val = str(parent_kit or "All Trailers").strip()
-    if parent_val and parent_val not in {"All Trailers", "All Kits"}:
-        out = [
-            r
-            for r in out
-            if _small_tool_trailer_label(
-                r,
-                view=_small_tool_tracking_view(
-                    r,
-                    assets_by_id=assets_by_id,
-                    employees_by_id=employees_by_id,
-                    jobs_by_id=jobs_by_id,
-                ),
-            )
-            == parent_val
-        ]
-    return apply_column_filters(out, _SMALL_TOOLS_TABLE_KEY, _SMALL_TOOL_FILTER_SPECS)
-
-
 def _small_tool_select_key(row_id: str) -> str:
     return f"small_tool_select_{row_id}"
 
@@ -507,21 +277,21 @@ def _open_hand_tool_row(row: dict) -> None:
     _prepare_open_hand_tool_row(row)
 
 
-def _prepare_open_small_tool_row(row: dict, assets_by_id: dict[str, dict]) -> None:
+def _prepare_open_small_tool_row(row: dict, assets_by_id: dict[str, dict] | None = None) -> None:
     """Set serialized tool detail modal state (caller must app-rerun to show dialog)."""
+    lookup = assets_by_id or {}
     if str(row.get("row_type") or "") == "kit_item":
         parent_id = str(row.get("parent_asset_id") or "").strip()
         if parent_id:
-            _open_assets_detail_modal(parent_id, assets_by_id.get(parent_id))
+            parent = lookup.get(parent_id) or _cached_asset_for_modal(parent_id)
+            _open_assets_detail_modal(parent_id, parent, tab_focus="Kit")
         return
-    aid = str(row.get("id") or "").strip()
+    aid = str(row.get("id") or row.get("_detail_asset_id") or "").strip()
     if aid:
-        _open_assets_detail_modal(aid, row)
-
-
-def _open_small_tool_row(row: dict, assets_by_id: dict[str, dict]) -> None:
-    _prepare_open_small_tool_row(row, assets_by_id)
-    ips_app_rerun()
+        asset = lookup.get(aid) or row if str(row.get("row_type") or "") == "asset" else None
+        if asset is None:
+            asset = _cached_asset_for_modal(aid)
+        _open_assets_detail_modal(aid, asset)
 
 
 def _open_serialized_tool_table_row(_row_id: str, row: dict, assets_by_id: dict[str, dict]) -> None:
@@ -558,51 +328,6 @@ def _select_serialized_tool_table_row(
             modal_key=_ASSETS_MODAL_KEY,
             module=_MOD,
         )
-
-
-def _serialized_tool_display_rows(
-    filtered: list[dict],
-    *,
-    assets_by_id: dict[str, dict],
-    employees_by_id: dict[str, dict],
-    jobs_by_id: dict[str, dict],
-) -> list[dict]:
-    display_rows: list[dict] = []
-    for row in filtered:
-        rid = _small_tool_row_id(row)
-        if not rid:
-            continue
-        view = _small_tool_tracking_view(
-            row,
-            assets_by_id=assets_by_id,
-            employees_by_id=employees_by_id,
-            jobs_by_id=jobs_by_id,
-        )
-        display_rows.append(
-            {
-                **row,
-                "_row_id": rid,
-                "_display_name": _small_tool_name(row),
-                "_display_model": _small_tool_model_number(row, view=view),
-                "_display_serial": _small_tool_serial(row, view=view),
-                "_display_trailer": _small_tool_trailer_label(row, view=view),
-                "_display_job": _small_tool_job_label(row, view=view),
-                "_display_status": _small_tool_status(row),
-                "_display_condition": _small_tool_condition_label(row, view=view),
-                "_thumb_asset": _small_tool_image_asset(row, assets_by_id),
-            }
-        )
-    return display_rows
-
-
-def _small_tool_image_asset(row: dict, assets_by_id: dict[str, dict]) -> dict:
-    if str(row.get("row_type") or "") == "kit_item":
-        child_id = str(row.get("child_asset_id") or "").strip()
-        if child_id:
-            linked = assets_by_id.get(child_id)
-            if linked:
-                return linked
-    return row
 
 
 def _asset_location(row: dict) -> str:
@@ -851,26 +576,15 @@ def _render_small_tools_table_column_filters(
 
 
 def _render_small_tools_table(
-    filtered: list[dict],
+    display_rows: list[dict],
     *,
     filter_options: dict[str, list[str]],
-    assets_by_id: dict[str, dict],
-    employees_by_id: dict[str, dict],
-    jobs_by_id: dict[str, dict],
+    field_mode: bool = False,
 ) -> None:
-    if not filtered:
+    if not display_rows:
         st.info("No serialized tools match your filters.")
-        st.session_state[_ALL_SMALL_TOOL_IDS_KEY] = []
         return
 
-    display_rows = _serialized_tool_display_rows(
-        filtered,
-        assets_by_id=assets_by_id,
-        employees_by_id=employees_by_id,
-        jobs_by_id=jobs_by_id,
-    )
-    all_row_ids = [str(row.get("_row_id") or "") for row in display_rows if str(row.get("_row_id") or "")]
-    st.session_state[_ALL_SMALL_TOOL_IDS_KEY] = all_row_ids
     row_by_id = {
         str(row.get("_row_id") or ""): row for row in display_rows if str(row.get("_row_id") or "")
     }
@@ -879,87 +593,65 @@ def _render_small_tools_table(
         return bool(st.session_state.get(_small_tool_select_key(row_id)))
 
     def _open_row(row_id: str, row: dict) -> None:
-        _open_serialized_tool_table_row(row_id, row, assets_by_id)
+        _open_serialized_tool_table_row(row_id, row, {})
 
     def _select_row(row_id: str, checked: bool) -> None:
         _select_serialized_tool_table_row(
             row_id,
             checked,
-            all_row_ids=all_row_ids,
+            all_row_ids=list(row_by_id.keys()),
             row_by_id=row_by_id,
-            assets_by_id=assets_by_id,
+            assets_by_id={},
         )
 
     with st.container(key="assets_table_wrap"):
         _render_small_tools_table_column_filters(filter_options=filter_options)
         st.markdown(
-            build_serialized_tools_html_table(display_rows, is_row_selected=_is_row_selected),
+            build_serialized_tools_html_table(
+                display_rows,
+                field_mode=field_mode,
+                is_row_selected=_is_row_selected if field_mode else None,
+            ),
             unsafe_allow_html=True,
         )
-        render_serialized_tools_table_bridge_legacy(
-            row_by_id,
-            open_row_fn=_open_row,
-            select_row_fn=_select_row,
-        )
-
-
-def _equipment_summary_counts(rows: list[dict]) -> dict[str, int]:
-    """UI-only counts for equipment summary cards (uses already-loaded rows)."""
-    counts = {
-        "total": len(rows),
-        "available": 0,
-        "checked_out": 0,
-        "out_for_repair": 0,
-        "service_due": 0,
-    }
-    for row in rows:
-        status = _normalize_asset_status(row.get("status"))
-        if status in ("Available", "In Service"):
-            counts["available"] += 1
-        elif status in ("Checked Out", "Assigned"):
-            counts["checked_out"] += 1
-        elif status == "Out for Repair":
-            counts["out_for_repair"] += 1
-        if status == "Maintenance Due":
-            counts["service_due"] += 1
-    return counts
+        if field_mode:
+            render_serialized_tools_table_bridge_legacy(
+                row_by_id,
+                open_row_fn=_open_row,
+                select_row_fn=_select_row,
+                field_mode=True,
+            )
 
 
 @fragment
-def _render_equipment_list(
-    rows: list[dict],
-) -> None:
+def _render_equipment_list() -> None:
     """Equipment tab filters and table — local reruns avoid full page reload."""
-    from app.pages._core.page_data_cache import page_data_cache_get
+    from app.components.table_pagination import pagination_meta
     from app.perf_debug import perf_span
 
-    catalog_version = _assets_catalog_version()
+    search = str(st.session_state.get("ast_search") or "").strip()
+    status = str(st.session_state.get("ast_bar_status") or "All Statuses")
+    statuses = [status] if status and status != "All Statuses" else None
 
-    with perf_span("assets.equipment_rows"):
-        def _equipment_rows() -> list[dict]:
-            return [r for r in rows if is_equipment_tab_asset(r)]
-
-        equipment_rows = page_data_cache_get(
-            f"assets_equipment_tab_{catalog_version}",
-            _equipment_rows,
+    with perf_span("assets.equipment.list_query"):
+        equip_page = list_equipment_page(
+            search=search,
+            statuses=statuses,
+            page=1,
+            page_size=50,
         )
-
-    with perf_span("assets.filter_metadata"):
-        def _filter_metadata() -> tuple[dict[str, list[str]], list[str]]:
-            options = build_filter_options(equipment_rows, _COLUMN_FILTER_SPECS)
-            statuses = sorted(
-                {
-                    _normalize_asset_status(r.get("status"))
-                    for r in equipment_rows
-                    if _normalize_asset_status(r.get("status"))
-                }
+    page_num, page_size, _ = pagination_meta(equip_page.total_count, _TABLE_KEY)
+    if page_num != equip_page.page or page_size != equip_page.page_size:
+        with perf_span("assets.equipment.list_query"):
+            equip_page = list_equipment_page(
+                search=search,
+                statuses=statuses,
+                page=page_num,
+                page_size=page_size,
             )
-            return options, statuses
 
-        filter_options, status_options = page_data_cache_get(
-            f"assets_equipment_filter_meta_{catalog_version}",
-            _filter_metadata,
-        )
+    filter_options = equip_page.filter_options
+    status_options = filter_options.get("status") or []
 
     def _filters() -> None:
         c1, c2, c3 = st.columns([3.2, 2.2, 0.6])
@@ -1000,58 +692,66 @@ def _render_equipment_list(
             st.session_state[_BULK_MOVE_OPEN_KEY] = True
             fragment_rerun()
     if st.session_state.get(_BULK_MOVE_OPEN_KEY):
-        assets_lookup = {
-            str(a.get("id") or "").strip(): a for a in rows if str(a.get("id") or "").strip()
-        }
+        selected_ids = _get_selected_asset_ids()
+        assets_lookup: dict[str, dict] = {}
+        if selected_ids:
+            from app.services.repository import fetch_by_id
+
+            for aid in selected_ids:
+                row = fetch_by_id("assets", aid)
+                if isinstance(row, dict):
+                    assets_lookup[aid] = row
         render_equipment_bulk_move_toolbar(
-            _get_selected_asset_ids(),
+            selected_ids,
             assets_lookup,
             on_clear_selection=lambda: _clear_asset_selection(st.session_state.get(_ALL_ASSET_IDS_KEY)),
             on_success_cache_clear=_clear_assets_catalog_cache,
         )
 
-    with perf_span("assets.filter_rows"):
-        filtered = _filter_rows(
-            equipment_rows,
-            q=str(st.session_state.get("ast_search") or "").strip(),
-            status=str(st.session_state.get("ast_bar_status") or "All Statuses"),
-        )
+    with perf_span("assets.equipment.pagination"):
+        render_table_pagination_header(equip_page.total_count, _TABLE_KEY, item_label="asset")
+        render_table_pagination_footer(equip_page.total_count, _TABLE_KEY)
 
-    with perf_span("assets.pagination"):
-        render_table_pagination_header(len(filtered), _TABLE_KEY, item_label="asset")
-        page_rows, _, _, _ = paginate_rows(filtered, _TABLE_KEY)
-        render_table_pagination_footer(len(filtered), _TABLE_KEY)
-
-    _render_custom_assets_table(page_rows, filter_options=filter_options)
+    with perf_span("assets.equipment.table_html"):
+        _render_custom_assets_table(equip_page.rows, filter_options=filter_options)
     _rerun_if_assets_modal_pending()
 
 
 @fragment
-def _render_small_tools_list(rows: list[dict]) -> None:
+def _render_small_tools_list() -> None:
     """Serialized tools tab filters and table — local reruns avoid full page reload."""
-    assets_by_id, employees_by_id, jobs_by_id = _small_tool_context_maps(rows)
-    small_tool_rows = _build_serialized_tool_list(rows)
-    enriched_rows = [
-        {
-            **r,
-            **_small_tool_tracking_view(
-                r,
-                assets_by_id=assets_by_id,
-                employees_by_id=employees_by_id,
-                jobs_by_id=jobs_by_id,
-            ),
-        }
-        for r in small_tool_rows
-    ]
-    filter_options = build_filter_options(enriched_rows, _SMALL_TOOL_FILTER_SPECS)
-    parent_kits = sorted(
-        {
-            _small_tool_trailer_label(r)
-            for r in enriched_rows
-            if _small_tool_trailer_label(r) and _small_tool_trailer_label(r) != "—"
-        }
-    )
-    status_options = sorted({_small_tool_status(r) for r in small_tool_rows if _small_tool_status(r)})
+    from app.components.table_pagination import pagination_meta
+    from app.perf_debug import perf_span
+
+    search = str(st.session_state.get("ast_st_search") or "").strip()
+    status = str(st.session_state.get("ast_st_status") or "All Statuses")
+    parent_kit = str(st.session_state.get("ast_st_parent_kit") or "All Trailers")
+    statuses = [status] if status and status != "All Statuses" else None
+    trailers = [parent_kit] if parent_kit and parent_kit not in {"All Trailers", "All Kits"} else None
+    field_mode = is_field_context()
+
+    with perf_span("assets.serialized.list_query"):
+        tools_page = list_serialized_tools_page(
+            search=search,
+            statuses=statuses,
+            trailers=trailers,
+            page=1,
+            page_size=50,
+        )
+    page_num, page_size, _ = pagination_meta(tools_page.total_count, _SMALL_TOOLS_TABLE_KEY)
+    if page_num != tools_page.page or page_size != tools_page.page_size:
+        with perf_span("assets.serialized.list_query"):
+            tools_page = list_serialized_tools_page(
+                search=search,
+                statuses=statuses,
+                trailers=trailers,
+                page=page_num,
+                page_size=page_size,
+            )
+
+    filter_options = tools_page.filter_options
+    parent_kits = filter_options.get("trailer") or []
+    status_options = filter_options.get("status") or []
 
     def _filters() -> None:
         c1, c2, c3, c4 = st.columns([2.4, 1.2, 1.2, 0.6])
@@ -1095,27 +795,16 @@ def _render_small_tools_list(rows: list[dict]) -> None:
 
     render_serialized_tools_toolbar()
 
-    filtered = _filter_small_tool_rows(
-        small_tool_rows,
-        q=str(st.session_state.get("ast_st_search") or "").strip(),
-        status=str(st.session_state.get("ast_st_status") or "All Statuses"),
-        parent_kit=str(st.session_state.get("ast_st_parent_kit") or "All Trailers"),
-        assets_by_id=assets_by_id,
-        employees_by_id=employees_by_id,
-        jobs_by_id=jobs_by_id,
-    )
+    with perf_span("assets.serialized.pagination"):
+        render_table_pagination_header(tools_page.total_count, _SMALL_TOOLS_TABLE_KEY, item_label="tool")
+        render_table_pagination_footer(tools_page.total_count, _SMALL_TOOLS_TABLE_KEY)
 
-    render_table_pagination_header(len(filtered), _SMALL_TOOLS_TABLE_KEY, item_label="tool")
-    page_rows, _, _, _ = paginate_rows(filtered, _SMALL_TOOLS_TABLE_KEY)
-    render_table_pagination_footer(len(filtered), _SMALL_TOOLS_TABLE_KEY)
-
-    _render_small_tools_table(
-        page_rows,
-        filter_options=filter_options,
-        assets_by_id=assets_by_id,
-        employees_by_id=employees_by_id,
-        jobs_by_id=jobs_by_id,
-    )
+    with perf_span("assets.serialized.table_html"):
+        _render_small_tools_table(
+            tools_page.rows,
+            filter_options=filter_options,
+            field_mode=field_mode,
+        )
     _rerun_if_assets_modal_pending()
 
 
@@ -1234,7 +923,7 @@ def _cached_asset_for_modal(asset_id: str) -> dict | None:
     """Resolve one asset for the detail modal without building a full-page cache."""
     from app.perf_debug import perf_span
 
-    with perf_span("assets.modal_lookup"):
+    with perf_span("assets.detail_lookup"):
         aid = str(asset_id or "").strip()
         if not aid:
             return None
@@ -1251,7 +940,9 @@ def _cached_asset_for_modal(asset_id: str) -> dict | None:
             asset = normalize_asset(raw)
             _put_asset_in_modal_cache(aid, asset)
             return asset
-        for row in load_assets():
+        from app.pages._core._data import _DEMO_ASSETS
+
+        for row in _DEMO_ASSETS:
             if str(row.get("id") or "").strip() == aid:
                 asset = normalize_asset(row)
                 _put_asset_in_modal_cache(aid, asset)
@@ -1832,7 +1523,6 @@ def _render_asset_detail_tabs(asset: dict) -> None:
     aid = str(asset.get("id") or "")
     asset_number = safe_value(asset.get("asset_number"))
     asset_name = safe_value(asset.get("asset_name"))
-    status = safe_value(asset.get("status"))
 
     focus = str(st.session_state.pop(ASSET_DETAIL_TAB_FOCUS_KEY, "") or "").strip()
     resolved_focus = _resolve_asset_detail_tab_name(focus) if focus else None
@@ -2137,6 +1827,62 @@ def _show_assets_detail_modal() -> None:
     render_asset_detail_dialog(asset)
 
 
+@st.dialog("New Asset", width="large")
+def _show_new_asset_dialog() -> None:
+    from app.perf_debug import perf_span
+
+    with perf_span("assets.new_form"):
+        st.text_input("Asset #", key="ast_new_num")
+        st.text_input("Asset name", key="ast_new_name")
+        st.text_input("Model #", key="ast_new_model_number")
+        st.selectbox("Category", lookup_options("asset_categories"), key="ast_new_cat")
+        st.selectbox("Status", lookup_options("asset_statuses"), key="ast_new_status")
+        _render_asset_rental_pricing_fields(new_asset=True)
+        st.file_uploader(
+            "Upload asset image",
+            type=list(ITEM_IMAGE_UPLOAD_TYPES),
+            key="ast_new_image",
+        )
+        save_col, cancel_col = st.columns(2)
+        with save_col:
+            save_clicked = st.button("Save Asset", key="ast_save_new", type="primary")
+        with cancel_col:
+            cancel_clicked = st.button("Cancel", key="ast_cancel_new")
+        if cancel_clicked:
+            return
+        if save_clicked:
+            from app.services.assets_service import save_asset
+
+            result = save_asset(
+                {
+                    "asset_number": st.session_state.get("ast_new_num"),
+                    "asset_name": st.session_state.get("ast_new_name"),
+                    "model_number": st.session_state.get("ast_new_model_number"),
+                    "category": st.session_state.get("ast_new_cat"),
+                    "status": st.session_state.get("ast_new_status"),
+                    **_rental_fields_from_session(_asset_rental_session_keys(new_asset=True)),
+                }
+            )
+            if not result.ok:
+                st.error(result.error or "Could not save asset.")
+            else:
+                new_id = ""
+                if isinstance(result.data, dict):
+                    new_id = str(result.data.get("id") or "").strip()
+                uploaded_file = st.session_state.get("ast_new_image")
+                if uploaded_file is not None and new_id and not is_demo_id(new_id):
+                    upload_result = upload_asset_image(
+                        new_id,
+                        uploaded_file,
+                        uploaded_by=_current_user_id(),
+                    )
+                    if not upload_result.ok:
+                        st.warning(upload_result.error or "Asset saved, but image upload failed.")
+                _clear_assets_catalog_cache()
+                st.success("Asset saved.")
+                st.rerun()
+
+
 def render() -> None:
     from app.pages._core._access import begin_module
     if not begin_module("assets"):
@@ -2186,7 +1932,7 @@ def render() -> None:
                 open_quick_add_tool_dialog()
         with new_col:
             if st.button("+ New Asset", key="ast_new", type="secondary"):
-                st.session_state[_SHOW_NEW_ASSET_FORM_KEY] = True
+                _show_new_asset_dialog()
 
     from app.ui.page_header import render_page_header
 
@@ -2225,62 +1971,6 @@ def render() -> None:
     if is_field_context():
         render_field_scan_bar(("🔧 Scan Asset", "scan_asset"))
 
-    if _SHOW_NEW_ASSET_FORM_KEY not in st.session_state:
-        st.session_state[_SHOW_NEW_ASSET_FORM_KEY] = False
-
-    if st.session_state.get(_SHOW_NEW_ASSET_FORM_KEY):
-        with st.expander("New Asset", expanded=True):
-            st.text_input("Asset #", key="ast_new_num")
-            st.text_input("Asset name", key="ast_new_name")
-            st.text_input("Model #", key="ast_new_model_number")
-            st.selectbox("Category", lookup_options("asset_categories"), key="ast_new_cat")
-            st.selectbox("Status", lookup_options("asset_statuses"), key="ast_new_status")
-            _render_asset_rental_pricing_fields(new_asset=True)
-            st.file_uploader(
-                "Upload asset image",
-                type=list(ITEM_IMAGE_UPLOAD_TYPES),
-                key="ast_new_image",
-            )
-            save_col, cancel_col = st.columns(2)
-            with save_col:
-                save_clicked = st.button("Save Asset", key="ast_save_new", type="primary")
-            with cancel_col:
-                cancel_clicked = st.button("Cancel", key="ast_cancel_new")
-            if cancel_clicked:
-                st.session_state[_SHOW_NEW_ASSET_FORM_KEY] = False
-                st.rerun()
-            if save_clicked:
-                from app.services.assets_service import save_asset
-                result = save_asset(
-                    {
-                        "asset_number": st.session_state.get("ast_new_num"),
-                        "asset_name": st.session_state.get("ast_new_name"),
-                        "model_number": st.session_state.get("ast_new_model_number"),
-                        "category": st.session_state.get("ast_new_cat"),
-                        "status": st.session_state.get("ast_new_status"),
-                        **_rental_fields_from_session(_asset_rental_session_keys(new_asset=True)),
-                    }
-                )
-                if not result.ok:
-                    st.error(result.error or "Could not save asset.")
-                else:
-                    new_id = ""
-                    if isinstance(result.data, dict):
-                        new_id = str(result.data.get("id") or "").strip()
-                    uploaded_file = st.session_state.get("ast_new_image")
-                    if uploaded_file is not None and new_id and not is_demo_id(new_id):
-                        upload_result = upload_asset_image(
-                            new_id,
-                            uploaded_file,
-                            uploaded_by=_current_user_id(),
-                        )
-                        if not upload_result.ok:
-                            st.warning(upload_result.error or "Asset saved, but image upload failed.")
-                    _clear_assets_catalog_cache()
-                    st.session_state[_SHOW_NEW_ASSET_FORM_KEY] = False
-                    st.success("Asset saved.")
-                    st.rerun()
-
     st.markdown(
         '<span class="ips-assets-main-tabs-anchor" aria-hidden="true"></span>',
         unsafe_allow_html=True,
@@ -2293,10 +1983,6 @@ def render() -> None:
         default=_ASSETS_MAIN_TABS[0],
     )
 
-    rows: list[dict] = []
-    if active_tab in ("Equipment", "Serialized Tools"):
-        rows = load_assets()
-
     if active_tab == "Equipment":
         with st.expander("Tool Trailers & Kits", expanded=False):
             if st.button("Load kit summary", key="ast_kit_summary_load", use_container_width=True):
@@ -2305,11 +1991,11 @@ def render() -> None:
                 render_kit_accountability_summary()
             else:
                 st.caption("Load kit accountability metrics on demand to speed up the assets page.")
-        _render_equipment_list(rows)
+        _render_equipment_list()
     elif active_tab == "Serialized Tools":
         st.caption(
             "Individual tools tracked by serial number — Milwaukee drills, impacts, grinders, saws, rotary hammers, and similar cordless tools."
         )
-        _render_small_tools_list(rows)
+        _render_small_tools_list()
     else:
         render_hand_tools_tab(on_open_tool=_open_hand_tool_row)
