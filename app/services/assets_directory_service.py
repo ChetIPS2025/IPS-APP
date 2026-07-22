@@ -101,14 +101,15 @@ class AssetsDirectoryPage:
 
 
 def _load_equipment_catalog() -> tuple[list[dict[str, Any]], bool]:
+    from app.pages._core._data import _cached_assets_rows
     from app.perf_debug import perf_span
-    from app.services.assets_service import list_assets
 
     version = assets_catalog_data_version()
 
     def _build() -> tuple[list[dict[str, Any]], bool]:
         with perf_span("assets.equipment.list_query"):
-            rows, used = list_assets()
+            rows, used = _cached_assets_rows()
+            rows = list(rows)
             equipment = [
                 _project_equipment_row(r)
                 for r in rows

@@ -172,14 +172,15 @@ def list_serialized_eligible_kit_items(
 
 
 def _load_serialized_asset_rows() -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], bool]:
+    from app.pages._core._data import _cached_assets_rows
     from app.perf_debug import perf_span
-    from app.services.assets_service import list_assets
 
     version = assets_catalog_data_version()
 
     def _build() -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], bool]:
         with perf_span("assets.serialized.list_query"):
-            rows, used = list_assets()
+            rows, used = _cached_assets_rows()
+            rows = list(rows)
             serialized_assets: list[dict[str, Any]] = []
             assets_by_id: dict[str, dict[str, Any]] = {}
             parent_assets_by_id: dict[str, dict[str, Any]] = {}
