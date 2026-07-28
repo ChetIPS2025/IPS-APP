@@ -11,7 +11,53 @@ from app.components.pricing_guide_directory_table import pricing_guide_detail_hr
 from app.components.pricing_guide_list_table import _pg_link_html, build_pricing_guide_html_table
 from app.pages import pricing_guide as pricing_guide_page
 from app.services.pricing_guide_directory_service import PricingGuidePage, list_pricing_guide_page
-from app.services.pricing_guide_service import calc_sell_price
+from app.services.pricing_guide_service import (
+    _build_pricing_guide_list_metadata,
+    calc_sell_price,
+    resolve_live_unit_cost,
+)
+
+
+class TestPricingGuideCatalogFetch(unittest.TestCase):
+    def test_resolve_live_unit_cost_skips_catalog_fallback_when_disabled(self) -> None:
+        row = {
+            "item_class": "Inventory",
+            "linked_inventory_id": "inv-missing",
+            "default_cost": 12.5,
+        }
+        with patch("app.pages._core._data.load_inventory") as load_mock:
+            cost = resolve_live_unit_cost(row, inv_costs={}, allow_fallback=False)
+        load_mock.assert_not_called()
+        assert cost == 12.5
+
+    def test_list_metadata_builds_rows_without_full_normalize(self) -> None:
+        raw = [
+            {
+                "id": "pg-1",
+                "description": "Widget",
+                "item_class": "Non-Inventory",
+                "category": "Misc",
+                "vendor": "Acme",
+                "is_active": True,
+                "default_cost": 10.0,
+                "default_markup_percent": 25.0,
+                "default_sell_price": 12.5,
+                "unit": "EA",
+            }
+        ]
+
+        def fake_fetch(table, **kwargs):
+            if table == "pricing_guide_items":
+                return raw
+            return []
+
+        result = _build_pricing_guide_list_metadata(
+            fetch_table=fake_fetch,
+            fetch_table_admin=fake_fetch,
+        )
+        assert len(result.rows) == 1
+        assert result.rows[0]["item"] == "Widget"
+        assert result.rows[0]["customer_price"] == 12.5
 
 
 class TestPricingGuideDirectoryService(unittest.TestCase):
@@ -34,7 +80,7 @@ class TestPricingGuideDirectoryService(unittest.TestCase):
         fetch_result = MagicMock(rows=rows, source="pricing_guide_items", warning=None)
 
         with patch(
-            "app.services.pricing_guide_directory_service._load_catalog_result",
+            "app.services.pricing_guide_directory_service._load_list_metadata",
             return_value=fetch_result,
         ):
             with patch(

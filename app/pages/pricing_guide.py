@@ -51,7 +51,7 @@ from app.services.pricing_guide_detail_service import (
     get_pricing_guide_item_detail,
     put_pricing_guide_in_modal_cache,
 )
-from app.services.pricing_guide_directory_service import list_pricing_guide_page
+from app.services.pricing_guide_directory_service import list_pricing_guide_page, load_pricing_guide_filter_options
 from app.services.pricing_guide_images import get_pricing_guide_image_url
 from app.services.pricing_guide_service import normalize_pricing_row, pricing_guide_fetch_status, save_pricing_item
 from app.styles import inject_pricing_guide_module_css
@@ -359,6 +359,11 @@ def _show_detail_modal() -> None:
 
 
 @fragment
+def _render_pricing_guide_summary_fragment(summary: dict[str, Any]) -> None:
+    _render_summary_cards(summary)
+
+
+@fragment
 def _render_pricing_guide_catalog_fragment(*, permissions: PricingGuidePermissions) -> None:
     """Pricing guide search, filters, summary, import, and catalog table — local reruns."""
 
@@ -383,11 +388,11 @@ def _render_pricing_guide_catalog_fragment(*, permissions: PricingGuidePermissio
     close_pricing_guide_filter_bar_shell()
 
     search = str(st.session_state.get("pg_search") or "").strip()
+    filter_options = load_pricing_guide_filter_options()
+    if sanitize_column_filters(_TABLE_KEY, filter_options, filter_fields=_FILTER_FIELDS):
+        filter_options = load_pricing_guide_filter_options()
     pg_page = list_pricing_guide_page(search=search, table_key=_TABLE_KEY)
-    if sanitize_column_filters(_TABLE_KEY, pg_page.filter_options, filter_fields=_FILTER_FIELDS):
-        pg_page = list_pricing_guide_page(search=search, table_key=_TABLE_KEY)
 
-    _render_summary_cards(pg_page.summary)
     render_pricing_guide_import_panel(can_import=permissions.can_import)
 
     with st.container():
@@ -397,6 +402,8 @@ def _render_pricing_guide_catalog_fragment(*, permissions: PricingGuidePermissio
             render_table_pagination_header(pg_page.total_count, _TABLE_KEY, item_label="item")
             _render_custom_pricing_guide_table(pg_page.rows, filter_options=pg_page.filter_options)
             render_table_pagination_footer(pg_page.total_count, _TABLE_KEY)
+
+    _render_pricing_guide_summary_fragment(pg_page.summary)
 
 
 def render() -> None:

@@ -12,8 +12,7 @@ from app.pages._core._data import pricing_guide_catalog_data_version
 from app.pages._core.page_data_cache import page_data_cache_get
 from app.services.pricing_guide_service import (
     PricingGuideFetchResult,
-    fetch_pricing_guide_catalog,
-    normalize_pricing_row,
+    cached_pricing_guide_list_metadata,
     pricing_guide_summary,
     search_pricing_rows,
 )
@@ -74,23 +73,23 @@ class PricingGuidePage:
     warning: str | None = None
 
 
-def _catalog_cache_key(*, include_inactive: bool) -> str:
+def _load_list_metadata(*, include_inactive: bool = True) -> PricingGuideFetchResult:
+    """Cross-session cached list metadata — no full catalog normalization."""
     version = pricing_guide_catalog_data_version()
-    return f"pg_catalog:{version}:inactive={include_inactive}"
-
-
-def _load_catalog_result(*, include_inactive: bool = True) -> PricingGuideFetchResult:
-    """Single authoritative catalog load per data version."""
-
-    def _fetch() -> PricingGuideFetchResult:
-        return fetch_pricing_guide_catalog(include_inactive=include_inactive)
-
-    return page_data_cache_get(_catalog_cache_key(include_inactive=include_inactive), _fetch)
+    rows, source, warning, fetch_failed = cached_pricing_guide_list_metadata(
+        catalog_version=version,
+        include_inactive=include_inactive,
+    )
+    return PricingGuideFetchResult(
+        list(rows),
+        source,  # type: ignore[arg-type]
+        warning,
+        fetch_failed=fetch_failed,
+    )
 
 
 def _list_projection(row: dict[str, Any]) -> dict[str, Any]:
-    normalized = normalize_pricing_row(row) if not row.get("item") else row
-    return {key: normalized.get(key) for key in _LIST_PROJECTION_KEYS}
+    return {key: row.get(key) for key in _LIST_PROJECTION_KEYS}
 
 
 def _filter_pricing_rows(
@@ -123,6 +122,28 @@ def _filter_pricing_rows(
     return apply_column_filters(out, table_key, _PG_COLUMN_FILTER_SPECS)
 
 
+def _build_filter_options(rows: list[dict[str, Any]]) -> dict[str, list[str]]:
+    classes: set[str] = set()
+    categories: set[str] = set()
+    vendors: set[str] = set()
+    statuses: set[str] = set()
+    for row in rows:
+        classes.add(str(row.get("item_class") or "Non-Inventory"))
+        cat = str(row.get("category") or "—").strip()
+        if cat:
+            categories.add(cat)
+        vendor = str(row.get("vendor") or "—").strip()
+        if vendor and vendor != "—":
+            vendors.add(vendor)
+        statuses.add(str(row.get("status") or "Active"))
+    return {
+        "item_class": sorted(classes),
+        "category": sorted(categories),
+        "vendor": sorted(vendors),
+        "status": sorted(statuses),
+    }
+
+
 def load_pricing_guide_filter_options() -> dict[str, list[str]]:
     """Distinct filter values cached by Pricing Guide catalog data version."""
     version = pricing_guide_catalog_data_version()
@@ -132,26 +153,8 @@ def load_pricing_guide_filter_options() -> dict[str, list[str]]:
         from app.perf_debug import perf_span
 
         with perf_span("pricing_guide.filter_options"):
-            result = _load_catalog_result(include_inactive=True)
-            classes: set[str] = set()
-            categories: set[str] = set()
-            vendors: set[str] = set()
-            statuses: set[str] = set()
-            for row in result.rows:
-                classes.add(str(row.get("item_class") or "Non-Inventory"))
-                cat = str(row.get("category") or "—").strip()
-                if cat:
-                    categories.add(cat)
-                vendor = str(row.get("vendor") or "—").strip()
-                if vendor and vendor != "—":
-                    vendors.add(vendor)
-                statuses.add(str(row.get("status") or "Active"))
-            return {
-                "item_class": sorted(classes),
-                "category": sorted(categories),
-                "vendor": sorted(vendors),
-                "status": sorted(statuses),
-            }
+            result = _load_list_metadata(include_inactive=True)
+            return _build_filter_options(result.rows)
 
     return page_data_cache_get(cache_key, _build)
 
@@ -172,7 +175,7 @@ def load_pricing_guide_summary(
     with perf_span("pricing_guide.summary"):
         rows = filtered_rows
         if rows is None:
-            catalog = _load_catalog_result(include_inactive=True)
+            catalog = _load_list_metadata(include_inactive=True)
             rows = _filter_pricing_rows(
                 catalog.rows,
                 search=search,
@@ -202,9 +205,10 @@ def list_pricing_guide_page(
     from app.perf_debug import perf_span
 
     with perf_span("pricing_guide.list_query"):
-        catalog = _load_catalog_result(include_inactive=include_inactive)
-        is_live = catalog.source == "pricing_guide_items"
-        warning = catalog.warning
+        metadata = _load_list_metadata(include_inactive=include_inactive)
+        is_live = metadata.source == "pricing_guide_items"
+        warning = metadata.warning
+        filter_options = load_pricing_guide_filter_options()
         if item_classes is None and table_key:
             item_classes = get_column_filter_values(table_key, "item_class") or None
         if categories is None and table_key:
@@ -214,7 +218,7 @@ def list_pricing_guide_page(
         if statuses is None and table_key:
             statuses = get_column_filter_values(table_key, "status") or None
         filtered = _filter_pricing_rows(
-            catalog.rows,
+            metadata.rows,
             search=search,
             item_classes=item_classes,
             categories=categories,
@@ -222,16 +226,7 @@ def list_pricing_guide_page(
             statuses=statuses,
             table_key=table_key,
         )
-        summary = load_pricing_guide_summary(
-            search=search,
-            item_classes=item_classes,
-            categories=categories,
-            vendors=vendors,
-            statuses=statuses,
-            filtered_rows=filtered,
-            table_key=table_key,
-        )
-        filter_options = load_pricing_guide_filter_options()
+        summary = pricing_guide_summary(filtered)
         page_num, size, _total_pages = pagination_meta(len(filtered), table_key)
         if page > 0 and page_size > 0:
             page_num = max(1, int(page))
@@ -254,10 +249,11 @@ def invalidate_pricing_guide_directory_cache() -> None:
     """Centralized Pricing Guide directory cache invalidation."""
     from app.pages._core._data import _bump_pricing_guide_catalog_data_version
     from app.services.pricing_guide_detail_service import invalidate_pricing_guide_detail_cache
-    from app.services.pricing_guide_service import cached_pricing_guide_rows
+    from app.services.pricing_guide_service import cached_pricing_guide_list_metadata, cached_pricing_guide_rows
 
     _bump_pricing_guide_catalog_data_version()
     cached_pricing_guide_rows.clear()
+    cached_pricing_guide_list_metadata.clear()
     st.session_state.pop("_pg_catalog_status_checked", None)
     st.session_state.pop("_ips_pg_directory_filter_options", None)
     invalidate_pricing_guide_detail_cache()

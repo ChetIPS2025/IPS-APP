@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Literal
@@ -182,6 +183,7 @@ def normalize_pricing_row(
     asset_labels: dict[str, str] | None = None,
     inventory_costs: dict[str, float] | None = None,
     asset_costs: dict[str, float] | None = None,
+    allow_live_cost_fallback: bool = True,
 ) -> dict[str, Any]:
     if raw.get("_source") == "estimate_materials":
         row = _legacy_material_to_row(raw)
@@ -251,7 +253,12 @@ def normalize_pricing_row(
         }
 
     active = row.get("is_active") is not False
-    live_cost = resolve_live_unit_cost(row, inv_costs=inventory_costs, asset_costs=asset_costs)
+    live_cost = resolve_live_unit_cost(
+        row,
+        inv_costs=inventory_costs,
+        asset_costs=asset_costs,
+        allow_fallback=allow_live_cost_fallback,
+    )
     from app.services.catalog_stock_policy_service import normalize_stock_policy, stock_policy_label
     policy = normalize_stock_policy(row.get("stock_policy"))
     return {
@@ -291,7 +298,103 @@ def _asset_cost_from_row(row: dict[str, Any]) -> float | None:
     return _cost_from_row(row, ("daily_rate", "hourly_rate", "rental_daily_rate", "purchase_cost", "current_value"))
 
 
-def _fetch_lookup_maps_from_db() -> tuple[
+def _asset_cost_from_row(row: dict[str, Any]) -> float | None:
+    return _cost_from_row(row, ("daily_rate", "hourly_rate", "rental_daily_rate", "purchase_cost", "current_value"))
+
+
+_PG_LIST_FETCH_COLUMNS = (
+    "id,item_code,item_type,item_class,description,category,subcategory,unit,"
+    "default_cost,default_markup_percent,default_sell_price,markup_percent,sell_price,"
+    "taxable,is_active,inventory_item_id,asset_id,linked_inventory_id,linked_asset_id,"
+    "vendor_id,vendor,labor_role,equipment_type,travel_type,notes,item_number,model_number,sku,"
+    "image_path,image_url,image_file_name,image_status,stock_policy,updated_at"
+)
+
+_VENDOR_LOOKUP_COLUMNS = "id,vendor_name,name"
+_INVENTORY_LOOKUP_COLUMNS = "id,item_name,name,description,average_cost,last_purchase_cost,unit_cost"
+_ASSET_LOOKUP_COLUMNS = (
+    "id,asset_name,name,include_in_pricing_guide,daily_rate,hourly_rate,"
+    "rental_daily_rate,purchase_cost,current_value"
+)
+
+
+def _unique_str_ids(values: Any) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    if not values:
+        return out
+    for val in values:
+        rid = str(val or "").strip()
+        if rid and rid not in seen:
+            seen.add(rid)
+            out.append(rid)
+    return out
+
+
+def _fetch_table_rows_by_ids(
+    table: str,
+    *,
+    columns: str,
+    ids: list[str],
+    use_admin: bool = True,
+) -> list[dict[str, Any]]:
+    wanted = _unique_str_ids(ids)
+    if not wanted:
+        return []
+    from app.db import get_admin_client, get_client, run_user_supabase_operation
+
+    def _run() -> list[dict[str, Any]]:
+        client = get_admin_client() if use_admin else get_client()
+        rows: list[dict[str, Any]] = []
+        chunk_size = 100
+        for idx in range(0, len(wanted), chunk_size):
+            chunk = wanted[idx : idx + chunk_size]
+            resp = client.table(table).select(columns).in_("id", chunk).execute()
+            rows.extend(list(resp.data or []))
+        return rows
+
+    try:
+        if use_admin:
+            return list(_run() or [])
+        return list(run_user_supabase_operation(f"read {table} by id", _run, friendly_on_failure=False) or [])
+    except Exception as exc:
+        _LOG.debug("fetch %s by ids failed: %s", table, exc)
+        return []
+
+
+def _collect_link_ids_from_rows(rows: list[dict[str, Any]]) -> tuple[list[str], list[str], list[str]]:
+    vendor_ids: set[str] = set()
+    inventory_ids: set[str] = set()
+    asset_ids: set[str] = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        vid = str(row.get("vendor_id") or "").strip()
+        if vid:
+            vendor_ids.add(vid)
+        inv_id = str(row.get("linked_inventory_id") or row.get("inventory_item_id") or "").strip()
+        if inv_id:
+            inventory_ids.add(inv_id)
+        ast_id = str(row.get("linked_asset_id") or row.get("asset_id") or "").strip()
+        if ast_id:
+            asset_ids.add(ast_id)
+    return sorted(vendor_ids), sorted(inventory_ids), sorted(asset_ids)
+
+
+def _label_from_row(row: dict[str, Any], name_fields: tuple[str, ...]) -> str:
+    for nf in name_fields:
+        label = str(row.get(nf) or "").strip()
+        if label:
+            return label
+    rid = str(row.get("id") or "").strip()
+    return rid[:8] if rid else ""
+
+
+def _build_lookup_maps_from_rows(
+    vendor_rows: list[dict[str, Any]],
+    inv_rows: list[dict[str, Any]],
+    asset_rows: list[dict[str, Any]],
+) -> tuple[
     dict[str, str],
     dict[str, str],
     dict[str, str],
@@ -305,64 +408,32 @@ def _fetch_lookup_maps_from_db() -> tuple[
     inventory_costs: dict[str, float] = {}
     asset_flags: dict[str, bool] = {}
     asset_costs: dict[str, float] = {}
-    from app.db import fetch_table, fetch_table_admin
-    fetcher = fetch_table_admin or fetch_table
-    for table, target, name_fields in (
-        ("vendors", vendor_names, ("vendor_name", "name")),
-    ):
-        try:
-            rows = list(fetcher(table, limit=10000) or [])
-        except Exception:
-            rows = []
-        for r in rows:
-            if not isinstance(r, dict):
-                continue
-            rid = str(r.get("id") or "").strip()
-            if not rid:
-                continue
-            label = ""
-            for nf in name_fields:
-                label = str(r.get(nf) or "").strip()
-                if label:
-                    break
-            target[rid] = label or rid[:8]
 
-    try:
-        inv_rows = list(fetcher("inventory_items", limit=10000) or [])
-    except Exception:
-        inv_rows = []
-    for r in inv_rows:
-        if not isinstance(r, dict):
+    for row in vendor_rows:
+        if not isinstance(row, dict):
             continue
-        rid = str(r.get("id") or "").strip()
+        rid = str(row.get("id") or "").strip()
+        if rid:
+            vendor_names[rid] = _label_from_row(row, ("vendor_name", "name")) or rid[:8]
+
+    for row in inv_rows:
+        if not isinstance(row, dict):
+            continue
+        rid = str(row.get("id") or "").strip()
         if not rid:
             continue
-        label = ""
-        for nf in ("item_name", "name", "description"):
-            label = str(r.get(nf) or "").strip()
-            if label:
-                break
-        inventory_labels[rid] = label or rid[:8]
-        cost = _inventory_cost_from_row(r)
+        inventory_labels[rid] = _label_from_row(row, ("item_name", "name", "description")) or rid[:8]
+        cost = _inventory_cost_from_row(row)
         if cost is not None:
             inventory_costs[rid] = cost
 
-    try:
-        asset_rows = list(fetcher("assets", limit=10000) or [])
-    except Exception:
-        asset_rows = []
     for row in asset_rows:
         if not isinstance(row, dict):
             continue
         aid = str(row.get("id") or "").strip()
         if not aid:
             continue
-        label = ""
-        for nf in ("asset_name", "name"):
-            label = str(row.get(nf) or "").strip()
-            if label:
-                break
-        asset_labels[aid] = label or aid[:8]
+        asset_labels[aid] = _label_from_row(row, ("asset_name", "name")) or aid[:8]
         if "include_in_pricing_guide" in row:
             asset_flags[aid] = bool(row.get("include_in_pricing_guide"))
         else:
@@ -372,6 +443,227 @@ def _fetch_lookup_maps_from_db() -> tuple[
             asset_costs[aid] = cost
 
     return vendor_names, inventory_labels, asset_labels, inventory_costs, asset_flags, asset_costs
+
+
+def _fetch_lookup_maps_for_ids(
+    vendor_ids: list[str],
+    inventory_ids: list[str],
+    asset_ids: list[str],
+) -> tuple[
+    dict[str, str],
+    dict[str, str],
+    dict[str, str],
+    dict[str, float],
+    dict[str, bool],
+    dict[str, float],
+]:
+    vendor_rows: list[dict[str, Any]] = []
+    inv_rows: list[dict[str, Any]] = []
+    asset_rows: list[dict[str, Any]] = []
+
+    def _fetch_vendors() -> list[dict[str, Any]]:
+        return _fetch_table_rows_by_ids("vendors", columns=_VENDOR_LOOKUP_COLUMNS, ids=vendor_ids)
+
+    def _fetch_inventory() -> list[dict[str, Any]]:
+        return _fetch_table_rows_by_ids("inventory_items", columns=_INVENTORY_LOOKUP_COLUMNS, ids=inventory_ids)
+
+    def _fetch_assets() -> list[dict[str, Any]]:
+        return _fetch_table_rows_by_ids("assets", columns=_ASSET_LOOKUP_COLUMNS, ids=asset_ids)
+
+    tasks: list[tuple[str, Callable[[], list[dict[str, Any]]]]] = []
+    if vendor_ids:
+        tasks.append(("vendors", _fetch_vendors))
+    if inventory_ids:
+        tasks.append(("inventory", _fetch_inventory))
+    if asset_ids:
+        tasks.append(("assets", _fetch_assets))
+
+    if not tasks:
+        return {}, {}, {}, {}, {}, {}
+
+    with ThreadPoolExecutor(max_workers=min(3, len(tasks))) as pool:
+        futures = {pool.submit(fn): label for label, fn in tasks}
+        for future in futures:
+            label = futures[future]
+            try:
+                data = future.result()
+            except Exception as exc:
+                _LOG.debug("lookup fetch %s failed: %s", label, exc)
+                data = []
+            if label == "vendors":
+                vendor_rows = data
+            elif label == "inventory":
+                inv_rows = data
+            else:
+                asset_rows = data
+
+    return _build_lookup_maps_from_rows(vendor_rows, inv_rows, asset_rows)
+
+
+def _fetch_lookup_maps_for_rows(rows: list[dict[str, Any]]) -> tuple[
+    dict[str, str],
+    dict[str, str],
+    dict[str, str],
+    dict[str, float],
+    dict[str, bool],
+    dict[str, float],
+]:
+    vendor_ids, inventory_ids, asset_ids = _collect_link_ids_from_rows(rows)
+    return _fetch_lookup_maps_for_ids(vendor_ids, inventory_ids, asset_ids)
+
+
+def _derive_item_class(raw: dict[str, Any], *, inv_id: str | None = None, asset_id: str | None = None) -> str:
+    item_class = str(raw.get("item_class") or "").strip()
+    if item_class and item_class in PRICING_ITEM_CLASSES:
+        return item_class
+    inv_id = inv_id or str(raw.get("linked_inventory_id") or raw.get("inventory_item_id") or "").strip() or None
+    asset_id = asset_id or str(raw.get("linked_asset_id") or raw.get("asset_id") or "").strip() or None
+    if inv_id:
+        return "Inventory"
+    if asset_id:
+        return "Asset"
+    return "Non-Inventory"
+
+
+def _metadata_unit_cost(
+    raw: dict[str, Any],
+    *,
+    item_class: str,
+    inv_id: str | None,
+    asset_id: str | None,
+    inv_costs: dict[str, float],
+    asset_costs: dict[str, float],
+) -> float:
+    base = float(raw.get("default_cost") or 0)
+    if item_class == "Inventory" and inv_id:
+        cached = inv_costs.get(inv_id)
+        if cached and cached > 0:
+            return cached
+    if item_class == "Asset" and asset_id:
+        cached = asset_costs.get(asset_id)
+        if cached and cached > 0:
+            return cached
+    return base
+
+
+def _build_list_metadata_row(
+    raw: dict[str, Any],
+    *,
+    vendor_names: dict[str, str],
+    inv_labels: dict[str, str],
+    asset_labels: dict[str, str],
+    inv_costs: dict[str, float],
+    asset_costs: dict[str, float],
+    asset_flags: dict[str, bool],
+) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    description = str(raw.get("description") or raw.get("item_code") or "").strip()
+    if not description:
+        return None
+
+    inv_id = str(raw.get("linked_inventory_id") or raw.get("inventory_item_id") or "").strip() or None
+    asset_id = str(raw.get("linked_asset_id") or raw.get("asset_id") or "").strip() or None
+    item_class = _derive_item_class(raw, inv_id=inv_id, asset_id=asset_id)
+    if item_class == "Asset" and asset_id and not asset_flags.get(asset_id, True):
+        return None
+
+    cost = _metadata_unit_cost(
+        raw,
+        item_class=item_class,
+        inv_id=inv_id,
+        asset_id=asset_id,
+        inv_costs=inv_costs,
+        asset_costs=asset_costs,
+    )
+    markup = float(raw.get("default_markup_percent") or raw.get("markup_percent") or 0)
+    sell_raw = raw.get("default_sell_price")
+    if sell_raw not in (None, ""):
+        sell = float(sell_raw)
+    else:
+        sell = calc_sell_price(cost, markup)
+    if not markup and cost > 0:
+        markup = calc_markup_percent(cost, sell)
+
+    vendor_id = str(raw.get("vendor_id") or "").strip() or None
+    vendor_display = (
+        vendor_names.get(vendor_id or "", "")
+        if vendor_id
+        else str(raw.get("vendor") or raw.get("vendor_name") or "")
+    ).strip() or "—"
+    active = raw.get("is_active") is not False
+
+    return {
+        "id": str(raw.get("id") or ""),
+        "item": description,
+        "description": description,
+        "item_code": str(raw.get("item_code") or raw.get("sku") or ""),
+        "item_key": str(raw.get("item_code") or raw.get("sku") or ""),
+        "item_class": item_class,
+        "item_type": str(raw.get("item_type") or "Material"),
+        "category": str(raw.get("category") or "—") or "—",
+        "vendor": vendor_display,
+        "status": "Active" if active else "Inactive",
+        "is_active": active,
+        "unit": str(raw.get("unit") or "EA"),
+        "default_cost": cost,
+        "markup_pct": markup,
+        "default_markup_percent": markup,
+        "customer_price": sell,
+        "default_sell_price": sell,
+        "sku": str(raw.get("sku") or raw.get("item_code") or ""),
+        "item_number": str(raw.get("item_number") or raw.get("item_code") or ""),
+        "model_number": str(raw.get("model_number") or ""),
+        "linked_inventory_id": inv_id,
+        "inventory_item_id": inv_id,
+        "linked_asset_id": asset_id,
+        "asset_id": asset_id,
+        "inventory_label": inv_labels.get(inv_id or "", "") if inv_id else "",
+        "asset_label": asset_labels.get(asset_id or "", "") if asset_id else "",
+        "image_path": str(raw.get("image_path") or ""),
+        "image_url": str(raw.get("image_url") or ""),
+        "image_file_name": str(raw.get("image_file_name") or ""),
+        "image_status": str(raw.get("image_status") or "missing"),
+        "updated_at": raw.get("updated_at"),
+    }
+
+
+def _fetch_raw_pricing_guide_items(
+    fetcher: Callable[..., list[dict[str, Any]]],
+    *,
+    limit: int = 10000,
+) -> list[dict[str, Any]]:
+    try:
+        return list(
+            fetcher(
+                "pricing_guide_items",
+                columns=_PG_LIST_FETCH_COLUMNS,
+                limit=limit,
+                order_by="description",
+            )
+            or []
+        )
+    except TypeError:
+        return list(fetcher("pricing_guide_items", limit=limit, order_by="description") or [])
+    except Exception as exc:
+        _LOG.warning("pricing_guide_items fetch failed: %s", exc)
+        raise
+
+
+def _fetch_lookup_maps_from_db() -> tuple[
+    dict[str, str],
+    dict[str, str],
+    dict[str, str],
+    dict[str, float],
+    dict[str, bool],
+    dict[str, float],
+]:
+    """Legacy full-table lookup maps — kept for cache compatibility."""
+    from app.db import fetch_table, fetch_table_admin
+
+    fetcher = fetch_table_admin or fetch_table
+    rows = list(fetcher("pricing_guide_items", columns="vendor_id,inventory_item_id,asset_id,linked_inventory_id,linked_asset_id", limit=10000) or [])
+    return _fetch_lookup_maps_for_rows(rows)
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -408,6 +700,98 @@ def pricing_guide_row_visible(row: dict[str, Any], asset_flags: dict[str, bool])
     return asset_flags.get(ast_id, True)
 
 
+def _build_pricing_guide_list_metadata(
+    *,
+    include_inactive: bool = True,
+    fetch_table: Callable[..., list[dict[str, Any]]] | None = None,
+    fetch_table_admin: Callable[..., list[dict[str, Any]]] | None = None,
+) -> PricingGuideFetchResult:
+    global _last_pricing_guide_fetch
+
+    if fetch_table is None or fetch_table_admin is None:
+        from app.db import fetch_table as _ft, fetch_table_admin as _fta
+        fetch_table = _ft
+        fetch_table_admin = _fta
+
+    fetcher = fetch_table_admin or fetch_table
+    fetch_error: str | None = None
+    raw_rows: list[dict[str, Any]] = []
+    try:
+        raw_rows = _fetch_raw_pricing_guide_items(fetcher)
+    except Exception as exc:
+        fetch_error = str(exc)
+
+    if raw_rows:
+        vendors, inv_labels, asset_labels, inv_costs, asset_flags, asset_costs = _fetch_lookup_maps_for_rows(raw_rows)
+        out: list[dict[str, Any]] = []
+        for raw in raw_rows:
+            row = _build_list_metadata_row(
+                raw,
+                vendor_names=vendors,
+                inv_labels=inv_labels,
+                asset_labels=asset_labels,
+                inv_costs=inv_costs,
+                asset_costs=asset_costs,
+                asset_flags=asset_flags,
+            )
+            if row is None:
+                continue
+            if not include_inactive and row.get("is_active") is False:
+                continue
+            out.append(row)
+        result = PricingGuideFetchResult(out, "pricing_guide_items")
+        _last_pricing_guide_fetch = result
+        return result
+
+    if not _allow_legacy_pricing_fallback():
+        if fetch_error:
+            warning = (
+                "Pricing Guide could not load `pricing_guide_items` from Supabase. "
+                "Run migration `082_pricing_guide_items.sql` and import catalog data. "
+                f"Legacy `estimate_materials` fallback is disabled in production. ({fetch_error})"
+            )
+            result = PricingGuideFetchResult([], "empty", warning=warning, fetch_failed=True)
+        else:
+            result = PricingGuideFetchResult([], "pricing_guide_items")
+        _last_pricing_guide_fetch = result
+        return result
+
+    legacy_out = _legacy_estimate_material_rows(
+        fetch_table=fetch_table,
+        fetch_table_admin=fetch_table_admin,
+        include_inactive=include_inactive,
+    )
+    warning = None
+    if fetch_error:
+        warning = (
+            f"`pricing_guide_items` unavailable ({fetch_error}). "
+            "Showing legacy `estimate_materials` catalog (development only)."
+        )
+    elif not legacy_out:
+        warning = "No rows in `pricing_guide_items` or `estimate_materials`."
+    else:
+        warning = (
+            "`pricing_guide_items` is empty — showing legacy `estimate_materials` catalog "
+            "(development only)."
+        )
+    metadata_rows = [normalize_pricing_row(r, allow_live_cost_fallback=False) for r in legacy_out]
+    result = PricingGuideFetchResult(metadata_rows, "estimate_materials", warning=warning)
+    _last_pricing_guide_fetch = result
+    return result
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def cached_pricing_guide_list_metadata(
+    *,
+    catalog_version: int,
+    include_inactive: bool = True,
+) -> tuple[tuple[dict[str, Any], ...], str, str | None, bool]:
+    """Cross-session list metadata for directory filter/summary/table views."""
+    _ = catalog_version
+    result = _build_pricing_guide_list_metadata(include_inactive=include_inactive)
+    return (tuple(result.rows), result.source, result.warning, bool(result.fetch_failed))
+
+
 def fetch_pricing_guide_catalog(
     *,
     include_inactive: bool = True,
@@ -422,17 +806,16 @@ def fetch_pricing_guide_catalog(
         fetch_table_admin = _fta
 
     fetcher = fetch_table_admin or fetch_table
-    vendors, inv_labels, asset_labels, inv_costs, asset_flags, asset_costs = _load_lookup_maps()
-    rows: list[dict[str, Any]] = []
     fetch_error: str | None = None
+    raw_rows: list[dict[str, Any]] = []
     try:
-        rows = list(fetcher("pricing_guide_items", limit=10000, order_by="description") or [])
+        raw_rows = _fetch_raw_pricing_guide_items(fetcher)
     except Exception as exc:
         fetch_error = str(exc)
         _LOG.warning("pricing_guide_items fetch failed: %s", exc)
-        rows = []
 
-    if rows:
+    if raw_rows:
+        vendors, inv_labels, asset_labels, inv_costs, asset_flags, asset_costs = _fetch_lookup_maps_for_rows(raw_rows)
         out = [
             normalize_pricing_row(
                 r,
@@ -441,8 +824,9 @@ def fetch_pricing_guide_catalog(
                 asset_labels=asset_labels,
                 inventory_costs=inv_costs,
                 asset_costs=asset_costs,
+                allow_live_cost_fallback=False,
             )
-            for r in rows
+            for r in raw_rows
             if isinstance(r, dict) and str(r.get("description") or r.get("item_code") or "").strip()
         ]
         out = [r for r in out if pricing_guide_row_visible(r, asset_flags)]
@@ -514,6 +898,7 @@ def clear_pricing_guide_cache() -> None:
 
     invalidate_pricing_guide_directory_cache()
     _cached_lookup_maps.clear()
+    cached_pricing_guide_list_metadata.clear()
     try:
         from app.services.item_images import clear_item_image_url_cache
         from app.services.pricing_guide_images import clear_pricing_guide_image_cache
@@ -648,6 +1033,7 @@ def resolve_live_unit_cost(
     *,
     inv_costs: dict[str, float] | None = None,
     asset_costs: dict[str, float] | None = None,
+    allow_fallback: bool = True,
 ) -> float:
     """Pull current cost from linked inventory or asset rental rate when available."""
     base = float(row.get("default_cost") or 0)
@@ -659,23 +1045,27 @@ def resolve_live_unit_cost(
             cached = inv_costs.get(inv_id)
             if cached and cached > 0:
                 return cached
-        from app.pages._core._data import load_inventory
-        inv = next((r for r in load_inventory() if str(r.get("id")) == inv_id), None)
-        if inv:
-            cost = _inventory_cost_from_row(inv)
-            if cost is not None:
-                return cost
+        if allow_fallback:
+            from app.pages._core._data import load_inventory
+
+            inv = next((r for r in load_inventory() if str(r.get("id")) == inv_id), None)
+            if inv:
+                cost = _inventory_cost_from_row(inv)
+                if cost is not None:
+                    return cost
     if item_class == "Asset" and ast_id:
         if asset_costs is not None:
             cached = asset_costs.get(ast_id)
             if cached and cached > 0:
                 return cached
-        from app.pages._core._data import load_assets
-        asset = next((r for r in load_assets() if str(r.get("id")) == ast_id), None)
-        if asset:
-            cost = _asset_cost_from_row(asset)
-            if cost is not None:
-                return cost
+        if allow_fallback:
+            from app.pages._core._data import load_assets
+
+            asset = next((r for r in load_assets() if str(r.get("id")) == ast_id), None)
+            if asset:
+                cost = _asset_cost_from_row(asset)
+                if cost is not None:
+                    return cost
     return base
 
 
