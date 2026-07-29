@@ -47,6 +47,8 @@ class TestEstimatesNativeLinks(unittest.TestCase):
         assert 'target="_self"' in html_out
         assert "estimate_detail=e-123" in html_out
         assert "ips_nav=estimates" in html_out
+        assert 'data-estimate-id="e-123"' in html_out
+        assert 'data-est-action="open"' in html_out
 
     def test_estimate_detail_href_encodes_tab(self) -> None:
         href = estimate_detail_href("id/with space", tab="materials")

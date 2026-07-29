@@ -207,13 +207,16 @@ def estimate_list_link_html(
     *,
     extra_class: str = "",
 ) -> str:
+    eid = str(estimate_id or "").strip()
     text = html.escape(label)
     title = html.escape(label, quote=True)
-    href = html.escape(estimate_detail_href(str(estimate_id or "").strip()), quote=True)
+    href = html.escape(estimate_detail_href(eid), quote=True)
+    est_id = html.escape(eid, quote=True)
     cls = f"ips-row-open-link ips-dash-est-link ips-estimates-list-link ips-estimates-open-link {extra_class}".strip()
     aria = html.escape(f"Open estimate details for {label}", quote=True)
     return (
         f'<a class="{html.escape(cls)}" href="{href}" target="_self" '
+        f'data-estimate-id="{est_id}" data-est-action="open" '
         f'aria-label="{aria}" title="{title}">{text}</a>'
     )
 
