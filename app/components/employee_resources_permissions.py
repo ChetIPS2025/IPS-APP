@@ -21,19 +21,15 @@ class EmployeeResourcesPermissions:
 
 
 def load_employee_resources_permissions() -> EmployeeResourcesPermissions:
+    from app.auth import _auth_user_email, _auth_user_id, current_profile, current_user_display_name
     from app.perf_debug import perf_span
 
     with perf_span("employee_resources.permissions"):
         role = str(effective_role() or "").strip()
         norm = normalize_role(role)
-        try:
-            import streamlit as st
-
-            user = st.session_state.get("user") or {}
-        except Exception:
-            user = {}
-        user_id = str(user.get("id") or user.get("sub") or "")
-        user_name = str(user.get("name") or user.get("email") or "")
+        prof = current_profile() or {}
+        user_id = str(_auth_user_id() or prof.get("id") or "")
+        user_name = str(current_user_display_name() or prof.get("email") or _auth_user_email() or "")
         is_admin = norm == "admin"
         return EmployeeResourcesPermissions(
             role=role,

@@ -35,8 +35,21 @@ class TestTimekeepingNavigationAccess(unittest.TestCase):
         self.assertEqual(st.session_state[SESSION_NAV_KEY], "timekeeping")
         self.assertEqual(st.session_state[IPS_NAV_INTENT_KEY], "timekeeping")
 
+    def test_permissions_fingerprint_ignores_supabase_user_in_auth_profile(self) -> None:
+        from app.pages import timekeeping as tk
+
+        class _FakeUser:
+            id = "auth-user-1"
+            email = "admin@example.com"
+
+        st.session_state["auth_profile"] = _FakeUser()
+        st.session_state["current_user_profile"] = {"id": "profile-1", "role": "admin"}
+        st.session_state["auth_user_id"] = "auth-user-1"
+        fp = tk._permissions_fingerprint()
+        self.assertIn("auth-user-1", fp)
+
     def test_reconcile_nav_intent_restores_lost_slug(self) -> None:
-        from app.navigation import IPS_NAV_INTENT_KEY, reconcile_nav_intent
+        from app.navigation import reconcile_nav_intent
 
         st.session_state[IPS_NAV_INTENT_KEY] = "timekeeping"
         st.session_state[SESSION_NAV_KEY] = "dashboard"

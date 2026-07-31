@@ -1180,8 +1180,13 @@ def create_auth_user(
     if user is None:
         raise RuntimeError(f"Supabase did not return a created user. raw_result={result!r}")
 
-    user_id = getattr(user, "id", None) or user.get("id")
-    user_email = getattr(user, "email", None) or user.get("email") or em_norm
+    user_id = getattr(user, "id", None)
+    if user_id is None and isinstance(user, dict):
+        user_id = user.get("id")
+    user_email = getattr(user, "email", None)
+    if user_email is None and isinstance(user, dict):
+        user_email = user.get("email")
+    user_email = user_email or em_norm
 
     eid_link = str(employee_id or "").strip() or None
     profile_payload: dict[str, Any] = {

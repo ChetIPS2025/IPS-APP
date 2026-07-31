@@ -314,9 +314,10 @@ def main() -> None:
     inject_page_loading_indicator()
     from app.auth import render_auth_identity_debug_panel, verify_identity_binding_or_stop
     verify_identity_binding_or_stop()
-    from app.auth import _ensure_auth_employee_attached
+    from app.auth import _ensure_auth_employee_attached, sanitize_auth_session_profiles
 
     _ensure_auth_employee_attached()
+    sanitize_auth_session_profiles()
     log_auth_state("app_authenticated")
 
     from app.components.sidebar_shell import (

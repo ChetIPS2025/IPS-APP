@@ -360,9 +360,22 @@ def _clear_current_user_snapshot() -> None:
 
 def _coerce_profile_dict(raw: Any) -> dict[str, Any]:
     """Return a profile mapping; ignore Supabase auth User objects stored by mistake."""
+    return coerce_profile_dict(raw)
+
+
+def coerce_profile_dict(raw: Any) -> dict[str, Any]:
+    """Return a profile mapping; ignore Supabase auth User objects stored by mistake."""
     if isinstance(raw, dict):
         return dict(raw)
     return {}
+
+
+def sanitize_auth_session_profiles() -> None:
+    """Drop non-dict values from profile session keys (e.g. cached Supabase User objects)."""
+    for key in ("auth_profile", CURRENT_USER_PROFILE_KEY, USER_PROFILE_KEY, CURRENT_USER_KEY):
+        raw = st.session_state.get(key)
+        if raw is not None and not isinstance(raw, dict):
+            st.session_state.pop(key, None)
 
 
 def _loaded_session_profile() -> dict[str, Any]:

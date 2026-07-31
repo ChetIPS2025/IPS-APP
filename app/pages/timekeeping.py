@@ -987,14 +987,12 @@ class TimekeepingPermissions:
 
 
 def _permissions_fingerprint() -> str:
-    from app.auth import AUTH_USER_ID_KEY, CURRENT_USER_PROFILE_KEY
+    from app.auth import AUTH_USER_ID_KEY, CURRENT_USER_PROFILE_KEY, coerce_profile_dict
     from app.utils.view_as import is_view_as_active, view_as_mode
 
-    prof = (
-        st.session_state.get("auth_profile")
-        or st.session_state.get(CURRENT_USER_PROFILE_KEY)
-        or {}
-    )
+    prof = coerce_profile_dict(st.session_state.get("auth_profile"))
+    if not prof:
+        prof = coerce_profile_dict(st.session_state.get(CURRENT_USER_PROFILE_KEY))
     uid = str(
         st.session_state.get(AUTH_USER_ID_KEY)
         or prof.get("id")
@@ -1061,14 +1059,12 @@ def _init_timekeeping_render_context() -> TimekeepingPermissions:
 
 
 def _cached_auth_profile() -> dict[str, Any]:
-    from app.auth import CURRENT_USER_PROFILE_KEY
+    from app.auth import CURRENT_USER_PROFILE_KEY, coerce_profile_dict
 
-    prof = (
-        st.session_state.get("auth_profile")
-        or st.session_state.get(CURRENT_USER_PROFILE_KEY)
-        or {}
-    )
-    return dict(prof) if isinstance(prof, dict) else {}
+    prof = coerce_profile_dict(st.session_state.get("auth_profile"))
+    if not prof:
+        prof = coerce_profile_dict(st.session_state.get(CURRENT_USER_PROFILE_KEY))
+    return prof
 
 
 def _current_user_id() -> str | None:

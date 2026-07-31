@@ -29,15 +29,15 @@ def load_task_permissions() -> TaskPermissions:
     try:
         import streamlit as st
 
-        user = st.session_state.get("user") or {}
+        from app.auth import _auth_user_email, _auth_user_id
+
         auth_emp = st.session_state.get("auth_employee") or {}
     except Exception:
-        user = {}
         auth_emp = {}
-    user_id = str(user.get("id") or user.get("sub") or prof.get("id") or "").strip()
+    user_id = str(_auth_user_id() or prof.get("id") or "").strip()
     employee_id = str(prof.get("employee_id") or auth_emp.get("id") or "").strip()
-    user_name = str(prof.get("full_name") or prof.get("name") or user.get("name") or "").strip()
-    email = str(prof.get("email") or user.get("email") or "").strip()
+    user_name = str(prof.get("full_name") or prof.get("name") or "").strip()
+    email = str(prof.get("email") or _auth_user_email() or "").strip()
     role_lower = role.lower()
     is_field_employee = role_lower == "employee"
     can_manage = role_lower in {

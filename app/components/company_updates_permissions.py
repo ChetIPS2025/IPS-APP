@@ -21,16 +21,13 @@ class CompanyUpdatesPermissions:
 
 
 def load_company_updates_permissions() -> CompanyUpdatesPermissions:
+    from app.auth import _auth_user_email, _auth_user_id, current_profile, current_user_display_name
+
     role = str(effective_role() or "").strip()
     norm = normalize_role(role)
-    try:
-        import streamlit as st
-
-        user = st.session_state.get("user") or {}
-    except Exception:
-        user = {}
-    user_id = str(user.get("id") or user.get("sub") or "")
-    user_name = str(user.get("name") or user.get("email") or "")
+    prof = current_profile() or {}
+    user_id = str(_auth_user_id() or prof.get("id") or "")
+    user_name = str(current_user_display_name() or prof.get("email") or _auth_user_email() or "")
     can_manage = can_manage_company_updates(role)
     can_view_receipts = norm in {"admin", "supervisor", "manager"}
     return CompanyUpdatesPermissions(
