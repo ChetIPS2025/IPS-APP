@@ -1,4 +1,4 @@
-﻿"""Estimate Materials module (Phase 2B) — Cost Builder–aligned materials panel."""
+"""Estimate Materials module (Phase 2B) — Cost Builder–aligned materials panel."""
 
 from __future__ import annotations
 

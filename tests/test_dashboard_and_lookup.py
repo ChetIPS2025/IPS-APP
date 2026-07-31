@@ -180,7 +180,7 @@ def test_ops_dashboard_css_uses_compact_vertical_spacing():
     from app.ui.ops_dashboard_styles import inject_ops_dashboard_styles
 
     source = inspect.getsource(inject_ops_dashboard_styles)
-    assert "ips-ops-dashboard-v32" in source
+    assert "ips-ops-dashboard-v33" in source
     assert "st-key-dashboard_root" in source
     assert "dashboard-kpi-grid" in source
     assert "dashboard-value-grid" in source

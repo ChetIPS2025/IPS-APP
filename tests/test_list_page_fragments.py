@@ -16,6 +16,16 @@ def _pricing_guide_source() -> str:
     return path.read_text(encoding="utf-8")
 
 
+def _pricing_guide_list_table_source() -> str:
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "app"
+        / "components"
+        / "pricing_guide_list_table.py"
+    )
+    return path.read_text(encoding="utf-8")
+
+
 def test_users_table_open_prepares_modal_without_rerun() -> None:
     from app.pages import employees as employees_page
 
@@ -49,7 +59,10 @@ def test_pricing_guide_table_uses_native_detail_links() -> None:
     assert "render_pricing_guide_table_bridge_legacy" not in src
     assert "list_pricing_guide_page" in src
     assert "_capture_pricing_detail_query" in src
-    assert "pricing_guide_detail_href" in src
+    assert "build_pricing_guide_html_table" in src
+
+    list_table_src = _pricing_guide_list_table_source().replace("\r\n", "\n")
+    assert "pricing_guide_detail_href" in list_table_src
 
 
 def test_pricing_guide_catalog_fragment_uses_directory_service() -> None:
