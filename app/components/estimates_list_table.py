@@ -652,7 +652,6 @@ def render_estimates_table_open_buttons(
 
             def _open(_eid: str = eid, _est: dict = est) -> None:
                 open_estimate_fn(_eid, _est)
-                ips_app_rerun()
 
             st.button(
                 "Open estimate",
@@ -721,8 +720,6 @@ def render_estimates_table_bridge(
       e.preventDefault();
       e.stopPropagation();
     }}
-    const bridgeKey = el.getAttribute("data-bridge-key");
-    if (bridgeKey && clickBridgeButton(bridgeKey)) return;
     sendValue("open:" + id);
   }}
 
