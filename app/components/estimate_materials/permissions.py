@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.auth import current_role
+from app.auth import current_profile, current_role
 
 
 @dataclass(frozen=True)
@@ -20,14 +20,11 @@ class EstimateMaterialsPermissions:
 
 def load_estimate_materials_permissions() -> EstimateMaterialsPermissions:
     role = str(current_role() or "").strip()
-    try:
-        import streamlit as st
-
-        user = st.session_state.get("user") or {}
-    except Exception:
-        user = {}
-    user_id = str(user.get("id") or user.get("sub") or "")
-    user_name = str(user.get("name") or user.get("email") or "")
+    profile = current_profile()
+    user_id = str(profile.get("id") or profile.get("user_id") or "").strip()
+    user_name = str(
+        profile.get("full_name") or profile.get("name") or profile.get("email") or ""
+    ).strip()
     role_lower = role.lower()
     can_edit = role_lower in {
         "admin",
