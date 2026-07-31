@@ -155,6 +155,61 @@ def _render_password_reset() -> None:
                 show_auth_error(exc)
 
 
+def capture_legacy_page_query() -> None:
+    """Map legacy ``?page=Timekeeping`` deep links to rebuilt module slugs."""
+    try:
+        raw = st.query_params.get("page")
+    except Exception:
+        return
+    if not raw:
+        return
+    if isinstance(raw, list):
+        raw = raw[0] if raw else ""
+    label = str(raw or "").strip()
+    if not label:
+        return
+    from app.navigation import LEGACY_PAGE_LABEL_TO_SLUG, set_nav_slug
+
+    mapped = LEGACY_PAGE_LABEL_TO_SLUG.get(label)
+    if not mapped:
+        slug = label.lower().replace(" ", "_").replace("-", "_")
+        from app.utils.permissions import NAV_SLUG_ALIASES
+
+        mapped = NAV_SLUG_ALIASES.get(slug, slug)
+    if mapped:
+        set_nav_slug(mapped)
+    try:
+        del st.query_params["page"]
+    except Exception:
+        pass
+
+
+def _render_nav_block_notice() -> None:
+    from app.navigation import current_nav_slug
+    from app.utils.view_as import IPS_NAV_BLOCK_KEY
+
+    nav_block = str(st.session_state.get(IPS_NAV_BLOCK_KEY) or "").strip()
+    if nav_block:
+        st.warning(nav_block)
+    denial = st.session_state.get("ips_last_nav_denial")
+    from app.navigation import IPS_NAV_INTENT_KEY
+
+    intent = str(st.session_state.get(IPS_NAV_INTENT_KEY) or "").strip()
+    if (
+        isinstance(denial, dict)
+        and str(denial.get("requested") or "") == "timekeeping"
+        and current_nav_slug() == "dashboard"
+        and intent == "timekeeping"
+    ):
+        eff = str(denial.get("effective_role") or "—")
+        cur = str(denial.get("current_role") or "—")
+        st.info(
+            f"Timekeeping navigation was blocked (effective role: **{eff}**, "
+            f"signed-in role: **{cur}**). "
+            f"If you use **View App As** on the Admin page, return to Admin View first."
+        )
+
+
 def main() -> None:
     configure_logging(settings.log_level)
     from app.perf_debug import perf_enabled
@@ -262,6 +317,7 @@ def main() -> None:
 
     apply_pending_navigation()
     capture_nav_slug_from_query()
+    capture_legacy_page_query()
 
     from app.auth import is_authenticated as _auth_check
     from app.navigation import (
@@ -300,6 +356,8 @@ def main() -> None:
 
     if is_view_as_active() and not is_view_as_mobile_preview():
         render_view_as_banner()
+
+    _render_nav_block_notice()
 
     render_sidebar(slug)
     inject_sidebar_shell()

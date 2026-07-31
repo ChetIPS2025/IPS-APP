@@ -84,6 +84,7 @@ def _clear_stale_detail_query_params(preserve_for_slug: str | None = None) -> No
 
 def _resolve_query_nav_slug(raw: str) -> str | None:
     from app.navigation import ACTIVE_MODULE_SLUGS, LEGACY_PAGE_LABEL_TO_SLUG, normalize_nav_slug
+    from app.utils.permissions import NAV_SLUG_ALIASES
 
     text = str(raw or "").strip()
     if not text:
@@ -91,12 +92,16 @@ def _resolve_query_nav_slug(raw: str) -> str | None:
     if text in LEGACY_PAGE_LABEL_TO_SLUG:
         text = LEGACY_PAGE_LABEL_TO_SLUG[text]
     slug = text.lower().replace(" ", "_").replace("-", "_")
+    slug = NAV_SLUG_ALIASES.get(slug, slug)
     if slug == "users":
         slug = "employees"
     if slug in {"scan_inventory", "scan_asset"}:
         return normalize_nav_slug(slug)
     if slug in ACTIVE_MODULE_SLUGS:
         return normalize_nav_slug(slug)
+    resolved = normalize_nav_slug(slug)
+    if resolved != normalize_nav_slug(""):
+        return resolved
     return None
 
 

@@ -124,6 +124,7 @@ def render_module(slug: str | None = None) -> None:
     active = normalize_nav_slug(slug or nav_slug() or "dashboard")
     role = effective_role()
     if not role_can_access_page(role, active):
+        from app.auth import current_role
         from app.navigation import default_nav_slug, set_nav_slug
         from app.utils.permissions import normalize_role
         from app.utils.view_as import IPS_NAV_BLOCK_KEY, is_view_as_active, view_as_display_label
@@ -134,7 +135,8 @@ def render_module(slug: str | None = None) -> None:
         if is_view_as_active():
             block_reason = (
                 f"Preview mode is active ({view_as_display_label()}). "
-                f"{page_label} is not available for the {role_label} role."
+                f"{page_label} is not available for the {role_label} role. "
+                f"Use **Return to Admin View** at the top of the page."
             )
         else:
             block_reason = (
@@ -142,9 +144,14 @@ def render_module(slug: str | None = None) -> None:
                 f"({role_label}). Contact an administrator if this seems wrong."
             )
         st.session_state[IPS_NAV_BLOCK_KEY] = block_reason
+        st.session_state["ips_last_nav_denial"] = {
+            "requested": active,
+            "effective_role": norm,
+            "current_role": normalize_role(current_role()),
+            "view_as": bool(is_view_as_active()),
+        }
         fallback = default_nav_slug()
         if active != fallback and role_can_access_page(role, fallback):
-            st.warning(block_reason)
             set_nav_slug(fallback)
             st.rerun()
             return

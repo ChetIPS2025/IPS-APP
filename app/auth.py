@@ -403,6 +403,7 @@ def _sync_current_user_snapshot(profile: dict[str, Any], *, auth_user_id: str) -
     st.session_state[IPS_CURRENT_USER_FULL_NAME_KEY] = full_name or None
     st.session_state[IPS_CURRENT_USER_ROLE_KEY] = role or None
     profile_copy = dict(profile)
+    st.session_state["auth_profile"] = profile_copy
     st.session_state[CURRENT_USER_KEY] = profile_copy
     st.session_state[USER_PROFILE_KEY] = profile_copy
     st.session_state[CURRENT_USER_PROFILE_KEY] = profile_copy
@@ -561,12 +562,60 @@ def _attach_employee_for_profile(profile: dict[str, Any]) -> None:
 
 def _ensure_auth_employee_attached() -> None:
     """Keep linked employee data available for permission fallback on cached sessions."""
-    if isinstance(st.session_state.get("auth_employee"), dict):
-        return
+    from app.utils.permissions import normalize_role
+
     prof = _loaded_session_profile()
     if not prof:
         return
-    _attach_employee_for_profile(prof)
+
+    raw_role = normalize_role(str(prof.get("role") or "viewer"))
+    cached = st.session_state.get("auth_employee")
+    has_cached = isinstance(cached, dict) and bool(cached.get("id"))
+    if raw_role in {"viewer", "employee"} or not has_cached:
+        _attach_employee_for_profile(prof)
+    _sync_resolved_role_to_profile_session(prof)
+
+
+def _auth_slug_for_resolved_role(resolved: str) -> str:
+    """Map normalized app role to profiles.role slug stored in Supabase."""
+    norm = str(resolved or "viewer").strip().lower()
+    if norm == "admin":
+        return "admin"
+    if norm in {"supervisor", "project manager"}:
+        return "manager"
+    if norm == "employee":
+        return "employee"
+    return "viewer"
+
+
+def _sync_resolved_role_to_profile_session(profile: dict[str, Any] | None = None) -> None:
+    """Align in-memory profile.role with resolved permissions (session only)."""
+    from app.utils.permissions import normalize_role
+
+    prof = dict(profile if isinstance(profile, dict) else _loaded_session_profile() or {})
+    if not prof:
+        return
+    resolved = _normalized_role_from_session()
+    current_norm = normalize_role(str(prof.get("role") or "viewer"))
+    if current_norm == resolved:
+        return
+    auth_slug = _auth_slug_for_resolved_role(resolved)
+    prof["role"] = auth_slug
+    uid = str(
+        prof.get("id")
+        or prof.get("user_id")
+        or st.session_state.get(AUTH_USER_ID_KEY)
+        or st.session_state.get(CURRENT_USER_ID_KEY)
+        or ""
+    ).strip()
+    if uid:
+        _sync_current_user_snapshot(prof, auth_user_id=uid)
+    else:
+        st.session_state["auth_profile"] = prof
+        st.session_state[CURRENT_USER_PROFILE_KEY] = prof
+        st.session_state[USER_PROFILE_KEY] = prof
+        st.session_state[CURRENT_USER_KEY] = prof
+        st.session_state[ROLE_KEY] = auth_slug
 
 
 def ensure_authenticated_user_identity(

@@ -155,11 +155,30 @@ def normalize_role(raw: str) -> str:
     return ROLE_ALIASES.get(r, "viewer")
 
 
+# Alternate slugs/labels that should resolve to a built module (see navigation.normalize_nav_slug).
+NAV_SLUG_ALIASES: dict[str, str] = {
+    "log_time": "timekeeping",
+    "time_reports": "timekeeping",
+    "time_tracking": "timekeeping",
+    "time_keeping": "timekeeping",
+    "pm_matrix_time_entry": "timekeeping",
+    "weekly_timekeeping": "timekeeping",
+}
+
+# Modules that share the same office-role access as Jobs (avoid redirect loops when role data is stale).
+_JOBS_COUPLED_PAGES: frozenset[str] = frozenset({"timekeeping", "weekly_timesheets"})
+
+
 def role_can_access_page(role: str, page_slug: str) -> bool:
     norm = normalize_role(role)
     slug = str(page_slug or "").strip().lower().replace(" ", "_").replace("-", "_")
+    slug = NAV_SLUG_ALIASES.get(slug, slug)
     allowed = _ROLE_PAGES.get(norm, _ROLE_PAGES["viewer"])
-    return slug in allowed
+    if slug in allowed:
+        return True
+    if slug in _JOBS_COUPLED_PAGES and "jobs" in allowed:
+        return True
+    return False
 
 
 def can_view_hr_documents(role: str) -> bool:

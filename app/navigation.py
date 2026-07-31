@@ -283,6 +283,8 @@ def normalize_nav_slug(raw: str | None) -> str:
     Unknown values fall back to :func:`default_nav_slug` so stale session keys
     cannot strand the user on an access-denied blank page.
     """
+    from app.utils.permissions import NAV_SLUG_ALIASES
+
     s = str(raw or "").strip()
     if not s:
         return default_nav_slug()
@@ -298,6 +300,7 @@ def normalize_nav_slug(raw: str | None) -> str:
     if mapped:
         return mapped
     slug = s.lower().replace(" ", "_").replace("-", "_")
+    slug = NAV_SLUG_ALIASES.get(slug, slug)
     if slug == "job_costing":
         return "jobs"
     if slug in {"scan_inventory", "scan_asset"}:
@@ -347,8 +350,13 @@ def navigate_back() -> None:
     st.rerun()
 
 
+IPS_NAV_INTENT_KEY = "ips_nav_intent"
+
+
 def set_nav_slug(slug: str) -> None:
     raw = str(slug or "").strip()
+    if raw:
+        st.session_state[IPS_NAV_INTENT_KEY] = raw
     prev = current_nav_slug()
     if raw == "scan_inventory":
         _record_nav_history(prev, "inventory")
@@ -397,6 +405,7 @@ __all__ = [
     "BUILT_MODULES",
     "INVENTORY_SCAN_EMBED_KEY",
     "ESTIMATE_DETAIL_TAB_KEY",
+    "IPS_NAV_INTENT_KEY",
     "IPS_NAV_PENDING_KEY",
     "IPS_NAV_HISTORY_KEY",
     "JC_FOCUS_JOB_KEY",

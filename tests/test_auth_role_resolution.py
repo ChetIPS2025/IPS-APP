@@ -41,6 +41,7 @@ class TestAuthRoleResolution(unittest.TestCase):
         lookup_mock.return_value = {"id": "e1", "role": "Admin"}
         _ensure_auth_employee_attached()
         self.assertEqual(st.session_state["auth_employee"]["id"], "e1")
+        self.assertEqual(st.session_state["auth_profile"]["role"], "admin")
 
 
 if __name__ == "__main__":
