@@ -1212,20 +1212,11 @@ def current_role() -> str:
 
     Supported roles: admin, supervisor, project manager, employee, viewer.
     """
+    from app.utils.permissions import normalize_role
+
     prof = _loaded_session_profile()
-    raw = str(prof.get("role", "viewer") or "viewer").strip().lower()
-    aliases = {
-        "admin": "admin",
-        "supervisor": "supervisor",
-        "manager": "project manager",
-        "pm": "project manager",
-        "project manager": "project manager",
-        "project_manager": "project manager",
-        "estimator": "project manager",
-        "employee": "employee",
-        "viewer": "viewer",
-    }
-    return aliases.get(raw, "viewer")
+    raw = str(prof.get("role", "viewer") or "viewer")
+    return normalize_role(raw)
 
 
 def get_current_user_role() -> str:

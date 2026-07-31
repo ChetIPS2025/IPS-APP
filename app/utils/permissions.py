@@ -127,20 +127,32 @@ _ROLE_PAGES: dict[str, frozenset[str]] = {
 }
 
 
+# Maps profile / lookup labels to canonical app roles used in _ROLE_PAGES.
+ROLE_ALIASES: dict[str, str] = {
+    "admin": "admin",
+    "administrator": "admin",
+    "owner": "admin",
+    "supervisor": "supervisor",
+    "field supervisor": "supervisor",
+    "manager": "project manager",
+    "office manager": "project manager",
+    "operations manager": "project manager",
+    "general manager": "project manager",
+    "viewer": "viewer",
+    "read only": "viewer",
+    "readonly": "viewer",
+    "employee": "employee",
+    "pm": "project manager",
+    "project manager": "project manager",
+    "project_manager": "project manager",
+    "projectmanager": "project manager",
+    "estimator": "project manager",
+}
+
+
 def normalize_role(raw: str) -> str:
     r = str(raw or "viewer").strip().lower()
-    aliases = {
-        "admin": "admin",
-        "supervisor": "supervisor",
-        "manager": "project manager",
-        "viewer": "viewer",
-        "employee": "employee",
-        "pm": "project manager",
-        "project manager": "project manager",
-        "project_manager": "project manager",
-        "estimator": "project manager",
-    }
-    return aliases.get(r, "viewer")
+    return ROLE_ALIASES.get(r, "viewer")
 
 
 def role_can_access_page(role: str, page_slug: str) -> bool:
