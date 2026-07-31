@@ -363,6 +363,59 @@ def _build_hand_tools_list(
     return sorted(out, key=lambda r: (str(r.get("tool_name") or "").casefold(), str(r.get("location_display") or "")))
 
 
+def resolve_hand_tool_row(tool_id: str) -> dict[str, Any] | None:
+    """Load and normalize one small-tool or kit-item row for detail navigation."""
+    tid = _clean_text(tool_id)
+    if not tid:
+        return None
+    from app.services.repository import fetch_by_id
+
+    assets_by_id, jobs_by_id = _resolve_catalog_maps(None, None)
+
+    row = fetch_by_id(_TABLE, tid)
+    if isinstance(row, dict) and row.get("is_active") is not False:
+        norm = normalize_hand_tool({**row, "row_type": "hand_tool"})
+        cid = norm.get("container_asset_id")
+        jid = norm.get("assigned_job_id")
+        if cid:
+            norm["container_label"] = _container_label_from_map(assets_by_id, cid)
+        if jid:
+            norm["job_label"] = _job_label_from_map(jobs_by_id, jid)
+        norm["location_display"] = _location_display(norm)
+        return norm
+
+    kit_raw = fetch_by_id(_KIT_ITEMS_TABLE, tid)
+    if not isinstance(kit_raw, dict) or kit_raw.get("is_active") is False:
+        return None
+    item = normalize_kit_item(kit_raw)
+    if _has_serial(item.get("serial_number")):
+        return None
+    if _clean_text(item.get("child_asset_id")):
+        return None
+    parent_id = _clean_text(item.get("parent_asset_id"))
+    parent = assets_by_id.get(parent_id) or {}
+    parent_loc = _clean_text(parent.get("location") or "—") or "—"
+    norm = normalize_hand_tool(
+        {
+            **item,
+            "row_type": "kit_item",
+            "tool_name": item.get("item_name"),
+            "quantity_on_hand": item.get("quantity_actual") or item.get("quantity_expected"),
+            "quantity_expected": item.get("quantity_expected"),
+            "storage_type": "Tool Trailer",
+            "container_asset_id": parent_id,
+            "container_label": _container_label_from_map(assets_by_id, parent_id),
+            "storage_location": parent_loc,
+            "assigned_job_id": parent.get("assigned_job_id"),
+            "job_label": _job_label_from_map(jobs_by_id, parent.get("assigned_job_id")),
+            "kit_item_id": item.get("id"),
+            "editable": False,
+        }
+    )
+    norm["location_display"] = _location_display(norm)
+    return norm
+
+
 def list_hand_tools(
     *,
     assets_by_id: dict[str, dict[str, Any]] | None = None,
@@ -699,6 +752,7 @@ __all__ = [
     "get_small_hand_tools_value_summary",
     "list_hand_tools",
     "normalize_hand_tool",
+    "resolve_hand_tool_row",
     "import_hand_tool_row",
     "hand_tool_kit_option_label",
     "link_hand_tool_to_kit",

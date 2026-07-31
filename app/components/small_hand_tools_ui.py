@@ -28,10 +28,10 @@ from app.components.record_modal import (
     show_modal_if_pending,
 )
 from app.components.small_hand_tools_list_table import (
+    HAND_TOOL_DETAIL_QUERY_KEY,
     HAND_TOOLS_TABLE_COL_WIDTHS_PX,
     build_hand_tools_html_table,
     render_hand_tools_table_bridge_legacy,
-    render_hand_tools_table_open_buttons,
 )
 from app.components.table_filters import (
     apply_column_filters,
@@ -76,6 +76,7 @@ _HAND_TOOL_SEL = "ht_detail_sel"
 _HAND_TOOL_MODAL_KEY = "ht_detail_modal"
 _HAND_TOOL_CACHE_KEY = "ht_detail_cache"
 _HAND_TOOL_DETAIL_TABLE_KEY = "assets_hand_tools_detail"
+_HAND_TOOL_DETAIL_QUERY_ERROR_KEY = "_ips_hand_tool_detail_query_error"
 _HAND_TOOL_ADJUST_ID_KEY = "ht_adjust_tool_id"
 _HAND_TOOL_FILTER_COLUMN_LAYOUT: list[tuple[str | None, str | None]] = [
     (None, None),
@@ -275,6 +276,51 @@ def _clear_hand_tool_detail_modal() -> None:
         modal_key=_HAND_TOOL_MODAL_KEY,
         module=_HAND_TOOL_MOD,
     )
+    if HAND_TOOL_DETAIL_QUERY_KEY in st.query_params:
+        del st.query_params[HAND_TOOL_DETAIL_QUERY_KEY]
+
+
+def _cached_hand_tool_for_modal(tool_id: str) -> dict | None:
+    tid = str(tool_id or "").strip()
+    if not tid:
+        return None
+    cache = st.session_state.get(_HAND_TOOL_CACHE_KEY)
+    if isinstance(cache, dict):
+        hit = cache.get(tid)
+        if isinstance(hit, dict):
+            return hit
+    from app.services.small_hand_tool_service import resolve_hand_tool_row
+
+    return resolve_hand_tool_row(tid)
+
+
+def capture_hand_tool_detail_query(
+    *,
+    assets_main_tab_key: str,
+    open_tool_row_fn: Callable[[dict], None],
+) -> None:
+    requested_id = str(st.query_params.get(HAND_TOOL_DETAIL_QUERY_KEY) or "").strip()
+    if not requested_id:
+        return
+
+    current_modal_id = str(st.session_state.get(_HAND_TOOL_MODAL_KEY) or "").strip()
+    if requested_id == current_modal_id:
+        return
+
+    tool = _cached_hand_tool_for_modal(requested_id)
+    if not tool:
+        st.session_state[_HAND_TOOL_DETAIL_QUERY_ERROR_KEY] = requested_id
+        if HAND_TOOL_DETAIL_QUERY_KEY in st.query_params:
+            del st.query_params[HAND_TOOL_DETAIL_QUERY_KEY]
+        return
+
+    st.session_state[assets_main_tab_key] = "Small Tools"
+    open_tool_row_fn(tool)
+
+
+def show_hand_tool_detail_query_error_if_any() -> None:
+    if st.session_state.pop(_HAND_TOOL_DETAIL_QUERY_ERROR_KEY, None):
+        st.warning("The selected small tool could not be found.")
 
 
 def _trailer_label_for_id(container_id: object, trailer_map: dict[str, str]) -> str:
@@ -659,7 +705,6 @@ def _render_table(
             build_hand_tools_html_table(rows, image_context=image_context),
             unsafe_allow_html=True,
         )
-        render_hand_tools_table_open_buttons(rows, open_row_fn=_open_row)
         render_hand_tools_table_bridge_legacy(
             row_by_id,
             open_row_fn=_open_row,

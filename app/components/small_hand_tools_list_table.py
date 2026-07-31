@@ -1,16 +1,39 @@
-"""HTML small hand tools table with click bridge (matches Serialized Tools layout)."""
+"""HTML small hand tools table with native detail links (adjust uses click bridge)."""
 
 from __future__ import annotations
 
 import html
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import urlencode
 
 import streamlit as st
 
 from app.services.catalog_images import CatalogImageContext, catalog_thumbnail_html
 
 HAND_TOOLS_TABLE_LAST_ACTION_KEY = "hand_tools_list_last_action"
+_ASSETS_NAV_QUERY_KEY = "ips_nav"
+_ASSETS_NAV_SLUG = "assets"
+HAND_TOOL_DETAIL_QUERY_KEY = "hand_tool_detail"
+
+
+def hand_tool_detail_href(row: dict[str, Any]) -> str:
+    """Native Assets URL for a small hand tool or kit-item row."""
+    if not row.get("editable", True):
+        parent_id = str(row.get("container_asset_id") or row.get("parent_asset_id") or "").strip()
+        if parent_id:
+            from app.components.assets_list_table import asset_detail_href
+
+            return asset_detail_href(parent_id, tab="kit")
+    row_id = str(row.get("id") or "").strip()
+    if not row_id:
+        return "#"
+    return "?" + urlencode(
+        {
+            _ASSETS_NAV_QUERY_KEY: _ASSETS_NAV_SLUG,
+            HAND_TOOL_DETAIL_QUERY_KEY: row_id,
+        }
+    )
 
 
 def hand_tools_bridge_button_key(row: dict[str, Any]) -> str:
@@ -49,19 +72,21 @@ def _cell_wrapper(inner: str, *, extra_class: str = "", align: str = "left") -> 
     return f'<div class="{html.escape(cls)}">{inner}</div>'
 
 
-def _tool_link_html(row_id: str, label: str) -> str:
+def _tool_link_html(row: dict[str, Any], label: str) -> str:
     text = html.escape(label)
     title = html.escape(label, quote=True)
-    rid = html.escape(row_id, quote=True)
+    href = html.escape(hand_tool_detail_href(row), quote=True)
+    row_id = html.escape(str(row.get("id") or "").strip(), quote=True)
     return (
         f'<a class="ips-row-open-link ips-dash-est-link ips-inventory-desc-link '
-        f'ips-assets-open-link ips-hand-tool-open-link" href="#" '
-        f'data-row-id="{rid}" title="{title}">{text}</a>'
+        f'ips-assets-open-link ips-hand-tool-open-link" href="{href}" target="_self" '
+        f'data-tool-id="{row_id}" title="{title}">{text}</a>'
     )
 
 
-def _tool_thumb_link_html(row_id: str, row: dict[str, Any], *, image_context: CatalogImageContext) -> str:
-    rid = html.escape(row_id, quote=True)
+def _tool_thumb_link_html(row: dict[str, Any], *, image_context: CatalogImageContext) -> str:
+    href = html.escape(hand_tool_detail_href(row), quote=True)
+    row_id = html.escape(str(row.get("id") or "").strip(), quote=True)
     thumb = catalog_thumbnail_html(
         row,
         kind="small_tool",
@@ -72,7 +97,8 @@ def _tool_thumb_link_html(row_id: str, row: dict[str, Any], *, image_context: Ca
     )
     return (
         f'<a class="ips-inventory-thumb-cell-link ips-assets-open-link ips-hand-tool-open-link" '
-        f'href="#" data-row-id="{rid}" title="View tool" aria-label="View tool">{thumb}</a>'
+        f'href="{href}" target="_self" data-tool-id="{row_id}" '
+        f'title="View tool" aria-label="View tool">{thumb}</a>'
     )
 
 
@@ -143,7 +169,7 @@ def build_hand_tools_html_table(
                 "image",
                 "center",
                 _cell_wrapper(
-                    _tool_thumb_link_html(row_id, row, image_context=image_context),
+                    _tool_thumb_link_html(row, image_context=image_context),
                     extra_class="ips-inventory-image-td",
                     align="center",
                 ),
@@ -152,7 +178,7 @@ def build_hand_tools_html_table(
                 "name",
                 "left",
                 _cell_wrapper(
-                    _tool_link_html(row_id, name if name != "—" else "View tool"),
+                    _tool_link_html(row, name if name != "—" else "View tool"),
                     extra_class="ips-dash-est-desc-cell",
                 ),
             ),
@@ -224,8 +250,7 @@ def build_hand_tools_html_table(
         )
         body_rows.append(
             f'<tr class="ips-dash-est-tr ips-dash-est-row-{row_parity} ips-hand-tool-row" '
-            f'data-row-id="{html.escape(row_id, quote=True)}" '
-            f'data-bridge-key="{html.escape(hand_tools_bridge_button_key(row), quote=True)}">'
+            f'data-row-id="{html.escape(row_id, quote=True)}">'
             f"{tds}"
             f"</tr>"
         )
@@ -389,23 +414,11 @@ def render_hand_tools_table_bridge_legacy(
     open_row_fn: Callable[[str, dict[str, Any]], None],
     adjust_row_fn: Callable[[str, dict[str, Any]], None],
 ) -> None:
+    _ = open_row_fn
     st.markdown(
         '<span class="ips-hand-tools-table-link-bridge-marker" aria-hidden="true"></span>',
         unsafe_allow_html=True,
     )
-    picked_open = render_hand_tools_table_open_bridge()
-    if picked_open:
-        row_id = str(picked_open).strip()
-        row = row_by_id.get(row_id)
-        if row:
-            handle_hand_tools_table_action(
-                row_id,
-                row_by_id,
-                last_action_key=last_action_key,
-                open_row_fn=open_row_fn,
-                adjust_row_fn=adjust_row_fn,
-            )
-            return
     picked = render_hand_tools_table_bridge(component_key=component_key, hook_key=hook_key)
     raw = str(picked or "").strip()
     if not raw:

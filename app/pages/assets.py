@@ -91,7 +91,12 @@ from app.components.serialized_tools_ui import (
     render_serialized_tool_tracking_panel,
     render_serialized_tools_toolbar,
 )
-from app.components.small_hand_tools_ui import open_hand_tool_detail, render_hand_tools_tab
+from app.components.small_hand_tools_ui import (
+    capture_hand_tool_detail_query,
+    open_hand_tool_detail,
+    render_hand_tools_tab,
+    show_hand_tool_detail_query_error_if_any,
+)
 from app.components.asset_reclassification_ui import (
     apply_tracking_bucket_change,
     render_asset_reclassification_panel,
@@ -1896,6 +1901,11 @@ def render() -> None:
     apply_pending_asset_deeplink()
     _capture_asset_detail_query()
     _show_asset_detail_query_error_if_any()
+    capture_hand_tool_detail_query(
+        assets_main_tab_key=_ASSETS_MAIN_TAB_KEY,
+        open_tool_row_fn=_prepare_open_hand_tool_row,
+    )
+    show_hand_tool_detail_query_error_if_any()
 
     deeplink_sel = str(st.session_state.get(_SEL) or "").strip()
     if deeplink_sel and not str(st.session_state.get(_ASSETS_MODAL_KEY) or "").strip():
