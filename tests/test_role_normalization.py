@@ -30,6 +30,10 @@ class TestRoleNormalization(unittest.TestCase):
         self.assertEqual(normalize_role("Technician"), "viewer")
         self.assertFalse(role_can_access_page("Technician", "timekeeping"))
 
+    def test_manager_auth_slug_maps_to_project_manager(self) -> None:
+        self.assertEqual(normalize_role("manager"), "project manager")
+        self.assertTrue(role_can_access_page("manager", "timekeeping"))
+
     def test_current_role_uses_shared_normalizer(self) -> None:
         st.session_state.clear()
         st.session_state["auth_profile"] = {"role": "Administrator", "id": "u1"}

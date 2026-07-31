@@ -125,13 +125,21 @@ def render_module(slug: str | None = None) -> None:
     role = effective_role()
     if not role_can_access_page(role, active):
         from app.navigation import default_nav_slug, set_nav_slug
+        from app.utils.permissions import normalize_role
 
+        norm = normalize_role(role)
+        page_label = str(active or "").replace("_", " ").strip().title() or "this page"
+        role_label = norm.replace("_", " ").title()
         fallback = default_nav_slug()
         if active != fallback and role_can_access_page(role, fallback):
+            st.warning(
+                f"You do not have access to **{page_label}** with your current role "
+                f"({role_label}). Contact an administrator if this seems wrong."
+            )
             set_nav_slug(fallback)
             st.rerun()
             return
-        st.error("You do not have access to this page.")
+        st.error(f"You do not have access to {page_label}.")
         return
 
     from app.pages._core._access import clear_demo_flag, end_module, show_demo_banner_if_needed

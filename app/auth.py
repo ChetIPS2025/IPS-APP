@@ -476,13 +476,20 @@ def _fetch_profile_for_auth_user_id(uid: str) -> dict[str, Any] | None:
             linked = fetch_one("profiles", {"id": profile_id})
             if linked and _profile_matches_auth_user(linked, auth_uid):
                 return linked
+        from app.services.employee_role_service import (
+            auth_role_from_permission_label,
+            resolve_employee_roles,
+        )
+
+        permission_role, _billing = resolve_employee_roles(emp)
+        auth_role = auth_role_from_permission_label(permission_role or "Employee")
         return {
             "id": auth_uid,
             "user_id": auth_uid,
             "email": str(emp.get("email") or "").strip(),
             "full_name": str(emp.get("name") or "").strip(),
             "name": str(emp.get("name") or "").strip(),
-            "role": str(emp.get("role") or "employee").strip(),
+            "role": auth_role,
             "employee_id": str(emp.get("id") or "").strip(),
             "is_active": True,
         }
@@ -1199,11 +1206,42 @@ def render_auth_identity_debug_panel() -> None:
                     f"Loaded profile ID: {str(prof.get('id') or '—')}",
                     f"Loaded profile name: {prof_name}",
                     f"Loaded profile auth user ID: {str(prof.get('id') or prof.get('user_id') or '—')}",
+                    f"Profile role (raw): {str(prof.get('role') or '—')}",
+                    f"Effective role: {current_role()}",
                     f"Preview mode: {preview_label}",
                     f"Greeting display name: {display_name}",
                 ]
             )
         )
+
+
+def _normalized_role_from_session() -> str:
+    """Resolve app role from profile.auth slug, with employee-permission fallback."""
+    from app.services.employee_role_service import (
+        auth_role_from_permission_label,
+        resolve_employee_roles,
+    )
+    from app.utils.permissions import normalize_role
+
+    prof = _loaded_session_profile()
+    raw = str(prof.get("role", "viewer") or "viewer")
+    norm = normalize_role(raw)
+    if norm not in {"viewer", "employee"}:
+        return norm
+
+    emp = st.session_state.get("auth_employee")
+    if not isinstance(emp, dict) or not emp:
+        return norm
+
+    permission_role, _billing = resolve_employee_roles(emp)
+    if not permission_role:
+        return norm
+    upgraded = normalize_role(auth_role_from_permission_label(permission_role))
+    if upgraded == "viewer":
+        return norm
+    if norm == "employee" and upgraded == "employee":
+        return norm
+    return upgraded
 
 
 def current_role() -> str:
@@ -1212,11 +1250,7 @@ def current_role() -> str:
 
     Supported roles: admin, supervisor, project manager, employee, viewer.
     """
-    from app.utils.permissions import normalize_role
-
-    prof = _loaded_session_profile()
-    raw = str(prof.get("role", "viewer") or "viewer")
-    return normalize_role(raw)
+    return _normalized_role_from_session()
 
 
 def get_current_user_role() -> str:

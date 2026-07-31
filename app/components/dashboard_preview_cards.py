@@ -114,15 +114,18 @@ def _todo_preview_html(rows: list[dict[str, Any]]) -> str:
     return f'<ul class="ips-dash-preview-list">{"".join(items)}</ul>'
 
 
-def _analytics_preview_html() -> str:
+def _analytics_preview_html(role: str) -> str:
+    from app.utils.permissions import role_can_access_page
+
     rows = [
-        ("job_costing", "📊", "Job Costing", "Roll-up costs and margin by job"),
-        ("timekeeping", "🕒", "Time Reports", "Weekly hours and labor summaries"),
-        ("estimates", "📄", "Estimate Reports", "Pipeline and estimate status"),
-        ("inventory", "📦", "Inventory Reports", "Stock movement and usage"),
+        ("job_costing", "📊", "Job Costing", "Roll-up costs and margin by job", "jobs"),
+        ("timekeeping", "🕒", "Time Reports", "Weekly hours and labor summaries", "timekeeping"),
+        ("estimates", "📄", "Estimate Reports", "Pipeline and estimate status", "estimates"),
+        ("inventory", "📦", "Inventory Reports", "Stock movement and usage", "inventory"),
     ]
+    rows = [row for row in rows if role_can_access_page(role, row[4])]
     items: list[str] = []
-    for action, icon, label, sub in rows:
+    for action, icon, label, sub, _slug in rows:
         action_attr = html.escape(action, quote=True)
         items.append(
             '<button type="button" class="ips-dash-analytics-row" '
@@ -147,8 +150,13 @@ def _handle_analytics_nav(action: str) -> None:
     picked = str(action or "").strip()
     if not picked:
         return
-    if picked == str(st.session_state.get(_ANALYTICS_NAV_LAST_KEY) or ""):
-        return
+    last = str(st.session_state.get(_ANALYTICS_NAV_LAST_KEY) or "")
+    if picked == last:
+        from app.navigation import current_nav_slug
+
+        if current_nav_slug() != "dashboard":
+            return
+        st.session_state.pop(_ANALYTICS_NAV_LAST_KEY, None)
     st.session_state[_ANALYTICS_NAV_LAST_KEY] = picked
     if picked == "job_costing":
         _nav_job_costing()
@@ -229,7 +237,7 @@ def _render_analytics_reports_card() -> None:
         '<span class="ips-dash-preview-card-icon">📈</span>'
         '<p class="ips-dash-preview-card-title">Analytics &amp; Reports</p>'
         "</div>"
-        f"{_analytics_preview_html()}",
+        f"{_analytics_preview_html(effective_role())}",
         unsafe_allow_html=True,
     )
     action = _render_analytics_reports_nav_bridge()
