@@ -38,9 +38,15 @@ _EQUIPMENT_LIST_COLUMNS = (
     "serial_number",
     "is_rentable",
     "rental_default_markup_percent",
+    "image_path",
+    "photo_path",
     "image_url",
     "photo_url",
     "thumbnail_url",
+    "image_mime_type",
+    "image_status",
+    "pricing_guide_id",
+    "pricing_item_id",
 )
 
 

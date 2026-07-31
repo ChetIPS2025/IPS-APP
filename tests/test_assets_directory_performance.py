@@ -71,6 +71,32 @@ def test_build_serialized_tool_display_row_calls_view_once() -> None:
     assert out["_display_name"] == "Drill"
 
 
+def test_equipment_projection_retains_image_path_for_thumbnails() -> None:
+    from app.components.assets_list_table import _asset_thumb_link_html
+    from app.services.assets_directory_service import _project_equipment_row
+
+    row = {
+        "id": "a-1",
+        "asset_name": "Generator",
+        "asset_number": "G-1",
+        "category": "Equipment",
+        "status": "Available",
+        "image_path": "assets/item_images/assets/a-1/photo.jpg",
+        "image_mime_type": "image/jpeg",
+    }
+    projected = _project_equipment_row(row)
+    assert projected.get("image_path") == row["image_path"]
+
+    with patch(
+        "app.services.item_images.create_signed_url",
+        return_value="https://cdn.example.com/signed-photo.jpg",
+    ):
+        html_out = _asset_thumb_link_html("a-1", projected)
+    assert "ips-inventory-thumb-img" in html_out
+    assert "https://cdn.example.com/signed-photo.jpg" in html_out
+    assert "ips-asset-thumb-placeholder" not in html_out
+
+
 def test_list_equipment_page_returns_only_requested_slice() -> None:
     rows = [{"id": f"a-{i}", "asset_name": f"Asset {i}", "category": "Equipment", "status": "Available"} for i in range(5)]
     with patch("app.services.assets_directory_service._load_equipment_catalog", return_value=(rows, True)):
