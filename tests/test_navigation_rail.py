@@ -84,6 +84,21 @@ class TestFirstClickNavigation(unittest.TestCase):
         for key in STALE_MODULE_DETAIL_QUERY_KEYS:
             self.assertNotIn(key, st.query_params)
 
+    def test_query_capture_preserves_target_module_detail_params(self) -> None:
+        st.session_state[SESSION_NAV_KEY] = "dashboard"
+        st.query_params.update(
+            {
+                "ips_nav": "estimates",
+                "estimate_detail": "est-42",
+                "customer_detail": "cust-1",
+            }
+        )
+        capture_nav_slug_from_query()
+        self.assertEqual(st.session_state[SESSION_NAV_KEY], "estimates")
+        self.assertEqual(st.query_params.get("estimate_detail"), "est-42")
+        self.assertNotIn("customer_detail", st.query_params)
+        self.assertNotIn("ips_nav", st.query_params)
+
     def test_pending_navigation_does_not_block_timekeeping_query(self) -> None:
         st.session_state[IPS_NAV_PENDING_KEY] = "Jobs"
         st.query_params["ips_nav"] = "timekeeping"

@@ -46,10 +46,22 @@ STALE_MODULE_DETAIL_QUERY_KEYS: frozenset[str] = frozenset(
         "task_detail",
         "task_tab",
         "pricing_detail",
+        "pricing_tab",
         "schedule_detail",
         "user_detail",
     }
 )
+
+MODULE_DETAIL_QUERY_KEYS: dict[str, frozenset[str]] = {
+    "customers": frozenset({"customer_detail", "customer_tab", "contact_detail", "location_detail"}),
+    "assets": frozenset({"asset_detail", "asset_tab"}),
+    "jobs": frozenset({"job_detail", "job_tab"}),
+    "estimates": frozenset({"estimate_detail", "estimate_tab"}),
+    "tasks": frozenset({"task_detail", "task_tab"}),
+    "pricing_guide": frozenset({"pricing_detail", "pricing_tab"}),
+    "scheduling": frozenset({"schedule_detail"}),
+    "employees": frozenset({"user_detail"}),
+}
 
 
 def sidebar_nav_href(slug: str) -> str:
@@ -58,8 +70,11 @@ def sidebar_nav_href(slug: str) -> str:
     return "?" + urlencode({"ips_nav": clean})
 
 
-def _clear_stale_detail_query_params() -> None:
+def _clear_stale_detail_query_params(preserve_for_slug: str | None = None) -> None:
+    preserve = MODULE_DETAIL_QUERY_KEYS.get(str(preserve_for_slug or "").strip(), frozenset())
     for key in STALE_MODULE_DETAIL_QUERY_KEYS:
+        if key in preserve:
+            continue
         try:
             if key in st.query_params:
                 del st.query_params[key]
@@ -212,7 +227,7 @@ def capture_nav_slug_from_query() -> None:
     st.session_state.pop(IPS_NAV_PENDING_KEY, None)
     set_nav_slug(resolved)
     st.session_state[IPS_NAV_QUERY_APPLIED_KEY] = resolved
-    _clear_stale_detail_query_params()
+    _clear_stale_detail_query_params(preserve_for_slug=resolved)
     try:
         del st.query_params["ips_nav"]
     except Exception:
