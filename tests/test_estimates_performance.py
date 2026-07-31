@@ -107,6 +107,16 @@ class TestEstimatesHeaderBeforeList(unittest.TestCase):
         assert render_block.find("load_estimates()") < 0
         assert header_pos < list_pos
 
+    def test_detail_pending_routes_before_list_page_header(self) -> None:
+        path = Path(__file__).resolve().parents[1] / "app" / "pages" / "estimates.py"
+        src = path.read_text(encoding="utf-8").replace("\r\n", "\n")
+        render_block = src.split("\ndef render(")[1].split("\ndef _export_estimates_csv")[0]
+        detail_pos = render_block.find("_estimates_detail_pending()")
+        header_pos = render_block.find("render_page_header")
+        assert detail_pos >= 0
+        assert header_pos >= 0
+        assert detail_pos < header_pos
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1942,6 +1942,17 @@ def render() -> None:
     inject_estimates_module_css()
     inject_estimates_page_layout_css()
 
+    _capture_estimate_detail_query()
+    _show_estimate_detail_query_error_if_any()
+
+    if _estimates_detail_pending():
+        eid = str(st.session_state.get(SELECTED_ESTIMATE_KEY) or "").strip()
+        if eid:
+            render_estimate_detail(eid)
+        if st.session_state.get(_NEW_ESTIMATE_DIALOG_KEY):
+            _show_new_estimate_dialog()
+        return
+
     def _estimates_header_actions() -> None:
         st.markdown(
             '<span class="ips-estimates-page-header-actions ips-page-header-inline-actions" aria-hidden="true"></span>',
@@ -1971,17 +1982,6 @@ def render() -> None:
             '<span class="ips-estimates-page ips-page-shell-marker" aria-hidden="true"></span>',
             unsafe_allow_html=True,
         )
-
-        _capture_estimate_detail_query()
-        _show_estimate_detail_query_error_if_any()
-
-        if _estimates_detail_pending():
-            eid = str(st.session_state.get(SELECTED_ESTIMATE_KEY) or "").strip()
-            if eid:
-                render_estimate_detail(eid)
-            if st.session_state.get(_NEW_ESTIMATE_DIALOG_KEY):
-                _show_new_estimate_dialog()
-            return
 
         if st.session_state.get(_NEW_ESTIMATE_DIALOG_KEY):
             _show_new_estimate_dialog()
