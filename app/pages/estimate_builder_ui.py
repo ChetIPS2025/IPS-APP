@@ -2965,6 +2965,31 @@ def _estimate_scope_display_text(est: dict[str, Any]) -> str:
     return ""
 
 
+def _scope_form_sync_key(estimate_id: str) -> str:
+    return f"est_sow_sync_{estimate_id}"
+
+
+def _scope_form_fingerprint(est: dict[str, Any]) -> str:
+    """Detect when persisted scope on ``est`` differs from the tab widget state."""
+    scope_text = _estimate_scope_display_text(est)
+    cust_resp = str(est.get("customer_responsibilities") or "").strip()
+    return f"{scope_text}\0{cust_resp}"
+
+
+def _seed_scope_form_from_estimate(est: dict[str, Any]) -> None:
+    """Load saved scope into widget session keys when estimate data changes."""
+    eid = str(est.get("id") or "").strip()
+    if not eid:
+        return
+    fp = _scope_form_fingerprint(est)
+    sync_key = _scope_form_sync_key(eid)
+    if st.session_state.get(sync_key) == fp:
+        return
+    st.session_state[f"est_sow_text_{eid}"] = _estimate_scope_display_text(est)
+    st.session_state[f"est_sow_cr_{eid}"] = str(est.get("customer_responsibilities") or "").strip()
+    st.session_state[sync_key] = fp
+
+
 def render_scope_of_work_tab(
     est: dict[str, Any],
     *,
@@ -2976,13 +3001,7 @@ def render_scope_of_work_tab(
         st.info("Save this estimate to Supabase before editing scope of work.")
         return
 
-    scope_text = _estimate_scope_display_text(est)
-    cust_resp = str(est.get("customer_responsibilities") or "").strip()
-    seed_key = f"est_sow_seeded_{eid}"
-    if not st.session_state.get(seed_key):
-        st.session_state[f"est_sow_text_{eid}"] = scope_text
-        st.session_state[f"est_sow_cr_{eid}"] = cust_resp
-        st.session_state[seed_key] = True
+    _seed_scope_form_from_estimate(est)
 
     st.caption(
         "Enter the full scope of work for proposals and field teams. "

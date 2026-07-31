@@ -490,7 +490,11 @@ def _persist_scope_of_work(data: dict, row_id: str) -> tuple[bool, str]:
 
 
 def _on_estimate_scope_saved(eid: str) -> None:
+    from app.services.estimate_detail_service import invalidate_estimate_detail_cache
+
     _refresh_estimate_modal_cache(eid)
+    invalidate_estimate_detail_cache(eid)
+    st.session_state.pop(f"est_sow_sync_{eid}", None)
     st.session_state.pop(f"est_sow_seeded_{eid}", None)
 
 
