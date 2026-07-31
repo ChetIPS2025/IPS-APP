@@ -495,6 +495,7 @@ section[data-testid="stMain"]:has(.ips-estimates-page) .ips-estimates-filter-bar
   background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%) !important;
   color: #ffffff !important;
   border: 1px solid #1e40af !important;
+  text-decoration: none !important;
 }
 .st-key-estimates_table_wrap .ips-dash-est-view:hover,
 .st-key-estimates_table_wrap .ips-dash-est-view:focus {

@@ -20,7 +20,7 @@ def test_estimates_list_table_uses_native_detail_links() -> None:
     src = _estimates_source().replace("\r\n", "\n")
     table_block = src.split("def _render_custom_estimates_table(")[1].split("def _contact_label_for_estimate")[0]
     assert "build_estimates_html_table" in table_block
-    assert "open_estimate_fn=_prepare_open_estimate_table_row" in table_block
+    assert "render_estimates_table_bridge" in table_block
     assert "estimate_detail_href" in src
 
 

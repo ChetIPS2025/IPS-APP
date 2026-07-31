@@ -195,32 +195,21 @@ def build_approved_flags(rows: list[dict[str, Any]]) -> dict[str, bool]:
     }
 
 
-def estimates_bridge_button_key(row: dict[str, Any]) -> str:
-    raw = str(row.get("id") or row.get("estimate_number") or "estimate").strip()
-    safe = "".join(ch if ch.isalnum() else "_" for ch in raw) or "estimate"
-    return f"est_bridge_open_{safe}"
-
-
 def estimate_list_link_html(
     estimate_id: str,
     label: str,
     *,
     extra_class: str = "",
-    bridge_key: str = "",
 ) -> str:
+    """Native same-app link — opens detail via ?ips_nav=estimates&estimate_detail=<id>."""
     eid = str(estimate_id or "").strip()
     text = html.escape(label)
     title = html.escape(label, quote=True)
     href = html.escape(estimate_detail_href(eid), quote=True)
-    est_id = html.escape(eid, quote=True)
     cls = f"ips-row-open-link ips-dash-est-link ips-estimates-list-link ips-estimates-open-link {extra_class}".strip()
     aria = html.escape(f"Open estimate details for {label}", quote=True)
-    bridge_attr = ""
-    if bridge_key:
-        bridge_attr = f' data-bridge-key="{html.escape(str(bridge_key).strip(), quote=True)}"'
     return (
         f'<a class="{html.escape(cls)}" href="{href}" target="_self" '
-        f'data-estimate-id="{est_id}" data-est-open="1"{bridge_attr} '
         f'aria-label="{aria}" title="{title}">{text}</a>'
     )
 
@@ -230,16 +219,15 @@ def _estimate_link_html(
     label: str,
     *,
     extra_class: str = "",
-    bridge_key: str = "",
 ) -> str:
-    return estimate_list_link_html(eid, label, extra_class=extra_class, bridge_key=bridge_key)
+    return estimate_list_link_html(eid, label, extra_class=extra_class)
 
 
 def _actions_html(eid: str, *, show_approve: bool, show_approved_label: bool) -> str:
     est_id = html.escape(str(eid or "").strip(), quote=True)
+    view_href = html.escape(estimate_detail_href(str(eid or "").strip()), quote=True)
     view_btn = (
-        f'<button type="button" class="ips-dash-est-action ips-dash-est-view" '
-        f'data-est-action="open" data-estimate-id="{est_id}">View</button>'
+        f'<a class="ips-dash-est-action ips-dash-est-view" href="{view_href}" target="_self">View</a>'
     )
     if show_approve:
         approve_btn = (
@@ -439,7 +427,6 @@ def build_estimates_html_table(
         num_label = est_no if est_no and est_no != "—" else "Open estimate"
         title_label = project if project and project != "—" else "Open estimate"
         row_parity = "even" if row_idx % 2 else "odd"
-        bridge_key = estimates_bridge_button_key(est)
 
         if layout == "list":
             cells = [
@@ -451,7 +438,6 @@ def build_estimates_html_table(
                             eid,
                             num_label,
                             extra_class="ips-dash-est-num-link",
-                            bridge_key=bridge_key,
                         ),
                         extra_class="ips-dash-est-num-cell",
                     ),
@@ -464,7 +450,6 @@ def build_estimates_html_table(
                             eid,
                             title_label,
                             extra_class="ips-dash-est-desc-link",
-                            bridge_key=bridge_key,
                         ),
                         extra_class="ips-dash-est-desc-cell",
                     ),
@@ -516,7 +501,6 @@ def build_estimates_html_table(
                             eid,
                             num_label,
                             extra_class="ips-dash-est-num-link",
-                            bridge_key=bridge_key,
                         ),
                         extra_class="ips-dash-est-num-cell",
                     ),
@@ -529,7 +513,6 @@ def build_estimates_html_table(
                             eid,
                             title_label,
                             extra_class="ips-dash-est-desc-link",
-                            bridge_key=bridge_key,
                         ),
                         extra_class="ips-dash-est-desc-cell",
                     ),
@@ -637,30 +620,6 @@ def handle_estimates_table_action(
     ips_app_rerun()
 
 
-def render_estimates_table_open_buttons(
-    estimates: list[dict[str, Any]],
-    *,
-    open_estimate_fn: Callable[[str, dict[str, Any] | None], None],
-) -> None:
-    """Hidden Streamlit buttons — HTML link clicks trigger these via the bridge script."""
-    with st.container(key="estimates_open_button_harness"):
-        for est in estimates:
-            eid = str(est.get("id") or "").strip()
-            if not eid:
-                continue
-            bridge_key = estimates_bridge_button_key(est)
-
-            def _open(_eid: str = eid, _est: dict = est) -> None:
-                open_estimate_fn(_eid, _est)
-
-            st.button(
-                "Open estimate",
-                key=bridge_key,
-                type="tertiary",
-                on_click=_open,
-            )
-
-
 def render_estimates_table_bridge(
     estimates_by_id: dict[str, dict[str, Any]],
     *,
@@ -682,8 +641,7 @@ def render_estimates_table_bridge(
   const doc = w.document;
   const hookKey = {hook_key!r};
   const wrapSel = {wrap_sel!r};
-  const openLinkSel = wrapSel + " [data-est-open='1'][data-estimate-id]";
-  const actionSel = wrapSel + " [data-estimate-id][data-est-action]";
+  const actionSel = wrapSel + " [data-estimate-id][data-est-action='approve']";
 
   function sendValue(action) {{
     const payload = {{ type: "streamlit:setComponentValue", value: action }};
@@ -703,37 +661,9 @@ def render_estimates_table_bridge(
     }}
   }}
 
-  function clickBridgeButton(bridgeKey) {{
-    if (!bridgeKey) return false;
-    const host = doc.querySelector(".st-key-" + bridgeKey);
-    const btn = host && host.querySelector('[data-testid="stButton"] > button');
-    if (!btn) return false;
-    btn.click();
-    return true;
-  }}
-
-  function openEstimate(el, e) {{
-    if (!el) return;
-    const id = el.getAttribute("data-estimate-id");
-    if (!id) return;
-    if (e) {{
-      e.preventDefault();
-      e.stopPropagation();
-    }}
-    sendValue("open:" + id);
-  }}
-
   function bindTargets() {{
     const wrap = doc.querySelector(wrapSel);
     if (!wrap) return;
-    wrap.querySelectorAll(openLinkSel).forEach(function (el) {{
-      if (el.dataset.ipsEstOpenBound === "1") return;
-      el.dataset.ipsEstOpenBound = "1";
-      el.addEventListener("click", function (e) {{ openEstimate(el, e); }}, true);
-      el.addEventListener("keydown", function (e) {{
-        if (e.key === "Enter" || e.key === " ") openEstimate(el, e);
-      }}, true);
-    }});
     wrap.querySelectorAll(actionSel).forEach(function (el) {{
       if (el.dataset.ipsEstTableBound === "1") return;
       el.dataset.ipsEstTableBound = "1";
@@ -741,9 +671,8 @@ def render_estimates_table_bridge(
         e.preventDefault();
         e.stopPropagation();
         const id = el.getAttribute("data-estimate-id");
-        const action = el.getAttribute("data-est-action") || "open";
         if (!id) return;
-        sendValue(action + ":" + id);
+        sendValue("approve:" + id);
       }}, true);
     }});
   }}
@@ -760,18 +689,12 @@ def render_estimates_table_bridge(
         if (!currentWrapSel) continue;
         const wrap = doc.querySelector(currentWrapSel);
         if (!wrap || !wrap.contains(t)) continue;
-        const openLink = t.closest("[data-est-open='1'][data-estimate-id]");
-        if (openLink && wrap.contains(openLink)) {{
-          openEstimate(openLink, e);
-          return;
-        }}
-        const actionEl = t.closest("[data-estimate-id][data-est-action]");
+        const actionEl = t.closest("[data-estimate-id][data-est-action='approve']");
         if (actionEl && wrap.contains(actionEl)) {{
           e.preventDefault();
           e.stopPropagation();
           const id = actionEl.getAttribute("data-estimate-id");
-          const action = actionEl.getAttribute("data-est-action") || "open";
-          if (id) sendValue(action + ":" + id);
+          if (id) sendValue("approve:" + id);
           return;
         }}
       }}

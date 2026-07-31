@@ -42,14 +42,13 @@ class TestEstimatesDirectoryService(unittest.TestCase):
 
 class TestEstimatesNativeLinks(unittest.TestCase):
     def test_estimate_list_link_html_uses_native_anchor(self) -> None:
-        html_out = estimate_list_link_html("e-123", "Q-123", bridge_key="est_bridge_open_e_123")
+        html_out = estimate_list_link_html("e-123", "Q-123")
         assert "<a " in html_out
         assert 'target="_self"' in html_out
         assert "estimate_detail=e-123" in html_out
         assert "ips_nav=estimates" in html_out
-        assert 'data-estimate-id="e-123"' in html_out
-        assert 'data-est-open="1"' in html_out
-        assert 'data-bridge-key="est_bridge_open_e_123"' in html_out
+        assert 'data-est-open="1"' not in html_out
+        assert "data-bridge-key" not in html_out
 
     def test_estimate_detail_href_encodes_tab(self) -> None:
         href = estimate_detail_href("id/with space", tab="materials")
