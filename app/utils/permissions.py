@@ -157,8 +157,9 @@ def normalize_role(raw: str) -> str:
 
 def role_can_access_page(role: str, page_slug: str) -> bool:
     norm = normalize_role(role)
+    slug = str(page_slug or "").strip().lower().replace(" ", "_").replace("-", "_")
     allowed = _ROLE_PAGES.get(norm, _ROLE_PAGES["viewer"])
-    return page_slug in allowed
+    return slug in allowed
 
 
 def can_view_hr_documents(role: str) -> bool:

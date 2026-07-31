@@ -104,6 +104,12 @@ def render() -> None:
     if not begin_module("dashboard"):
         return
 
+    from app.utils.view_as import IPS_NAV_BLOCK_KEY
+
+    nav_block = str(st.session_state.pop(IPS_NAV_BLOCK_KEY, "") or "").strip()
+    if nav_block:
+        st.warning(nav_block)
+
     ctx = _build_render_context()
     profile = current_profile() or {}
     role = effective_role()

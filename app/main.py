@@ -241,6 +241,9 @@ def main() -> None:
     inject_page_loading_indicator()
     from app.auth import render_auth_identity_debug_panel, verify_identity_binding_or_stop
     verify_identity_binding_or_stop()
+    from app.auth import _ensure_auth_employee_attached
+
+    _ensure_auth_employee_attached()
     log_auth_state("app_authenticated")
 
     from app.components.sidebar_shell import (
@@ -290,10 +293,13 @@ def main() -> None:
     slug = current_nav_slug()
     st.session_state[SESSION_NAV_KEY] = slug
 
-    from app.utils.view_as import ensure_view_as_navigation, is_view_as_mobile_preview
+    from app.utils.view_as import ensure_view_as_navigation, is_view_as_active, is_view_as_mobile_preview, render_view_as_banner
     ensure_view_as_navigation()
     slug = current_nav_slug()
     st.session_state[SESSION_NAV_KEY] = slug
+
+    if is_view_as_active() and not is_view_as_mobile_preview():
+        render_view_as_banner()
 
     render_sidebar(slug)
     inject_sidebar_shell()

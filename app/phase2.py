@@ -126,20 +126,29 @@ def render_module(slug: str | None = None) -> None:
     if not role_can_access_page(role, active):
         from app.navigation import default_nav_slug, set_nav_slug
         from app.utils.permissions import normalize_role
+        from app.utils.view_as import IPS_NAV_BLOCK_KEY, is_view_as_active, view_as_display_label
 
         norm = normalize_role(role)
         page_label = str(active or "").replace("_", " ").strip().title() or "this page"
         role_label = norm.replace("_", " ").title()
-        fallback = default_nav_slug()
-        if active != fallback and role_can_access_page(role, fallback):
-            st.warning(
-                f"You do not have access to **{page_label}** with your current role "
+        if is_view_as_active():
+            block_reason = (
+                f"Preview mode is active ({view_as_display_label()}). "
+                f"{page_label} is not available for the {role_label} role."
+            )
+        else:
+            block_reason = (
+                f"You do not have access to {page_label} with your current role "
                 f"({role_label}). Contact an administrator if this seems wrong."
             )
+        st.session_state[IPS_NAV_BLOCK_KEY] = block_reason
+        fallback = default_nav_slug()
+        if active != fallback and role_can_access_page(role, fallback):
+            st.warning(block_reason)
             set_nav_slug(fallback)
             st.rerun()
             return
-        st.error(f"You do not have access to {page_label}.")
+        st.error(block_reason)
         return
 
     from app.pages._core._access import clear_demo_flag, end_module, show_demo_banner_if_needed

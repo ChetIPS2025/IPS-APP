@@ -500,17 +500,73 @@ def _reload_profile_for_user_id(uid: str) -> dict[str, Any] | None:
     return _fetch_profile_for_auth_user_id(uid)
 
 
+def _lookup_linked_employee(profile: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    """Find the employees row linked to the signed-in profile."""
+    from app.db import fetch_by_match_admin, fetch_one
+
+    prof = profile if isinstance(profile, dict) else _loaded_session_profile()
+    cached = st.session_state.get("auth_employee")
+    if isinstance(cached, dict) and cached.get("id"):
+        return dict(cached)
+
+    emp_id = str(prof.get("employee_id") or "").strip()
+    if emp_id:
+        try:
+            row = fetch_one("employees", {"id": emp_id})
+            if row:
+                return dict(row)
+        except Exception:
+            pass
+
+    auth_uid = str(
+        prof.get("id")
+        or prof.get("user_id")
+        or st.session_state.get(AUTH_USER_ID_KEY)
+        or st.session_state.get(CURRENT_USER_ID_KEY)
+        or ""
+    ).strip()
+    if auth_uid:
+        try:
+            rows = fetch_by_match_admin(
+                "employees",
+                {"auth_user_id": auth_uid},
+                columns="id,email,name,role,trade,position,profile_id,auth_user_id,status,is_active",
+                limit=1,
+            ) or []
+            if rows:
+                return dict(rows[0])
+        except Exception:
+            pass
+
+    email = str(prof.get("email") or st.session_state.get(AUTH_EMAIL_KEY) or "").strip().lower()
+    if email:
+        try:
+            rows = fetch_by_match_admin(
+                "employees",
+                {"email": email},
+                columns="id,email,name,role,trade,position,profile_id,auth_user_id,status,is_active",
+                limit=1,
+            ) or []
+            if rows:
+                return dict(rows[0])
+        except Exception:
+            pass
+    return None
+
+
 def _attach_employee_for_profile(profile: dict[str, Any]) -> None:
-    st.session_state["auth_employee"] = None
-    emp_id = str(profile.get("employee_id") or "").strip()
-    if not emp_id:
+    emp = _lookup_linked_employee(profile)
+    st.session_state["auth_employee"] = emp
+
+
+def _ensure_auth_employee_attached() -> None:
+    """Keep linked employee data available for permission fallback on cached sessions."""
+    if isinstance(st.session_state.get("auth_employee"), dict):
         return
-    try:
-        emp = fetch_one("employees", {"id": emp_id})
-        if emp:
-            st.session_state["auth_employee"] = emp
-    except Exception:
-        st.session_state["auth_employee"] = None
+    prof = _loaded_session_profile()
+    if not prof:
+        return
+    _attach_employee_for_profile(prof)
 
 
 def ensure_authenticated_user_identity(
@@ -558,6 +614,7 @@ def ensure_authenticated_user_identity(
         )
 
         if not need_live and not force_profile_reload:
+            _ensure_auth_employee_attached()
             sync_auth_flags()
             return True
 
@@ -617,6 +674,7 @@ def ensure_authenticated_user_identity(
 
         st.session_state["auth_user"] = live_user
         st.session_state["user"] = live_user
+        _ensure_auth_employee_attached()
         _sync_current_user_snapshot(prof, auth_user_id=live_uid)
         sync_auth_flags()
         return True
@@ -1229,8 +1287,10 @@ def _normalized_role_from_session() -> str:
     if norm not in {"viewer", "employee"}:
         return norm
 
-    emp = st.session_state.get("auth_employee")
-    if not isinstance(emp, dict) or not emp:
+    emp = _lookup_linked_employee(prof)
+    if emp:
+        st.session_state["auth_employee"] = emp
+    else:
         return norm
 
     permission_role, _billing = resolve_employee_roles(emp)

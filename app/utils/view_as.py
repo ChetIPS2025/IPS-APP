@@ -91,18 +91,32 @@ def _clear_view_as_picker_widgets() -> None:
         st.session_state.pop(f"ips_view_as_picker_sync_{suffix}", None)
 
 
+IPS_NAV_BLOCK_KEY = "ips_nav_block_reason"
+
+
 def ensure_view_as_navigation() -> None:
     """Keep admins on pages allowed by the active preview role."""
+    if st.session_state.get(IPS_VIEW_AS_ACTIVE_KEY) and not is_real_admin():
+        clear_view_as()
+        return
     if not is_view_as_active():
         return
     from app.navigation import current_nav_slug, default_nav_slug, set_nav_slug
-    from app.utils.permissions import role_can_access_page
+    from app.utils.permissions import normalize_role, role_can_access_page
+
     slug = current_nav_slug()
     role = ui_role()
     if role_can_access_page(role, slug):
         return
     target = default_nav_slug()
+    page_label = str(slug or "").replace("_", " ").strip().title() or "this page"
+    role_label = normalize_role(role).replace("_", " ").title()
+    st.session_state[IPS_NAV_BLOCK_KEY] = (
+        f"Preview mode is active ({view_as_display_label()}). "
+        f"{page_label} is not available for the {role_label} role."
+    )
     if slug != target and role_can_access_page(role, target):
+        st.warning(st.session_state[IPS_NAV_BLOCK_KEY])
         set_nav_slug(target)
         st.rerun()
 

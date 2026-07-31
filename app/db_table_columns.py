@@ -327,6 +327,8 @@ PROFILES_COLUMNS = _cols(
     "email",
     "full_name",
     "role",
+    "employee_id",
+    "must_reset_password",
     "is_active",
     "phone",
     "created_at",
