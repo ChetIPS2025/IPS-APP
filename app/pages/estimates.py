@@ -33,6 +33,7 @@ from app.pages.estimate_builder_ui import (
     render_equipment_tab,
     render_labor_tab,
     render_other_costs_tab,
+    render_proposal_preview_tab,
     render_scope_of_work_tab,
     render_subcontractors_tab,
     render_summary_tab,
@@ -149,6 +150,7 @@ _ESTIMATE_DETAIL_TABS = [
     "Subcontractors",
     "Other Costs",
     "Summary",
+    "Proposal",
     "Documents",
 ]
 _PENDING_APPROVE_KEY = "est_pending_approve_id"
@@ -556,6 +558,8 @@ def _set_estimate_detail_tab_from_query(tab: str) -> None:
         "subcontractors": "Subcontractors",
         "other costs": "Other Costs",
         "summary": "Summary",
+        "proposal": "Proposal",
+        "quote": "Proposal",
         "documents": "Documents",
     }
     resolved = alias.get(raw.lower(), raw)
@@ -1441,6 +1445,16 @@ def _render_estimate_detail_tabs(est: dict) -> None:
 
     elif active_tab == "Summary":
         render_summary_tab(est)
+
+    elif active_tab == "Proposal":
+        st.caption(
+            "Preview and download the IPS customer quote letter. Uses scope, customer info, "
+            "and rolled-up totals from the cost tabs — not individual line items."
+        )
+        if eid and not is_demo_id(eid):
+            render_proposal_preview_tab(est)
+        else:
+            placeholder_html("Save this estimate to preview and export the customer quote.")
 
     elif active_tab == "Documents":
         _render_estimate_documents_tab(est)
