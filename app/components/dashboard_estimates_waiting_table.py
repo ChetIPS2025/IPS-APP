@@ -11,6 +11,7 @@ from app.components.estimates_list_table import (
     build_estimates_html_table,
     filter_waiting_approval_rows,
     render_estimates_table_bridge,
+    render_estimates_table_open_buttons,
 )
 _EST_WAITING_LAST_KEY = "_ips_dash_est_waiting_last"
 
@@ -57,9 +58,18 @@ def render_dashboard_estimates_waiting_table(
             build_estimates_html_table(waiting, approve_flags=approve_flags),
             unsafe_allow_html=True,
         )
+
+        def _open_waiting_estimate(eid: str, est: dict | None) -> None:
+            from app.navigation import navigate_to_estimate_detail
+
+            navigate_to_estimate_detail(eid)
+
+        render_estimates_table_open_buttons(waiting, open_estimate_fn=_open_waiting_estimate)
         render_estimates_table_bridge(
             estimates_by_id,
             component_key="ips_dash_est_waiting_bridge",
             hook_key="ipsDashEstWaiting::action",
             last_action_key=_EST_WAITING_LAST_KEY,
+            open_estimate_fn=_open_waiting_estimate,
+            table_wrap_key="dashboard_estimates_waiting_table",
         )

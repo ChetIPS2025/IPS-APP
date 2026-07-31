@@ -74,6 +74,7 @@ from app.components.estimates_list_table import (
     filter_waiting_approval_rows,
     open_estimate_detail,
     render_estimates_table_bridge,
+    render_estimates_table_open_buttons,
 )
 from app.components.headers import render_page_brand_header
 from app.components.layout import render_filter_bar as layout_filter_bar
@@ -727,13 +728,17 @@ def _render_custom_estimates_table(
             ),
             unsafe_allow_html=True,
         )
+        render_estimates_table_open_buttons(
+            filtered,
+            open_estimate_fn=_prepare_open_estimate_table_row,
+        )
         render_estimates_table_bridge(
             estimates_by_id,
             component_key="ips_estimates_list_bridge",
             hook_key="ipsEstList::action",
             last_action_key=ESTIMATES_TABLE_LAST_ACTION_KEY,
             pending_approve_key=_PENDING_APPROVE_KEY,
-            open_estimate_fn=None,
+            open_estimate_fn=_prepare_open_estimate_table_row,
         )
 
     return all_estimate_ids

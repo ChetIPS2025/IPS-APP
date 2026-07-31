@@ -206,6 +206,7 @@ def estimate_list_link_html(
     label: str,
     *,
     extra_class: str = "",
+    bridge_key: str = "",
 ) -> str:
     eid = str(estimate_id or "").strip()
     text = html.escape(label)
@@ -214,15 +215,24 @@ def estimate_list_link_html(
     est_id = html.escape(eid, quote=True)
     cls = f"ips-row-open-link ips-dash-est-link ips-estimates-list-link ips-estimates-open-link {extra_class}".strip()
     aria = html.escape(f"Open estimate details for {label}", quote=True)
+    bridge_attr = ""
+    if bridge_key:
+        bridge_attr = f' data-bridge-key="{html.escape(str(bridge_key).strip(), quote=True)}"'
     return (
         f'<a class="{html.escape(cls)}" href="{href}" target="_self" '
-        f'data-estimate-id="{est_id}" data-est-action="open" '
+        f'data-estimate-id="{est_id}" data-est-open="1"{bridge_attr} '
         f'aria-label="{aria}" title="{title}">{text}</a>'
     )
 
 
-def _estimate_link_html(eid: str, label: str, *, extra_class: str = "") -> str:
-    return estimate_list_link_html(eid, label, extra_class=extra_class)
+def _estimate_link_html(
+    eid: str,
+    label: str,
+    *,
+    extra_class: str = "",
+    bridge_key: str = "",
+) -> str:
+    return estimate_list_link_html(eid, label, extra_class=extra_class, bridge_key=bridge_key)
 
 
 def _actions_html(eid: str, *, show_approve: bool, show_approved_label: bool) -> str:
@@ -429,6 +439,7 @@ def build_estimates_html_table(
         num_label = est_no if est_no and est_no != "—" else "Open estimate"
         title_label = project if project and project != "—" else "Open estimate"
         row_parity = "even" if row_idx % 2 else "odd"
+        bridge_key = estimates_bridge_button_key(est)
 
         if layout == "list":
             cells = [
@@ -440,6 +451,7 @@ def build_estimates_html_table(
                             eid,
                             num_label,
                             extra_class="ips-dash-est-num-link",
+                            bridge_key=bridge_key,
                         ),
                         extra_class="ips-dash-est-num-cell",
                     ),
@@ -452,6 +464,7 @@ def build_estimates_html_table(
                             eid,
                             title_label,
                             extra_class="ips-dash-est-desc-link",
+                            bridge_key=bridge_key,
                         ),
                         extra_class="ips-dash-est-desc-cell",
                     ),
@@ -499,7 +512,12 @@ def build_estimates_html_table(
                     "num",
                     "left",
                     _cell_wrapper(
-                        _estimate_link_html(eid, num_label, extra_class="ips-dash-est-num-link"),
+                        _estimate_link_html(
+                            eid,
+                            num_label,
+                            extra_class="ips-dash-est-num-link",
+                            bridge_key=bridge_key,
+                        ),
                         extra_class="ips-dash-est-num-cell",
                     ),
                 ),
@@ -507,7 +525,12 @@ def build_estimates_html_table(
                     "desc",
                     "left",
                     _cell_wrapper(
-                        _estimate_link_html(eid, title_label, extra_class="ips-dash-est-desc-link"),
+                        _estimate_link_html(
+                            eid,
+                            title_label,
+                            extra_class="ips-dash-est-desc-link",
+                            bridge_key=bridge_key,
+                        ),
                         extra_class="ips-dash-est-desc-cell",
                     ),
                 ),
@@ -629,6 +652,7 @@ def render_estimates_table_open_buttons(
 
             def _open(_eid: str = eid, _est: dict = est) -> None:
                 open_estimate_fn(_eid, _est)
+                ips_app_rerun()
 
             st.button(
                 "Open estimate",
@@ -646,8 +670,11 @@ def render_estimates_table_bridge(
     last_action_key: str,
     pending_approve_key: str = "est_pending_approve_id",
     open_estimate_fn: Callable[[str, dict[str, Any] | None], None] | None = None,
+    table_wrap_key: str = "estimates_table_wrap",
 ) -> None:
     from app.ui.clean_table import _components_html
+
+    wrap_sel = f".st-key-{table_wrap_key}"
     picked = _components_html(
         f"""
 <script>
@@ -655,7 +682,9 @@ def render_estimates_table_bridge(
   const w = window.parent || window;
   const doc = w.document;
   const hookKey = {hook_key!r};
-  const sel = "[data-estimate-id][data-est-action]";
+  const wrapSel = {wrap_sel!r};
+  const openLinkSel = wrapSel + " [data-est-open='1'][data-estimate-id]";
+  const actionSel = wrapSel + " [data-estimate-id][data-est-action]";
 
   function sendValue(action) {{
     const payload = {{ type: "streamlit:setComponentValue", value: action }};
@@ -675,8 +704,40 @@ def render_estimates_table_bridge(
     }}
   }}
 
+  function clickBridgeButton(bridgeKey) {{
+    if (!bridgeKey) return false;
+    const host = doc.querySelector(".st-key-" + bridgeKey);
+    const btn = host && host.querySelector('[data-testid="stButton"] > button');
+    if (!btn) return false;
+    btn.click();
+    return true;
+  }}
+
+  function openEstimate(el, e) {{
+    if (!el) return;
+    const id = el.getAttribute("data-estimate-id");
+    if (!id) return;
+    if (e) {{
+      e.preventDefault();
+      e.stopPropagation();
+    }}
+    const bridgeKey = el.getAttribute("data-bridge-key");
+    if (bridgeKey && clickBridgeButton(bridgeKey)) return;
+    sendValue("open:" + id);
+  }}
+
   function bindTargets() {{
-    doc.querySelectorAll(sel).forEach(function (el) {{
+    const wrap = doc.querySelector(wrapSel);
+    if (!wrap) return;
+    wrap.querySelectorAll(openLinkSel).forEach(function (el) {{
+      if (el.dataset.ipsEstOpenBound === "1") return;
+      el.dataset.ipsEstOpenBound = "1";
+      el.addEventListener("click", function (e) {{ openEstimate(el, e); }}, true);
+      el.addEventListener("keydown", function (e) {{
+        if (e.key === "Enter" || e.key === " ") openEstimate(el, e);
+      }}, true);
+    }});
+    wrap.querySelectorAll(actionSel).forEach(function (el) {{
       if (el.dataset.ipsEstTableBound === "1") return;
       el.dataset.ipsEstTableBound = "1";
       el.addEventListener("click", function (e) {{
@@ -686,12 +747,42 @@ def render_estimates_table_bridge(
         const action = el.getAttribute("data-est-action") || "open";
         if (!id) return;
         sendValue(action + ":" + id);
-      }});
+      }}, true);
     }});
   }}
 
+  if (!doc.ipsEstTableDocClick) {{
+    doc.ipsEstTableDocClick = true;
+    doc.addEventListener("click", function (e) {{
+      const t = e.target;
+      if (!t || !t.closest) return;
+      const registries = Object.values(doc.ipsEstTableRegistry || {{}});
+      for (var i = 0; i < registries.length; i++) {{
+        const cfg = registries[i];
+        const currentWrapSel = cfg && cfg.wrapSel;
+        if (!currentWrapSel) continue;
+        const wrap = doc.querySelector(currentWrapSel);
+        if (!wrap || !wrap.contains(t)) continue;
+        const openLink = t.closest("[data-est-open='1'][data-estimate-id]");
+        if (openLink && wrap.contains(openLink)) {{
+          openEstimate(openLink, e);
+          return;
+        }}
+        const actionEl = t.closest("[data-estimate-id][data-est-action]");
+        if (actionEl && wrap.contains(actionEl)) {{
+          e.preventDefault();
+          e.stopPropagation();
+          const id = actionEl.getAttribute("data-estimate-id");
+          const action = actionEl.getAttribute("data-est-action") || "open";
+          if (id) sendValue(action + ":" + id);
+          return;
+        }}
+      }}
+    }}, true);
+  }}
+
   if (!doc.ipsEstTableRegistry) doc.ipsEstTableRegistry = {{}};
-  doc.ipsEstTableRegistry[hookKey] = {{ bind: bindTargets }};
+  doc.ipsEstTableRegistry[hookKey] = {{ bind: bindTargets, wrapSel: wrapSel }};
   bindTargets();
   if (!doc.ipsEstTableBindObserver) {{
     doc.ipsEstTableBindObserver = new MutationObserver(function () {{
