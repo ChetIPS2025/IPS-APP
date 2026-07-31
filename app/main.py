@@ -185,16 +185,34 @@ def capture_legacy_page_query() -> None:
 
 
 def _render_nav_block_notice() -> None:
-    from app.navigation import current_nav_slug
+    from app.auth import current_role
+    from app.navigation import IPS_NAV_INTENT_KEY, IPS_NAV_RETRY_KEY, current_nav_slug, normalize_nav_slug, navigate_module
+    from app.utils.permissions import normalize_role
     from app.utils.view_as import IPS_NAV_BLOCK_KEY
 
     nav_block = str(st.session_state.get(IPS_NAV_BLOCK_KEY) or "").strip()
     if nav_block:
         st.warning(nav_block)
-    denial = st.session_state.get("ips_last_nav_denial")
-    from app.navigation import IPS_NAV_INTENT_KEY
 
     intent = str(st.session_state.get(IPS_NAV_INTENT_KEY) or "").strip()
+    current = current_nav_slug()
+    target = normalize_nav_slug(intent) if intent else current
+    if intent and target != current:
+        retries = int(st.session_state.get(IPS_NAV_RETRY_KEY) or 0)
+        if retries < 2:
+            st.session_state[IPS_NAV_RETRY_KEY] = retries + 1
+            navigate_module(intent)
+        else:
+            st.error(
+                f"Could not open **{target.replace('_', ' ').title()}** "
+                f"(still on **{current.replace('_', ' ').title()}**). "
+                f"Signed-in role: **{normalize_role(current_role()).replace('_', ' ').title()}**. "
+                f"Try a hard refresh (Ctrl+F5) or sign out and back in."
+            )
+            st.session_state.pop(IPS_NAV_RETRY_KEY, None)
+            return
+
+    denial = st.session_state.get("ips_last_nav_denial")
     if (
         isinstance(denial, dict)
         and str(denial.get("requested") or "") == "timekeeping"
@@ -318,6 +336,10 @@ def main() -> None:
     apply_pending_navigation()
     capture_nav_slug_from_query()
     capture_legacy_page_query()
+
+    from app.navigation import reconcile_nav_intent
+
+    reconcile_nav_intent()
 
     from app.auth import is_authenticated as _auth_check
     from app.navigation import (

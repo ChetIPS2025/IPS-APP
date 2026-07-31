@@ -13,15 +13,17 @@ from app.pages._core._data import load_recent_qr_scans, load_tasks
 from app.services.management_reminders_service import due_date_badge, filter_dashboard_reminders
 from app.utils.formatting import fmt_date
 def _nav_slug(slug: str) -> None:
-    from app.navigation import set_nav_slug
-    set_nav_slug(slug)
-    st.rerun()
+    from app.navigation import navigate_module
+
+    navigate_module(slug)
 
 
 def _nav_job_costing() -> None:
     from app.navigation import open_jobs_job_costing
+    from app.ui.streamlit_perf import ips_app_rerun
+
     open_jobs_job_costing()
-    st.rerun()
+    ips_app_rerun()
 
 
 def _priority_badge(priority: object) -> str:

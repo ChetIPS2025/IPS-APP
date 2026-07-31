@@ -153,7 +153,9 @@ def render_module(slug: str | None = None) -> None:
         fallback = default_nav_slug()
         if active != fallback and role_can_access_page(role, fallback):
             set_nav_slug(fallback)
-            st.rerun()
+            from app.ui.streamlit_perf import ips_app_rerun
+
+            ips_app_rerun()
             return
         st.error(block_reason)
         return

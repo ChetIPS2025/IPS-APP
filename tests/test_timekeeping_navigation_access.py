@@ -35,6 +35,14 @@ class TestTimekeepingNavigationAccess(unittest.TestCase):
         self.assertEqual(st.session_state[SESSION_NAV_KEY], "timekeeping")
         self.assertEqual(st.session_state[IPS_NAV_INTENT_KEY], "timekeeping")
 
+    def test_reconcile_nav_intent_restores_lost_slug(self) -> None:
+        from app.navigation import IPS_NAV_INTENT_KEY, reconcile_nav_intent
+
+        st.session_state[IPS_NAV_INTENT_KEY] = "timekeeping"
+        st.session_state[SESSION_NAV_KEY] = "dashboard"
+        reconcile_nav_intent()
+        self.assertEqual(st.session_state[SESSION_NAV_KEY], "timekeeping")
+
     def test_query_capture_accepts_time_reports_alias(self) -> None:
         from app.components.sidebar_shell import capture_nav_slug_from_query
 

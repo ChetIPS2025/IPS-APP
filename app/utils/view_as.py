@@ -118,7 +118,9 @@ def ensure_view_as_navigation() -> None:
     if slug != target and role_can_access_page(role, target):
         st.warning(st.session_state[IPS_NAV_BLOCK_KEY])
         set_nav_slug(target)
-        st.rerun()
+        from app.ui.streamlit_perf import ips_app_rerun
+
+        ips_app_rerun()
 
 
 def set_view_as(mode: str) -> None:

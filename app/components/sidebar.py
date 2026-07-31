@@ -18,7 +18,7 @@ from app.components.sidebar_shell import (
     store_sidebar_nav_fallback,
 )
 from app.config import APP_VERSION
-from app.navigation import set_nav_slug
+from app.navigation import navigate_module, set_nav_slug
 from app.utils.constants import EMPLOYEE_NAV_PAGES, FIELD_NAV_PAGES, NAV_PAGES
 from app.utils.permissions import (
     filter_employee_nav_for_role,
@@ -189,10 +189,8 @@ def _render_sidebar_body(active_slug: str) -> None:
                 type="secondary",
                 help=label,
             ):
-                if not is_active or slug in _SCAN_SLUGS:
-                    set_nav_slug(slug)
-                    request_sidebar_collapse_after_nav()
-                    st.rerun()
+                navigate_module(slug)
+                request_sidebar_collapse_after_nav()
 
         st.markdown(f'<{_OT} class="ips-sidebar-footer sidebar-footer">', unsafe_allow_html=True)
 
@@ -208,9 +206,10 @@ def _render_sidebar_body(active_slug: str) -> None:
             if fm != field_mode:
                 st.session_state["ips_field_mode"] = fm
                 if fm and role_can_access_page(role, "field_dashboard"):
-                    set_nav_slug("field_dashboard")
-                request_sidebar_collapse_after_nav()
-                st.rerun()
+                    navigate_module("field_dashboard")
+                else:
+                    request_sidebar_collapse_after_nav()
+                    st.rerun()
 
         name = html.escape(current_user_display_name())
         role_lbl = html.escape(role.replace("_", " ").title())

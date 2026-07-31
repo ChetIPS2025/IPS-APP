@@ -215,6 +215,13 @@ def capture_nav_slug_from_query() -> None:
         raw = None
     if guard and not raw:
         st.session_state.pop(IPS_NAV_QUERY_APPLIED_KEY, None)
+        from app.navigation import normalize_nav_slug, set_nav_slug
+        from app.utils.constants import SESSION_NAV_KEY
+
+        guarded = normalize_nav_slug(str(guard or ""))
+        current = normalize_nav_slug(str(st.session_state.get(SESSION_NAV_KEY) or ""))
+        if guarded and guarded != current:
+            set_nav_slug(guarded)
         return
     if not raw:
         return
@@ -510,7 +517,7 @@ def _desktop_nav_rail_html(rows: list[dict[str, str]], active_slug: str) -> str:
 
 
 def _desktop_nav_rail_click_script() -> str:
-    """Desktop rail logout fallback when the hidden Streamlit logout button is unavailable."""
+    """Wire desktop rail module links to hidden Streamlit sidebar nav buttons."""
     return """
 <script>
 (function () {
@@ -521,8 +528,33 @@ def _desktop_nav_rail_click_script() -> str:
       return document;
     }
   }
+  function sidebarNavButton(d, slug) {
+    if (!d || !slug) return null;
+    var selectors = [
+      'section[data-testid="stSidebar"] [class*="st-key-nav_' + slug + '"] button',
+      '[data-testid="stSidebar"] [class*="st-key-nav_' + slug + '"] button'
+    ];
+    for (var i = 0; i < selectors.length; i++) {
+      var btn = d.querySelector(selectors[i]);
+      if (btn) return btn;
+    }
+    return null;
+  }
   function wireDesktopNavRail(d) {
     if (!d || !d.body) return;
+    d.querySelectorAll('.ips-desktop-nav-rail__link[data-ips-rail-slug]').forEach(function (link) {
+      if (link.dataset.ipsRailNavWired === '1') return;
+      link.dataset.ipsRailNavWired = '1';
+      link.addEventListener('click', function (ev) {
+        var slug = link.getAttribute('data-ips-rail-slug');
+        if (!slug) return;
+        var btn = sidebarNavButton(d, slug);
+        if (btn) {
+          ev.preventDefault();
+          btn.click();
+        }
+      });
+    });
     d.querySelectorAll('.ips-desktop-nav-rail__link[data-ips-rail-logout="1"]').forEach(function (link) {
       if (link.dataset.ipsRailLogoutWired === '1') return;
       link.dataset.ipsRailLogoutWired = '1';
@@ -548,6 +580,7 @@ def _desktop_nav_rail_click_script() -> str:
   boot();
   setTimeout(boot, 80);
   setTimeout(boot, 400);
+  setTimeout(boot, 1200);
 })();
 </script>
 """

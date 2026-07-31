@@ -351,6 +351,7 @@ def navigate_back() -> None:
 
 
 IPS_NAV_INTENT_KEY = "ips_nav_intent"
+IPS_NAV_RETRY_KEY = "ips_nav_retry_count"
 
 
 def set_nav_slug(slug: str) -> None:
@@ -375,6 +376,27 @@ def set_nav_slug(slug: str) -> None:
     new_slug = normalize_nav_slug(raw)
     _record_nav_history(prev, new_slug)
     st.session_state[SESSION_NAV_KEY] = new_slug
+
+
+def navigate_module(slug: str) -> None:
+    """Switch modules with a full app rerun (required when triggered from fragments)."""
+    set_nav_slug(slug)
+    from app.ui.streamlit_perf import ips_app_rerun
+
+    ips_app_rerun()
+
+
+def reconcile_nav_intent() -> None:
+    """Re-apply the last requested module when session navigation was lost between reruns."""
+    intent_raw = str(st.session_state.get(IPS_NAV_INTENT_KEY) or "").strip()
+    if not intent_raw:
+        return
+    target = normalize_nav_slug(intent_raw)
+    current = normalize_nav_slug(str(st.session_state.get(SESSION_NAV_KEY) or ""))
+    if target == current:
+        st.session_state.pop(IPS_NAV_RETRY_KEY, None)
+        return
+    set_nav_slug(target)
 
 
 def ensure_nav_defaults() -> None:
@@ -406,6 +428,7 @@ __all__ = [
     "INVENTORY_SCAN_EMBED_KEY",
     "ESTIMATE_DETAIL_TAB_KEY",
     "IPS_NAV_INTENT_KEY",
+    "IPS_NAV_RETRY_KEY",
     "IPS_NAV_PENDING_KEY",
     "IPS_NAV_HISTORY_KEY",
     "JC_FOCUS_JOB_KEY",
@@ -425,7 +448,9 @@ __all__ = [
     "navigate_to_timekeeping",
     "navigate_to_weekly_timesheet",
     "navigate_back",
+    "navigate_module",
     "normalize_nav_slug",
+    "reconcile_nav_intent",
     "on_nav_change",
     "open_jobs_job_costing",
     "open_jobs_weekly_timesheets",
